@@ -573,13 +573,33 @@ const TournamentDetail = () => {
       toast.success("Avanço automático realizado!");
     }
 
-    // Check if all GROUP stage matches are completed -> auto-generate knockout
-    const groupMatches = matches.filter((m) => m.round === 0);
-    const allGroupsDone = groupMatches.length > 0 && groupMatches.every((m) => m.id === matchId ? true : m.status === "completed");
-    const knockoutExists = matches.some((m) => m.round > 0);
+    // Re-fetch matches from DB to get fresh state after update
+    const { data: freshMatches } = await organizerQuery({
+      table: "matches",
+      operation: "select",
+      filters: { tournament_id: id },
+      order: [{ column: "round" }, { column: "position" }],
+    });
 
-    if (allGroupsDone && !knockoutExists && match.round === 0) {
-      await generateKnockoutFromGroups();
+    if (freshMatches) {
+      const groupMatches = freshMatches.filter((m: any) => m.round === 0);
+      const allGroupsDone = groupMatches.length > 0 && groupMatches.every((m: any) => m.status === "completed");
+      const knockoutExists = freshMatches.some((m: any) => m.round > 0);
+
+      if (allGroupsDone && !knockoutExists && match.round === 0) {
+        await generateKnockoutFromGroups();
+      }
+
+      // Check if ALL tournament matches are completed (knockout included)
+      const allDone = freshMatches.every((m: any) => m.status === "completed");
+      if (allDone && freshMatches.some((m: any) => m.round > 0)) {
+        await organizerQuery({
+          table: "tournaments",
+          operation: "update",
+          data: { status: "completed" },
+          filters: { id },
+        });
+      }
     }
 
     fetchData();

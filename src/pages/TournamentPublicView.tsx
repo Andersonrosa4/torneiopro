@@ -8,7 +8,8 @@ import { motion } from "framer-motion";
 import { Trophy, Users, MapPin, Calendar, ArrowLeft } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BracketTreeView from "@/components/BracketTreeView";
-import MatchSequenceTab from "@/components/MatchSequenceTab";
+import MatchSequenceViewer from "@/components/MatchSequenceViewer";
+import ClassificationTab from "@/components/ClassificationTab";
 import RankingsTab from "@/components/RankingsTab";
 import ThemedBackground from "@/components/ThemedBackground";
 
@@ -177,7 +178,13 @@ const TournamentPublicView = () => {
             </TabsContent>
 
             <TabsContent value="sequence">
-              <MatchSequenceTab matches={matches} teams={teams} />
+              <MatchSequenceViewer
+                matches={matches}
+                teams={teams}
+                isOwner={false}
+                onDeclareWinner={() => {}}
+                onUpdateScore={() => {}}
+              />
             </TabsContent>
 
             <TabsContent value="classification">
@@ -186,13 +193,7 @@ const TournamentPublicView = () => {
                   <h2 className="mb-3 text-xl font-semibold flex items-center gap-2">
                     <Trophy className="h-5 w-5" /> Classificação
                   </h2>
-                  <BracketTreeView
-                    matches={matches}
-                    participants={participants}
-                    isOwner={false}
-                    onDeclareWinner={() => {}}
-                    onUpdateScore={() => {}}
-                  />
+                  <ClassificationTab matches={matches} teams={teams} />
                 </section>
               ) : (
                 <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">

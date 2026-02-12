@@ -5,7 +5,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
-import { Plus, Trophy, Users, Calendar, ArrowRight, MapPin, ArrowLeft } from "lucide-react";
+import { Plus, Trophy, Users, Calendar, ArrowRight, MapPin, ArrowLeft, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { organizerQuery } from "@/lib/organizerApi";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AppHeader from "@/components/AppHeader";
 import ThemedBackground from "@/components/ThemedBackground";
@@ -76,6 +79,17 @@ const Dashboard = () => {
     }
   }, [user, isAdmin, organizerId]);
 
+  const deleteTournament = async (tournamentId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    await organizerQuery({ table: "rankings", operation: "delete", filters: { tournament_id: tournamentId } });
+    await organizerQuery({ table: "matches", operation: "delete", filters: { tournament_id: tournamentId } });
+    await organizerQuery({ table: "teams", operation: "delete", filters: { tournament_id: tournamentId } });
+    await organizerQuery({ table: "tournaments", operation: "delete", filters: { id: tournamentId } });
+    setTournaments((prev) => prev.filter((t) => t.id !== tournamentId));
+    toast.success("Torneio excluído!");
+  };
+
   return (
     <ThemedBackground>
       <AppHeader />
@@ -124,11 +138,41 @@ const Dashboard = () => {
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {tournaments.map((t, i) => (
                   <motion.div key={t.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-                    <Link to={`/tournaments/${t.id}`}>
+                    <Link to={`/tournaments/${t.id}`} className="block">
                       <div className="group rounded-xl border border-border bg-card p-5 shadow-card transition-all hover:border-primary/30 hover:shadow-glow">
                         <div className="mb-3 flex items-start justify-between">
                           <h3 className="text-lg font-semibold leading-tight group-hover:text-primary transition-colors">{t.name}</h3>
-                          <Badge className={statusColors[t.status] || ""}>{statusLabels[t.status] || t.status}</Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge className={statusColors[t.status] || ""}>{statusLabels[t.status] || t.status}</Badge>
+                            {(isAdmin || t.created_by === organizerId) && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 w-7 p-0"
+                                    onClick={(e) => e.preventDefault()}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Excluir torneio "{t.name}"?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Esta ação não pode ser desfeita. Todos os dados (duplas, partidas, ranking) serão removidos.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={(e) => deleteTournament(t.id, e)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                      Excluir
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
+                          </div>
                         </div>
                         <div className="mb-2 text-sm">{sportLabels[t.sport] || t.sport}</div>
                         {t.description && (

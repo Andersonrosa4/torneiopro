@@ -183,6 +183,9 @@ const TournamentPublicView = () => {
                 teams={teams}
                 isOwner={false}
                 numSets={tournament?.num_sets || 3}
+                tournamentName={tournament?.name || ""}
+                sport={tournament?.sport || ""}
+                eventDate={tournament?.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
                 onDeclareWinner={() => {}}
                 onUpdateScore={() => {}}
               />
@@ -208,6 +211,8 @@ const TournamentPublicView = () => {
                 tournamentId={id || ""}
                 isOwner={false}
                 sport={tournament.sport}
+                tournamentName={tournament.name}
+                eventDate={tournament.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
               />
             </TabsContent>
           </Tabs>

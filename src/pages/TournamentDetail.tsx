@@ -10,7 +10,8 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Plus, Trash2, Trophy, Users, Shuffle, Copy, Pencil, Check, X, ArrowLeft, Undo2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import AppHeader from "@/components/AppHeader";
 import ThemedBackground from "@/components/ThemedBackground";
 import BracketTreeView from "@/components/BracketTreeView";
@@ -463,6 +464,17 @@ const TournamentDetail = () => {
     });
   };
 
+  const deleteTournament = async () => {
+    if (!id) return;
+    // Delete all related data in order
+    await organizerQuery({ table: "rankings", operation: "delete", filters: { tournament_id: id } });
+    await organizerQuery({ table: "matches", operation: "delete", filters: { tournament_id: id } });
+    await organizerQuery({ table: "teams", operation: "delete", filters: { tournament_id: id } });
+    await organizerQuery({ table: "tournaments", operation: "delete", filters: { id } });
+    toast.success("Torneio excluído com sucesso!");
+    navigate("/dashboard");
+  };
+
   const copyCode = () => {
     if (tournament?.tournament_code) {
       navigator.clipboard.writeText(tournament.tournament_code);
@@ -584,6 +596,29 @@ const TournamentDetail = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {isOwner && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" className="gap-1">
+                      <Trash2 className="h-4 w-4" /> Excluir Torneio
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Tem certeza que deseja excluir este torneio?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Esta ação não pode ser desfeita. Todos os dados relacionados (duplas, chaveamento, partidas, classificação e ranking) serão removidos permanentemente.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={deleteTournament} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                        Excluir
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
               {tournament.tournament_code && (
                 <button
                   onClick={copyCode}
@@ -779,6 +814,9 @@ const TournamentDetail = () => {
                     teams={teams}
                     isOwner={isOwner}
                     numSets={tournament?.num_sets || 3}
+                    tournamentName={tournament?.name || ""}
+                    sport={sportLabels[tournament?.sport] || tournament?.sport || ""}
+                    eventDate={tournament?.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
                     onDeclareWinner={declareWinner}
                     onUpdateScore={updateScore}
                   />
@@ -812,6 +850,8 @@ const TournamentDetail = () => {
                 tournamentId={id || ""}
                 isOwner={isOwner}
                 sport={tournament.sport}
+                tournamentName={tournament.name}
+                eventDate={tournament.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
               />
             </TabsContent>
           </Tabs>

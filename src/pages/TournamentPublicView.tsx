@@ -12,6 +12,7 @@ import MatchSequenceViewer from "@/components/MatchSequenceViewer";
 import ClassificationTab from "@/components/ClassificationTab";
 import RankingsTab from "@/components/RankingsTab";
 import ThemedBackground from "@/components/ThemedBackground";
+import FlowAppsBranding from "@/components/FlowAppsBranding";
 
 const sportLabels: Record<string, string> = {
   beach_volleyball: "Vôlei de Praia",
@@ -220,7 +221,9 @@ const TournamentPublicView = () => {
               />
             </TabsContent>
           </Tabs>
+          <FlowAppsBranding variant="tournament-cta" />
         </motion.div>
+        <FlowAppsBranding variant="internal-footer" />
       </div>
     </ThemedBackground>
   );

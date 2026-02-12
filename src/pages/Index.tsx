@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Trophy } from "lucide-react";
+import FlowAppsBranding from "@/components/FlowAppsBranding";
 import beachVolleyImg from "@/assets/sport-beach-volleyball.jpg";
 import futevoleiImg from "@/assets/sport-futevolei.jpg";
 import beachTennisImg from "@/assets/sport-beach-tennis.jpg";
@@ -124,6 +125,8 @@ const Index = () => {
             Sou atleta → Entrar com código do torneio
           </button>
         </motion.div>
+
+        <FlowAppsBranding variant="home-footer" />
       </div>
     </div>
   );

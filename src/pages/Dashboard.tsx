@@ -58,25 +58,34 @@ const Dashboard = () => {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchTournaments = async () => {
-      let query = supabase
-        .from("tournaments")
-        .select("*")
-        .order("created_at", { ascending: false });
+  const fetchTournaments = async () => {
+    let query = supabase
+      .from("tournaments")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-      // Admin sees ALL tournaments; organizer sees only their own
-      if (!isAdmin) {
-        query = query.eq("created_by", organizerId || "");
-      }
-
-      const { data, error } = await query;
-      if (!error && data) setTournaments(data);
-      setLoading(false);
-    };
-    if (user) {
-      fetchTournaments();
+    if (!isAdmin) {
+      query = query.eq("created_by", organizerId || "");
     }
+
+    const { data, error } = await query;
+    if (!error && data) setTournaments(data);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    if (user) fetchTournaments();
+  }, [user, isAdmin, organizerId]);
+
+  // Realtime: tournaments
+  useEffect(() => {
+    const channel = supabase
+      .channel("dashboard-tournaments-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "tournaments" }, () => {
+        if (user) fetchTournaments();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [user, isAdmin, organizerId]);
 
   const deleteTournament = async (tournamentId: string, e: React.MouseEvent) => {

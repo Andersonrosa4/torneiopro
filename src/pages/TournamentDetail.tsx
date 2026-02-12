@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Plus, Trash2, Trophy, Users, Shuffle, Copy, Pencil, Check, X, ArrowLeft } from "lucide-react";
+import { Plus, Trash2, Trophy, Users, Shuffle, Copy, Pencil, Check, X, ArrowLeft, Undo2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import AppHeader from "@/components/AppHeader";
@@ -101,12 +101,16 @@ const TournamentDetail = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Real-time subscriptions for matches, teams, rankings
   useEffect(() => {
     if (!id) return;
     const channel = supabase
-      .channel(`matches-${id}`)
+      .channel(`tournament-rt-${id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `tournament_id=eq.${id}` }, () => fetchData())
       .on("postgres_changes", { event: "*", schema: "public", table: "teams", filter: `tournament_id=eq.${id}` }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "tournaments" }, (payload) => {
+        if ((payload.new as any)?.id === id) fetchData();
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [id, fetchData]);
@@ -129,7 +133,6 @@ const TournamentDetail = () => {
     if (!id) return;
     const count = Number(fictitiousCount);
     if (count < 1 || count > 64) { toast.error("Quantidade inválida"); return; }
-
     const newTeams = [];
     for (let i = 0; i < count; i++) {
       const num = teams.length + i + 1;
@@ -170,9 +173,7 @@ const TournamentDetail = () => {
     fetchData();
   };
 
-  const cancelEdit = () => {
-    setEditingTeamId(null);
-  };
+  const cancelEdit = () => { setEditingTeamId(null); };
 
   const shuffleTeams = async () => {
     if (!id) return;
@@ -184,13 +185,12 @@ const TournamentDetail = () => {
     fetchData();
   };
 
-  const generateBracket = async (config: { startRound: number; useSeeds: boolean; numSets: number; gamesPerSet?: number }) => {
+  const generateBracket = async (config: { startRound: number; useSeeds: boolean; numSets: number; gamesPerSet?: number; seedTeamIds?: string[] }) => {
     if (!id || !tournament) return;
     if (teams.length < 2) { toast.error("Precisa de pelo menos 2 duplas"); return; }
 
     await supabase.from("matches").delete().eq("tournament_id", id);
 
-    // Update tournament with set config
     await supabase.from("tournaments").update({
       num_sets: config.numSets,
       games_per_set: config.gamesPerSet || null,
@@ -200,7 +200,12 @@ const TournamentDetail = () => {
     const maxRounds = Math.ceil(Math.log2(totalSlots));
 
     let arranged = [...teams];
-    if (config.useSeeds) {
+    if (config.useSeeds && config.seedTeamIds && config.seedTeamIds.length > 0) {
+      // Place seed teams first, then rest randomly
+      const seeds = arranged.filter(t => config.seedTeamIds!.includes(t.id));
+      const nonSeeds = arranged.filter(t => !config.seedTeamIds!.includes(t.id)).sort(() => Math.random() - 0.5);
+      arranged = [...seeds, ...nonSeeds];
+    } else if (config.useSeeds) {
       arranged.sort((a, b) => (a.seed || 0) - (b.seed || 0));
     } else {
       arranged.sort(() => Math.random() - 0.5);
@@ -235,10 +240,49 @@ const TournamentDetail = () => {
       }
     }
 
+    // Auto-advance byes (matches where one team is null)
+    for (const m of newMatches) {
+      if (m.team1_id && !m.team2_id) {
+        m.winner_team_id = m.team1_id;
+        m.status = "completed";
+      } else if (!m.team1_id && m.team2_id) {
+        m.winner_team_id = m.team2_id;
+        m.status = "completed";
+      }
+    }
+
     const { error } = await supabase.from("matches").insert(newMatches);
     if (error) { toast.error(error.message); return; }
+
+    // Advance bye winners to next round
+    const inserted = await supabase.from("matches").select("*").eq("tournament_id", id).order("round").order("position");
+    if (inserted.data) {
+      for (const m of inserted.data) {
+        if (m.winner_team_id && m.status === "completed") {
+          const nextRound = m.round + 1;
+          const nextPosition = Math.ceil(m.position / 2);
+          const isTop = m.position % 2 === 1;
+          const nextMatch = inserted.data.find(
+            (nm: any) => nm.round === nextRound && nm.position === nextPosition
+          );
+          if (nextMatch) {
+            const update = isTop ? { team1_id: m.winner_team_id } : { team2_id: m.winner_team_id };
+            await supabase.from("matches").update(update).eq("id", nextMatch.id);
+          }
+        }
+      }
+    }
+
     await supabase.from("tournaments").update({ status: "in_progress" as const }).eq("id", id);
     toast.success("Chaveamento gerado!");
+    fetchData();
+  };
+
+  const undoBracket = async () => {
+    if (!id) return;
+    await supabase.from("matches").delete().eq("tournament_id", id);
+    await supabase.from("tournaments").update({ status: "draft" as const }).eq("id", id);
+    toast.success("Chaveamento desfeito!");
     fetchData();
   };
 
@@ -263,9 +307,7 @@ const TournamentDetail = () => {
     );
 
     if (nextMatch) {
-      const update = isTop
-        ? { team1_id: winnerId }
-        : { team2_id: winnerId };
+      const update = isTop ? { team1_id: winnerId } : { team2_id: winnerId };
       await supabase.from("matches").update(update).eq("id", nextMatch.id);
       toast.success("Avanço automático realizado!");
     } else {
@@ -361,29 +403,22 @@ const TournamentDetail = () => {
                   <p className="text-xl font-mono font-bold tracking-[0.3em] text-primary">{tournament.tournament_code}</p>
                 </button>
               )}
-              {isOwner && tournament.status === "draft" && teams.length >= 2 && (
-                <GenerateBracketDialog 
-                  onGenerate={generateBracket}
-                  teamCount={teams.length}
-                  isDisabled={false}
-                  sport={tournament.sport}
-                />
-              )}
             </div>
           </div>
 
+          {/* All tabs always visible */}
           <Tabs defaultValue="teams" className="w-full">
             <TabsList className="mb-4 flex-wrap">
               <TabsTrigger value="teams">Duplas</TabsTrigger>
-              <TabsTrigger value="bracket" disabled={matches.length === 0}>Chaveamento</TabsTrigger>
-              <TabsTrigger value="sequence" disabled={matches.length === 0}>Sequência</TabsTrigger>
-              <TabsTrigger value="classification" disabled={matches.length === 0}>Classificação</TabsTrigger>
+              <TabsTrigger value="bracket">Chaveamento</TabsTrigger>
+              <TabsTrigger value="sequence">Sequência</TabsTrigger>
+              <TabsTrigger value="classification">Classificação</TabsTrigger>
               <TabsTrigger value="rankings">Ranking</TabsTrigger>
             </TabsList>
 
-            {/* Duplas Tab */}
+            {/* Duplas Tab - always shows team list */}
             <TabsContent value="teams">
-              {isOwner && (tournament.status === "draft" || tournament.status === "registration") && (
+              {isOwner && (
                 <section className="rounded-xl border border-border bg-card p-6 shadow-card">
                   <h2 className="mb-4 text-xl font-semibold">Cadastrar Dupla</h2>
                   <div className="mb-4 flex flex-col gap-2 sm:flex-row">
@@ -437,73 +472,50 @@ const TournamentDetail = () => {
                       </Button>
                     )}
                   </div>
-
-                  {teams.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Nenhuma dupla cadastrada. Adicione duplas acima.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {teams.map((t, i) => (
-                        <div key={t.id} className="flex items-center justify-between rounded-lg border border-border bg-secondary/50 px-4 py-2">
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground shrink-0">
-                              {i + 1}
-                            </span>
-                            {editingTeamId === t.id ? (
-                              <div className="flex items-center gap-2 flex-1">
-                                <Input
-                                  value={editP1}
-                                  onChange={(e) => setEditP1(e.target.value)}
-                                  className="h-8 text-sm"
-                                  placeholder="Jogador 1"
-                                />
-                                <Input
-                                  value={editP2}
-                                  onChange={(e) => setEditP2(e.target.value)}
-                                  className="h-8 text-sm"
-                                  placeholder="Jogador 2"
-                                />
-                                <Button variant="ghost" size="sm" onClick={saveEdit} className="h-7 w-7 p-0">
-                                  <Check className="h-4 w-4 text-success" />
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={cancelEdit} className="h-7 w-7 p-0">
-                                  <X className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <span className="font-medium truncate">
-                                {t.player1_name} / {t.player2_name}
-                                {t.is_fictitious && <span className="ml-2 text-xs text-muted-foreground">(fictícia)</span>}
-                              </span>
-                            )}
-                          </div>
-                          {editingTeamId !== t.id && (
-                            <div className="flex items-center gap-1 shrink-0">
-                              <Button variant="ghost" size="sm" onClick={() => startEdit(t)} className="h-7 w-7 p-0">
-                                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => removeTeam(t.id)} className="h-7 w-7 p-0">
-                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </section>
               )}
 
-              {/* Read-only view for non-owners */}
-              {!isOwner && teams.length > 0 && (
-                <section className="rounded-xl border border-border bg-card p-6 shadow-card">
+              {/* Team list always visible */}
+              {teams.length === 0 ? (
+                <p className="text-sm text-muted-foreground mt-4">Nenhuma dupla cadastrada.</p>
+              ) : (
+                <section className="mt-4 rounded-xl border border-border bg-card p-6 shadow-card">
                   <h2 className="mb-4 text-xl font-semibold">Duplas ({teams.length})</h2>
                   <div className="space-y-2">
                     {teams.map((t, i) => (
-                      <div key={t.id} className="flex items-center gap-3 rounded-lg border border-border bg-secondary/50 px-4 py-2">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
-                          {i + 1}
-                        </span>
-                        <span className="font-medium">{t.player1_name} / {t.player2_name}</span>
+                      <div key={t.id} className="flex items-center justify-between rounded-lg border border-border bg-secondary/50 px-4 py-2">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground shrink-0">
+                            {i + 1}
+                          </span>
+                          {editingTeamId === t.id ? (
+                            <div className="flex items-center gap-2 flex-1">
+                              <Input value={editP1} onChange={(e) => setEditP1(e.target.value)} className="h-8 text-sm" placeholder="Jogador 1" />
+                              <Input value={editP2} onChange={(e) => setEditP2(e.target.value)} className="h-8 text-sm" placeholder="Jogador 2" />
+                              <Button variant="ghost" size="sm" onClick={saveEdit} className="h-7 w-7 p-0">
+                                <Check className="h-4 w-4 text-success" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={cancelEdit} className="h-7 w-7 p-0">
+                                <X className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="font-medium truncate">
+                              {t.player1_name} / {t.player2_name}
+                              {t.is_fictitious && <span className="ml-2 text-xs text-muted-foreground">(fictícia)</span>}
+                            </span>
+                          )}
+                        </div>
+                        {isOwner && editingTeamId !== t.id && (
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button variant="ghost" size="sm" onClick={() => startEdit(t)} className="h-7 w-7 p-0">
+                              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => removeTeam(t.id)} className="h-7 w-7 p-0">
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -511,32 +523,56 @@ const TournamentDetail = () => {
               )}
             </TabsContent>
 
-            {/* Chaveamento Tab */}
+            {/* Chaveamento Tab - Generate button lives here */}
             <TabsContent value="bracket">
-              {matches.length > 0 && (
-                <section>
-                  <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-xl font-semibold flex items-center gap-2">
-                      <Trophy className="h-5 w-5" /> Chaveamento
-                    </h2>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant={viewMode === "tree" ? "default" : "outline"}
-                        onClick={() => setViewMode("tree")}
-                      >
-                        Árvore
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={viewMode === "list" ? "default" : "outline"}
-                        onClick={() => setViewMode("list")}
-                      >
-                        Lista
-                      </Button>
-                    </div>
-                  </div>
+              {isOwner && matches.length === 0 && teams.length >= 2 && (
+                <div className="mb-4">
+                  <GenerateBracketDialog
+                    onGenerate={generateBracket}
+                    teamCount={teams.length}
+                    teams={teams}
+                    isDisabled={false}
+                    sport={tournament.sport}
+                  />
+                </div>
+              )}
 
+              {isOwner && matches.length > 0 && (
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant={viewMode === "tree" ? "default" : "outline"}
+                      onClick={() => setViewMode("tree")}
+                    >
+                      Árvore
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={viewMode === "list" ? "default" : "outline"}
+                      onClick={() => setViewMode("list")}
+                    >
+                      Lista
+                    </Button>
+                  </div>
+                  <Button variant="destructive" size="sm" className="gap-1" onClick={undoBracket}>
+                    <Undo2 className="h-4 w-4" /> Desfazer Chaveamento
+                  </Button>
+                </div>
+              )}
+
+              {!isOwner && matches.length > 0 && (
+                <div className="mb-4 flex gap-2">
+                  <Button size="sm" variant={viewMode === "tree" ? "default" : "outline"} onClick={() => setViewMode("tree")}>Árvore</Button>
+                  <Button size="sm" variant={viewMode === "list" ? "default" : "outline"} onClick={() => setViewMode("list")}>Lista</Button>
+                </div>
+              )}
+
+              {matches.length > 0 ? (
+                <section>
+                  <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
+                    <Trophy className="h-5 w-5" /> Chaveamento
+                  </h2>
                   {viewMode === "tree" ? (
                     <BracketTreeView
                       matches={matches}
@@ -555,17 +591,32 @@ const TournamentDetail = () => {
                     />
                   )}
                 </section>
+              ) : (
+                <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
+                  <p className="text-muted-foreground">
+                    {teams.length < 2
+                      ? "Adicione pelo menos 2 duplas para gerar o chaveamento."
+                      : "Clique em \"Gerar Chaveamento\" para começar."}
+                  </p>
+                </div>
               )}
             </TabsContent>
 
             {/* Sequência Tab */}
             <TabsContent value="sequence">
+              {isOwner && matches.length > 0 && (
+                <div className="mb-4 flex justify-end">
+                  <Button variant="destructive" size="sm" className="gap-1" onClick={undoBracket}>
+                    <Undo2 className="h-4 w-4" /> Desfazer Sequência
+                  </Button>
+                </div>
+              )}
               <MatchSequenceTab matches={matches} teams={teams} />
             </TabsContent>
 
-            {/* Classificação Tab - Tree view (left to right genealogy style) */}
+            {/* Classificação Tab */}
             <TabsContent value="classification">
-              {matches.length > 0 && (
+              {matches.length > 0 ? (
                 <section>
                   <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
                     <Trophy className="h-5 w-5" /> Classificação
@@ -578,13 +629,17 @@ const TournamentDetail = () => {
                     onUpdateScore={updateScore}
                   />
                 </section>
+              ) : (
+                <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
+                  <p className="text-muted-foreground">Gere o chaveamento primeiro.</p>
+                </div>
               )}
             </TabsContent>
 
             {/* Ranking Tab */}
             <TabsContent value="rankings">
-              <RankingsTab 
-                tournamentId={id || ""} 
+              <RankingsTab
+                tournamentId={id || ""}
                 isOwner={isOwner}
                 sport={tournament.sport}
               />

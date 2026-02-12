@@ -33,7 +33,7 @@ interface BracketTreeViewProps {
 
 const BracketTreeView = ({ matches, participants, isOwner, onDeclareWinner, onUpdateScore }: BracketTreeViewProps) => {
   const [selectedBracket, setSelectedBracket] = useState<number>(1);
-  
+
   const bracketMatches = matches.filter(m => (m.bracket_number || 1) === selectedBracket);
   const brackets = Array.from(new Set(matches.map(m => m.bracket_number || 1))).sort();
 
@@ -45,22 +45,35 @@ const BracketTreeView = ({ matches, participants, isOwner, onDeclareWinner, onUp
     return participants.find((p) => p.id === id)?.name || "A definir";
   };
 
+  const getShortName = (id: string | null) => {
+    const full = getName(id);
+    if (full === "A definir") return "TBD";
+    // Shorten: "Player1 / Player2" -> "P1 / P2" (first names)
+    const parts = full.split(" / ");
+    if (parts.length === 2) {
+      return parts.map(p => p.split(" ")[0]).join(" / ");
+    }
+    return full.length > 16 ? full.slice(0, 14) + "…" : full;
+  };
+
   const getRoundLabel = (round: number) => {
     if (round === rounds) return "Final";
-    if (round === rounds - 1) return "Semifinal";
+    if (round === rounds - 1) return "Semi";
     if (round === rounds - 2) return "Quartas";
     if (round === rounds - 3) return "Oitavas";
-    return `Rodada ${round}`;
+    return `R${round}`;
   };
 
   const getMatchesByRound = (round: number) => {
     return bracketMatches.filter(m => m.round === round).sort((a, b) => a.position - b.position);
   };
 
+  const totalRounds = rounds - minRound + 1;
+
   return (
     <div className="w-full">
       {brackets.length > 1 && (
-        <div className="mb-6 flex gap-2">
+        <div className="mb-4 flex gap-2 flex-wrap">
           {brackets.map(bracket => (
             <Button
               key={bracket}
@@ -74,36 +87,34 @@ const BracketTreeView = ({ matches, participants, isOwner, onDeclareWinner, onUp
         </div>
       )}
 
-      <div className="overflow-x-auto pb-4">
-        <div className="flex gap-8 min-w-max">
-          {Array.from({ length: rounds - minRound + 1 }, (_, i) => minRound + i).map((round) => {
+      {/* Compact responsive bracket */}
+      <div className="w-full overflow-x-auto">
+        <div
+          className="flex gap-2 sm:gap-4 min-w-0"
+          style={{ minWidth: `${Math.max(totalRounds * 160, 320)}px` }}
+        >
+          {Array.from({ length: totalRounds }, (_, i) => minRound + i).map((round) => {
             const roundMatches = getMatchesByRound(round);
             return (
-              <motion.div
-                key={round}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: round * 0.1 }}
-                className="flex flex-col"
-              >
-                <h3 className="mb-6 text-center text-sm font-bold text-primary uppercase tracking-wider">
+              <div key={round} className="flex flex-col flex-1 min-w-[140px] max-w-[220px]">
+                <h3 className="mb-3 text-center text-xs font-bold text-primary uppercase tracking-wider">
                   {getRoundLabel(round)}
                 </h3>
-                <div className="relative flex flex-1 flex-col justify-around gap-8">
+                <div className="flex flex-1 flex-col justify-around gap-2">
                   {roundMatches.map((match) => (
-                    <div key={match.id} className="relative">
-                      <TreeMatchCard
-                        match={match}
-                        getName={getName}
-                        isOwner={isOwner}
-                        onDeclareWinner={onDeclareWinner}
-                        onUpdateScore={onUpdateScore}
-                        isFinal={round === rounds}
-                      />
-                    </div>
+                    <CompactMatchCard
+                      key={match.id}
+                      match={match}
+                      getName={getShortName}
+                      getFullName={getName}
+                      isOwner={isOwner}
+                      onDeclareWinner={onDeclareWinner}
+                      onUpdateScore={onUpdateScore}
+                      isFinal={round === rounds}
+                    />
                   ))}
                 </div>
-              </motion.div>
+              </div>
             );
           })}
         </div>
@@ -112,11 +123,12 @@ const BracketTreeView = ({ matches, participants, isOwner, onDeclareWinner, onUp
   );
 };
 
-const TreeMatchCard = ({
-  match, getName, isOwner, onDeclareWinner, onUpdateScore, isFinal,
+const CompactMatchCard = ({
+  match, getName, getFullName, isOwner, onDeclareWinner, onUpdateScore, isFinal,
 }: {
   match: Match;
   getName: (id: string | null) => string;
+  getFullName: (id: string | null) => string;
   isOwner: boolean;
   onDeclareWinner: (matchId: string, winnerId: string) => void;
   onUpdateScore: (matchId: string, score1: number, score2: number) => void;
@@ -138,66 +150,65 @@ const TreeMatchCard = ({
     <motion.div
       initial={{ scale: 0.95, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
-      className={`relative w-72 rounded-lg border bg-card shadow-card transition-all ${
-        isFinal ? "border-primary/60 shadow-lg" : "border-border"
-      } ${isCompleted ? "opacity-80" : ""} hover:border-primary/40`}
+      title={`${getFullName(match.team1_id)} vs ${getFullName(match.team2_id)}`}
+      className={`relative rounded-md border bg-card shadow-sm transition-all text-xs ${
+        isFinal ? "border-primary/60 shadow-glow" : "border-border"
+      } ${isCompleted ? "opacity-80" : ""}`}
     >
       {isFinal && (
-        <div className="absolute -top-3 left-4 inline-block rounded-full bg-gradient-primary px-3 py-1 text-xs font-bold text-primary-foreground shadow-lg">
-          <Trophy className="inline h-3 w-3 mr-1" /> FINAL
+        <div className="flex items-center justify-center gap-1 rounded-t-md bg-gradient-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
+          <Trophy className="h-2.5 w-2.5" /> FINAL
         </div>
       )}
 
-      <div className={`flex items-center justify-between gap-3 border-b border-border px-4 py-3 transition-colors ${
+      {/* Team 1 */}
+      <div className={`flex items-center gap-1 border-b border-border px-2 py-1.5 ${
         match.winner_team_id === match.team1_id && isCompleted ? "bg-success/15" : ""
       }`}>
-        <div className="flex-1 min-w-0">
-          <p className={`text-sm font-medium truncate ${
-            match.winner_team_id === match.team1_id && isCompleted ? "text-success font-bold" : p1Name === "A definir" ? "text-muted-foreground" : ""
-          }`}>
-            {p1Name}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <span className={`flex-1 truncate text-xs font-medium ${
+          match.winner_team_id === match.team1_id && isCompleted ? "text-success font-bold" : p1Name === "TBD" ? "text-muted-foreground" : ""
+        }`}>
+          {p1Name}
+        </span>
+        <div className="flex items-center gap-1 shrink-0">
           {canScore ? (
-            <Input value={s1} onChange={(e) => setS1(e.target.value)} onBlur={handleScoreBlur} className="h-8 w-14 text-center text-sm p-1" />
+            <Input value={s1} onChange={(e) => setS1(e.target.value)} onBlur={handleScoreBlur} className="h-6 w-10 text-center text-xs p-0" />
           ) : (
-            <span className="text-sm font-bold tabular-nums w-8 text-right">{match.score1 ?? "-"}</span>
+            <span className="text-xs font-bold tabular-nums w-5 text-right">{match.score1 ?? "-"}</span>
           )}
           {canScore && match.team1_id && (
-            <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => onDeclareWinner(match.id, match.team1_id!)}>
-              <Check className="h-4 w-4 text-success" />
+            <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => onDeclareWinner(match.id, match.team1_id!)}>
+              <Check className="h-3 w-3 text-success" />
             </Button>
           )}
           {isCompleted && match.winner_team_id === match.team1_id && (
-            <Trophy className="h-4 w-4 text-success shrink-0" />
+            <Trophy className="h-3 w-3 text-success shrink-0" />
           )}
         </div>
       </div>
 
-      <div className={`flex items-center justify-between gap-3 px-4 py-3 transition-colors ${
+      {/* Team 2 */}
+      <div className={`flex items-center gap-1 px-2 py-1.5 ${
         match.winner_team_id === match.team2_id && isCompleted ? "bg-success/15" : ""
       }`}>
-        <div className="flex-1 min-w-0">
-          <p className={`text-sm font-medium truncate ${
-            match.winner_team_id === match.team2_id && isCompleted ? "text-success font-bold" : p2Name === "A definir" ? "text-muted-foreground" : ""
-          }`}>
-            {p2Name}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <span className={`flex-1 truncate text-xs font-medium ${
+          match.winner_team_id === match.team2_id && isCompleted ? "text-success font-bold" : p2Name === "TBD" ? "text-muted-foreground" : ""
+        }`}>
+          {p2Name}
+        </span>
+        <div className="flex items-center gap-1 shrink-0">
           {canScore ? (
-            <Input value={s2} onChange={(e) => setS2(e.target.value)} onBlur={handleScoreBlur} className="h-8 w-14 text-center text-sm p-1" />
+            <Input value={s2} onChange={(e) => setS2(e.target.value)} onBlur={handleScoreBlur} className="h-6 w-10 text-center text-xs p-0" />
           ) : (
-            <span className="text-sm font-bold tabular-nums w-8 text-right">{match.score2 ?? "-"}</span>
+            <span className="text-xs font-bold tabular-nums w-5 text-right">{match.score2 ?? "-"}</span>
           )}
           {canScore && match.team2_id && (
-            <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => onDeclareWinner(match.id, match.team2_id!)}>
-              <Check className="h-4 w-4 text-success" />
+            <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => onDeclareWinner(match.id, match.team2_id!)}>
+              <Check className="h-3 w-3 text-success" />
             </Button>
           )}
           {isCompleted && match.winner_team_id === match.team2_id && (
-            <Trophy className="h-4 w-4 text-success shrink-0" />
+            <Trophy className="h-3 w-3 text-success shrink-0" />
           )}
         </div>
       </div>

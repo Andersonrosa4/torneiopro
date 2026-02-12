@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +24,7 @@ interface RankingsTabProps {
 }
 
 const RankingsTab = ({ tournamentId, isOwner, sport }: RankingsTabProps) => {
+  const { user } = useAuth();
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [athleteName, setAthleteName] = useState("");
@@ -47,7 +49,6 @@ const RankingsTab = ({ tournamentId, isOwner, sport }: RankingsTabProps) => {
   useEffect(() => {
     fetchRankings();
 
-    // Real-time subscription
     const channel = supabase
       .channel(`rankings-${tournamentId}`)
       .on(
@@ -72,13 +73,17 @@ const RankingsTab = ({ tournamentId, isOwner, sport }: RankingsTabProps) => {
       toast.error("Preencha o nome e os pontos (≥ 0)");
       return;
     }
+    if (!user) {
+      toast.error("Você precisa estar logado");
+      return;
+    }
 
     const { error } = await supabase.from("rankings").insert({
       athlete_name: athleteName.trim(),
       points: Number(points),
       sport: sport as any,
       tournament_id: tournamentId,
-      created_by: "", // Will be set by RLS context if available
+      created_by: user.id,
     });
 
     if (error) {
@@ -89,7 +94,6 @@ const RankingsTab = ({ tournamentId, isOwner, sport }: RankingsTabProps) => {
     toast.success("Pontos adicionados!");
     setAthleteName("");
     setPoints("");
-    fetchRankings();
   };
 
   const updatePoints = async (id: string, newPoints: number) => {
@@ -107,8 +111,6 @@ const RankingsTab = ({ tournamentId, isOwner, sport }: RankingsTabProps) => {
       toast.error("Erro ao atualizar pontos");
       return;
     }
-
-    fetchRankings();
   };
 
   const deleteRanking = async (id: string) => {
@@ -120,7 +122,6 @@ const RankingsTab = ({ tournamentId, isOwner, sport }: RankingsTabProps) => {
     }
 
     toast.success("Ranking removido!");
-    fetchRankings();
   };
 
   if (loading) {
@@ -133,7 +134,6 @@ const RankingsTab = ({ tournamentId, isOwner, sport }: RankingsTabProps) => {
 
   return (
     <div className="space-y-6">
-      {/* Seção de adição de pontos - apenas para organizadores */}
       {isOwner && (
         <motion.section
           initial={{ opacity: 0, y: 12 }}
@@ -166,7 +166,6 @@ const RankingsTab = ({ tournamentId, isOwner, sport }: RankingsTabProps) => {
         </motion.section>
       )}
 
-      {/* Ranking */}
       <motion.section
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -217,10 +216,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport }: RankingsTabProps) => {
                         size="sm"
                         variant="ghost"
                         onClick={() =>
-                          updatePoints(
-                            ranking.id,
-                            Math.max(0, ranking.points - 1)
-                          )
+                          updatePoints(ranking.id, Math.max(0, ranking.points - 1))
                         }
                         className="h-8 px-2"
                       >
@@ -243,7 +239,6 @@ const RankingsTab = ({ tournamentId, isOwner, sport }: RankingsTabProps) => {
         )}
       </motion.section>
 
-      {/* Podium dos 3 primeiros */}
       {rankings.length > 0 && (
         <motion.section
           initial={{ opacity: 0, y: 12 }}
@@ -253,42 +248,25 @@ const RankingsTab = ({ tournamentId, isOwner, sport }: RankingsTabProps) => {
         >
           <h3 className="mb-4 text-lg font-semibold">Pódio</h3>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {/* 2º lugar */}
             {rankings[1] && (
               <div className="flex flex-col items-center rounded-lg border border-border bg-card p-4 shadow-card order-first sm:order-none">
                 <div className="mb-2 text-3xl font-bold text-secondary">🥈</div>
-                <p className="text-sm font-medium text-center truncate">
-                  {rankings[1].athlete_name}
-                </p>
-                <p className="text-lg font-bold text-primary">
-                  {rankings[1].points} pts
-                </p>
+                <p className="text-sm font-medium text-center truncate">{rankings[1].athlete_name}</p>
+                <p className="text-lg font-bold text-primary">{rankings[1].points} pts</p>
               </div>
             )}
-
-            {/* 1º lugar */}
             {rankings[0] && (
               <div className="flex flex-col items-center rounded-lg border-2 border-primary bg-gradient-primary p-4 shadow-lg order-none sm:order-first">
                 <div className="mb-2 text-4xl font-bold">🥇</div>
-                <p className="text-sm font-medium text-center text-primary-foreground truncate">
-                  {rankings[0].athlete_name}
-                </p>
-                <p className="text-xl font-bold text-primary-foreground">
-                  {rankings[0].points} pts
-                </p>
+                <p className="text-sm font-medium text-center text-primary-foreground truncate">{rankings[0].athlete_name}</p>
+                <p className="text-xl font-bold text-primary-foreground">{rankings[0].points} pts</p>
               </div>
             )}
-
-            {/* 3º lugar */}
             {rankings[2] && (
               <div className="flex flex-col items-center rounded-lg border border-border bg-card p-4 shadow-card order-last">
                 <div className="mb-2 text-3xl font-bold text-muted">🥉</div>
-                <p className="text-sm font-medium text-center truncate">
-                  {rankings[2].athlete_name}
-                </p>
-                <p className="text-lg font-bold text-primary">
-                  {rankings[2].points} pts
-                </p>
+                <p className="text-sm font-medium text-center truncate">{rankings[2].athlete_name}</p>
+                <p className="text-lg font-bold text-primary">{rankings[2].points} pts</p>
               </div>
             )}
           </div>

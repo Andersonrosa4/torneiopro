@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Plus, Trash2, TrendingUp, Download, FileText, Sheet, Pencil, Check, X } from "lucide-react";
 import { motion } from "framer-motion";
-import { organizerQuery } from "@/lib/organizerApi";
+
 import { exportRankings } from "@/lib/exportUtils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -109,21 +109,19 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       toast.error("Selecione o atleta e insira os pontos (≥ 0)");
       return;
     }
-    if (!user) {
+
+    const createdBy = organizerId || user?.id || "";
+    if (!createdBy) {
       toast.error("Você precisa estar logado");
       return;
     }
 
-    const { error } = await organizerQuery({
-      table: "rankings",
-      operation: "insert",
-      data: {
-        athlete_name: selectedAthlete,
-        points: Number(points),
-        sport,
-        tournament_id: tournamentId,
-        created_by: organizerId || "",
-      },
+    const { error } = await supabase.from("rankings").insert({
+      athlete_name: selectedAthlete,
+      points: Number(points),
+      sport: sport as "beach_volleyball" | "futevolei" | "beach_tennis",
+      tournament_id: tournamentId,
+      created_by: createdBy,
     });
 
     if (error) {
@@ -134,6 +132,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
     toast.success("Pontos adicionados!");
     setSelectedAthlete("");
     setPoints("");
+    fetchRankings();
   };
 
   const updatePoints = async (id: string, newPoints: number) => {
@@ -142,32 +141,25 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       return;
     }
 
-    const { error } = await organizerQuery({
-      table: "rankings",
-      operation: "update",
-      data: { points: newPoints },
-      filters: { id },
-    });
+    const { error } = await supabase.from("rankings").update({ points: newPoints }).eq("id", id);
 
     if (error) {
       toast.error("Erro ao atualizar pontos");
     } else {
       setEditingId(null);
+      fetchRankings();
     }
   };
 
   const deleteRanking = async (id: string) => {
-    const { error } = await organizerQuery({
-      table: "rankings",
-      operation: "delete",
-      filters: { id },
-    });
+    const { error } = await supabase.from("rankings").delete().eq("id", id);
 
     if (error) {
       toast.error("Erro ao remover ranking");
       return;
     }
     toast.success("Ranking removido!");
+    fetchRankings();
   };
 
   // Rankings are already sorted by points desc from the query

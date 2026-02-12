@@ -1,15 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Trash2, TrendingUp, Download, FileText, Sheet } from "lucide-react";
+import { Plus, Trash2, TrendingUp, Download, FileText, Sheet, Pencil, Check, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { organizerQuery } from "@/lib/organizerApi";
 import { exportRankings } from "@/lib/exportUtils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface RankingEntry {
   id: string;
@@ -18,6 +19,12 @@ interface RankingEntry {
   sport: string;
   tournament_id: string;
   created_by: string;
+}
+
+interface Team {
+  id: string;
+  player1_name: string;
+  player2_name: string;
 }
 
 interface RankingsTabProps {
@@ -31,11 +38,13 @@ interface RankingsTabProps {
 const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventDate }: RankingsTabProps) => {
   const { user, organizerId } = useAuth();
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
-  const [athleteName, setAthleteName] = useState("");
+  const [selectedAthlete, setSelectedAthlete] = useState("");
   const [points, setPoints] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editPoints, setEditPoints] = useState("");
 
-  // SELECT uses direct supabase (policy is true)
   const fetchRankings = async () => {
     const { data, error } = await supabase
       .from("rankings")
@@ -47,37 +56,57 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       toast.error("Erro ao carregar rankings");
       return;
     }
-
     setRankings(data || []);
     setLoading(false);
   };
 
+  const fetchTeams = async () => {
+    const { data } = await supabase
+      .from("teams")
+      .select("*")
+      .eq("tournament_id", tournamentId)
+      .order("seed");
+    if (data) setTeams(data);
+  };
+
   useEffect(() => {
     fetchRankings();
+    fetchTeams();
 
     const channel = supabase
       .channel(`rankings-${tournamentId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "rankings",
-          filter: `tournament_id=eq.${tournamentId}`,
-        },
-        () => fetchRankings()
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "rankings", filter: `tournament_id=eq.${tournamentId}` }, () => fetchRankings())
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [tournamentId]);
 
-  // Writes use organizerQuery
+  // Build athlete options from teams (individual player names)
+  const athleteOptions = useMemo(() => {
+    const names = new Set<string>();
+    for (const t of teams) {
+      names.add(t.player1_name);
+      names.add(t.player2_name);
+    }
+    // Also add team pair names
+    for (const t of teams) {
+      names.add(`${t.player1_name} / ${t.player2_name}`);
+    }
+    return [...names].sort();
+  }, [teams]);
+
+  // Already added athletes
+  const addedAthletes = useMemo(() => new Set(rankings.map((r) => r.athlete_name)), [rankings]);
+
+  // Filter out already-added athletes
+  const availableAthletes = useMemo(
+    () => athleteOptions.filter((name) => !addedAthletes.has(name)),
+    [athleteOptions, addedAthletes]
+  );
+
   const addAthletePoints = async () => {
-    if (!athleteName.trim() || !points || Number(points) < 0) {
-      toast.error("Preencha o nome e os pontos (≥ 0)");
+    if (!selectedAthlete || !points || Number(points) < 0) {
+      toast.error("Selecione o atleta e insira os pontos (≥ 0)");
       return;
     }
     if (!user) {
@@ -89,9 +118,9 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       table: "rankings",
       operation: "insert",
       data: {
-        athlete_name: athleteName.trim(),
+        athlete_name: selectedAthlete,
         points: Number(points),
-        sport: sport,
+        sport,
         tournament_id: tournamentId,
         created_by: organizerId || "",
       },
@@ -103,7 +132,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
     }
 
     toast.success("Pontos adicionados!");
-    setAthleteName("");
+    setSelectedAthlete("");
     setPoints("");
   };
 
@@ -122,6 +151,8 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
 
     if (error) {
       toast.error("Erro ao atualizar pontos");
+    } else {
+      setEditingId(null);
     }
   };
 
@@ -136,9 +167,14 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       toast.error("Erro ao remover ranking");
       return;
     }
-
     toast.success("Ranking removido!");
   };
+
+  // Rankings are already sorted by points desc from the query
+  const sortedRankings = useMemo(
+    () => [...rankings].sort((a, b) => b.points - a.points),
+    [rankings]
+  );
 
   if (loading) {
     return (
@@ -160,12 +196,20 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
             <TrendingUp className="h-5 w-5" /> Atribuir Pontos
           </h2>
           <div className="flex flex-col gap-4 sm:flex-row">
-            <Input
-              placeholder="Nome do atleta"
-              value={athleteName}
-              onChange={(e) => setAthleteName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addAthletePoints()}
-            />
+            <Select value={selectedAthlete} onValueChange={setSelectedAthlete}>
+              <SelectTrigger className="flex-1">
+                <SelectValue placeholder="Selecione o atleta/dupla" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableAthletes.length === 0 ? (
+                  <SelectItem value="__none" disabled>Todos os atletas já foram adicionados</SelectItem>
+                ) : (
+                  availableAthletes.map((name) => (
+                    <SelectItem key={name} value={name}>{name}</SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
             <Input
               type="number"
               placeholder="Pontos"
@@ -190,7 +234,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       >
         <h2 className="mb-4 text-xl font-semibold">Classificação Geral</h2>
 
-        {rankings.length === 0 ? (
+        {sortedRankings.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
             Nenhum atleta no ranking ainda.
           </p>
@@ -205,19 +249,19 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   <DropdownMenuItem onClick={() => {
-                    const rows = rankings.map((r, i) => ({ position: i + 1, athlete_name: r.athlete_name, points: r.points }));
+                    const rows = sortedRankings.map((r, i) => ({ position: i + 1, athlete_name: r.athlete_name, points: r.points }));
                     exportRankings("pdf", rows, { tournamentName, sport, date: eventDate });
                   }}>
                     <FileText className="h-4 w-4 mr-2" /> PDF
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => {
-                    const rows = rankings.map((r, i) => ({ position: i + 1, athlete_name: r.athlete_name, points: r.points }));
+                    const rows = sortedRankings.map((r, i) => ({ position: i + 1, athlete_name: r.athlete_name, points: r.points }));
                     exportRankings("xlsx", rows, { tournamentName, sport, date: eventDate });
                   }}>
                     <Sheet className="h-4 w-4 mr-2" /> Excel (.xlsx)
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => {
-                    const rows = rankings.map((r, i) => ({ position: i + 1, athlete_name: r.athlete_name, points: r.points }));
+                    const rows = sortedRankings.map((r, i) => ({ position: i + 1, athlete_name: r.athlete_name, points: r.points }));
                     exportRankings("csv", rows, { tournamentName, sport, date: eventDate });
                   }}>
                     <FileText className="h-4 w-4 mr-2" /> CSV
@@ -225,68 +269,81 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-          <div className="space-y-2">
-            {rankings.map((ranking, idx) => (
-              <motion.div
-                key={ranking.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: idx * 0.05 }}
-                className="flex items-center justify-between rounded-lg border border-border bg-secondary/50 px-4 py-3 hover:border-primary/40 transition-colors"
-              >
-                <div className="flex items-center gap-4 flex-1">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-primary text-sm font-bold text-primary-foreground">
-                    {idx + 1}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium truncate">{ranking.athlete_name}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <Badge variant="secondary" className="text-base font-bold tabular-nums">
-                    {ranking.points} pts
-                  </Badge>
-
-                  {isOwner && (
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => updatePoints(ranking.id, ranking.points + 1)}
-                        className="h-8 px-2"
-                      >
-                        +1
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() =>
-                          updatePoints(ranking.id, Math.max(0, ranking.points - 1))
-                        }
-                        className="h-8 px-2"
-                      >
-                        -1
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => deleteRanking(ranking.id)}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+            <div className="space-y-2">
+              {sortedRankings.map((ranking, idx) => (
+                <motion.div
+                  key={ranking.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className="flex items-center justify-between rounded-lg border border-border bg-secondary/50 px-4 py-3 hover:border-primary/40 transition-colors"
+                >
+                  <div className="flex items-center gap-4 flex-1">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-primary text-sm font-bold text-primary-foreground">
+                      {idx + 1}
                     </div>
-                  )}
-                </div>
-              </motion.div>
-            ))}
-          </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">{ranking.athlete_name}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    {editingId === ranking.id ? (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          value={editPoints}
+                          onChange={(e) => setEditPoints(e.target.value)}
+                          className="h-8 w-20 text-center text-sm"
+                          min="0"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") updatePoints(ranking.id, Number(editPoints) || 0);
+                            if (e.key === "Escape") setEditingId(null);
+                          }}
+                        />
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => updatePoints(ranking.id, Number(editPoints) || 0)}>
+                          <Check className="h-4 w-4 text-success" />
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditingId(null)}>
+                          <X className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Badge variant="secondary" className="text-base font-bold tabular-nums">
+                        {ranking.points} pts
+                      </Badge>
+                    )}
+
+                    {isOwner && editingId !== ranking.id && (
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => { setEditingId(ranking.id); setEditPoints(String(ranking.points)); }}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => deleteRanking(ranking.id)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+            </div>
           </>
         )}
       </motion.section>
 
-      {rankings.length > 0 && (
+      {sortedRankings.length > 0 && (
         <motion.section
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -295,25 +352,25 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
         >
           <h3 className="mb-4 text-lg font-semibold">Pódio</h3>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {rankings[1] && (
+            {sortedRankings[1] && (
               <div className="flex flex-col items-center rounded-lg border border-border bg-card p-4 shadow-card order-first sm:order-none">
                 <div className="mb-2 text-3xl font-bold text-secondary">🥈</div>
-                <p className="text-sm font-medium text-center truncate">{rankings[1].athlete_name}</p>
-                <p className="text-lg font-bold text-primary">{rankings[1].points} pts</p>
+                <p className="text-sm font-medium text-center truncate">{sortedRankings[1].athlete_name}</p>
+                <p className="text-lg font-bold text-primary">{sortedRankings[1].points} pts</p>
               </div>
             )}
-            {rankings[0] && (
+            {sortedRankings[0] && (
               <div className="flex flex-col items-center rounded-lg border-2 border-primary bg-gradient-primary p-4 shadow-lg order-none sm:order-first">
                 <div className="mb-2 text-4xl font-bold">🥇</div>
-                <p className="text-sm font-medium text-center text-primary-foreground truncate">{rankings[0].athlete_name}</p>
-                <p className="text-xl font-bold text-primary-foreground">{rankings[0].points} pts</p>
+                <p className="text-sm font-medium text-center text-primary-foreground truncate">{sortedRankings[0].athlete_name}</p>
+                <p className="text-xl font-bold text-primary-foreground">{sortedRankings[0].points} pts</p>
               </div>
             )}
-            {rankings[2] && (
+            {sortedRankings[2] && (
               <div className="flex flex-col items-center rounded-lg border border-border bg-card p-4 shadow-card order-last">
                 <div className="mb-2 text-3xl font-bold text-muted">🥉</div>
-                <p className="text-sm font-medium text-center truncate">{rankings[2].athlete_name}</p>
-                <p className="text-lg font-bold text-primary">{rankings[2].points} pts</p>
+                <p className="text-sm font-medium text-center truncate">{sortedRankings[2].athlete_name}</p>
+                <p className="text-lg font-bold text-primary">{sortedRankings[2].points} pts</p>
               </div>
             )}
           </div>

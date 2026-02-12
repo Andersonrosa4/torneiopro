@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSportTheme } from "@/contexts/SportContext";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ import AppHeader from "@/components/AppHeader";
 const CreateTournament = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { setSelectedSport } = useSportTheme();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     name: "",
@@ -30,6 +32,7 @@ const CreateTournament = () => {
     e.preventDefault();
     if (!user) return;
     setLoading(true);
+    setSelectedSport(form.sport as any);
 
     const { data, error } = await supabase
       .from("tournaments")

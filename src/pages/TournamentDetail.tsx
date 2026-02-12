@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSportTheme } from "@/contexts/SportContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -71,6 +72,7 @@ const TournamentDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { setSelectedSport } = useSportTheme();
   const [tournament, setTournament] = useState<any>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -93,11 +95,14 @@ const TournamentDetail = () => {
       supabase.from("teams").select("*").eq("tournament_id", id).order("seed"),
       supabase.from("matches").select("*").eq("tournament_id", id).order("round").order("position"),
     ]);
-    if (tRes.data) setTournament(tRes.data);
+    if (tRes.data) {
+      setTournament(tRes.data);
+      setSelectedSport(tRes.data.sport);
+    }
     if (teamsRes.data) setTeams(teamsRes.data);
     if (mRes.data) setMatches(mRes.data);
     setLoading(false);
-  }, [id]);
+  }, [id, setSelectedSport]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

@@ -8,10 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Plus, Trash2, Play, Trophy, Users, Shuffle, Copy, DollarSign } from "lucide-react";
+import { Plus, Trash2, Trophy, Users, Shuffle, Copy, DollarSign } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AppHeader from "@/components/AppHeader";
 import BracketView from "@/components/BracketView";
+import { GenerateBracketDialog } from "@/components/GenerateBracketDialog";
 
 const sportLabels: Record<string, string> = {
   beach_volleyball: "🏐 Beach Volley",
@@ -153,25 +154,33 @@ const TournamentDetail = () => {
     fetchData();
   };
 
-  const generateBracket = async () => {
+  const generateBracket = async (startRound: number = 1, useSeeds: boolean = true) => {
     if (!id || !tournament) return;
     if (teams.length < 2) { toast.error("Precisa de pelo menos 2 duplas"); return; }
 
     await supabase.from("matches").delete().eq("tournament_id", id);
 
     const totalSlots = Math.pow(2, Math.ceil(Math.log2(teams.length)));
-    const rounds = Math.ceil(Math.log2(totalSlots));
-    const seeded = [...teams].sort((a, b) => (a.seed || 0) - (b.seed || 0));
-    const matchesPerRound1 = totalSlots / 2;
+    const maxRounds = Math.ceil(Math.log2(totalSlots));
+    
+    // Arranjar times para seed ou shuffle
+    let arranged = [...teams];
+    if (useSeeds) {
+      arranged.sort((a, b) => (a.seed || 0) - (b.seed || 0));
+    } else {
+      arranged.sort(() => Math.random() - 0.5);
+    }
 
     const newMatches: any[] = [];
 
-    for (let i = 0; i < matchesPerRound1; i++) {
-      const t1 = seeded[i] || null;
-      const t2 = seeded[totalSlots - 1 - i] || null;
+    // Gerar primeira rodada
+    const matchesInFirstRound = totalSlots / 2;
+    for (let i = 0; i < matchesInFirstRound; i++) {
+      const t1 = arranged[i] || null;
+      const t2 = arranged[totalSlots - 1 - i] || null;
       newMatches.push({
         tournament_id: id,
-        round: 1,
+        round: startRound,
         position: i + 1,
         participant1_id: t1?.id || null,
         participant2_id: t2?.id || null,
@@ -181,7 +190,8 @@ const TournamentDetail = () => {
       });
     }
 
-    for (let r = 2; r <= rounds; r++) {
+    // Gerar rodadas seguintes
+    for (let r = startRound + 1; r <= maxRounds; r++) {
       const count = totalSlots / Math.pow(2, r);
       for (let p = 0; p < count; p++) {
         newMatches.push({
@@ -308,10 +318,11 @@ const TournamentDetail = () => {
                 </button>
               )}
               {isOwner && tournament.status === "draft" && teams.length >= 2 && (
-                <Button onClick={generateBracket} className="gap-2 bg-gradient-primary text-primary-foreground hover:opacity-90">
-                  <Play className="h-4 w-4" />
-                  Gerar Chaveamento
-                </Button>
+                <GenerateBracketDialog 
+                  onGenerate={generateBracket}
+                  teamCount={teams.length}
+                  isDisabled={false}
+                />
               )}
             </div>
           </div>

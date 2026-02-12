@@ -30,8 +30,9 @@ interface BracketViewProps {
 }
 
 const BracketView = ({ matches, participants, isOwner, onDeclareWinner, onUpdateScore }: BracketViewProps) => {
-  const rounds = Math.max(...matches.map((m) => m.round));
-  const roundNumbers = Array.from({ length: rounds }, (_, i) => i + 1);
+  const rounds = matches.length > 0 ? Math.max(...matches.map((m) => m.round)) : 0;
+  const minRound = matches.length > 0 ? Math.min(...matches.map((m) => m.round)) : 1;
+  const roundNumbers = Array.from({ length: rounds - minRound + 1 }, (_, i) => i + minRound);
 
   const getName = (id: string | null) => {
     if (!id) return "A definir";
@@ -42,6 +43,7 @@ const BracketView = ({ matches, participants, isOwner, onDeclareWinner, onUpdate
     if (round === rounds) return "Final";
     if (round === rounds - 1) return "Semifinal";
     if (round === rounds - 2) return "Quartas";
+    if (round === rounds - 3) return "Oitavas";
     return `Rodada ${round}`;
   };
 

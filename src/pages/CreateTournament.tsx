@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSportTheme } from "@/contexts/SportContext";
 import { useNavigate } from "react-router-dom";
@@ -13,6 +12,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import ThemedBackground from "@/components/ThemedBackground";
+import { organizerQuery } from "@/lib/organizerApi";
 
 const CreateTournament = () => {
   const { organizerId, user } = useAuth();
@@ -35,21 +35,23 @@ const CreateTournament = () => {
     setLoading(true);
     setSelectedSport(form.sport as any);
 
-    const { data, error } = await supabase
-      .from("tournaments")
-      .insert({
+    const { data, error } = await organizerQuery({
+      table: "tournaments",
+      operation: "insert",
+      data: {
         name: form.name,
         description: form.description || null,
-        sport: form.sport as any,
+        sport: form.sport,
         format: form.format,
         category: form.category || null,
         event_date: form.event_date || null,
         location: form.location || null,
         created_by: organizerId || "",
-        status: "draft" as const,
-      })
-      .select()
-      .single();
+        status: "draft",
+      },
+      select: "*",
+      single: true,
+    });
 
     if (error) {
       toast.error(error.message);

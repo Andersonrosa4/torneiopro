@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +7,7 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Plus, Trash2, Pencil, Check, X, Users, Eye, EyeOff } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { organizerQuery } from "@/lib/organizerApi";
 
 interface Organizer {
   id: string;
@@ -35,10 +35,12 @@ const AdminOrganizersTab = () => {
   const [editPassword, setEditPassword] = useState("");
 
   const fetchOrganizers = async () => {
-    const { data, error } = await supabase
-      .from("organizers")
-      .select("id, username, display_name, created_at")
-      .order("created_at", { ascending: false });
+    const { data, error } = await organizerQuery({
+      table: "organizers",
+      operation: "select",
+      select: "id, username, display_name, created_at",
+      order: { column: "created_at", ascending: false },
+    });
     if (!error && data) setOrganizers(data);
     setLoading(false);
   };
@@ -57,15 +59,19 @@ const AdminOrganizersTab = () => {
       return;
     }
 
-    const { error } = await supabase.from("organizers").insert({
-      username: username.trim(),
-      password_hash: password, // In production, hash on server side
-      display_name: displayName.trim() || null,
-      created_by: organizerId || "",
+    const { error } = await organizerQuery({
+      table: "organizers",
+      operation: "insert",
+      data: {
+        username: username.trim(),
+        password_hash: password,
+        display_name: displayName.trim() || null,
+        created_by: organizerId || "",
+      },
     });
 
     if (error) {
-      if (error.code === "23505") {
+      if (error.message?.includes("23505") || error.message?.includes("duplicate")) {
         toast.error("Usuário já existe");
       } else {
         toast.error(error.message);
@@ -103,10 +109,12 @@ const AdminOrganizersTab = () => {
       updates.password_hash = editPassword;
     }
 
-    const { error } = await supabase
-      .from("organizers")
-      .update(updates)
-      .eq("id", editingId);
+    const { error } = await organizerQuery({
+      table: "organizers",
+      operation: "update",
+      data: updates,
+      filters: { id: editingId },
+    });
 
     if (error) {
       toast.error(error.message);
@@ -119,7 +127,11 @@ const AdminOrganizersTab = () => {
   };
 
   const deleteOrganizer = async (id: string) => {
-    const { error } = await supabase.from("organizers").delete().eq("id", id);
+    const { error } = await organizerQuery({
+      table: "organizers",
+      operation: "delete",
+      filters: { id },
+    });
     if (error) {
       toast.error(error.message);
       return;

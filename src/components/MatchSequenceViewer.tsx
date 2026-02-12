@@ -18,6 +18,8 @@ interface Match {
   winner_team_id: string | null;
   status: string;
   bracket_number?: number;
+  bracket_type?: string;
+  bracket_half?: string | null;
 }
 
 interface Team {
@@ -140,7 +142,7 @@ const MatchSequenceViewer = ({
       case 1: return "Semifinal";
       case 2: return "Quartas de Final";
       case 3: return "Oitavas de Final";
-      default: return `Round of ${2 ** roundsFromEnd}`;
+      default: return `Fase de ${2 ** roundsFromEnd}`;
     }
   };
 
@@ -196,8 +198,13 @@ const MatchSequenceViewer = ({
     return groups;
   }, [sequence, maxRound]);
 
-  const getGroupId = (match: Match) => {
+  const getGroupId = (match: Match & { bracket_type?: string; bracket_half?: string | null }) => {
     if (match.round === 0) return `Grupo ${match.bracket_number || 1}`;
+    if (match.bracket_type === 'winners' && match.bracket_half) return `Vencedores ${match.bracket_half === 'upper' ? 'Superior' : 'Inferior'}`;
+    if (match.bracket_type === 'winners' && !match.bracket_half) return 'Final dos Vencedores';
+    if (match.bracket_type === 'losers') return `Perdedores ${match.bracket_half === 'upper' ? 'Inferior' : 'Superior'}`;
+    if (match.bracket_type === 'final') return 'Grande Final';
+    if (match.bracket_type === 'third_place') return 'Disputa 3º Lugar';
     return `Chave ${match.bracket_number || 1}`;
   };
 

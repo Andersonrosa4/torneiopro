@@ -98,7 +98,7 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
           <div className="space-y-4">
             {rounds.map(round => (
               <div key={round} className="space-y-2">
-                <div className="text-xs font-semibold text-muted-foreground uppercase">Round {round}</div>
+                <div className="text-xs font-semibold text-muted-foreground uppercase">Rodada {round}</div>
                 {roundGroups[round].map(match => (
                   <motion.div
                     key={match.id}
@@ -141,15 +141,15 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Trophy className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-bold text-primary">Chave Winners (Vencedores)</h3>
+              <h3 className="text-lg font-bold text-primary">Chave dos Vencedores</h3>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              {winnersUpper.length > 0 && renderBracketColumn('Winners Upper Half', winnersUpper, 'bg-blue-950/20')}
-              {winnersLower.length > 0 && renderBracketColumn('Winners Lower Half', winnersLower, 'bg-cyan-950/20')}
+              {winnersUpper.length > 0 && renderBracketColumn('Vencedores - Metade Superior', winnersUpper, 'bg-blue-950/20')}
+              {winnersLower.length > 0 && renderBracketColumn('Vencedores - Metade Inferior', winnersLower, 'bg-cyan-950/20')}
             </div>
             {winnersMatches.filter(m => !m.bracket_half).length > 0 && (
               <div>
-                {renderBracketColumn('Winners Final', winnersMatches.filter(m => !m.bracket_half), 'bg-primary/10')}
+                {renderBracketColumn('Final dos Vencedores', winnersMatches.filter(m => !m.bracket_half), 'bg-primary/10')}
               </div>
             )}
           </div>
@@ -158,10 +158,10 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
         {/* Losers Bracket */}
         {losersMatches.length > 0 && (
           <div className="space-y-3">
-            <h3 className="text-lg font-bold text-accent">Chave Losers (Perdedores)</h3>
+            <h3 className="text-lg font-bold text-accent">Chave dos Perdedores</h3>
             <div className="grid grid-cols-2 gap-4">
-              {losersUpper.length > 0 && renderBracketColumn('Losers Lower Half ↓ (de Winners Upper)', losersUpper, 'bg-orange-950/20')}
-              {losersLower.length > 0 && renderBracketColumn('Losers Upper Half ↑ (de Winners Lower)', losersLower, 'bg-red-950/20')}
+              {losersUpper.length > 0 && renderBracketColumn('Perdedores Inferior ↓ (de Vencedores Superior)', losersUpper, 'bg-orange-950/20')}
+              {losersLower.length > 0 && renderBracketColumn('Perdedores Superior ↑ (de Vencedores Inferior)', losersLower, 'bg-red-950/20')}
             </div>
           </div>
         )}
@@ -170,7 +170,7 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
         {finalMatches.length > 0 && (
           <div className="space-y-3">
             <h3 className="text-lg font-bold text-primary flex items-center gap-2">
-              <Trophy className="h-5 w-5" /> Final Geral
+              <Trophy className="h-5 w-5" /> Grande Final
             </h3>
             <div className="bg-gradient-to-r from-primary/10 to-accent/10 rounded-lg p-4 border border-primary/30">
               {finalMatches.map(match => (
@@ -190,8 +190,8 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
         {/* Mirror Crossing Legend */}
         <div className="rounded-lg bg-muted/30 border border-border p-3 text-xs space-y-1">
           <div className="font-semibold text-muted-foreground mb-2">📍 Cruzamento Espelhado (Anti-Choque):</div>
-          <div className="text-muted-foreground">→ Winners Upper looser → Losers Lower</div>
-          <div className="text-muted-foreground">← Winners Lower looser → Losers Upper</div>
+          <div className="text-muted-foreground">→ Perdedor Vencedores Superior → Perdedores Inferior</div>
+          <div className="text-muted-foreground">← Perdedor Vencedores Inferior → Perdedores Superior</div>
         </div>
       </motion.div>
     );

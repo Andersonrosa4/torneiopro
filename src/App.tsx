@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import AthleteLogin from "./pages/AthleteLogin";
 import TournamentPublicView from "./pages/TournamentPublicView";
+import PublicRankingsView from "./pages/PublicRankingsView";
 import Dashboard from "./pages/Dashboard";
 import CreateTournament from "./pages/CreateTournament";
 import TournamentDetail from "./pages/TournamentDetail";
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/athlete-login" element={<AthleteLogin />} />
             <Route path="/tournament-view/:id" element={<TournamentPublicView />} />
+            <Route path="/ranking/:code" element={<PublicRankingsView />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/tournaments/new" element={<ProtectedRoute><CreateTournament /></ProtectedRoute>} />
             <Route path="/tournaments/:id" element={<ProtectedRoute><TournamentDetail /></ProtectedRoute>} />

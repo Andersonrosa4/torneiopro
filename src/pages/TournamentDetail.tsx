@@ -14,6 +14,7 @@ import AppHeader from "@/components/AppHeader";
 import BracketView from "@/components/BracketView";
 import BracketTreeView from "@/components/BracketTreeView";
 import { GenerateBracketDialog } from "@/components/GenerateBracketDialog";
+import RankingsTab from "@/components/RankingsTab";
 
 const sportLabels: Record<string, string> = {
   beach_volleyball: "🏐 Beach Volley",
@@ -343,6 +344,7 @@ const TournamentDetail = () => {
               <TabsTrigger value="teams">Duplas</TabsTrigger>
               <TabsTrigger value="registrations">Inscrições</TabsTrigger>
               <TabsTrigger value="bracket" disabled={matches.length === 0}>Chaveamento</TabsTrigger>
+              <TabsTrigger value="rankings">Ranking</TabsTrigger>
             </TabsList>
 
             {/* Duplas Tab */}
@@ -489,6 +491,15 @@ const TournamentDetail = () => {
                   )}
                 </section>
               )}
+            </TabsContent>
+
+            {/* Ranking Tab */}
+            <TabsContent value="rankings">
+              <RankingsTab 
+                tournamentId={id || ""} 
+                isOwner={isOwner}
+                sport={tournament.sport}
+              />
             </TabsContent>
           </Tabs>
         </motion.div>

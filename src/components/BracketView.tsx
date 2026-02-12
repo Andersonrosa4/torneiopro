@@ -13,11 +13,11 @@ interface Match {
   id: string;
   round: number;
   position: number;
-  participant1_id: string | null;
-  participant2_id: string | null;
+  team1_id: string | null;
+  team2_id: string | null;
   score1: number | null;
   score2: number | null;
-  winner_id: string | null;
+  winner_team_id: string | null;
   status: string;
 }
 
@@ -91,10 +91,10 @@ const MatchCard = ({
   const [s1, setS1] = useState(match.score1?.toString() || "0");
   const [s2, setS2] = useState(match.score2?.toString() || "0");
 
-  const p1Name = getName(match.participant1_id);
-  const p2Name = getName(match.participant2_id);
+  const p1Name = getName(match.team1_id);
+  const p2Name = getName(match.team2_id);
   const isCompleted = match.status === "completed";
-  const canScore = isOwner && !isCompleted && match.participant1_id && match.participant2_id;
+  const canScore = isOwner && !isCompleted && match.team1_id && match.team2_id;
 
   const handleScoreBlur = () => {
     onUpdateScore(match.id, Number(s1) || 0, Number(s2) || 0);
@@ -107,8 +107,8 @@ const MatchCard = ({
           <Trophy className="h-3 w-3" /> FINAL
         </div>
       )}
-      <div className={`flex items-center gap-2 border-b border-border px-3 py-2 ${match.winner_id === match.participant1_id ? "bg-success/10" : ""}`}>
-        <span className={`flex-1 text-sm font-medium truncate ${match.winner_id === match.participant1_id ? "text-success" : p1Name === "A definir" ? "text-muted-foreground" : ""}`}>
+      <div className={`flex items-center gap-2 border-b border-border px-3 py-2 ${match.winner_team_id === match.team1_id && isCompleted ? "bg-success/10" : ""}`}>
+        <span className={`flex-1 text-sm font-medium truncate ${match.winner_team_id === match.team1_id && isCompleted ? "text-success" : p1Name === "A definir" ? "text-muted-foreground" : ""}`}>
           {p1Name}
         </span>
         {canScore ? (
@@ -116,17 +116,17 @@ const MatchCard = ({
         ) : (
           <span className="text-sm font-bold tabular-nums">{match.score1 ?? "-"}</span>
         )}
-        {canScore && match.participant1_id && (
-          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onDeclareWinner(match.id, match.participant1_id!)}>
+        {canScore && match.team1_id && (
+          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onDeclareWinner(match.id, match.team1_id!)}>
             <Check className="h-3.5 w-3.5 text-success" />
           </Button>
         )}
-        {isCompleted && match.winner_id === match.participant1_id && (
+        {isCompleted && match.winner_team_id === match.team1_id && (
           <Trophy className="h-3.5 w-3.5 text-success shrink-0" />
         )}
       </div>
-      <div className={`flex items-center gap-2 px-3 py-2 ${match.winner_id === match.participant2_id ? "bg-success/10" : ""}`}>
-        <span className={`flex-1 text-sm font-medium truncate ${match.winner_id === match.participant2_id ? "text-success" : p2Name === "A definir" ? "text-muted-foreground" : ""}`}>
+      <div className={`flex items-center gap-2 px-3 py-2 ${match.winner_team_id === match.team2_id && isCompleted ? "bg-success/10" : ""}`}>
+        <span className={`flex-1 text-sm font-medium truncate ${match.winner_team_id === match.team2_id && isCompleted ? "text-success" : p2Name === "A definir" ? "text-muted-foreground" : ""}`}>
           {p2Name}
         </span>
         {canScore ? (
@@ -134,12 +134,12 @@ const MatchCard = ({
         ) : (
           <span className="text-sm font-bold tabular-nums">{match.score2 ?? "-"}</span>
         )}
-        {canScore && match.participant2_id && (
-          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onDeclareWinner(match.id, match.participant2_id!)}>
+        {canScore && match.team2_id && (
+          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onDeclareWinner(match.id, match.team2_id!)}>
             <Check className="h-3.5 w-3.5 text-success" />
           </Button>
         )}
-        {isCompleted && match.winner_id === match.participant2_id && (
+        {isCompleted && match.winner_team_id === match.team2_id && (
           <Trophy className="h-3.5 w-3.5 text-success shrink-0" />
         )}
       </div>

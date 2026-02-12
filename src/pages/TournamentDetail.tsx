@@ -217,8 +217,6 @@ const TournamentDetail = () => {
         position: i + 1,
         team1_id: t1?.id || null,
         team2_id: t2?.id || null,
-        participant1_id: t1?.id || null,
-        participant2_id: t2?.id || null,
         status: "pending" as const,
       });
     }
@@ -232,8 +230,6 @@ const TournamentDetail = () => {
           position: p + 1,
           team1_id: null,
           team2_id: null,
-          participant1_id: null,
-          participant2_id: null,
           status: "pending" as const,
         });
       }
@@ -253,7 +249,6 @@ const TournamentDetail = () => {
     confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
 
     await supabase.from("matches").update({
-      winner_id: winnerId,
       winner_team_id: winnerId,
       status: "completed" as const,
     }).eq("id", matchId);
@@ -269,8 +264,8 @@ const TournamentDetail = () => {
 
     if (nextMatch) {
       const update = isTop
-        ? { participant1_id: winnerId, team1_id: winnerId }
-        : { participant2_id: winnerId, team2_id: winnerId };
+        ? { team1_id: winnerId }
+        : { team2_id: winnerId };
       await supabase.from("matches").update(update).eq("id", nextMatch.id);
       toast.success("Avanço automático realizado!");
     } else {

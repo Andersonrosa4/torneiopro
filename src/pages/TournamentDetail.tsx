@@ -12,6 +12,7 @@ import { Plus, Trash2, Trophy, Users, Shuffle, Copy, Pencil, Check, X, ArrowLeft
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import AppHeader from "@/components/AppHeader";
+import ThemedBackground from "@/components/ThemedBackground";
 import BracketView from "@/components/BracketView";
 import BracketTreeView from "@/components/BracketTreeView";
 import { GenerateBracketDialog } from "@/components/GenerateBracketDialog";
@@ -342,24 +343,24 @@ const TournamentDetail = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
+      <ThemedBackground>
         <AppHeader />
         <div className="flex justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
-      </div>
+      </ThemedBackground>
     );
   }
 
   if (!tournament) {
     return (
-      <div className="min-h-screen bg-background">
+      <ThemedBackground>
         <AppHeader />
         <div className="container py-20 text-center">
           <p className="text-muted-foreground">Torneio não encontrado.</p>
           <Button variant="ghost" onClick={() => navigate("/dashboard")} className="mt-4">Voltar ao Painel</Button>
         </div>
-      </div>
+      </ThemedBackground>
     );
   }
 
@@ -370,7 +371,7 @@ const TournamentDetail = () => {
   }));
 
   return (
-    <div className="min-h-screen bg-background">
+    <ThemedBackground>
       <AppHeader />
       <main className="container py-8">
         <Button variant="ghost" onClick={() => navigate("/dashboard")} className="mb-4 gap-2">
@@ -652,7 +653,7 @@ const TournamentDetail = () => {
           </Tabs>
         </motion.div>
       </main>
-    </div>
+    </ThemedBackground>
   );
 };
 

@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Trophy, Hash } from "lucide-react";
+import ThemedBackground from "@/components/ThemedBackground";
 
 const AthleteLogin = () => {
   const [code, setCode] = useState("");
@@ -37,7 +38,12 @@ const AthleteLogin = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-[hsl(210_40%_15%)] via-[hsl(210_35%_20%)] to-[hsl(25_30%_25%)] px-4 relative overflow-hidden">
+      {/* Sand texture */}
+      <div className="absolute inset-0 sand-texture pointer-events-none" />
+      {/* Light beams */}
+      <div className="absolute top-0 left-1/4 w-32 h-full bg-gradient-to-b from-[hsl(195_80%_60%/0.08)] to-transparent rotate-12 animate-light-beam" />
+      <div className="absolute top-0 right-1/3 w-24 h-full bg-gradient-to-b from-[hsl(35_80%_60%/0.06)] to-transparent -rotate-6 animate-light-beam" style={{ animationDelay: "2s" }} />
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

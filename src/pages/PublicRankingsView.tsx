@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { TrendingUp } from "lucide-react";
 import { motion } from "framer-motion";
 import AppHeader from "@/components/AppHeader";
+import ThemedBackground from "@/components/ThemedBackground";
 
 interface RankingEntry {
   id: string;
@@ -86,28 +87,28 @@ const PublicRankingsView = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
+      <ThemedBackground>
         <AppHeader />
         <div className="flex justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
-      </div>
+      </ThemedBackground>
     );
   }
 
   if (!tournament) {
     return (
-      <div className="min-h-screen bg-background">
+      <ThemedBackground>
         <AppHeader />
         <div className="container py-20 text-center">
           <p className="text-muted-foreground">Torneio não encontrado.</p>
         </div>
-      </div>
+      </ThemedBackground>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <ThemedBackground>
       <AppHeader />
       <main className="container py-8">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
@@ -226,7 +227,7 @@ const PublicRankingsView = () => {
           </motion.section>
         </motion.div>
       </main>
-    </div>
+    </ThemedBackground>
   );
 };
 

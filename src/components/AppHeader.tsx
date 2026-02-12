@@ -19,7 +19,7 @@ const AppHeader = () => {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border glass">
+    <header className="sticky top-0 z-50 border-b border-border glass backdrop-blur-md">
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-6">
           <Link to="/dashboard" className="flex items-center gap-2">

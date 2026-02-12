@@ -118,6 +118,36 @@ export type Database = {
           },
         ]
       }
+      organizers: {
+        Row: {
+          created_at: string
+          created_by: string
+          display_name: string | null
+          id: string
+          password_hash: string
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          display_name?: string | null
+          id?: string
+          password_hash: string
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          display_name?: string | null
+          id?: string
+          password_hash?: string
+          updated_at?: string
+          username?: string
+        }
+        Relationships: []
+      }
       participants: {
         Row: {
           created_at: string

@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BracketTreeView from "@/components/BracketTreeView";
 import MatchSequenceTab from "@/components/MatchSequenceTab";
 import RankingsTab from "@/components/RankingsTab";
+import ThemedBackground from "@/components/ThemedBackground";
 
 const sportLabels: Record<string, string> = {
   beach_volleyball: "Vôlei de Praia",
@@ -65,18 +66,22 @@ const TournamentPublicView = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-      </div>
+      <ThemedBackground>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      </ThemedBackground>
     );
   }
 
   if (!tournament) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background gap-4">
-        <p className="text-muted-foreground">Torneio não encontrado.</p>
-        <Button variant="ghost" onClick={() => navigate("/")}>Voltar</Button>
-      </div>
+      <ThemedBackground>
+        <div className="flex min-h-screen flex-col items-center justify-center gap-4">
+          <p className="text-muted-foreground">Torneio não encontrado.</p>
+          <Button variant="ghost" onClick={() => navigate("/")}>Voltar</Button>
+        </div>
+      </ThemedBackground>
     );
   }
 
@@ -87,7 +92,7 @@ const TournamentPublicView = () => {
   }));
 
   return (
-    <div className="min-h-screen bg-background">
+    <ThemedBackground>
       <div className="container py-8">
         <Button variant="ghost" onClick={() => navigate("/")} className="mb-4 gap-2">
           <ArrowLeft className="h-4 w-4" /> Voltar
@@ -206,7 +211,7 @@ const TournamentPublicView = () => {
           </Tabs>
         </motion.div>
       </div>
-    </div>
+    </ThemedBackground>
   );
 };
 

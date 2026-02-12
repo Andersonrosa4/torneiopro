@@ -15,6 +15,7 @@ import BracketView from "@/components/BracketView";
 import BracketTreeView from "@/components/BracketTreeView";
 import { GenerateBracketDialog } from "@/components/GenerateBracketDialog";
 import RankingsTab from "@/components/RankingsTab";
+import confetti from "canvas-confetti";
 
 const sportLabels: Record<string, string> = {
   beach_volleyball: "🏐 Beach Volley",
@@ -221,6 +222,17 @@ const TournamentDetail = () => {
      const match = matches.find((m) => m.id === matchId);
      if (!match || !id) return;
 
+     // Efeito visual ao declarar vencedor
+     const triggerConfetti = () => {
+       confetti({
+         particleCount: 50,
+         spread: 60,
+         origin: { y: 0.6 },
+         duration: 1500,
+       });
+     };
+     triggerConfetti();
+
      // Atualiza o match com o vencedor
      await supabase.from("matches").update({
        winner_id: winnerId,
@@ -249,6 +261,20 @@ const TournamentDetail = () => {
        // Se não há próximo match, torneio está finalizado (ou chave está finalizada)
        await supabase.from("tournaments").update({ status: "completed" as const }).eq("id", id);
        toast.success("Torneio finalizado! 🏆");
+       
+       // Confete especial para finalização do torneio
+       setTimeout(() => {
+         for (let i = 0; i < 3; i++) {
+           setTimeout(() => {
+             confetti({
+               particleCount: 100,
+               spread: 70,
+               origin: { y: 0.5, x: Math.random() },
+               duration: 2000,
+             });
+           }, i * 300);
+         }
+       }, 500);
      }
      fetchData();
    };

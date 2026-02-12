@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { organizerQuery } from "@/lib/organizerApi";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +9,7 @@ import { Plus, Trophy, Users, Calendar, ArrowRight, MapPin, ArrowLeft } from "lu
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AppHeader from "@/components/AppHeader";
 import ThemedBackground from "@/components/ThemedBackground";
-import AdminOrganizersTab from "@/components/AdminOrganizersTab";
+import UserManagementTab from "@/components/UserManagementTab";
 
 const statusLabels: Record<string, string> = {
   draft: "Rascunho",
@@ -52,10 +51,9 @@ interface Tournament {
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user, organizerId } = useAuth();
+  const { user, organizerId, isAdmin } = useAuth();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const fetchTournaments = async () => {
@@ -68,21 +66,8 @@ const Dashboard = () => {
       if (!error && data) setTournaments(data);
       setLoading(false);
     };
-    const checkAdmin = async () => {
-      if (!user) return;
-      // Use organizer-api to check admin role (bypasses RLS)
-      const { data } = await organizerQuery({
-        table: "user_roles",
-        operation: "select",
-        select: "role",
-        filters: { user_id: organizerId || "", role: "admin" },
-        maybeSingle: true,
-      });
-      setIsAdmin(!!data);
-    };
     if (user) {
       fetchTournaments();
-      checkAdmin();
     }
   }, [user]);
 
@@ -106,17 +91,17 @@ const Dashboard = () => {
           </Link>
         </div>
 
-        <Tabs defaultValue={isAdmin ? "organizers" : "tournaments"}>
+        <Tabs defaultValue="tournaments">
           {isAdmin && (
             <TabsList className="mb-4">
-              <TabsTrigger value="organizers">Gestão de Organizadores</TabsTrigger>
               <TabsTrigger value="tournaments">Meus Torneios</TabsTrigger>
+              <TabsTrigger value="users">Gestão de Usuários</TabsTrigger>
             </TabsList>
           )}
 
           {isAdmin && (
-            <TabsContent value="organizers">
-              <AdminOrganizersTab />
+            <TabsContent value="users">
+              <UserManagementTab />
             </TabsContent>
           )}
 

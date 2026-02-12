@@ -61,6 +61,10 @@ const TournamentPublicView = () => {
       .channel(`public-rt-${id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `tournament_id=eq.${id}` }, () => fetchData())
       .on("postgres_changes", { event: "*", schema: "public", table: "teams", filter: `tournament_id=eq.${id}` }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "tournaments" }, (payload) => {
+        if ((payload.new as any)?.id === id) fetchData();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "rankings", filter: `tournament_id=eq.${id}` }, () => fetchData())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [id, fetchData]);

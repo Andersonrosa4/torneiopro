@@ -14,9 +14,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import AppHeader from "@/components/AppHeader";
 import ThemedBackground from "@/components/ThemedBackground";
 import BracketTreeView from "@/components/BracketTreeView";
+import MatchSequenceViewer from "@/components/MatchSequenceViewer";
+import ClassificationTab from "@/components/ClassificationTab";
 import { GenerateBracketDialog } from "@/components/GenerateBracketDialog";
 import RankingsTab from "@/components/RankingsTab";
-import { rankTeamsInGroup, selectIndexTeams } from "@/lib/tiebreakLogic";
 import confetti from "canvas-confetti";
 import { organizerQuery } from "@/lib/organizerApi";
 
@@ -759,7 +760,7 @@ const TournamentDetail = () => {
               )}
             </TabsContent>
 
-            {/* Sequência Tab - Tree view with score editing */}
+            {/* Sequência Tab - Match sequence with group identification */}
             <TabsContent value="sequence">
               {isOwner && matches.length > 0 && (
                 <div className="mb-4 flex justify-end">
@@ -773,9 +774,9 @@ const TournamentDetail = () => {
                   <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
                     <Trophy className="h-5 w-5" /> Sequência de Partidas
                   </h2>
-                  <BracketTreeView
+                  <MatchSequenceViewer
                     matches={matches}
-                    participants={participants}
+                    teams={teams}
                     isOwner={isOwner}
                     onDeclareWinner={declareWinner}
                     onUpdateScore={updateScore}
@@ -788,20 +789,14 @@ const TournamentDetail = () => {
               )}
             </TabsContent>
 
-            {/* Classificação Tab */}
+            {/* Classificação Tab - Read-only standings */}
             <TabsContent value="classification">
               {matches.length > 0 ? (
                 <section>
                   <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
                     <Trophy className="h-5 w-5" /> Classificação
                   </h2>
-                  <BracketTreeView
-                    matches={matches}
-                    participants={participants}
-                    isOwner={isOwner}
-                    onDeclareWinner={declareWinner}
-                    onUpdateScore={updateScore}
-                  />
+                  <ClassificationTab matches={matches} teams={teams} />
                 </section>
               ) : (
                 <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">

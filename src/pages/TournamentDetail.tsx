@@ -105,12 +105,12 @@ const TournamentDetail = () => {
 
   const isOwner = tournament?.created_by === organizerId || isAdmin;
 
-  // Filtered data by selected modality
+  // Filtered data by selected modality — STRICT isolation, no fallback
   const filteredTeams = selectedModality
-    ? teams.filter(t => t.modality_id === selectedModality.id || !t.modality_id)
+    ? teams.filter(t => t.modality_id === selectedModality.id)
     : teams;
   const filteredMatches = selectedModality
-    ? matches.filter(m => m.modality_id === selectedModality.id || !m.modality_id)
+    ? matches.filter(m => m.modality_id === selectedModality.id)
     : matches;
 
   // Reads use direct supabase (SELECT policies are true)
@@ -156,7 +156,7 @@ const TournamentDetail = () => {
         tournament_id: id,
         player1_name: player1.trim(),
         player2_name: player2.trim(),
-        seed: teams.length + 1,
+        seed: filteredTeams.length + 1,
         modality_id: selectedModality?.id || null,
       },
     });
@@ -172,7 +172,7 @@ const TournamentDetail = () => {
     if (count < 1 || count > 64) { toast.error("Quantidade inválida"); return; }
     const newTeams = [];
     for (let i = 0; i < count; i++) {
-      const num = teams.length + i + 1;
+      const num = filteredTeams.length + i + 1;
       newTeams.push({
         tournament_id: id,
         player1_name: `Jogador ${num}A`,
@@ -221,7 +221,7 @@ const TournamentDetail = () => {
 
   const shuffleTeams = async () => {
     if (!id) return;
-    const shuffled = [...teams].sort(() => Math.random() - 0.5);
+    const shuffled = [...filteredTeams].sort(() => Math.random() - 0.5);
     for (let i = 0; i < shuffled.length; i++) {
       await organizerQuery({
         table: "teams",
@@ -248,7 +248,15 @@ const TournamentDetail = () => {
     numIndexTeams?: number;
   }) => {
 
-    await organizerQuery({ table: "matches", operation: "delete", filters: { tournament_id: id } });
+    // Delete only matches for the current modality
+    if (selectedModality) {
+      const modalityMatches = matches.filter(m => m.modality_id === selectedModality.id);
+      for (const m of modalityMatches) {
+        await organizerQuery({ table: "matches", operation: "delete", filters: { id: m.id } });
+      }
+    } else {
+      await organizerQuery({ table: "matches", operation: "delete", filters: { tournament_id: id } });
+    }
 
     await organizerQuery({
       table: "tournaments",
@@ -257,9 +265,11 @@ const TournamentDetail = () => {
       filters: { id },
     });
 
+    const currentModalityId = selectedModality?.id || null;
+
     if (config.useGroupStage) {
       // === GROUP STAGE ===
-      const nonByeTeams = teams.filter(t => !config.byeTeamIds.includes(t.id));
+      const nonByeTeams = filteredTeams.filter(t => !config.byeTeamIds.includes(t.id));
       let arranged = [...nonByeTeams];
       if (config.useSeeds && config.seedTeamIds && config.seedTeamIds.length > 0) {
         const seeds = arranged.filter(t => config.seedTeamIds!.includes(t.id));
@@ -288,6 +298,7 @@ const TournamentDetail = () => {
               team2_id: groupTeams[j].id,
               status: "pending",
               bracket_number: g + 1,
+              modality_id: currentModalityId,
             });
           }
         }
@@ -316,10 +327,10 @@ const TournamentDetail = () => {
       fetchData();
     } else {
       // === DIRECT KNOCKOUT ===
-      const totalSlots = Math.pow(2, Math.ceil(Math.log2(teams.length)));
+      const totalSlots = Math.pow(2, Math.ceil(Math.log2(filteredTeams.length)));
       const maxRounds = Math.ceil(Math.log2(totalSlots));
 
-      let arranged = [...teams];
+      let arranged = [...filteredTeams];
       if (config.useSeeds && config.seedTeamIds && config.seedTeamIds.length > 0) {
         const seeds = arranged.filter(t => config.seedTeamIds!.includes(t.id));
         const nonSeeds = arranged.filter(t => !config.seedTeamIds!.includes(t.id)).sort(() => Math.random() - 0.5);
@@ -342,6 +353,7 @@ const TournamentDetail = () => {
           team1_id: t1?.id || null,
           team2_id: t2?.id || null,
           status: "pending",
+          modality_id: currentModalityId,
         });
       }
 
@@ -355,6 +367,7 @@ const TournamentDetail = () => {
             team1_id: null,
             team2_id: null,
             status: "pending",
+            modality_id: currentModalityId,
           });
         }
       }
@@ -416,13 +429,15 @@ const TournamentDetail = () => {
 
   const undoBracket = async () => {
     if (!id) return;
-    await organizerQuery({ table: "matches", operation: "delete", filters: { tournament_id: id } });
-    await organizerQuery({
-      table: "tournaments",
-      operation: "update",
-      data: { status: "draft" },
-      filters: { id },
-    });
+    // Delete only matches for the current modality
+    if (selectedModality) {
+      const modalityMatches = matches.filter(m => m.modality_id === selectedModality.id);
+      for (const m of modalityMatches) {
+        await organizerQuery({ table: "matches", operation: "delete", filters: { id: m.id } });
+      }
+    } else {
+      await organizerQuery({ table: "matches", operation: "delete", filters: { tournament_id: id } });
+    }
     toast.success("Chaveamento desfeito!");
     fetchData();
   };
@@ -448,7 +463,7 @@ const TournamentDetail = () => {
 
     // Build team names map
     const teamNames: Record<string, string> = {};
-    teams.forEach((t) => { teamNames[t.id] = `${t.player1_name} / ${t.player2_name}`; });
+    filteredTeams.forEach((t) => { teamNames[t.id] = `${t.player1_name} / ${t.player2_name}`; });
 
     // Rank teams in each group
     const groupRankings: Record<string, { teamId: string; rank: number; pointDifferential: number }[]> = {};
@@ -476,7 +491,7 @@ const TournamentDetail = () => {
     const allAdvancing = [...advancingTeamIds, ...indexTeamIds];
 
     // Also include BYE teams that went straight to knockout
-    const byeTeams = teams.filter((t) => !groupMatches.some((m: any) => m.team1_id === t.id || m.team2_id === t.id));
+    const byeTeams = filteredTeams.filter((t) => !groupMatches.some((m: any) => m.team1_id === t.id || m.team2_id === t.id));
     byeTeams.forEach((t) => allAdvancing.push(t.id));
 
     if (allAdvancing.length < 2) {
@@ -504,6 +519,7 @@ const TournamentDetail = () => {
         team2_id: t2 || null,
         status: "pending",
         bracket_number: 1,
+        modality_id: selectedModality?.id || null,
       });
     }
 
@@ -518,6 +534,7 @@ const TournamentDetail = () => {
           team2_id: null,
           status: "pending",
           bracket_number: 1,
+          modality_id: selectedModality?.id || null,
         });
       }
     }
@@ -1069,6 +1086,7 @@ const TournamentDetail = () => {
                 sport={tournament.sport}
                 tournamentName={tournament.name}
                 eventDate={tournament.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
+                modalityId={selectedModality?.id || null}
               />
             </TabsContent>
           </Tabs>

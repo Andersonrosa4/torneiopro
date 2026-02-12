@@ -82,6 +82,22 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Ensure admin organizer exists in organizers table
+    const { data: existingOrganizer } = await supabase
+      .from("organizers")
+      .select("id")
+      .eq("username", "admin")
+      .maybeSingle();
+
+    if (!existingOrganizer) {
+      await supabase.from("organizers").insert({
+        username: "admin",
+        password_hash: adminPassword,
+        display_name: "Admin",
+        created_by: userId,
+      });
+    }
+
     return new Response(
       JSON.stringify({ success: true, message: "Admin account ready", userId }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }

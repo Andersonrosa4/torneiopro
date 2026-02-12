@@ -34,15 +34,15 @@ const BracketView = ({ matches, participants, isOwner, onDeclareWinner, onUpdate
   const roundNumbers = Array.from({ length: rounds }, (_, i) => i + 1);
 
   const getName = (id: string | null) => {
-    if (!id) return "TBD";
-    return participants.find((p) => p.id === id)?.name || "TBD";
+    if (!id) return "A definir";
+    return participants.find((p) => p.id === id)?.name || "A definir";
   };
 
   const getRoundLabel = (round: number) => {
     if (round === rounds) return "Final";
-    if (round === rounds - 1) return "Semi-Final";
-    if (round === rounds - 2) return "Quarter-Final";
-    return `Round ${round}`;
+    if (round === rounds - 1) return "Semifinal";
+    if (round === rounds - 2) return "Quartas";
+    return `Rodada ${round}`;
   };
 
   return (
@@ -77,12 +77,7 @@ const BracketView = ({ matches, participants, isOwner, onDeclareWinner, onUpdate
 };
 
 const MatchCard = ({
-  match,
-  getName,
-  isOwner,
-  onDeclareWinner,
-  onUpdateScore,
-  isFinal,
+  match, getName, isOwner, onDeclareWinner, onUpdateScore, isFinal,
 }: {
   match: Match;
   getName: (id: string | null) => string;
@@ -104,24 +99,18 @@ const MatchCard = ({
   };
 
   return (
-    <div className={`w-60 rounded-lg border bg-card shadow-card ${isFinal ? "border-primary/40 shadow-glow" : "border-border"} ${isCompleted ? "opacity-80" : ""}`}>
+    <div className={`w-64 rounded-lg border bg-card shadow-card ${isFinal ? "border-primary/40 shadow-glow" : "border-border"} ${isCompleted ? "opacity-80" : ""}`}>
       {isFinal && (
         <div className="flex items-center justify-center gap-1 rounded-t-lg bg-gradient-primary px-2 py-1 text-xs font-bold text-primary-foreground">
           <Trophy className="h-3 w-3" /> FINAL
         </div>
       )}
-      {/* Player 1 */}
       <div className={`flex items-center gap-2 border-b border-border px-3 py-2 ${match.winner_id === match.participant1_id ? "bg-success/10" : ""}`}>
-        <span className={`flex-1 text-sm font-medium truncate ${match.winner_id === match.participant1_id ? "text-success" : p1Name === "TBD" ? "text-muted-foreground" : ""}`}>
+        <span className={`flex-1 text-sm font-medium truncate ${match.winner_id === match.participant1_id ? "text-success" : p1Name === "A definir" ? "text-muted-foreground" : ""}`}>
           {p1Name}
         </span>
         {canScore ? (
-          <Input
-            value={s1}
-            onChange={(e) => setS1(e.target.value)}
-            onBlur={handleScoreBlur}
-            className="h-7 w-12 text-center text-sm p-0"
-          />
+          <Input value={s1} onChange={(e) => setS1(e.target.value)} onBlur={handleScoreBlur} className="h-7 w-12 text-center text-sm p-0" />
         ) : (
           <span className="text-sm font-bold tabular-nums">{match.score1 ?? "-"}</span>
         )}
@@ -134,18 +123,12 @@ const MatchCard = ({
           <Trophy className="h-3.5 w-3.5 text-success shrink-0" />
         )}
       </div>
-      {/* Player 2 */}
       <div className={`flex items-center gap-2 px-3 py-2 ${match.winner_id === match.participant2_id ? "bg-success/10" : ""}`}>
-        <span className={`flex-1 text-sm font-medium truncate ${match.winner_id === match.participant2_id ? "text-success" : p2Name === "TBD" ? "text-muted-foreground" : ""}`}>
+        <span className={`flex-1 text-sm font-medium truncate ${match.winner_id === match.participant2_id ? "text-success" : p2Name === "A definir" ? "text-muted-foreground" : ""}`}>
           {p2Name}
         </span>
         {canScore ? (
-          <Input
-            value={s2}
-            onChange={(e) => setS2(e.target.value)}
-            onBlur={handleScoreBlur}
-            className="h-7 w-12 text-center text-sm p-0"
-          />
+          <Input value={s2} onChange={(e) => setS2(e.target.value)} onBlur={handleScoreBlur} className="h-7 w-12 text-center text-sm p-0" />
         ) : (
           <span className="text-sm font-bold tabular-nums">{match.score2 ?? "-"}</span>
         )}

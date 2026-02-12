@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Trophy, Mail, Lock, User } from "lucide-react";
@@ -15,6 +15,7 @@ const Auth = () => {
   const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +25,7 @@ const Auth = () => {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        toast.success("Welcome back!");
+        toast.success("Bem-vindo de volta!");
         navigate("/dashboard");
       } else {
         const { error } = await supabase.auth.signUp({
@@ -36,7 +37,7 @@ const Auth = () => {
           },
         });
         if (error) throw error;
-        toast.success("Check your email to confirm your account!");
+        toast.success("Verifique seu email para confirmar sua conta!");
       }
     } catch (error: any) {
       toast.error(error.message);
@@ -57,10 +58,10 @@ const Auth = () => {
             <Trophy className="h-8 w-8 text-primary-foreground" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            Tournament Manager
+            Arena Pro
           </h1>
           <p className="mt-2 text-muted-foreground">
-            {isLogin ? "Sign in to manage your tournaments" : "Create your account"}
+            {isLogin ? "Entre para gerenciar seus torneios" : "Crie sua conta"}
           </p>
         </div>
 
@@ -68,14 +69,14 @@ const Auth = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div className="space-y-2">
-                <Label htmlFor="displayName">Display Name</Label>
+                <Label htmlFor="displayName">Nome</Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="displayName"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="Your name"
+                    placeholder="Seu nome"
                     className="pl-10"
                     required={!isLogin}
                   />
@@ -91,14 +92,14 @@ const Auth = () => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
+                  placeholder="voce@exemplo.com"
                   className="pl-10"
                   required
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">Senha</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -114,7 +115,7 @@ const Auth = () => {
               </div>
             </div>
             <Button type="submit" className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90" disabled={loading}>
-              {loading ? "Loading..." : isLogin ? "Sign In" : "Create Account"}
+              {loading ? "Carregando..." : isLogin ? "Entrar" : "Criar Conta"}
             </Button>
           </form>
 
@@ -124,9 +125,18 @@ const Auth = () => {
               onClick={() => setIsLogin(!isLogin)}
               className="text-sm text-primary hover:underline"
             >
-              {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
+              {isLogin ? "Não tem conta? Cadastre-se" : "Já tem conta? Entre"}
             </button>
           </div>
+        </div>
+
+        <div className="mt-4 text-center">
+          <button
+            onClick={() => navigate("/")}
+            className="text-sm text-muted-foreground hover:text-primary transition-colors"
+          >
+            ← Voltar ao início
+          </button>
         </div>
       </motion.div>
     </div>

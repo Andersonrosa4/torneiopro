@@ -1,8 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Check } from "lucide-react";
+import { Trophy, Check, Save } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface Match {
@@ -28,14 +28,85 @@ interface MatchSequenceViewerProps {
   matches: Match[];
   teams: Team[];
   isOwner: boolean;
+  numSets: number;
   onDeclareWinner: (matchId: string, winnerId: string) => void;
   onUpdateScore: (matchId: string, score1: number, score2: number) => void;
+}
+
+/**
+ * Generates a match sequence with round-based interleaving:
+ * - One match from each group per round
+ * - No team plays back-to-back matches
+ */
+function generateSequence(matches: Match[]): Match[] {
+  if (matches.length === 0) return [];
+
+  const rounds = [...new Set(matches.map((m) => m.round))].sort((a, b) => a - b);
+  const brackets = [...new Set(matches.map((m) => m.bracket_number || 1))].sort((a, b) => a - b);
+
+  // Build round-robin interleaved sequence
+  const interleaved: Match[] = [];
+  for (const round of rounds) {
+    const roundMatches = matches.filter((m) => m.round === round);
+    const byBracket: Record<number, Match[]> = {};
+    for (const b of brackets) {
+      byBracket[b] = roundMatches
+        .filter((m) => (m.bracket_number || 1) === b)
+        .sort((a, b2) => a.position - b2.position);
+    }
+    const maxLen = Math.max(...Object.values(byBracket).map((a) => a.length), 0);
+    for (let i = 0; i < maxLen; i++) {
+      for (const b of brackets) {
+        if (byBracket[b]?.[i]) interleaved.push(byBracket[b][i]);
+      }
+    }
+  }
+
+  // Post-process: ensure no team plays back-to-back
+  return resolveConsecutiveConflicts(interleaved);
+}
+
+function resolveConsecutiveConflicts(sequence: Match[]): Match[] {
+  const result = [...sequence];
+  const maxPasses = result.length * 2;
+
+  for (let pass = 0; pass < maxPasses; pass++) {
+    let swapped = false;
+    for (let i = 1; i < result.length; i++) {
+      if (hasTeamOverlap(result[i - 1], result[i])) {
+        // Find next non-conflicting match to swap
+        let swapIdx = -1;
+        for (let j = i + 1; j < result.length; j++) {
+          if (
+            !hasTeamOverlap(result[i - 1], result[j]) &&
+            (i + 1 >= result.length || !hasTeamOverlap(result[j], result[i + 1]))
+          ) {
+            swapIdx = j;
+            break;
+          }
+        }
+        if (swapIdx !== -1) {
+          [result[i], result[swapIdx]] = [result[swapIdx], result[i]];
+          swapped = true;
+        }
+      }
+    }
+    if (!swapped) break;
+  }
+  return result;
+}
+
+function hasTeamOverlap(a: Match, b: Match): boolean {
+  const teamsA = [a.team1_id, a.team2_id].filter(Boolean);
+  const teamsB = [b.team1_id, b.team2_id].filter(Boolean);
+  return teamsA.some((t) => teamsB.includes(t));
 }
 
 const MatchSequenceViewer = ({
   matches,
   teams,
   isOwner,
+  numSets,
   onDeclareWinner,
   onUpdateScore,
 }: MatchSequenceViewerProps) => {
@@ -45,32 +116,7 @@ const MatchSequenceViewer = ({
     return team ? `${team.player1_name} / ${team.player2_name}` : "A definir";
   };
 
-  // Generate match sequence
-  const sequence = useMemo(() => {
-    if (matches.length === 0) return [];
-    const rounds = [...new Set(matches.map((m) => m.round))].sort((a, b) => a - b);
-    const brackets = [...new Set(matches.map((m) => m.bracket_number || 1))].sort(
-      (a, b) => a - b
-    );
-
-    const ordered: Match[] = [];
-    for (const round of rounds) {
-      const roundMatches = matches.filter((m) => m.round === round);
-      const byBracket: Record<number, Match[]> = {};
-      for (const b of brackets) {
-        byBracket[b] = roundMatches
-          .filter((m) => (m.bracket_number || 1) === b)
-          .sort((a, b2) => a.position - b2.position);
-      }
-      const maxLen = Math.max(...Object.values(byBracket).map((a) => a.length));
-      for (let i = 0; i < maxLen; i++) {
-        for (const b of brackets) {
-          if (byBracket[b][i]) ordered.push(byBracket[b][i]);
-        }
-      }
-    }
-    return ordered;
-  }, [matches]);
+  const sequence = useMemo(() => generateSequence(matches), [matches]);
 
   const maxRound = matches.length > 0 ? Math.max(...matches.map((m) => m.round)) : 0;
 
@@ -108,6 +154,7 @@ const MatchSequenceViewer = ({
           getGroupId={getGroupId}
           getRoundLabel={getRoundLabel}
           isOwner={isOwner}
+          numSets={numSets}
           onDeclareWinner={onDeclareWinner}
           onUpdateScore={onUpdateScore}
         />
@@ -123,6 +170,7 @@ interface MatchCardProps {
   getGroupId: (match: Match) => string;
   getRoundLabel: (round: number) => string;
   isOwner: boolean;
+  numSets: number;
   onDeclareWinner: (matchId: string, winnerId: string) => void;
   onUpdateScore: (matchId: string, score1: number, score2: number) => void;
 }
@@ -134,11 +182,25 @@ const MatchCard = ({
   getGroupId,
   getRoundLabel,
   isOwner,
+  numSets,
   onDeclareWinner,
   onUpdateScore,
 }: MatchCardProps) => {
-  const [s1, setS1] = useState(match.score1?.toString() || "0");
-  const [s2, setS2] = useState(match.score2?.toString() || "0");
+  // Parse existing scores into sets (stored as total, we split evenly for display)
+  const initSets = () => {
+    const sets: { s1: string; s2: string }[] = [];
+    for (let i = 0; i < numSets; i++) {
+      sets.push({ s1: "0", s2: "0" });
+    }
+    return sets;
+  };
+
+  const [setScores, setSetScores] = useState(initSets);
+
+  // Sync when match data changes
+  useEffect(() => {
+    setSetScores(initSets());
+  }, [numSets, match.id]);
 
   const isCompleted = match.status === "completed";
   const team1Name = getTeamName(match.team1_id);
@@ -146,20 +208,33 @@ const MatchCard = ({
   const hasTeams = match.team1_id && match.team2_id;
   const canScore = isOwner && !isCompleted && hasTeams;
 
-  const handleScoreBlur = () => {
-    onUpdateScore(match.id, Number(s1) || 0, Number(s2) || 0);
+  const handleSaveScore = () => {
+    const total1 = setScores.reduce((sum, s) => sum + (Number(s.s1) || 0), 0);
+    const total2 = setScores.reduce((sum, s) => sum + (Number(s.s2) || 0), 0);
+    onUpdateScore(match.id, total1, total2);
   };
+
+  const updateSetScore = (setIdx: number, field: "s1" | "s2", value: string) => {
+    setSetScores((prev) => {
+      const copy = [...prev];
+      copy[setIdx] = { ...copy[setIdx], [field]: value };
+      return copy;
+    });
+  };
+
+  const totalScore1 = setScores.reduce((sum, s) => sum + (Number(s.s1) || 0), 0);
+  const totalScore2 = setScores.reduce((sum, s) => sum + (Number(s.s2) || 0), 0);
 
   return (
     <motion.div
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.02 }}
+      transition={{ delay: Math.min(index * 0.02, 1) }}
       className={`flex flex-col gap-2 rounded-lg border bg-card px-4 py-3 shadow-card transition-all ${
         isCompleted ? "border-success/30 opacity-80" : hasTeams ? "border-primary/30" : "border-border"
       }`}
     >
-      {/* Header: Number, Round, Group */}
+      {/* Header */}
       <div className="flex items-center gap-3">
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground shrink-0">
           {index}
@@ -173,68 +248,88 @@ const MatchCard = ({
         {isCompleted && <Trophy className="h-4 w-4 text-success ml-auto shrink-0" />}
       </div>
 
-      {/* Teams and Scores */}
+      {/* Teams */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm font-medium">{team1Name}</span>
+        <span className={`text-sm font-medium ${isCompleted && match.winner_team_id === match.team1_id ? "text-success font-bold" : ""}`}>
+          {team1Name}
+        </span>
         <span className="text-xs text-muted-foreground">vs</span>
-        <span className="text-sm font-medium">{team2Name}</span>
+        <span className={`text-sm font-medium ${isCompleted && match.winner_team_id === match.team2_id ? "text-success font-bold" : ""}`}>
+          {team2Name}
+        </span>
       </div>
 
-      {/* Scores and Winner Selection */}
-      {hasTeams && (
+      {/* Score editing with sets */}
+      {hasTeams && canScore && (
+        <div className="space-y-2 mt-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {setScores.map((s, idx) => (
+              <div key={idx} className="flex items-center gap-1">
+                <span className="text-[10px] text-muted-foreground font-medium">S{idx + 1}</span>
+                <Input
+                  value={s.s1}
+                  onChange={(e) => updateSetScore(idx, "s1", e.target.value)}
+                  className="h-7 w-10 text-center text-xs p-0"
+                />
+                <span className="text-xs text-muted-foreground">×</span>
+                <Input
+                  value={s.s2}
+                  onChange={(e) => updateSetScore(idx, "s2", e.target.value)}
+                  className="h-7 w-10 text-center text-xs p-0"
+                />
+                {idx < setScores.length - 1 && <span className="text-muted-foreground mx-1">|</span>}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-muted-foreground">Total: {totalScore1} × {totalScore2}</span>
+            <Button size="sm" variant="outline" className="h-6 px-2 text-xs gap-1" onClick={handleSaveScore}>
+              <Save className="h-3 w-3" /> Salvar
+            </Button>
+            {match.team1_id && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-xs"
+                onClick={() => {
+                  handleSaveScore();
+                  onDeclareWinner(match.id, match.team1_id!);
+                }}
+              >
+                <Check className="h-3 w-3 text-success mr-1" /> {getTeamName(match.team1_id).split(" / ")[0]}
+              </Button>
+            )}
+            {match.team2_id && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-xs"
+                onClick={() => {
+                  handleSaveScore();
+                  onDeclareWinner(match.id, match.team2_id!);
+                }}
+              >
+                <Check className="h-3 w-3 text-success mr-1" /> {getTeamName(match.team2_id).split(" / ")[0]}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Completed / Read-only score display */}
+      {hasTeams && !canScore && (
         <div className="flex items-center gap-2 flex-wrap mt-2">
-          {canScore ? (
-            <>
-              <Input
-                value={s1}
-                onChange={(e) => setS1(e.target.value)}
-                onBlur={handleScoreBlur}
-                className="h-7 w-12 text-center text-xs p-1"
-                placeholder="0"
-              />
-              <span className="text-xs font-medium">-</span>
-              <Input
-                value={s2}
-                onChange={(e) => setS2(e.target.value)}
-                onBlur={handleScoreBlur}
-                className="h-7 w-12 text-center text-xs p-1"
-                placeholder="0"
-              />
-              {match.team1_id && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 px-2 text-xs"
-                  onClick={() => onDeclareWinner(match.id, match.team1_id!)}
-                >
-                  <Check className="h-3 w-3 text-success mr-1" /> {getTeamName(match.team1_id).split(" / ")[0]}
-                </Button>
-              )}
-              {match.team2_id && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 px-2 text-xs"
-                  onClick={() => onDeclareWinner(match.id, match.team2_id!)}
-                >
-                  <Check className="h-3 w-3 text-success mr-1" /> {getTeamName(match.team2_id).split(" / ")[0]}
-                </Button>
-              )}
-            </>
-          ) : (
-            <>
-              <span className="text-sm font-mono font-bold">
-                {match.score1 ?? "-"} - {match.score2 ?? "-"}
-              </span>
-              {isCompleted && match.winner_team_id && (
-                <Badge className="bg-success/20 text-success border-0 text-xs">
-                  Vencedor: {getTeamName(match.winner_team_id)}
-                </Badge>
-              )}
-              {!isCompleted && (
-                <Badge className="bg-warning/20 text-warning border-0 text-xs">Pendente</Badge>
-              )}
-            </>
+          <span className="text-sm font-mono font-bold">
+            {match.score1 ?? "-"} × {match.score2 ?? "-"}
+          </span>
+          {isCompleted && match.winner_team_id && (
+            <Badge className="bg-success/20 text-success border-0 text-xs">
+              Vencedor: {getTeamName(match.winner_team_id)}
+            </Badge>
+          )}
+          {!isCompleted && (
+            <Badge className="bg-warning/20 text-warning border-0 text-xs">Pendente</Badge>
           )}
         </div>
       )}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { organizerQuery } from "@/lib/organizerApi";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -69,12 +70,14 @@ const Dashboard = () => {
     };
     const checkAdmin = async () => {
       if (!user) return;
-      const { data } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", organizerId || "")
-        .eq("role", "admin")
-        .maybeSingle();
+      // Use organizer-api to check admin role (bypasses RLS)
+      const { data } = await organizerQuery({
+        table: "user_roles",
+        operation: "select",
+        select: "role",
+        filters: { user_id: organizerId || "", role: "admin" },
+        maybeSingle: true,
+      });
       setIsAdmin(!!data);
     };
     if (user) {

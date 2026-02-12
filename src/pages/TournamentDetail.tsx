@@ -20,6 +20,7 @@ import RankingsTab from "@/components/RankingsTab";
 import MatchSequenceTab from "@/components/MatchSequenceTab";
 import { rankTeamsInGroup, selectIndexTeams } from "@/lib/tiebreakLogic";
 import confetti from "canvas-confetti";
+import { organizerQuery } from "@/lib/organizerApi";
 
 const sportLabels: Record<string, string> = {
   beach_volleyball: "🏐 Vôlei de Praia",
@@ -90,6 +91,7 @@ const TournamentDetail = () => {
 
   const isOwner = tournament?.created_by === organizerId;
 
+  // Reads use direct supabase (SELECT policies are true)
   const fetchData = useCallback(async () => {
     if (!id) return;
     const [tRes, teamsRes, mRes] = await Promise.all([
@@ -108,7 +110,7 @@ const TournamentDetail = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Real-time subscriptions for matches, teams, rankings
+  // Real-time subscriptions
   useEffect(() => {
     if (!id) return;
     const channel = supabase
@@ -122,13 +124,18 @@ const TournamentDetail = () => {
     return () => { supabase.removeChannel(channel); };
   }, [id, fetchData]);
 
+  // All writes go through organizerQuery
   const addTeam = async () => {
     if (!player1.trim() || !player2.trim() || !id) return;
-    const { error } = await supabase.from("teams").insert({
-      tournament_id: id,
-      player1_name: player1.trim(),
-      player2_name: player2.trim(),
-      seed: teams.length + 1,
+    const { error } = await organizerQuery({
+      table: "teams",
+      operation: "insert",
+      data: {
+        tournament_id: id,
+        player1_name: player1.trim(),
+        player2_name: player2.trim(),
+        seed: teams.length + 1,
+      },
     });
     if (error) { toast.error(error.message); return; }
     setPlayer1("");
@@ -151,7 +158,11 @@ const TournamentDetail = () => {
         is_fictitious: true,
       });
     }
-    const { error } = await supabase.from("teams").insert(newTeams);
+    const { error } = await organizerQuery({
+      table: "teams",
+      operation: "insert",
+      data: newTeams,
+    });
     if (error) { toast.error(error.message); return; }
     toast.success(`${count} dupla(s) fictícia(s) criada(s)!`);
     setFictitiousDialogOpen(false);
@@ -159,7 +170,7 @@ const TournamentDetail = () => {
   };
 
   const removeTeam = async (tid: string) => {
-    await supabase.from("teams").delete().eq("id", tid);
+    await organizerQuery({ table: "teams", operation: "delete", filters: { id: tid } });
     fetchData();
   };
 
@@ -171,10 +182,12 @@ const TournamentDetail = () => {
 
   const saveEdit = async () => {
     if (!editingTeamId || !editP1.trim() || !editP2.trim()) return;
-    await supabase.from("teams").update({
-      player1_name: editP1.trim(),
-      player2_name: editP2.trim(),
-    }).eq("id", editingTeamId);
+    await organizerQuery({
+      table: "teams",
+      operation: "update",
+      data: { player1_name: editP1.trim(), player2_name: editP2.trim() },
+      filters: { id: editingTeamId },
+    });
     setEditingTeamId(null);
     toast.success("Dupla atualizada!");
     fetchData();
@@ -186,7 +199,12 @@ const TournamentDetail = () => {
     if (!id) return;
     const shuffled = [...teams].sort(() => Math.random() - 0.5);
     for (let i = 0; i < shuffled.length; i++) {
-      await supabase.from("teams").update({ seed: i + 1 }).eq("id", shuffled[i].id);
+      await organizerQuery({
+        table: "teams",
+        operation: "update",
+        data: { seed: i + 1 },
+        filters: { id: shuffled[i].id },
+      });
     }
     toast.success("Duplas embaralhadas!");
     fetchData();
@@ -206,12 +224,14 @@ const TournamentDetail = () => {
     numIndexTeams?: number;
   }) => {
 
-    await supabase.from("matches").delete().eq("tournament_id", id);
+    await organizerQuery({ table: "matches", operation: "delete", filters: { tournament_id: id } });
 
-    await supabase.from("tournaments").update({
-      num_sets: config.numSets,
-      games_per_set: config.gamesPerSet || null,
-    }).eq("id", id);
+    await organizerQuery({
+      table: "tournaments",
+      operation: "update",
+      data: { num_sets: config.numSets, games_per_set: config.gamesPerSet || null },
+      filters: { id },
+    });
 
     if (config.useGroupStage) {
       // === GROUP STAGE ===
@@ -225,15 +245,12 @@ const TournamentDetail = () => {
         arranged.sort(() => Math.random() - 0.5);
       }
 
-      // Distribute teams into groups
       const groups: typeof arranged[] = Array.from({ length: config.numGroups }, () => []);
       arranged.forEach((team, i) => {
         groups[i % config.numGroups].push(team);
       });
 
       const newMatches: any[] = [];
-
-      // Create round-robin matches for each group
       for (let g = 0; g < groups.length; g++) {
         const groupTeams = groups[g];
         let pos = 1;
@@ -241,33 +258,40 @@ const TournamentDetail = () => {
           for (let j = i + 1; j < groupTeams.length; j++) {
             newMatches.push({
               tournament_id: id,
-              round: 0, // Round 0 = group stage
+              round: 0,
               position: pos++,
               team1_id: groupTeams[i].id,
               team2_id: groupTeams[j].id,
-              status: "pending" as const,
-              bracket_number: g + 1, // bracket_number = group number
+              status: "pending",
+              bracket_number: g + 1,
             });
           }
         }
       }
 
-      const { error } = await supabase.from("matches").insert(newMatches);
+      const { error } = await organizerQuery({ table: "matches", operation: "insert", data: newMatches });
       if (error) { toast.error(error.message); return; }
 
-      await supabase.from("tournaments").update({ status: "in_progress" as const }).eq("id", id);
+      await organizerQuery({
+        table: "tournaments",
+        operation: "update",
+        data: { status: "in_progress" },
+        filters: { id },
+      });
       
-      // Store index advancement configuration for later use
       if (config.useIndex && config.numIndexTeams && config.numIndexTeams > 0) {
-        await supabase.from("tournaments").update({
-          num_brackets: config.numIndexTeams,
-        }).eq("id", id);
+        await organizerQuery({
+          table: "tournaments",
+          operation: "update",
+          data: { num_brackets: config.numIndexTeams },
+          filters: { id },
+        });
       }
       
       toast.success(`Fase de grupos gerada! ${config.numGroups} grupo(s) criado(s)${config.useIndex ? ` + ${config.numIndexTeams} índice` : ""}.`);
       fetchData();
     } else {
-      // === DIRECT KNOCKOUT (existing logic) ===
+      // === DIRECT KNOCKOUT ===
       const totalSlots = Math.pow(2, Math.ceil(Math.log2(teams.length)));
       const maxRounds = Math.ceil(Math.log2(totalSlots));
 
@@ -293,7 +317,7 @@ const TournamentDetail = () => {
           position: i + 1,
           team1_id: t1?.id || null,
           team2_id: t2?.id || null,
-          status: "pending" as const,
+          status: "pending",
         });
       }
 
@@ -306,7 +330,7 @@ const TournamentDetail = () => {
             position: p + 1,
             team1_id: null,
             team2_id: null,
-            status: "pending" as const,
+            status: "pending",
           });
         }
       }
@@ -322,29 +346,45 @@ const TournamentDetail = () => {
         }
       }
 
-      const { error } = await supabase.from("matches").insert(newMatches);
+      const { error } = await organizerQuery({ table: "matches", operation: "insert", data: newMatches });
       if (error) { toast.error(error.message); return; }
 
-      // Advance bye winners to next round
-      const inserted = await supabase.from("matches").select("*").eq("tournament_id", id).order("round").order("position");
-      if (inserted.data) {
-        for (const m of inserted.data) {
+      // Re-fetch matches to get IDs for bye advancement
+      const { data: insertedMatches } = await organizerQuery({
+        table: "matches",
+        operation: "select",
+        filters: { tournament_id: id },
+        order: [{ column: "round" }, { column: "position" }],
+      });
+
+      if (insertedMatches) {
+        for (const m of insertedMatches) {
           if (m.winner_team_id && m.status === "completed") {
             const nextRound = m.round + 1;
             const nextPosition = Math.ceil(m.position / 2);
             const isTop = m.position % 2 === 1;
-            const nextMatch = inserted.data.find(
+            const nextMatch = insertedMatches.find(
               (nm: any) => nm.round === nextRound && nm.position === nextPosition
             );
             if (nextMatch) {
               const update = isTop ? { team1_id: m.winner_team_id } : { team2_id: m.winner_team_id };
-              await supabase.from("matches").update(update).eq("id", nextMatch.id);
+              await organizerQuery({
+                table: "matches",
+                operation: "update",
+                data: update,
+                filters: { id: nextMatch.id },
+              });
             }
           }
         }
       }
 
-      await supabase.from("tournaments").update({ status: "in_progress" as const }).eq("id", id);
+      await organizerQuery({
+        table: "tournaments",
+        operation: "update",
+        data: { status: "in_progress" },
+        filters: { id },
+      });
       toast.success("Chaveamento gerado!");
       fetchData();
     }
@@ -352,8 +392,13 @@ const TournamentDetail = () => {
 
   const undoBracket = async () => {
     if (!id) return;
-    await supabase.from("matches").delete().eq("tournament_id", id);
-    await supabase.from("tournaments").update({ status: "draft" as const }).eq("id", id);
+    await organizerQuery({ table: "matches", operation: "delete", filters: { tournament_id: id } });
+    await organizerQuery({
+      table: "tournaments",
+      operation: "update",
+      data: { status: "draft" },
+      filters: { id },
+    });
     toast.success("Chaveamento desfeito!");
     fetchData();
   };
@@ -364,10 +409,12 @@ const TournamentDetail = () => {
 
     confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
 
-    await supabase.from("matches").update({
-      winner_team_id: winnerId,
-      status: "completed" as const,
-    }).eq("id", matchId);
+    await organizerQuery({
+      table: "matches",
+      operation: "update",
+      data: { winner_team_id: winnerId, status: "completed" },
+      filters: { id: matchId },
+    });
 
     const nextRound = match.round + 1;
     const nextPosition = Math.ceil(match.position / 2);
@@ -380,10 +427,20 @@ const TournamentDetail = () => {
 
     if (nextMatch) {
       const update = isTop ? { team1_id: winnerId } : { team2_id: winnerId };
-      await supabase.from("matches").update(update).eq("id", nextMatch.id);
+      await organizerQuery({
+        table: "matches",
+        operation: "update",
+        data: update,
+        filters: { id: nextMatch.id },
+      });
       toast.success("Avanço automático realizado!");
     } else {
-      await supabase.from("tournaments").update({ status: "completed" as const }).eq("id", id);
+      await organizerQuery({
+        table: "tournaments",
+        operation: "update",
+        data: { status: "completed" },
+        filters: { id },
+      });
       toast.success("Torneio finalizado! 🏆");
       setTimeout(() => {
         for (let i = 0; i < 3; i++) {
@@ -397,7 +454,12 @@ const TournamentDetail = () => {
   };
 
   const updateScore = async (matchId: string, score1: number, score2: number) => {
-    await supabase.from("matches").update({ score1, score2 }).eq("id", matchId);
+    await organizerQuery({
+      table: "matches",
+      operation: "update",
+      data: { score1, score2 },
+      filters: { id: matchId },
+    });
   };
 
   const copyCode = () => {
@@ -488,7 +550,7 @@ const TournamentDetail = () => {
               <TabsTrigger value="rankings">Ranking</TabsTrigger>
             </TabsList>
 
-            {/* Duplas Tab - always shows team list */}
+            {/* Duplas Tab */}
             <TabsContent value="teams">
               {isOwner && (
                 <section className="rounded-xl border border-border bg-card p-6 shadow-card">
@@ -595,7 +657,7 @@ const TournamentDetail = () => {
               )}
             </TabsContent>
 
-            {/* Chaveamento Tab - Generate button lives here */}
+            {/* Chaveamento Tab */}
             <TabsContent value="bracket">
               {isOwner && matches.length === 0 && teams.length >= 2 && (
                 <div className="mb-4">

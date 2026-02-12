@@ -19,7 +19,7 @@ import MatchSequenceViewer from "@/components/MatchSequenceViewer";
 import ClassificationTab from "@/components/ClassificationTab";
 import { GenerateBracketDialog } from "@/components/GenerateBracketDialog";
 import RankingsTab from "@/components/RankingsTab";
-import confetti from "canvas-confetti";
+import { rankTeamsInGroup, selectIndexTeams } from "@/lib/tiebreakLogic";
 import { organizerQuery } from "@/lib/organizerApi";
 
 const sportLabels: Record<string, string> = {
@@ -405,6 +405,143 @@ const TournamentDetail = () => {
     fetchData();
   };
 
+  const generateKnockoutFromGroups = async () => {
+    if (!id) return;
+
+    // Fetch latest matches
+    const { data: latestMatches } = await organizerQuery({
+      table: "matches",
+      operation: "select",
+      filters: { tournament_id: id },
+      order: [{ column: "round" }, { column: "position" }],
+    });
+    if (!latestMatches) return;
+
+    const groupMatches = latestMatches.filter((m: any) => m.round === 0);
+    const brackets = Array.from(new Set<number>(groupMatches.map((m: any) => (m.bracket_number || 1) as number))).sort((a, b) => a - b);
+
+    // Get tournament config for index
+    const numIndexTeams = tournament?.num_brackets || 0;
+    const teamsPerGroupAdvancing = tournament?.num_sets ? undefined : 2; // default 2
+
+    // Build team names map
+    const teamNames: Record<string, string> = {};
+    teams.forEach((t) => { teamNames[t.id] = `${t.player1_name} / ${t.player2_name}`; });
+
+    // Rank teams in each group
+    const groupRankings: Record<string, { teamId: string; rank: number; pointDifferential: number }[]> = {};
+    const advancingTeamIds: string[] = [];
+
+    // Determine how many advance per group (use config or default to 2)
+    const advPerGroup = 2; // Default; could be stored in tournament config
+
+    for (const bracket of brackets) {
+      const gMatches = groupMatches.filter((m: any) => (m.bracket_number || 1) === bracket);
+      const gTeamIds = [...new Set(gMatches.flatMap((m: any) => [m.team1_id, m.team2_id].filter(Boolean)))] as string[];
+      const ranking = rankTeamsInGroup(gTeamIds, teamNames, gMatches);
+      groupRankings[String(bracket)] = ranking;
+
+      // Top N advance
+      ranking.slice(0, advPerGroup).forEach((r) => advancingTeamIds.push(r.teamId));
+    }
+
+    // Index teams (best non-advancing across groups)
+    let indexTeamIds: string[] = [];
+    if (numIndexTeams > 0) {
+      indexTeamIds = selectIndexTeams(groupRankings, numIndexTeams, advPerGroup);
+    }
+
+    const allAdvancing = [...advancingTeamIds, ...indexTeamIds];
+
+    // Also include BYE teams that went straight to knockout
+    const byeTeams = teams.filter((t) => !groupMatches.some((m: any) => m.team1_id === t.id || m.team2_id === t.id));
+    byeTeams.forEach((t) => allAdvancing.push(t.id));
+
+    if (allAdvancing.length < 2) {
+      toast.error("Duplas insuficientes para fase eliminatória.");
+      return;
+    }
+
+    // Determine knockout size
+    const totalSlots = Math.pow(2, Math.ceil(Math.log2(allAdvancing.length)));
+    const maxRounds = Math.ceil(Math.log2(totalSlots));
+
+    // Shuffle advancing teams (could seed by rank later)
+    const arranged = [...allAdvancing].sort(() => Math.random() - 0.5);
+
+    const newMatches: any[] = [];
+    const matchesInFirstRound = totalSlots / 2;
+    for (let i = 0; i < matchesInFirstRound; i++) {
+      const t1 = arranged[i] || null;
+      const t2 = arranged[totalSlots - 1 - i] || null;
+      newMatches.push({
+        tournament_id: id,
+        round: 1,
+        position: i + 1,
+        team1_id: t1 || null,
+        team2_id: t2 || null,
+        status: "pending",
+        bracket_number: 1,
+      });
+    }
+
+    for (let r = 2; r <= maxRounds; r++) {
+      const count = totalSlots / Math.pow(2, r);
+      for (let p = 0; p < count; p++) {
+        newMatches.push({
+          tournament_id: id,
+          round: r,
+          position: p + 1,
+          team1_id: null,
+          team2_id: null,
+          status: "pending",
+          bracket_number: 1,
+        });
+      }
+    }
+
+    // Auto-advance byes
+    for (const m of newMatches) {
+      if (m.team1_id && !m.team2_id) {
+        m.winner_team_id = m.team1_id;
+        m.status = "completed";
+      } else if (!m.team1_id && m.team2_id) {
+        m.winner_team_id = m.team2_id;
+        m.status = "completed";
+      }
+    }
+
+    const { error } = await organizerQuery({ table: "matches", operation: "insert", data: newMatches });
+    if (error) { toast.error(error.message); return; }
+
+    // Advance byes in knockout
+    const { data: insertedMatches } = await organizerQuery({
+      table: "matches",
+      operation: "select",
+      filters: { tournament_id: id },
+      order: [{ column: "round" }, { column: "position" }],
+    });
+    if (insertedMatches) {
+      const knockoutMatches = insertedMatches.filter((m: any) => m.round > 0);
+      for (const m of knockoutMatches) {
+        if (m.winner_team_id && m.status === "completed") {
+          const nextRound = m.round + 1;
+          const nextPosition = Math.ceil(m.position / 2);
+          const isTop = m.position % 2 === 1;
+          const nextMatch = knockoutMatches.find((nm: any) => nm.round === nextRound && nm.position === nextPosition);
+          if (nextMatch) {
+            const update = isTop ? { team1_id: m.winner_team_id } : { team2_id: m.winner_team_id };
+            await organizerQuery({ table: "matches", operation: "update", data: update, filters: { id: nextMatch.id } });
+          }
+        }
+      }
+    }
+
+    const phaseLabel = allAdvancing.length <= 2 ? "Final" : allAdvancing.length <= 4 ? "Semifinais" : allAdvancing.length <= 8 ? "Quartas de Final" : "Oitavas de Final";
+    toast.success(`Fase de grupos concluída! ${phaseLabel} gerada automaticamente com ${allAdvancing.length} duplas.`);
+    fetchData();
+  };
+
   const declareWinner = async (matchId: string, winnerId: string) => {
     const match = matches.find((m) => m.id === matchId);
     if (!match || !id) return;
@@ -436,26 +573,13 @@ const TournamentDetail = () => {
       toast.success("Avanço automático realizado!");
     }
 
-    // Check if ALL matches in the tournament are now completed (after this update)
-    const remainingPending = matches.filter(
-      (m) => m.id !== matchId && m.status !== "completed"
-    );
-    if (remainingPending.length === 0) {
-      // All matches done — tournament is finished
-      await organizerQuery({
-        table: "tournaments",
-        operation: "update",
-        data: { status: "completed" },
-        filters: { id },
-      });
-      toast.success("Torneio finalizado! 🏆");
-      setTimeout(() => {
-        for (let i = 0; i < 5; i++) {
-          setTimeout(() => {
-            confetti({ particleCount: 120, spread: 80, origin: { y: 0.5, x: Math.random() } });
-          }, i * 300);
-        }
-      }, 500);
+    // Check if all GROUP stage matches are completed -> auto-generate knockout
+    const groupMatches = matches.filter((m) => m.round === 0);
+    const allGroupsDone = groupMatches.length > 0 && groupMatches.every((m) => m.id === matchId ? true : m.status === "completed");
+    const knockoutExists = matches.some((m) => m.round > 0);
+
+    if (allGroupsDone && !knockoutExists && match.round === 0) {
+      await generateKnockoutFromGroups();
     }
 
     fetchData();

@@ -25,7 +25,16 @@ const CreateTournament = () => {
     event_date: "",
     location: "",
     registration_value: "",
+    num_sets: 3,
+    games_per_set: 21,
   });
+
+  const getMaxSets = () => {
+    if (form.sport === "beach_tennis") return 3;
+    return 3;
+  };
+
+  const showGamesPerSet = form.sport === "beach_tennis";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,6 +53,8 @@ const CreateTournament = () => {
         event_date: form.event_date || null,
         location: form.location || null,
         registration_value: form.registration_value ? Number(form.registration_value) : null,
+        num_sets: form.num_sets,
+        games_per_set: showGamesPerSet ? form.games_per_set : null,
         created_by: user.id,
         status: "draft" as const,
       })
@@ -160,6 +171,33 @@ const CreateTournament = () => {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Sets do Torneio</Label>
+                <Select value={String(form.num_sets)} onValueChange={(v) => setForm({ ...form, num_sets: Number(v) })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {[1, 2, 3].map((n) => (
+                      <SelectItem key={n} value={String(n)}>{n} set{n > 1 ? 's' : ''}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {showGamesPerSet && (
+                <div className="space-y-2">
+                  <Label>Pontos por Set</Label>
+                  <Select value={String(form.games_per_set)} onValueChange={(v) => setForm({ ...form, games_per_set: Number(v) })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {[15, 21, 25].map((n) => (
+                        <SelectItem key={n} value={String(n)}>{n} pontos</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             <Button type="submit" className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90" disabled={loading}>

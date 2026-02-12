@@ -25,6 +25,8 @@ interface GenerateBracketDialogProps {
     numGroups: number;
     teamsPerGroupAdvancing: number;
     byeTeamIds: string[];
+    useIndex: boolean;
+    numIndexTeams?: number;
   }) => void;
   teamCount: number;
   teams: Team[];
@@ -42,8 +44,11 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
   const [numGroups, setNumGroups] = useState("2");
   const [teamsPerGroupAdvancing, setTeamsPerGroupAdvancing] = useState("2");
   const [byeTeamIds, setByeTeamIds] = useState<string[]>([]);
+  const [useIndex, setUseIndex] = useState(false);
+  const [numIndexTeams, setNumIndexTeams] = useState("1");
 
   const isBeachTennis = sport === "beach_tennis";
+  const supportsIndex = sport === "beach_volleyball" || sport === "futevolei";
 
   // Calculate knockout phase based on advancing teams
   const groups = Number(numGroups) || 2;
@@ -92,6 +97,8 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
       numGroups: groups,
       teamsPerGroupAdvancing: advancing,
       byeTeamIds,
+      useIndex: supportsIndex && useIndex,
+      numIndexTeams: supportsIndex && useIndex ? Number(numIndexTeams) : 0,
     });
     setOpen(false);
   };
@@ -186,6 +193,42 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                     <p className="text-xs text-primary">{byeTeamIds.length} dupla(s) com BYE</p>
                   )}
                 </div>
+
+                {/* Index advancement (Volleyball/Futevolei only) */}
+                {supportsIndex && (
+                  <div className="rounded-lg border border-primary/30 bg-primary/10 p-4 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        checked={useIndex}
+                        onCheckedChange={(v) => setUseIndex(!!v)}
+                        id="indexAdvance"
+                      />
+                      <Label htmlFor="indexAdvance" className="text-base font-semibold cursor-pointer text-primary">
+                        Duplas avançam por Índice?
+                      </Label>
+                    </div>
+                    {useIndex && (
+                      <div className="pl-7">
+                        <div className="space-y-2">
+                          <Label className="text-sm">Quantas duplas avançam por índice?</Label>
+                          <Select value={numIndexTeams} onValueChange={setNumIndexTeams}>
+                            <SelectTrigger className="bg-card">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 9 }, (_, i) => i).map(n => (
+                                <SelectItem key={n} value={String(n)}>{n} dupla{n !== 1 ? "s" : ""}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            Máximo 8 duplas. Serão selecionadas automaticamente conforme melhor desempenho nos grupos.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Knockout phase detection */}
                 <div className="rounded-lg border border-primary/30 bg-primary/10 p-3">

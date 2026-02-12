@@ -6,15 +6,18 @@ import { Label } from "@/components/ui/label";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Trophy, Lock, User, ArrowLeft } from "lucide-react";
+import { Trophy, Lock, User, ArrowLeft, Mail } from "lucide-react";
 import { useSportTheme } from "@/contexts/SportContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Auth = () => {
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
+  const [loginType, setLoginType] = useState<"admin" | "organizer">("admin");
   const navigate = useNavigate();
   const location = useLocation();
   const { setSelectedSport } = useSportTheme();
@@ -27,7 +30,6 @@ const Auth = () => {
     }
   }, [sport, setSelectedSport]);
 
-  // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
       navigate("/dashboard", { replace: true });
@@ -39,22 +41,24 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      // Login via organizer-login edge function
+      const body = loginType === "admin"
+        ? { email: email.trim(), password }
+        : { username: username.trim(), password };
+
       const { data, error } = await supabase.functions.invoke("organizer-login", {
-        body: { username, password },
+        body,
       });
 
       if (error || !data?.success) {
         throw new Error(data?.error || "Falha na autenticação");
       }
 
-      // Use AuthContext login to persist state
-      login(data.token, data.organizerId);
+      login(data.token, data.organizerId, data.role);
       setRedirecting(true);
       toast.success("Bem-vindo!");
       navigate("/dashboard", { replace: true });
     } catch (error: any) {
-      toast.error(error.message || "Usuário ou senha incorretos");
+      toast.error(error.message || "Credenciais incorretas");
     } finally {
       setLoading(false);
     }
@@ -81,16 +85,13 @@ const Auth = () => {
 
   return (
     <div className={`flex min-h-screen items-center justify-center bg-gradient-to-b ${sportBg} px-4 relative overflow-hidden`}>
-      {/* Animated light beams - sport themed */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 left-1/4 w-32 h-full bg-gradient-to-b from-[hsl(var(--primary))_0.08] to-transparent rotate-12 animate-light-beam" />
         <div className="absolute top-0 right-1/3 w-24 h-full bg-gradient-to-b from-[hsl(var(--accent))_0.06] to-transparent -rotate-6 animate-light-beam" style={{ animationDelay: "2s" }} />
       </div>
 
-      {/* Sand texture overlay */}
       <div className="absolute inset-0 sand-texture pointer-events-none" />
 
-      {/* Content */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -109,22 +110,47 @@ const Auth = () => {
         </div>
 
         <div className="rounded-xl border border-border bg-card p-6 shadow-card">
+          <Tabs value={loginType} onValueChange={(v) => setLoginType(v as "admin" | "organizer")} className="mb-4">
+            <TabsList className="w-full">
+              <TabsTrigger value="admin" className="flex-1">Admin</TabsTrigger>
+              <TabsTrigger value="organizer" className="flex-1">Organizador</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="username">Usuário</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="username"
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Seu usuário"
-                  className="pl-10"
-                  required
-                />
+            {loginType === "admin" ? (
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="seu@email.com"
+                    className="pl-10"
+                    required
+                  />
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="username">Usuário</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="username"
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Seu usuário"
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="password">Senha</Label>
@@ -152,9 +178,6 @@ const Auth = () => {
           </form>
 
           <div className="mt-6 text-center">
-            <p className="text-sm text-muted-foreground mb-3">
-              Novo organizador?
-            </p>
             <p className="text-xs text-muted-foreground">
               Solicite ao Administrador para criar sua conta
             </p>

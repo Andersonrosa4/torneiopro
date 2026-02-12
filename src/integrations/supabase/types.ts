@@ -123,8 +123,10 @@ export type Database = {
           created_at: string
           created_by: string
           display_name: string | null
+          email: string | null
           id: string
           password_hash: string
+          role: string
           updated_at: string
           username: string
         }
@@ -132,8 +134,10 @@ export type Database = {
           created_at?: string
           created_by: string
           display_name?: string | null
+          email?: string | null
           id?: string
           password_hash: string
+          role?: string
           updated_at?: string
           username: string
         }
@@ -141,8 +145,10 @@ export type Database = {
           created_at?: string
           created_by?: string
           display_name?: string | null
+          email?: string | null
           id?: string
           password_hash?: string
+          role?: string
           updated_at?: string
           username?: string
         }

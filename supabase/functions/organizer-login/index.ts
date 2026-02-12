@@ -5,28 +5,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Simple string hash function (not cryptographically secure, for demo only)
-const hashPassword = (password: string): string => {
-  let hash = 0;
-  for (let i = 0; i < password.length; i++) {
-    const char = password.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return hash.toString();
-};
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const { username, password } = await req.json();
+    const { username, email, password } = await req.json();
 
-    if (!username || !password) {
+    if ((!username && !email) || !password) {
       return new Response(
-        JSON.stringify({ success: false, error: "Username e password são obrigatórios" }),
+        JSON.stringify({ success: false, error: "Credenciais são obrigatórias" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -38,26 +27,28 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Find organizer by username
-    const { data: organizers, error: selectError } = await supabase
+    // Find organizer by email or username
+    let query = supabase
       .from("organizers")
-      .select("id, username, password_hash")
-      .eq("username", username)
-      .single();
+      .select("id, username, email, password_hash, role");
 
-    if (selectError || !organizers) {
+    if (email) {
+      query = query.eq("email", email.trim().toLowerCase());
+    } else {
+      query = query.eq("username", username.trim());
+    }
+
+    const { data: organizer, error: selectError } = await query.single();
+
+    if (selectError || !organizer) {
       return new Response(
         JSON.stringify({ success: false, error: "Usuário ou senha incorretos" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Verify password (simple string comparison - assumes password_hash stores plain text or matches)
-    const passwordHash = hashPassword(password);
-    const storedHash = organizers.password_hash;
-
-    // Try both: direct comparison (if stored as plain) and hash comparison
-    const passwordMatch = password === storedHash || passwordHash === storedHash;
+    // Verify password (direct comparison)
+    const passwordMatch = password === organizer.password_hash;
 
     if (!passwordMatch) {
       return new Response(
@@ -67,13 +58,14 @@ Deno.serve(async (req) => {
     }
 
     // Create a simple token
-    const token = btoa(`${organizers.id}:${Date.now()}`);
+    const token = btoa(`${organizer.id}:${Date.now()}`);
 
     return new Response(
       JSON.stringify({
         success: true,
         token,
-        organizerId: organizers.id,
+        organizerId: organizer.id,
+        role: organizer.role,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

@@ -18,6 +18,7 @@ import BracketTreeView from "@/components/BracketTreeView";
 import { GenerateBracketDialog } from "@/components/GenerateBracketDialog";
 import RankingsTab from "@/components/RankingsTab";
 import MatchSequenceTab from "@/components/MatchSequenceTab";
+import { rankTeamsInGroup, selectIndexTeams } from "@/lib/tiebreakLogic";
 import confetti from "canvas-confetti";
 
 const sportLabels: Record<string, string> = {
@@ -201,9 +202,9 @@ const TournamentDetail = () => {
     numGroups: number;
     teamsPerGroupAdvancing: number;
     byeTeamIds: string[];
+    useIndex: boolean;
+    numIndexTeams?: number;
   }) => {
-    if (!id || !tournament) return;
-    if (teams.length < 2) { toast.error("Precisa de pelo menos 2 duplas"); return; }
 
     await supabase.from("matches").delete().eq("tournament_id", id);
 
@@ -255,7 +256,15 @@ const TournamentDetail = () => {
       if (error) { toast.error(error.message); return; }
 
       await supabase.from("tournaments").update({ status: "in_progress" as const }).eq("id", id);
-      toast.success(`Fase de grupos gerada! ${config.numGroups} grupo(s) criado(s).`);
+      
+      // Store index advancement configuration for later use
+      if (config.useIndex && config.numIndexTeams && config.numIndexTeams > 0) {
+        await supabase.from("tournaments").update({
+          num_brackets: config.numIndexTeams,
+        }).eq("id", id);
+      }
+      
+      toast.success(`Fase de grupos gerada! ${config.numGroups} grupo(s) criado(s)${config.useIndex ? ` + ${config.numIndexTeams} índice` : ""}.`);
       fetchData();
     } else {
       // === DIRECT KNOCKOUT (existing logic) ===

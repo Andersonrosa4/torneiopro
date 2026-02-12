@@ -132,10 +132,16 @@ const MatchSequenceViewer = ({
 
   const getRoundLabel = (round: number) => {
     if (round === 0) return "Grupo";
-    if (round === maxRound) return "Final";
-    if (round === maxRound - 1) return "Semifinal";
-    if (round === maxRound - 2) return "Quartas";
-    return `Rodada ${round}`;
+    
+    // Knockout phase labeling based on distance from final
+    const roundsFromEnd = maxRound - round;
+    switch (roundsFromEnd) {
+      case 0: return "Final";
+      case 1: return "Semifinal";
+      case 2: return "Quartas de Final";
+      case 3: return "Oitavas de Final";
+      default: return `Round of ${2 ** roundsFromEnd}`;
+    }
   };
 
   // Group sequence into display rounds for headers

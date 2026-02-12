@@ -11,7 +11,7 @@ const AppHeader = () => {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate("/auth");
+    navigate("/");
   };
 
   if (!user) return null;
@@ -27,7 +27,7 @@ const AppHeader = () => {
               <Trophy className="h-5 w-5 text-primary-foreground" />
             </div>
             <span className="text-lg font-bold tracking-tight text-foreground font-display">
-              TourneyMgr
+              Arena Pro
             </span>
           </Link>
           <nav className="hidden items-center gap-1 md:flex">
@@ -38,7 +38,7 @@ const AppHeader = () => {
                 className="gap-2"
               >
                 <LayoutDashboard className="h-4 w-4" />
-                Dashboard
+                Painel
               </Button>
             </Link>
             <Link to="/tournaments/new">
@@ -48,7 +48,7 @@ const AppHeader = () => {
                 className="gap-2"
               >
                 <Plus className="h-4 w-4" />
-                New Tournament
+                Novo Torneio
               </Button>
             </Link>
           </nav>
@@ -59,7 +59,7 @@ const AppHeader = () => {
           </span>
           <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2">
             <LogOut className="h-4 w-4" />
-            <span className="hidden md:inline">Sign Out</span>
+            <span className="hidden md:inline">Sair</span>
           </Button>
         </div>
       </div>

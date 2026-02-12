@@ -6,16 +6,19 @@ import { Label } from "@/components/ui/label";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Trophy, Lock, User } from "lucide-react";
+import { Trophy, Lock, User, ArrowLeft } from "lucide-react";
 import { useSportTheme } from "@/contexts/SportContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Auth = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { setSelectedSport } = useSportTheme();
+  const { login, isAuthenticated } = useAuth();
   const sport = (location.state as any)?.sport || null;
 
   useEffect(() => {
@@ -23,6 +26,13 @@ const Auth = () => {
       setSelectedSport(sport);
     }
   }, [sport, setSelectedSport]);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,10 +48,11 @@ const Auth = () => {
         throw new Error(data?.error || "Falha na autenticação");
       }
 
+      // Use AuthContext login to persist state
+      login(data.token, data.organizerId);
+      setRedirecting(true);
       toast.success("Bem-vindo!");
-      sessionStorage.setItem("organizer_token", data.token);
-      sessionStorage.setItem("organizer_id", data.organizerId);
-      navigate("/dashboard");
+      navigate("/dashboard", { replace: true });
     } catch (error: any) {
       toast.error(error.message || "Usuário ou senha incorretos");
     } finally {
@@ -56,6 +67,17 @@ const Auth = () => {
   };
 
   const sportBg = sport ? sportBgMap[sport] : "from-[hsl(220_15%_10%)] via-[hsl(220_12%_14%)] to-[hsl(25_15%_12%)]";
+
+  if (redirecting) {
+    return (
+      <div className={`flex min-h-screen items-center justify-center bg-gradient-to-b ${sportBg}`}>
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto mb-4" />
+          <p className="text-muted-foreground">Redirecionando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`flex min-h-screen items-center justify-center bg-gradient-to-b ${sportBg} px-4 relative overflow-hidden`}>
@@ -137,6 +159,16 @@ const Auth = () => {
               Solicite ao Administrador para criar sua conta
             </p>
           </div>
+        </div>
+
+        <div className="mt-4 text-center">
+          <button
+            onClick={() => navigate("/")}
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Voltar para Seleção de Esporte
+          </button>
         </div>
       </motion.div>
     </div>

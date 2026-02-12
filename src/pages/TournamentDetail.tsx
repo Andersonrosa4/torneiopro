@@ -13,11 +13,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import AppHeader from "@/components/AppHeader";
 import ThemedBackground from "@/components/ThemedBackground";
-import BracketView from "@/components/BracketView";
 import BracketTreeView from "@/components/BracketTreeView";
 import { GenerateBracketDialog } from "@/components/GenerateBracketDialog";
 import RankingsTab from "@/components/RankingsTab";
-import MatchSequenceTab from "@/components/MatchSequenceTab";
 import { rankTeamsInGroup, selectIndexTeams } from "@/lib/tiebreakLogic";
 import confetti from "canvas-confetti";
 import { organizerQuery } from "@/lib/organizerApi";
@@ -73,7 +71,7 @@ interface Match {
 
 const TournamentDetail = () => {
   const { id } = useParams<{ id: string }>();
-  const { user, organizerId } = useAuth();
+  const { user, organizerId, isAdmin } = useAuth();
   const navigate = useNavigate();
   const { setSelectedSport } = useSportTheme();
   const [tournament, setTournament] = useState<any>(null);
@@ -82,7 +80,7 @@ const TournamentDetail = () => {
   const [player1, setPlayer1] = useState("");
   const [player2, setPlayer2] = useState("");
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<"list" | "tree">("tree");
+  
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [editP1, setEditP1] = useState("");
   const [editP2, setEditP2] = useState("");
@@ -91,7 +89,7 @@ const TournamentDetail = () => {
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState("");
 
-  const isOwner = tournament?.created_by === organizerId;
+  const isOwner = tournament?.created_by === organizerId || isAdmin;
 
   // Reads use direct supabase (SELECT policies are true)
   const fetchData = useCallback(async () => {
@@ -714,7 +712,7 @@ const TournamentDetail = () => {
               )}
             </TabsContent>
 
-            {/* Chaveamento Tab */}
+            {/* Chaveamento Tab - Structural view only (no scores/results) */}
             <TabsContent value="bracket">
               {isOwner && matches.length === 0 && teams.length >= 2 && (
                 <div className="mb-4">
@@ -729,33 +727,10 @@ const TournamentDetail = () => {
               )}
 
               {isOwner && matches.length > 0 && (
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant={viewMode === "tree" ? "default" : "outline"}
-                      onClick={() => setViewMode("tree")}
-                    >
-                      Árvore
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={viewMode === "list" ? "default" : "outline"}
-                      onClick={() => setViewMode("list")}
-                    >
-                      Lista
-                    </Button>
-                  </div>
+                <div className="mb-4 flex justify-end">
                   <Button variant="destructive" size="sm" className="gap-1" onClick={undoBracket}>
                     <Undo2 className="h-4 w-4" /> Desfazer Chaveamento
                   </Button>
-                </div>
-              )}
-
-              {!isOwner && matches.length > 0 && (
-                <div className="mb-4 flex gap-2">
-                  <Button size="sm" variant={viewMode === "tree" ? "default" : "outline"} onClick={() => setViewMode("tree")}>Árvore</Button>
-                  <Button size="sm" variant={viewMode === "list" ? "default" : "outline"} onClick={() => setViewMode("list")}>Lista</Button>
                 </div>
               )}
 
@@ -764,23 +739,14 @@ const TournamentDetail = () => {
                   <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
                     <Trophy className="h-5 w-5" /> Chaveamento
                   </h2>
-                  {viewMode === "tree" ? (
-                    <BracketTreeView
-                      matches={matches}
-                      participants={participants}
-                      isOwner={isOwner}
-                      onDeclareWinner={declareWinner}
-                      onUpdateScore={updateScore}
-                    />
-                  ) : (
-                    <BracketView
-                      matches={matches}
-                      participants={participants}
-                      isOwner={isOwner}
-                      onDeclareWinner={declareWinner}
-                      onUpdateScore={updateScore}
-                    />
-                  )}
+                  <BracketTreeView
+                    matches={matches}
+                    participants={participants}
+                    isOwner={false}
+                    onDeclareWinner={() => {}}
+                    onUpdateScore={() => {}}
+                    structuralOnly
+                  />
                 </section>
               ) : (
                 <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
@@ -793,7 +759,7 @@ const TournamentDetail = () => {
               )}
             </TabsContent>
 
-            {/* Sequência Tab */}
+            {/* Sequência Tab - Tree view with score editing */}
             <TabsContent value="sequence">
               {isOwner && matches.length > 0 && (
                 <div className="mb-4 flex justify-end">
@@ -802,7 +768,24 @@ const TournamentDetail = () => {
                   </Button>
                 </div>
               )}
-              <MatchSequenceTab matches={matches} teams={teams} />
+              {matches.length > 0 ? (
+                <section>
+                  <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
+                    <Trophy className="h-5 w-5" /> Sequência de Partidas
+                  </h2>
+                  <BracketTreeView
+                    matches={matches}
+                    participants={participants}
+                    isOwner={isOwner}
+                    onDeclareWinner={declareWinner}
+                    onUpdateScore={updateScore}
+                  />
+                </section>
+              ) : (
+                <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
+                  <p className="text-muted-foreground">Gere o chaveamento primeiro para ver a sequência de partidas.</p>
+                </div>
+              )}
             </TabsContent>
 
             {/* Classificação Tab */}

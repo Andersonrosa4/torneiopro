@@ -57,19 +57,24 @@ const Dashboard = () => {
 
   useEffect(() => {
     const fetchTournaments = async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("tournaments")
         .select("*")
-        .eq("created_by", organizerId || "")
         .order("created_at", { ascending: false });
 
+      // Admin sees ALL tournaments; organizer sees only their own
+      if (!isAdmin) {
+        query = query.eq("created_by", organizerId || "");
+      }
+
+      const { data, error } = await query;
       if (!error && data) setTournaments(data);
       setLoading(false);
     };
     if (user) {
       fetchTournaments();
     }
-  }, [user]);
+  }, [user, isAdmin, organizerId]);
 
   return (
     <ThemedBackground>

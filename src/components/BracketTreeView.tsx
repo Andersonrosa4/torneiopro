@@ -29,9 +29,10 @@ interface BracketTreeViewProps {
   isOwner: boolean;
   onDeclareWinner: (matchId: string, winnerId: string) => void;
   onUpdateScore: (matchId: string, score1: number, score2: number) => void;
+  structuralOnly?: boolean;
 }
 
-const BracketTreeView = ({ matches, participants, isOwner, onDeclareWinner, onUpdateScore }: BracketTreeViewProps) => {
+const BracketTreeView = ({ matches, participants, isOwner, onDeclareWinner, onUpdateScore, structuralOnly = false }: BracketTreeViewProps) => {
   const [selectedBracket, setSelectedBracket] = useState<number>(1);
 
   const hasGroupStage = matches.some(m => m.round === 0);
@@ -137,6 +138,7 @@ const BracketTreeView = ({ matches, participants, isOwner, onDeclareWinner, onUp
                         onDeclareWinner={onDeclareWinner}
                         onUpdateScore={onUpdateScore}
                         isFinal={false}
+                        structuralOnly={structuralOnly}
                       />
                     ))}
                   </div>
@@ -193,6 +195,7 @@ const BracketTreeView = ({ matches, participants, isOwner, onDeclareWinner, onUp
                           onDeclareWinner={onDeclareWinner}
                           onUpdateScore={onUpdateScore}
                           isFinal={round === rounds}
+                          structuralOnly={structuralOnly}
                         />
                       ))}
                     </div>
@@ -212,7 +215,7 @@ const BracketTreeView = ({ matches, participants, isOwner, onDeclareWinner, onUp
 };
 
 const CompactMatchCard = ({
-  match, getName, getFullName, isOwner, onDeclareWinner, onUpdateScore, isFinal,
+  match, getName, getFullName, isOwner, onDeclareWinner, onUpdateScore, isFinal, structuralOnly = false,
 }: {
   match: Match;
   getName: (id: string | null) => string;
@@ -221,6 +224,7 @@ const CompactMatchCard = ({
   onDeclareWinner: (matchId: string, winnerId: string) => void;
   onUpdateScore: (matchId: string, score1: number, score2: number) => void;
   isFinal: boolean;
+  structuralOnly?: boolean;
 }) => {
   const [s1, setS1] = useState(match.score1?.toString() || "0");
   const [s2, setS2] = useState(match.score2?.toString() || "0");
@@ -228,7 +232,7 @@ const CompactMatchCard = ({
   const p1Name = getName(match.team1_id);
   const p2Name = getName(match.team2_id);
   const isCompleted = match.status === "completed";
-  const canScore = isOwner && !isCompleted && match.team1_id && match.team2_id;
+  const canScore = !structuralOnly && isOwner && !isCompleted && match.team1_id && match.team2_id;
 
   const handleScoreBlur = () => {
     onUpdateScore(match.id, Number(s1) || 0, Number(s2) || 0);
@@ -258,21 +262,23 @@ const CompactMatchCard = ({
         }`}>
           {p1Name}
         </span>
-        <div className="flex items-center gap-1 shrink-0">
-          {canScore ? (
-            <Input value={s1} onChange={(e) => setS1(e.target.value)} onBlur={handleScoreBlur} className="h-6 w-10 text-center text-xs p-0" />
-          ) : (
-            <span className="text-xs font-bold tabular-nums w-5 text-right">{match.score1 ?? "-"}</span>
-          )}
-          {canScore && match.team1_id && (
-            <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => onDeclareWinner(match.id, match.team1_id!)}>
-              <Check className="h-3 w-3 text-success" />
-            </Button>
-          )}
-          {isCompleted && match.winner_team_id === match.team1_id && (
-            <Trophy className="h-3 w-3 text-success shrink-0" />
-          )}
-        </div>
+        {!structuralOnly && (
+          <div className="flex items-center gap-1 shrink-0">
+            {canScore ? (
+              <Input value={s1} onChange={(e) => setS1(e.target.value)} onBlur={handleScoreBlur} className="h-6 w-10 text-center text-xs p-0" />
+            ) : (
+              <span className="text-xs font-bold tabular-nums w-5 text-right">{match.score1 ?? "-"}</span>
+            )}
+            {canScore && match.team1_id && (
+              <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => onDeclareWinner(match.id, match.team1_id!)}>
+                <Check className="h-3 w-3 text-success" />
+              </Button>
+            )}
+            {isCompleted && match.winner_team_id === match.team1_id && (
+              <Trophy className="h-3 w-3 text-success shrink-0" />
+            )}
+          </div>
+        )}
       </div>
 
       {/* Team 2 */}
@@ -284,21 +290,23 @@ const CompactMatchCard = ({
         }`}>
           {p2Name}
         </span>
-        <div className="flex items-center gap-1 shrink-0">
-          {canScore ? (
-            <Input value={s2} onChange={(e) => setS2(e.target.value)} onBlur={handleScoreBlur} className="h-6 w-10 text-center text-xs p-0" />
-          ) : (
-            <span className="text-xs font-bold tabular-nums w-5 text-right">{match.score2 ?? "-"}</span>
-          )}
-          {canScore && match.team2_id && (
-            <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => onDeclareWinner(match.id, match.team2_id!)}>
-              <Check className="h-3 w-3 text-success" />
-            </Button>
-          )}
-          {isCompleted && match.winner_team_id === match.team2_id && (
-            <Trophy className="h-3 w-3 text-success shrink-0" />
-          )}
-        </div>
+        {!structuralOnly && (
+          <div className="flex items-center gap-1 shrink-0">
+            {canScore ? (
+              <Input value={s2} onChange={(e) => setS2(e.target.value)} onBlur={handleScoreBlur} className="h-6 w-10 text-center text-xs p-0" />
+            ) : (
+              <span className="text-xs font-bold tabular-nums w-5 text-right">{match.score2 ?? "-"}</span>
+            )}
+            {canScore && match.team2_id && (
+              <Button size="sm" variant="ghost" className="h-5 w-5 p-0" onClick={() => onDeclareWinner(match.id, match.team2_id!)}>
+                <Check className="h-3 w-3 text-success" />
+              </Button>
+            )}
+            {isCompleted && match.winner_team_id === match.team2_id && (
+              <Trophy className="h-3 w-3 text-success shrink-0" />
+            )}
+          </div>
+        )}
       </div>
     </motion.div>
   );

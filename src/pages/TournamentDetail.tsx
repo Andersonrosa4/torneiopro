@@ -12,6 +12,7 @@ import { Plus, Trash2, Trophy, Users, Shuffle, Copy, DollarSign } from "lucide-r
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AppHeader from "@/components/AppHeader";
 import BracketView from "@/components/BracketView";
+import BracketTreeView from "@/components/BracketTreeView";
 import { GenerateBracketDialog } from "@/components/GenerateBracketDialog";
 
 const sportLabels: Record<string, string> = {
@@ -73,6 +74,7 @@ const TournamentDetail = () => {
   const [player1, setPlayer1] = useState("");
   const [player2, setPlayer2] = useState("");
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<"list" | "tree">("tree");
 
   const isOwner = tournament?.created_by === user?.id;
 
@@ -214,32 +216,41 @@ const TournamentDetail = () => {
     fetchData();
   };
 
-  const declareWinner = async (matchId: string, winnerId: string) => {
-    const match = matches.find((m) => m.id === matchId);
-    if (!match || !id) return;
+   const declareWinner = async (matchId: string, winnerId: string) => {
+     const match = matches.find((m) => m.id === matchId);
+     if (!match || !id) return;
 
-    await supabase.from("matches").update({
-      winner_id: winnerId,
-      winner_team_id: winnerId,
-      status: "completed" as const,
-    }).eq("id", matchId);
+     // Atualiza o match com o vencedor
+     await supabase.from("matches").update({
+       winner_id: winnerId,
+       winner_team_id: winnerId,
+       status: "completed" as const,
+     }).eq("id", matchId);
 
-    const nextRound = match.round + 1;
-    const nextPosition = Math.ceil(match.position / 2);
-    const isTop = match.position % 2 === 1;
+     const nextRound = match.round + 1;
+     const nextPosition = Math.ceil(match.position / 2);
+     const isTop = match.position % 2 === 1;
 
-    const nextMatch = matches.find((m) => m.round === nextRound && m.position === nextPosition);
-    if (nextMatch) {
-      const update = isTop
-        ? { participant1_id: winnerId, team1_id: winnerId }
-        : { participant2_id: winnerId, team2_id: winnerId };
-      await supabase.from("matches").update(update).eq("id", nextMatch.id);
-    } else {
-      await supabase.from("tournaments").update({ status: "completed" as const }).eq("id", id);
-      toast.success("Torneio finalizado! 🏆");
-    }
-    fetchData();
-  };
+     // Encontra o próximo match na mesma chave (bracket)
+     const bracket_number = match.bracket_number || 1;
+     const nextMatch = matches.find(
+       (m) => m.round === nextRound && m.position === nextPosition && (m.bracket_number || 1) === bracket_number
+     );
+
+     if (nextMatch) {
+       // Avanço automático: time vencedor sobe para próxima rodada
+       const update = isTop
+         ? { participant1_id: winnerId, team1_id: winnerId }
+         : { participant2_id: winnerId, team2_id: winnerId };
+       await supabase.from("matches").update(update).eq("id", nextMatch.id);
+       toast.success("Avanço automático realizado!");
+     } else {
+       // Se não há próximo match, torneio está finalizado (ou chave está finalizada)
+       await supabase.from("tournaments").update({ status: "completed" as const }).eq("id", id);
+       toast.success("Torneio finalizado! 🏆");
+     }
+     fetchData();
+   };
 
   const updateScore = async (matchId: string, score1: number, score2: number) => {
     await supabase.from("matches").update({ score1, score2 }).eq("id", matchId);
@@ -437,16 +448,45 @@ const TournamentDetail = () => {
             <TabsContent value="bracket">
               {matches.length > 0 && (
                 <section>
-                  <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
-                    <Trophy className="h-5 w-5" /> Chaveamento
-                  </h2>
-                  <BracketView
-                    matches={matches}
-                    participants={participants}
-                    isOwner={isOwner}
-                    onDeclareWinner={declareWinner}
-                    onUpdateScore={updateScore}
-                  />
+                  <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-xl font-semibold flex items-center gap-2">
+                      <Trophy className="h-5 w-5" /> Chaveamento
+                    </h2>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant={viewMode === "tree" ? "default" : "outline"}
+                        onClick={() => setViewMode("tree")}
+                      >
+                        Visão em Árvore
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={viewMode === "list" ? "default" : "outline"}
+                        onClick={() => setViewMode("list")}
+                      >
+                        Visão em Lista
+                      </Button>
+                    </div>
+                  </div>
+
+                  {viewMode === "tree" ? (
+                    <BracketTreeView
+                      matches={matches}
+                      participants={participants}
+                      isOwner={isOwner}
+                      onDeclareWinner={declareWinner}
+                      onUpdateScore={updateScore}
+                    />
+                  ) : (
+                    <BracketView
+                      matches={matches}
+                      participants={participants}
+                      isOwner={isOwner}
+                      onDeclareWinner={declareWinner}
+                      onUpdateScore={updateScore}
+                    />
+                  )}
                 </section>
               )}
             </TabsContent>

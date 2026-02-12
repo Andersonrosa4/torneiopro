@@ -70,7 +70,7 @@ const MatchSequenceTab = ({ matches, teams }: MatchSequenceTabProps) => {
       case 1: return "Semifinal";
       case 2: return "Quartas de Final";
       case 3: return "Oitavas de Final";
-      default: return `Round of ${2 ** roundsFromEnd}`;
+      default: return `Fase de ${2 ** roundsFromEnd}`;
     }
   };
 

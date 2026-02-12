@@ -42,8 +42,8 @@ const BracketView = ({ matches, participants, isOwner, onDeclareWinner, onUpdate
   const getRoundLabel = (round: number) => {
     if (round === rounds) return "Final";
     if (round === rounds - 1) return "Semifinal";
-    if (round === rounds - 2) return "Quartas";
-    if (round === rounds - 3) return "Oitavas";
+    if (round === rounds - 2) return "Quartas de Final";
+    if (round === rounds - 3) return "Oitavas de Final";
     return `Rodada ${round}`;
   };
 

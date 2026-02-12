@@ -180,8 +180,8 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                       chave dos Perdedores e Grande Final com possível reset.
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <span className="text-xs rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Winners Bracket</span>
-                      <span className="text-xs rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Losers Bracket</span>
+                      <span className="text-xs rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Chave dos Vencedores</span>
+                      <span className="text-xs rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Chave dos Perdedores</span>
                       <span className="text-xs rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Grande Final</span>
                     </div>
                   </div>
@@ -355,18 +355,18 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                   <div className="space-y-2 text-sm text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full bg-primary shrink-0" />
-                      <span><strong className="text-foreground">Winners Bracket:</strong> {getKnockoutPhase(teamCount)} → Final Winners</span>
+                      <span><strong className="text-foreground">Chave dos Vencedores:</strong> {getKnockoutPhase(teamCount)} → Final dos Vencedores</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full bg-destructive shrink-0" />
-                      <span><strong className="text-foreground">Losers Bracket:</strong> Perdedores disputam entre si</span>
+                      <span><strong className="text-foreground">Chave dos Perdedores:</strong> Perdedores disputam entre si</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full bg-warning shrink-0" />
-                      <span><strong className="text-foreground">Grande Final:</strong> Campeão Winners vs Campeão Losers</span>
+                      <span><strong className="text-foreground">Grande Final:</strong> Campeão dos Vencedores vs Campeão dos Perdedores</span>
                     </div>
                     <p className="text-xs mt-2 border-t border-border pt-2">
-                      Uma equipe só é eliminada após duas derrotas. Se o campeão da Losers vencer a Grande Final, uma final extra (reset) é disputada.
+                      Uma equipe só é eliminada após duas derrotas. Se o campeão dos Perdedores vencer a Grande Final, uma Final Extra (reset) é disputada.
                     </p>
                   </div>
                   <div className="rounded-lg border border-primary/30 bg-primary/10 p-3">

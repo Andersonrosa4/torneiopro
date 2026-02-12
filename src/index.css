@@ -6,56 +6,57 @@
 
 @layer base {
   :root {
-    --background: 220 20% 7%;
-    --foreground: 210 20% 92%;
+    /* Beach Sports Theme — sand, ocean, sunset */
+    --background: 35 30% 95%;
+    --foreground: 25 20% 15%;
 
-    --card: 220 18% 10%;
-    --card-foreground: 210 20% 92%;
+    --card: 36 35% 98%;
+    --card-foreground: 25 20% 15%;
 
-    --popover: 220 18% 10%;
-    --popover-foreground: 210 20% 92%;
+    --popover: 36 35% 98%;
+    --popover-foreground: 25 20% 15%;
 
-    --primary: 185 80% 50%;
-    --primary-foreground: 220 20% 7%;
+    --primary: 195 85% 42%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 15% 16%;
-    --secondary-foreground: 210 20% 85%;
+    --secondary: 35 25% 90%;
+    --secondary-foreground: 25 18% 30%;
 
-    --muted: 220 14% 14%;
-    --muted-foreground: 215 12% 52%;
+    --muted: 35 20% 92%;
+    --muted-foreground: 25 10% 45%;
 
-    --accent: 265 70% 60%;
-    --accent-foreground: 210 20% 95%;
+    --accent: 22 90% 55%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 72% 55%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 100%;
 
-    --success: 150 60% 45%;
-    --success-foreground: 220 20% 7%;
+    --success: 155 55% 40%;
+    --success-foreground: 0 0% 100%;
 
     --warning: 38 90% 55%;
-    --warning-foreground: 220 20% 7%;
+    --warning-foreground: 25 20% 12%;
 
-    --border: 220 14% 18%;
-    --input: 220 14% 18%;
-    --ring: 185 80% 50%;
+    --border: 35 18% 82%;
+    --input: 35 18% 82%;
+    --ring: 195 85% 42%;
 
     --radius: 0.75rem;
 
-    --sidebar-background: 220 18% 10%;
-    --sidebar-foreground: 210 20% 85%;
-    --sidebar-primary: 185 80% 50%;
-    --sidebar-primary-foreground: 220 20% 7%;
-    --sidebar-accent: 220 14% 14%;
-    --sidebar-accent-foreground: 210 20% 85%;
-    --sidebar-border: 220 14% 18%;
-    --sidebar-ring: 185 80% 50%;
+    --sidebar-background: 36 30% 96%;
+    --sidebar-foreground: 25 18% 30%;
+    --sidebar-primary: 195 85% 42%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 35 20% 90%;
+    --sidebar-accent-foreground: 25 18% 30%;
+    --sidebar-border: 35 18% 82%;
+    --sidebar-ring: 195 85% 42%;
 
-    --gradient-primary: linear-gradient(135deg, hsl(185 80% 50%), hsl(200 85% 55%));
-    --gradient-accent: linear-gradient(135deg, hsl(265 70% 60%), hsl(285 65% 55%));
-    --gradient-surface: linear-gradient(180deg, hsl(220 18% 12%), hsl(220 18% 8%));
-    --shadow-glow: 0 0 20px hsl(185 80% 50% / 0.15);
-    --shadow-card: 0 4px 24px hsl(0 0% 0% / 0.3);
+    --gradient-primary: linear-gradient(135deg, hsl(195 85% 42%), hsl(180 70% 45%));
+    --gradient-accent: linear-gradient(135deg, hsl(22 90% 55%), hsl(35 85% 55%));
+    --gradient-surface: linear-gradient(180deg, hsl(36 35% 98%), hsl(35 30% 94%));
+    --shadow-glow: 0 0 20px hsl(195 85% 42% / 0.2);
+    --shadow-card: 0 4px 16px hsl(25 15% 50% / 0.08);
   }
 }
 
@@ -94,8 +95,34 @@
     box-shadow: var(--shadow-card);
   }
   .glass {
-    background: hsl(220 18% 10% / 0.7);
+    background: hsl(36 35% 98% / 0.8);
     backdrop-filter: blur(12px);
-    border: 1px solid hsl(220 14% 20% / 0.5);
+    border: 1px solid hsl(35 18% 85% / 0.6);
+  }
+
+  /* Sand texture overlay */
+  .sand-texture {
+    background-image:
+      radial-gradient(circle at 20% 50%, hsl(35 30% 88% / 0.4) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, hsl(35 25% 85% / 0.3) 0%, transparent 50%),
+      radial-gradient(circle at 50% 80%, hsl(35 30% 90% / 0.3) 0%, transparent 50%);
+  }
+
+  /* Light beam animation for home */
+  @keyframes light-beam {
+    0%, 100% { opacity: 0.15; transform: translateX(-10px) rotate(-5deg); }
+    50% { opacity: 0.3; transform: translateX(10px) rotate(5deg); }
+  }
+  .animate-light-beam {
+    animation: light-beam 6s ease-in-out infinite;
+  }
+
+  /* Sport card glow hover */
+  .sport-card-glow {
+    transition: all 0.3s ease;
+  }
+  .sport-card-glow:hover {
+    box-shadow: 0 0 24px hsl(195 85% 42% / 0.25), 0 8px 32px hsl(25 15% 50% / 0.12);
+    transform: translateY(-4px);
   }
 }

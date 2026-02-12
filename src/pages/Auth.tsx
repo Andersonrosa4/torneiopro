@@ -56,12 +56,12 @@ const Auth = () => {
   };
 
   const sportBgMap: Record<string, string> = {
-    beach_volleyball: "from-[hsl(35_40%_20%)] via-[hsl(35_35%_25%)] to-[hsl(48_50%_30%)]",
-    futevolei: "from-[hsl(155_40%_20%)] via-[hsl(195_35%_25%)] to-[hsl(155_50%_30%)]",
-    beach_tennis: "from-[hsl(180_40%_20%)] via-[hsl(195_35%_25%)] to-[hsl(22_50%_30%)]",
+    beach_volleyball: "from-[hsl(35_20%_10%)] via-[hsl(35_15%_14%)] to-[hsl(48_20%_12%)]",
+    futevolei: "from-[hsl(155_20%_10%)] via-[hsl(195_15%_14%)] to-[hsl(155_20%_12%)]",
+    beach_tennis: "from-[hsl(180_20%_10%)] via-[hsl(195_15%_14%)] to-[hsl(22_20%_12%)]",
   };
 
-  const sportBg = sport ? sportBgMap[sport] : "from-[hsl(35_40%_20%)] via-[hsl(195_35%_25%)] to-[hsl(22_50%_30%)]";
+  const sportBg = sport ? sportBgMap[sport] : "from-[hsl(220_15%_10%)] via-[hsl(220_12%_14%)] to-[hsl(25_15%_12%)]";
 
   return (
     <div className={`flex min-h-screen items-center justify-center bg-gradient-to-b ${sportBg} px-4 relative overflow-hidden`}>

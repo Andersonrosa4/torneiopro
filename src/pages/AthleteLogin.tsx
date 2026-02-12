@@ -38,7 +38,7 @@ const AthleteLogin = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-[hsl(210_40%_15%)] via-[hsl(210_35%_20%)] to-[hsl(25_30%_25%)] px-4 relative overflow-hidden">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-[hsl(220_15%_10%)] via-[hsl(220_12%_14%)] to-[hsl(25_15%_12%)] px-4 relative overflow-hidden">
       {/* Sand texture */}
       <div className="absolute inset-0 sand-texture pointer-events-none" />
       {/* Light beams */}

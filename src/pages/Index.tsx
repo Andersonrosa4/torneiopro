@@ -38,7 +38,7 @@ const Index = () => {
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4">
       {/* Beach arena background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[hsl(210_40%_15%)] via-[hsl(210_35%_20%)] to-[hsl(25_30%_25%)]" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[hsl(220_15%_8%)] via-[hsl(220_12%_12%)] to-[hsl(25_15%_14%)]" />
 
       {/* Sand texture at bottom */}
       <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-[hsl(35_35%_65%/0.3)] to-transparent" />

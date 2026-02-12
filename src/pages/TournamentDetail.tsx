@@ -191,7 +191,17 @@ const TournamentDetail = () => {
     fetchData();
   };
 
-  const generateBracket = async (config: { startRound: number; useSeeds: boolean; numSets: number; gamesPerSet?: number; seedTeamIds?: string[] }) => {
+  const generateBracket = async (config: {
+    startRound: number;
+    useSeeds: boolean;
+    numSets: number;
+    gamesPerSet?: number;
+    seedTeamIds?: string[];
+    useGroupStage: boolean;
+    numGroups: number;
+    teamsPerGroupAdvancing: number;
+    byeTeamIds: string[];
+  }) => {
     if (!id || !tournament) return;
     if (teams.length < 2) { toast.error("Precisa de pelo menos 2 duplas"); return; }
 
@@ -202,86 +212,133 @@ const TournamentDetail = () => {
       games_per_set: config.gamesPerSet || null,
     }).eq("id", id);
 
-    const totalSlots = Math.pow(2, Math.ceil(Math.log2(teams.length)));
-    const maxRounds = Math.ceil(Math.log2(totalSlots));
+    if (config.useGroupStage) {
+      // === GROUP STAGE ===
+      const nonByeTeams = teams.filter(t => !config.byeTeamIds.includes(t.id));
+      let arranged = [...nonByeTeams];
+      if (config.useSeeds && config.seedTeamIds && config.seedTeamIds.length > 0) {
+        const seeds = arranged.filter(t => config.seedTeamIds!.includes(t.id));
+        const nonSeeds = arranged.filter(t => !config.seedTeamIds!.includes(t.id)).sort(() => Math.random() - 0.5);
+        arranged = [...seeds, ...nonSeeds];
+      } else {
+        arranged.sort(() => Math.random() - 0.5);
+      }
 
-    let arranged = [...teams];
-    if (config.useSeeds && config.seedTeamIds && config.seedTeamIds.length > 0) {
-      // Place seed teams first, then rest randomly
-      const seeds = arranged.filter(t => config.seedTeamIds!.includes(t.id));
-      const nonSeeds = arranged.filter(t => !config.seedTeamIds!.includes(t.id)).sort(() => Math.random() - 0.5);
-      arranged = [...seeds, ...nonSeeds];
-    } else if (config.useSeeds) {
-      arranged.sort((a, b) => (a.seed || 0) - (b.seed || 0));
-    } else {
-      arranged.sort(() => Math.random() - 0.5);
-    }
-
-    const newMatches: any[] = [];
-    const matchesInFirstRound = totalSlots / 2;
-    for (let i = 0; i < matchesInFirstRound; i++) {
-      const t1 = arranged[i] || null;
-      const t2 = arranged[totalSlots - 1 - i] || null;
-      newMatches.push({
-        tournament_id: id,
-        round: config.startRound,
-        position: i + 1,
-        team1_id: t1?.id || null,
-        team2_id: t2?.id || null,
-        status: "pending" as const,
+      // Distribute teams into groups
+      const groups: typeof arranged[] = Array.from({ length: config.numGroups }, () => []);
+      arranged.forEach((team, i) => {
+        groups[i % config.numGroups].push(team);
       });
-    }
 
-    for (let r = config.startRound + 1; r <= maxRounds; r++) {
-      const count = totalSlots / Math.pow(2, r);
-      for (let p = 0; p < count; p++) {
-        newMatches.push({
-          tournament_id: id,
-          round: r,
-          position: p + 1,
-          team1_id: null,
-          team2_id: null,
-          status: "pending" as const,
-        });
-      }
-    }
+      const newMatches: any[] = [];
 
-    // Auto-advance byes (matches where one team is null)
-    for (const m of newMatches) {
-      if (m.team1_id && !m.team2_id) {
-        m.winner_team_id = m.team1_id;
-        m.status = "completed";
-      } else if (!m.team1_id && m.team2_id) {
-        m.winner_team_id = m.team2_id;
-        m.status = "completed";
-      }
-    }
-
-    const { error } = await supabase.from("matches").insert(newMatches);
-    if (error) { toast.error(error.message); return; }
-
-    // Advance bye winners to next round
-    const inserted = await supabase.from("matches").select("*").eq("tournament_id", id).order("round").order("position");
-    if (inserted.data) {
-      for (const m of inserted.data) {
-        if (m.winner_team_id && m.status === "completed") {
-          const nextRound = m.round + 1;
-          const nextPosition = Math.ceil(m.position / 2);
-          const isTop = m.position % 2 === 1;
-          const nextMatch = inserted.data.find(
-            (nm: any) => nm.round === nextRound && nm.position === nextPosition
-          );
-          if (nextMatch) {
-            const update = isTop ? { team1_id: m.winner_team_id } : { team2_id: m.winner_team_id };
-            await supabase.from("matches").update(update).eq("id", nextMatch.id);
+      // Create round-robin matches for each group
+      for (let g = 0; g < groups.length; g++) {
+        const groupTeams = groups[g];
+        let pos = 1;
+        for (let i = 0; i < groupTeams.length; i++) {
+          for (let j = i + 1; j < groupTeams.length; j++) {
+            newMatches.push({
+              tournament_id: id,
+              round: 0, // Round 0 = group stage
+              position: pos++,
+              team1_id: groupTeams[i].id,
+              team2_id: groupTeams[j].id,
+              status: "pending" as const,
+              bracket_number: g + 1, // bracket_number = group number
+            });
           }
         }
       }
-    }
 
-    await supabase.from("tournaments").update({ status: "in_progress" as const }).eq("id", id);
-    toast.success("Chaveamento gerado!");
-    fetchData();
+      const { error } = await supabase.from("matches").insert(newMatches);
+      if (error) { toast.error(error.message); return; }
+
+      await supabase.from("tournaments").update({ status: "in_progress" as const }).eq("id", id);
+      toast.success(`Fase de grupos gerada! ${config.numGroups} grupo(s) criado(s).`);
+      fetchData();
+    } else {
+      // === DIRECT KNOCKOUT (existing logic) ===
+      const totalSlots = Math.pow(2, Math.ceil(Math.log2(teams.length)));
+      const maxRounds = Math.ceil(Math.log2(totalSlots));
+
+      let arranged = [...teams];
+      if (config.useSeeds && config.seedTeamIds && config.seedTeamIds.length > 0) {
+        const seeds = arranged.filter(t => config.seedTeamIds!.includes(t.id));
+        const nonSeeds = arranged.filter(t => !config.seedTeamIds!.includes(t.id)).sort(() => Math.random() - 0.5);
+        arranged = [...seeds, ...nonSeeds];
+      } else if (config.useSeeds) {
+        arranged.sort((a, b) => (a.seed || 0) - (b.seed || 0));
+      } else {
+        arranged.sort(() => Math.random() - 0.5);
+      }
+
+      const newMatches: any[] = [];
+      const matchesInFirstRound = totalSlots / 2;
+      for (let i = 0; i < matchesInFirstRound; i++) {
+        const t1 = arranged[i] || null;
+        const t2 = arranged[totalSlots - 1 - i] || null;
+        newMatches.push({
+          tournament_id: id,
+          round: config.startRound,
+          position: i + 1,
+          team1_id: t1?.id || null,
+          team2_id: t2?.id || null,
+          status: "pending" as const,
+        });
+      }
+
+      for (let r = config.startRound + 1; r <= maxRounds; r++) {
+        const count = totalSlots / Math.pow(2, r);
+        for (let p = 0; p < count; p++) {
+          newMatches.push({
+            tournament_id: id,
+            round: r,
+            position: p + 1,
+            team1_id: null,
+            team2_id: null,
+            status: "pending" as const,
+          });
+        }
+      }
+
+      // Auto-advance byes
+      for (const m of newMatches) {
+        if (m.team1_id && !m.team2_id) {
+          m.winner_team_id = m.team1_id;
+          m.status = "completed";
+        } else if (!m.team1_id && m.team2_id) {
+          m.winner_team_id = m.team2_id;
+          m.status = "completed";
+        }
+      }
+
+      const { error } = await supabase.from("matches").insert(newMatches);
+      if (error) { toast.error(error.message); return; }
+
+      // Advance bye winners to next round
+      const inserted = await supabase.from("matches").select("*").eq("tournament_id", id).order("round").order("position");
+      if (inserted.data) {
+        for (const m of inserted.data) {
+          if (m.winner_team_id && m.status === "completed") {
+            const nextRound = m.round + 1;
+            const nextPosition = Math.ceil(m.position / 2);
+            const isTop = m.position % 2 === 1;
+            const nextMatch = inserted.data.find(
+              (nm: any) => nm.round === nextRound && nm.position === nextPosition
+            );
+            if (nextMatch) {
+              const update = isTop ? { team1_id: m.winner_team_id } : { team2_id: m.winner_team_id };
+              await supabase.from("matches").update(update).eq("id", nextMatch.id);
+            }
+          }
+        }
+      }
+
+      await supabase.from("tournaments").update({ status: "in_progress" as const }).eq("id", id);
+      toast.success("Chaveamento gerado!");
+      fetchData();
+    }
   };
 
   const undoBracket = async () => {

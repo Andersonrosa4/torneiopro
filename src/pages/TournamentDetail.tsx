@@ -583,8 +583,32 @@ const TournamentDetail = () => {
 
     if (freshMatches) {
       const groupMatches = freshMatches.filter((m: any) => m.round === 0);
-      const allGroupsDone = groupMatches.length > 0 && groupMatches.every((m: any) => m.status === "completed");
       const knockoutExists = freshMatches.some((m: any) => m.round > 0);
+
+      // Calculate expected group matches using round-robin formula: n(n-1)/2 per group
+      const groupBrackets = new Map<number, any[]>();
+      groupMatches.forEach((m: any) => {
+        const bracket = m.bracket_number || 1;
+        if (!groupBrackets.has(bracket)) {
+          groupBrackets.set(bracket, []);
+        }
+        groupBrackets.get(bracket)!.push(m);
+      });
+
+      // Calculate total expected matches
+      let totalExpectedMatches = 0;
+      groupBrackets.forEach((matches) => {
+        const teamIds = new Set(matches.flatMap((m: any) => [m.team1_id, m.team2_id].filter(Boolean)));
+        const n = teamIds.size;
+        const expectedPerGroup = (n * (n - 1)) / 2;
+        totalExpectedMatches += expectedPerGroup;
+      });
+
+      // Count completed group matches
+      const completedGroupMatches = groupMatches.filter((m: any) => m.status === "completed").length;
+
+      // Only advance to knockout when ALL expected group matches are completed
+      const allGroupsDone = totalExpectedMatches > 0 && completedGroupMatches === totalExpectedMatches;
 
       if (allGroupsDone && !knockoutExists && match.round === 0) {
         await generateKnockoutFromGroups();

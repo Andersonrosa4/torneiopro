@@ -34,11 +34,19 @@ interface BracketTreeViewProps {
 const BracketTreeView = ({ matches, participants, isOwner, onDeclareWinner, onUpdateScore }: BracketTreeViewProps) => {
   const [selectedBracket, setSelectedBracket] = useState<number>(1);
 
-  const bracketMatches = matches.filter(m => (m.bracket_number || 1) === selectedBracket);
-  const brackets = Array.from(new Set(matches.map(m => m.bracket_number || 1))).sort();
+  const hasGroupStage = matches.some(m => m.round === 0);
+  const knockoutMatches = matches.filter(m => m.round > 0);
+  const groupMatches = matches.filter(m => m.round === 0);
+
+  // For knockout view
+  const bracketMatches = knockoutMatches.filter(m => (m.bracket_number || 1) === selectedBracket);
+  const brackets = Array.from(new Set(knockoutMatches.map(m => m.bracket_number || 1))).sort();
 
   const rounds = bracketMatches.length > 0 ? Math.max(...bracketMatches.map((m) => m.round)) : 0;
   const minRound = bracketMatches.length > 0 ? Math.min(...bracketMatches.map((m) => m.round)) : 1;
+
+  // Group stage data
+  const groupNumbers = Array.from(new Set(groupMatches.map(m => m.bracket_number || 1))).sort();
 
   const getName = (id: string | null) => {
     if (!id) return "A definir";
@@ -48,7 +56,6 @@ const BracketTreeView = ({ matches, participants, isOwner, onDeclareWinner, onUp
   const getShortName = (id: string | null) => {
     const full = getName(id);
     if (full === "A definir") return "TBD";
-    // Shorten: "Player1 / Player2" -> "P1 / P2" (first names)
     const parts = full.split(" / ");
     if (parts.length === 2) {
       return parts.map(p => p.split(" ")[0]).join(" / ");
@@ -57,6 +64,7 @@ const BracketTreeView = ({ matches, participants, isOwner, onDeclareWinner, onUp
   };
 
   const getRoundLabel = (round: number) => {
+    if (round === 0) return "Grupos";
     if (round === rounds) return "Final";
     if (round === rounds - 1) return "Semi";
     if (round === rounds - 2) return "Quartas";
@@ -70,55 +78,135 @@ const BracketTreeView = ({ matches, participants, isOwner, onDeclareWinner, onUp
 
   const totalRounds = rounds - minRound + 1;
 
+  // Group standings
+  const getGroupStandings = (groupNum: number) => {
+    const gMatches = groupMatches.filter(m => (m.bracket_number || 1) === groupNum);
+    const teamIds = new Set<string>();
+    gMatches.forEach(m => {
+      if (m.team1_id) teamIds.add(m.team1_id);
+      if (m.team2_id) teamIds.add(m.team2_id);
+    });
+
+    const standings = Array.from(teamIds).map(tid => {
+      const wins = gMatches.filter(m => m.winner_team_id === tid).length;
+      const played = gMatches.filter(m => (m.team1_id === tid || m.team2_id === tid) && m.status === "completed").length;
+      return { id: tid, name: getShortName(tid), wins, played };
+    });
+
+    return standings.sort((a, b) => b.wins - a.wins);
+  };
+
   return (
-    <div className="w-full">
-      {brackets.length > 1 && (
-        <div className="mb-4 flex gap-2 flex-wrap">
-          {brackets.map(bracket => (
-            <Button
-              key={bracket}
-              variant={selectedBracket === bracket ? "default" : "outline"}
-              onClick={() => setSelectedBracket(bracket)}
-              size="sm"
-            >
-              Chave {bracket}
-            </Button>
-          ))}
+    <div className="w-full space-y-6">
+      {/* Group Stage */}
+      {hasGroupStage && groupNumbers.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-bold text-primary flex items-center gap-2">
+            <Trophy className="h-5 w-5" /> Fase de Grupos
+          </h3>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {groupNumbers.map(gNum => {
+              const gMatches = groupMatches.filter(m => (m.bracket_number || 1) === gNum);
+              const standings = getGroupStandings(gNum);
+              return (
+                <div key={gNum} className="rounded-xl border border-border bg-card p-4 shadow-card">
+                  <h4 className="mb-3 text-sm font-bold text-primary uppercase tracking-wider">
+                    Grupo {gNum}
+                  </h4>
+                  {/* Standings */}
+                  <div className="mb-3 space-y-1">
+                    {standings.map((s, i) => (
+                      <div key={s.id} className="flex items-center justify-between rounded-md bg-secondary/50 px-3 py-1.5 text-xs">
+                        <span className="flex items-center gap-2">
+                          <span className="font-bold text-muted-foreground">{i + 1}.</span>
+                          <span className="font-medium text-foreground">{s.name}</span>
+                        </span>
+                        <span className="font-bold text-primary">{s.wins}V / {s.played}J</span>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Group matches */}
+                  <div className="space-y-1.5">
+                    {gMatches.map(match => (
+                      <CompactMatchCard
+                        key={match.id}
+                        match={match}
+                        getName={getShortName}
+                        getFullName={getName}
+                        isOwner={isOwner}
+                        onDeclareWinner={onDeclareWinner}
+                        onUpdateScore={onUpdateScore}
+                        isFinal={false}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {/* Compact responsive bracket */}
-      <div className="w-full overflow-x-auto">
-        <div
-          className="flex gap-2 sm:gap-4 min-w-0"
-          style={{ minWidth: `${Math.max(totalRounds * 160, 320)}px` }}
-        >
-          {Array.from({ length: totalRounds }, (_, i) => minRound + i).map((round) => {
-            const roundMatches = getMatchesByRound(round);
-            return (
-              <div key={round} className="flex flex-col flex-1 min-w-[140px] max-w-[220px]">
-                <h3 className="mb-3 text-center text-xs font-bold text-primary uppercase tracking-wider">
-                  {getRoundLabel(round)}
-                </h3>
-                <div className="flex flex-1 flex-col justify-around gap-2">
-                  {roundMatches.map((match) => (
-                    <CompactMatchCard
-                      key={match.id}
-                      match={match}
-                      getName={getShortName}
-                      getFullName={getName}
-                      isOwner={isOwner}
-                      onDeclareWinner={onDeclareWinner}
-                      onUpdateScore={onUpdateScore}
-                      isFinal={round === rounds}
-                    />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+      {/* Knockout Phase */}
+      {knockoutMatches.length > 0 && (
+        <div>
+          {hasGroupStage && (
+            <h3 className="mb-3 text-lg font-bold text-primary flex items-center gap-2">
+              <Trophy className="h-5 w-5" /> Fase Eliminatória
+            </h3>
+          )}
+          {brackets.length > 1 && (
+            <div className="mb-4 flex gap-2 flex-wrap">
+              {brackets.map(bracket => (
+                <Button
+                  key={bracket}
+                  variant={selectedBracket === bracket ? "default" : "outline"}
+                  onClick={() => setSelectedBracket(bracket)}
+                  size="sm"
+                >
+                  Chave {bracket}
+                </Button>
+              ))}
+            </div>
+          )}
+
+          <div className="w-full overflow-x-auto">
+            <div
+              className="flex gap-2 sm:gap-4 min-w-0"
+              style={{ minWidth: `${Math.max(totalRounds * 160, 320)}px` }}
+            >
+              {Array.from({ length: totalRounds }, (_, i) => minRound + i).map((round) => {
+                const roundMatches = getMatchesByRound(round);
+                return (
+                  <div key={round} className="flex flex-col flex-1 min-w-[140px] max-w-[220px]">
+                    <h3 className="mb-3 text-center text-xs font-bold text-primary uppercase tracking-wider">
+                      {getRoundLabel(round)}
+                    </h3>
+                    <div className="flex flex-1 flex-col justify-around gap-2">
+                      {roundMatches.map((match) => (
+                        <CompactMatchCard
+                          key={match.id}
+                          match={match}
+                          getName={getShortName}
+                          getFullName={getName}
+                          isOwner={isOwner}
+                          onDeclareWinner={onDeclareWinner}
+                          onUpdateScore={onUpdateScore}
+                          isFinal={round === rounds}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {knockoutMatches.length === 0 && !hasGroupStage && (
+        <p className="text-muted-foreground text-center py-8">Nenhuma partida gerada.</p>
+      )}
     </div>
   );
 };

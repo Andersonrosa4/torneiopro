@@ -61,6 +61,7 @@ const MatchSequenceTab = ({ matches, teams }: MatchSequenceTabProps) => {
   const maxRound = matches.length > 0 ? Math.max(...matches.map((m) => m.round)) : 0;
 
   const getRoundLabel = (round: number) => {
+    if (round === 0) return "Grupo";
     if (round === maxRound) return "Final";
     if (round === maxRound - 1) return "Semifinal";
     if (round === maxRound - 2) return "Quartas";

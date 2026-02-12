@@ -1,0 +1,1 @@
+ALTER TABLE public.rankings DROP CONSTRAINT IF EXISTS rankings_created_by_fkey;

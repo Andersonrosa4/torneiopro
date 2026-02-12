@@ -12,9 +12,13 @@ const FlowAppsBranding = ({ variant }: FlowAppsBrandingProps) => {
       href={INSTAGRAM_URL}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-1.5 text-primary hover:text-primary/80 transition-colors"
+      className="inline-flex items-center gap-1.5 font-bold text-transparent bg-clip-text transition-all hover:scale-105"
+      style={{
+        backgroundImage: "linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888)",
+        filter: "drop-shadow(0 0 6px rgba(225, 48, 108, 0.4))",
+      }}
     >
-      <Instagram className="h-4 w-4" />
+      <Instagram className="h-4 w-4 text-pink-500" style={{ filter: "drop-shadow(0 0 4px rgba(225, 48, 108, 0.5))" }} />
       @flowapps.ofc
     </a>
   );
@@ -30,7 +34,11 @@ const FlowAppsBranding = ({ variant }: FlowAppsBrandingProps) => {
           href={INSTAGRAM_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-block mt-2 rounded-full border border-primary/30 bg-primary/10 px-5 py-2 text-sm font-medium text-primary hover:bg-primary/20 transition-colors"
+          className="inline-block mt-2 rounded-full px-6 py-2.5 text-sm font-bold text-white transition-all duration-200 hover:scale-105"
+          style={{
+            backgroundImage: "linear-gradient(135deg, #e53e3e, #c53030, #9b2c2c)",
+            boxShadow: "0 4px 15px rgba(229, 62, 62, 0.4)",
+          }}
         >
           Criar meu aplicativo
         </a>

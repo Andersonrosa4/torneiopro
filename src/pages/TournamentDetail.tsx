@@ -25,6 +25,7 @@ import FlowAppsBranding from "@/components/FlowAppsBranding";
 import ModalityTabs from "@/components/ModalityTabs";
 import { useModalities } from "@/hooks/useModalities";
 import { generateDoubleEliminationBracket } from "@/lib/doubleEliminationLogic";
+import { processDoubleEliminationAdvance, handleResetFinal } from "@/lib/doubleEliminationAdvance";
 
 const sportLabels: Record<string, string> = {
   beach_volleyball: "🏐 Vôlei de Praia",
@@ -640,6 +641,9 @@ const TournamentDetail = () => {
     const match = matches.find((m) => m.id === matchId);
     if (!match || !id) return;
 
+    // Get loser ID
+    const loserId = match.team1_id === winnerId ? match.team2_id : match.team1_id;
+
     await organizerQuery({
       table: "matches",
       operation: "update",
@@ -648,45 +652,46 @@ const TournamentDetail = () => {
     });
 
     // Determine if this is a double elimination bracket
-    const isDoubleElimination = match.bracket_type && match.bracket_type !== 'winners' || 
-      matches.some(m => m.bracket_type === 'losers' || m.bracket_type === 'final');
+    const isDoubleElimination = matches.some(m => m.bracket_type === 'losers' || m.bracket_type === 'final');
 
     if (isDoubleElimination) {
-      // For double elimination, use next_win_match_id / next_lose_match_id if available
-      if (match.next_win_match_id) {
-        const isTop = match.position % 2 === 1;
-        const update = isTop ? { team1_id: winnerId } : { team2_id: winnerId };
-        await organizerQuery({ table: "matches", operation: "update", data: update, filters: { id: match.next_win_match_id } });
-      } else {
-        // Fallback: find next match within same bracket_half and bracket_type
-        const nextRound = match.round + 1;
-        const nextPosition = Math.ceil(match.position / 2);
-        const isTop = match.position % 2 === 1;
-        const nextMatch = matches.find(
-          (m) => m.round === nextRound && m.position === nextPosition && 
-                 m.bracket_type === match.bracket_type && m.bracket_half === match.bracket_half
-        );
-        if (nextMatch) {
-          const update = isTop ? { team1_id: winnerId } : { team2_id: winnerId };
-          await organizerQuery({ table: "matches", operation: "update", data: update, filters: { id: nextMatch.id } });
-        }
+      // Use new advancement logic
+      const advancement = processDoubleEliminationAdvance(matches, match, winnerId, loserId);
+      
+      // Apply winner updates
+      for (const update of advancement.winnerUpdates) {
+        await organizerQuery({
+          table: "matches",
+          operation: "update",
+          data: update.data,
+          filters: { id: update.matchId },
+        });
       }
 
-      // Handle loser going to losers bracket (mirror crossing)
-      const loserId = match.team1_id === winnerId ? match.team2_id : match.team1_id;
-      if (loserId && match.bracket_type === 'winners' && match.bracket_half) {
-        if (match.next_lose_match_id) {
-          const isTop = match.position % 2 === 1;
-          const update = isTop ? { team1_id: loserId } : { team2_id: loserId };
-          await organizerQuery({ table: "matches", operation: "update", data: update, filters: { id: match.next_lose_match_id } });
-        }
+      // Apply loser updates (mirror crossing)
+      for (const update of advancement.loserUpdates) {
+        await organizerQuery({
+          table: "matches",
+          operation: "update",
+          data: update.data,
+          filters: { id: update.matchId },
+        });
       }
 
-      // Winners final: advance winner to grand final
-      if (match.bracket_type === 'winners' && !match.bracket_half) {
-        const grandFinal = matches.find(m => m.bracket_type === 'final');
-        if (grandFinal) {
-          await organizerQuery({ table: "matches", operation: "update", data: { team1_id: winnerId }, filters: { id: grandFinal.id } });
+      // Check if reset final is needed
+      if (match.bracket_type === 'final') {
+        const { needsReset, resetMatchToCreate } = handleResetFinal(matches, match);
+        if (needsReset && resetMatchToCreate) {
+          await organizerQuery({
+            table: "matches",
+            operation: "insert",
+            data: [{
+              tournament_id: id,
+              modality_id: match.modality_id,
+              ...resetMatchToCreate,
+            }],
+          });
+          toast.success("🔄 Final Extra gerada! Campeão dos Perdedores venceu a Grande Final.");
         }
       }
 

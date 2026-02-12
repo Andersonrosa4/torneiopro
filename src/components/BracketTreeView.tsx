@@ -23,6 +23,7 @@ interface Match {
   bracket_number?: number;
   bracket_type?: string;
   bracket_half?: string | null;
+  modality_id?: string;
 }
 
 interface BracketTreeViewProps {
@@ -73,6 +74,7 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
     const winnersMatches = matches.filter(m => m.bracket_type === 'winners');
     const losersMatches = matches.filter(m => m.bracket_type === 'losers');
     const finalMatches = matches.filter(m => m.bracket_type === 'final' || m.bracket_type === 'third_place');
+    const resetFinalMatches = matches.filter(m => m.bracket_type === 'reset_final');
 
     const winnersUpper = winnersMatches.filter(m => m.bracket_half === 'upper');
     const winnersLower = winnersMatches.filter(m => m.bracket_half === 'lower');
@@ -175,6 +177,28 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
             <div className="bg-gradient-to-r from-primary/10 to-accent/10 rounded-lg p-4 border border-primary/30">
               {finalMatches.map(match => (
                 <div key={match.id} className="space-y-2">
+                  <div className="font-medium text-foreground">{getName(match.team1_id)}</div>
+                  {match.status === 'completed' && match.score1 !== null && (
+                    <div className="text-sm font-mono font-bold text-success">{match.score1} - {match.score2}</div>
+                  )}
+                  <div className="border-t border-border my-2" />
+                  <div className="font-medium text-foreground">{getName(match.team2_id)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Reset Final (Extra) */}
+        {resetFinalMatches.length > 0 && (
+          <div className="space-y-3">
+            <h3 className="text-lg font-bold text-warning flex items-center gap-2">
+              <Trophy className="h-5 w-5" /> Final Extra (Reset)
+            </h3>
+            <div className="bg-gradient-to-r from-warning/10 to-accent/10 rounded-lg p-4 border border-warning/30">
+              {resetFinalMatches.map(match => (
+                <div key={match.id} className="space-y-2">
+                  <div className="text-xs text-muted-foreground mb-2">Campeão dos Perdedores vs Campeão</div>
                   <div className="font-medium text-foreground">{getName(match.team1_id)}</div>
                   {match.status === 'completed' && match.score1 !== null && (
                     <div className="text-sm font-mono font-bold text-success">{match.score1} - {match.score2}</div>

@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
+import ThemedBackground from "@/components/ThemedBackground";
 
 const CreateTournament = () => {
   const { user } = useAuth();
@@ -60,7 +61,7 @@ const CreateTournament = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <ThemedBackground>
       <AppHeader />
       <main className="container max-w-2xl py-8">
         <Button variant="ghost" onClick={() => navigate("/dashboard")} className="mb-4 gap-2">
@@ -143,7 +144,7 @@ const CreateTournament = () => {
           </form>
         </motion.div>
       </main>
-    </div>
+    </ThemedBackground>
   );
 };
 

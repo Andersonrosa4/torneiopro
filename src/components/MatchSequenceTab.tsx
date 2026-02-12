@@ -68,6 +68,44 @@ const MatchSequenceTab = ({ matches, teams }: MatchSequenceTabProps) => {
     return `Rodada ${round}`;
   };
 
+  // Group into display rounds
+  const groupedRounds = useMemo(() => {
+    if (sequence.length === 0) return [];
+
+    const groups: { label: string; items: { match: Match; idx: number }[] }[] = [];
+    const groupStage = sequence.filter((m) => m.round === 0);
+    const knockoutStage = sequence.filter((m) => m.round > 0);
+
+    if (groupStage.length > 0) {
+      const bracketCount = new Set(groupStage.map((m) => m.bracket_number || 1)).size;
+      const perRound = Math.max(bracketCount, 1);
+      let roundNum = 1;
+      for (let i = 0; i < groupStage.length; i += perRound) {
+        const chunk = groupStage.slice(i, i + perRound);
+        groups.push({ label: `Rodada ${roundNum}`, items: chunk.map((m) => ({ match: m, idx: 0 })) });
+        roundNum++;
+      }
+    }
+
+    if (knockoutStage.length > 0) {
+      const rounds = [...new Set(knockoutStage.map((m) => m.round))].sort((a, b) => a - b);
+      for (const r of rounds) {
+        groups.push({
+          label: getRoundLabel(r),
+          items: knockoutStage.filter((m) => m.round === r).map((m) => ({ match: m, idx: 0 })),
+        });
+      }
+    }
+
+    let counter = 1;
+    for (const g of groups) {
+      for (const entry of g.items) {
+        entry.idx = counter++;
+      }
+    }
+    return groups;
+  }, [sequence, maxRound]);
+
   if (sequence.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
@@ -79,55 +117,58 @@ const MatchSequenceTab = ({ matches, teams }: MatchSequenceTabProps) => {
   return (
     <section className="space-y-3">
       <h2 className="text-xl font-semibold mb-4">Sequência de Partidas</h2>
-      {sequence.map((match, idx) => {
-        const isCompleted = match.status === "completed";
-        const team1Name = getTeamName(match.team1_id);
-        const team2Name = getTeamName(match.team2_id);
-        const hasTeams = match.team1_id && match.team2_id;
+      {groupedRounds.map((group) => (
+        <div key={group.label} className="space-y-2">
+          <h3 className="text-lg font-semibold text-primary mt-4 mb-1 border-b border-border pb-1">
+            {group.label}
+          </h3>
+          {group.items.map(({ match, idx }) => {
+            const isCompleted = match.status === "completed";
+            const team1Name = getTeamName(match.team1_id);
+            const team2Name = getTeamName(match.team2_id);
+            const hasTeams = match.team1_id && match.team2_id;
 
-        return (
-          <div
-            key={match.id}
-            className={`flex items-center gap-4 rounded-lg border bg-card px-4 py-3 shadow-card transition-all ${
-              isCompleted ? "border-success/30 opacity-80" : hasTeams ? "border-primary/30" : "border-border"
-            }`}
-          >
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground shrink-0">
-              {idx + 1}
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="outline" className="text-xs shrink-0">
-                  {getRoundLabel(match.round)}
-                </Badge>
-                <span className="text-sm font-medium truncate">
-                  {team1Name}
+            return (
+              <div
+                key={match.id}
+                className={`flex items-center gap-4 rounded-lg border bg-card px-4 py-3 shadow-card transition-all ${
+                  isCompleted ? "border-success/30 opacity-80" : hasTeams ? "border-primary/30" : "border-border"
+                }`}
+              >
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground shrink-0">
+                  {idx}
                 </span>
-                <span className="text-xs text-muted-foreground">vs</span>
-                <span className="text-sm font-medium truncate">
-                  {team2Name}
-                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="outline" className="text-xs shrink-0">
+                      {getRoundLabel(match.round)}
+                    </Badge>
+                    <span className="text-sm font-medium truncate">{team1Name}</span>
+                    <span className="text-xs text-muted-foreground">vs</span>
+                    <span className="text-sm font-medium truncate">{team2Name}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {isCompleted && (
+                    <>
+                      <span className="text-sm font-mono font-bold">
+                        {match.score1} - {match.score2}
+                      </span>
+                      <Trophy className="h-4 w-4 text-success" />
+                    </>
+                  )}
+                  {!isCompleted && hasTeams && (
+                    <Badge className="bg-warning/20 text-warning border-0">Pendente</Badge>
+                  )}
+                  {!isCompleted && !hasTeams && (
+                    <Badge variant="outline" className="text-muted-foreground">Aguardando</Badge>
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {isCompleted && (
-                <>
-                  <span className="text-sm font-mono font-bold">
-                    {match.score1} - {match.score2}
-                  </span>
-                  <Trophy className="h-4 w-4 text-success" />
-                </>
-              )}
-              {!isCompleted && hasTeams && (
-                <Badge className="bg-warning/20 text-warning border-0">Pendente</Badge>
-              )}
-              {!isCompleted && !hasTeams && (
-                <Badge variant="outline" className="text-muted-foreground">Aguardando</Badge>
-              )}
-            </div>
-          </div>
-        );
-      })}
+            );
+          })}
+        </div>
+      ))}
     </section>
   );
 };

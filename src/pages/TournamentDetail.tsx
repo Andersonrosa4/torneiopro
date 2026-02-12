@@ -409,8 +409,6 @@ const TournamentDetail = () => {
     const match = matches.find((m) => m.id === matchId);
     if (!match || !id) return;
 
-    confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
-
     await organizerQuery({
       table: "matches",
       operation: "update",
@@ -437,6 +435,7 @@ const TournamentDetail = () => {
       });
       toast.success("Avanço automático realizado!");
     } else {
+      // This is the final match — show confetti and mark tournament complete
       await organizerQuery({
         table: "tournaments",
         operation: "update",
@@ -445,14 +444,25 @@ const TournamentDetail = () => {
       });
       toast.success("Torneio finalizado! 🏆");
       setTimeout(() => {
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 5; i++) {
           setTimeout(() => {
-            confetti({ particleCount: 100, spread: 70, origin: { y: 0.5, x: Math.random() } });
+            confetti({ particleCount: 120, spread: 80, origin: { y: 0.5, x: Math.random() } });
           }, i * 300);
         }
       }, 500);
     }
     fetchData();
+  };
+
+  // Combined handler: save score + declare winner in one action
+  const handleAutoResult = async (matchId: string, score1: number, score2: number, winnerId: string) => {
+    await organizerQuery({
+      table: "matches",
+      operation: "update",
+      data: { score1, score2 },
+      filters: { id: matchId },
+    });
+    await declareWinner(matchId, winnerId);
   };
 
   const updateScore = async (matchId: string, score1: number, score2: number) => {
@@ -819,6 +829,7 @@ const TournamentDetail = () => {
                     eventDate={tournament?.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
                     onDeclareWinner={declareWinner}
                     onUpdateScore={updateScore}
+                    onAutoResult={handleAutoResult}
                   />
                 </section>
               ) : (

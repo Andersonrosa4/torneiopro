@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Check, Save, Download, FileText, Sheet } from "lucide-react";
+import { Trophy, Check, Save, Download, FileText, Sheet, Pencil } from "lucide-react";
 import { motion } from "framer-motion";
 import { exportMatchSequence } from "@/lib/exportUtils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -36,6 +36,7 @@ interface MatchSequenceViewerProps {
   eventDate?: string;
   onDeclareWinner: (matchId: string, winnerId: string) => void;
   onUpdateScore: (matchId: string, score1: number, score2: number) => void;
+  onAutoResult?: (matchId: string, score1: number, score2: number, winnerId: string) => void;
 }
 
 /**
@@ -117,6 +118,7 @@ const MatchSequenceViewer = ({
   eventDate,
   onDeclareWinner,
   onUpdateScore,
+  onAutoResult,
 }: MatchSequenceViewerProps) => {
   const getTeamName = (teamId: string | null) => {
     if (!teamId) return "A definir";
@@ -200,6 +202,7 @@ const MatchSequenceViewer = ({
           numSets={numSets}
           onDeclareWinner={onDeclareWinner}
           onUpdateScore={onUpdateScore}
+          onAutoResult={onAutoResult}
         />
       ))}
     </section>
@@ -216,6 +219,7 @@ interface MatchCardProps {
   numSets: number;
   onDeclareWinner: (matchId: string, winnerId: string) => void;
   onUpdateScore: (matchId: string, score1: number, score2: number) => void;
+  onAutoResult?: (matchId: string, score1: number, score2: number, winnerId: string) => void;
 }
 
 const MatchCard = ({
@@ -228,8 +232,8 @@ const MatchCard = ({
   numSets,
   onDeclareWinner,
   onUpdateScore,
+  onAutoResult,
 }: MatchCardProps) => {
-  // Parse existing scores into sets (stored as total, we split evenly for display)
   const initSets = () => {
     const sets: { s1: string; s2: string }[] = [];
     for (let i = 0; i < numSets; i++) {
@@ -239,8 +243,8 @@ const MatchCard = ({
   };
 
   const [setScores, setSetScores] = useState(initSets);
+  const [isEditing, setIsEditing] = useState(false);
 
-  // Sync when match data changes
   useEffect(() => {
     setSetScores(initSets());
   }, [numSets, match.id]);
@@ -249,12 +253,44 @@ const MatchCard = ({
   const team1Name = getTeamName(match.team1_id);
   const team2Name = getTeamName(match.team2_id);
   const hasTeams = match.team1_id && match.team2_id;
-  const canScore = isOwner && !isCompleted && hasTeams;
+  const canScore = isOwner && hasTeams && (!isCompleted || isEditing);
 
-  const handleSaveScore = () => {
-    const total1 = setScores.reduce((sum, s) => sum + (Number(s.s1) || 0), 0);
-    const total2 = setScores.reduce((sum, s) => sum + (Number(s.s2) || 0), 0);
-    onUpdateScore(match.id, total1, total2);
+  // Calculate sets won by each team
+  const setsWon = useMemo(() => {
+    let t1 = 0, t2 = 0;
+    for (const s of setScores) {
+      const s1 = Number(s.s1) || 0;
+      const s2 = Number(s.s2) || 0;
+      if (s1 > s2) t1++;
+      else if (s2 > s1) t2++;
+    }
+    return { t1, t2 };
+  }, [setScores]);
+
+  const totalScore1 = setScores.reduce((sum, s) => sum + (Number(s.s1) || 0), 0);
+  const totalScore2 = setScores.reduce((sum, s) => sum + (Number(s.s2) || 0), 0);
+
+  // Auto-determine winner based on majority of sets
+  const autoWinnerId = useMemo(() => {
+    const majority = Math.ceil(numSets / 2);
+    if (setsWon.t1 >= majority && match.team1_id) return match.team1_id;
+    if (setsWon.t2 >= majority && match.team2_id) return match.team2_id;
+    return null;
+  }, [setsWon, numSets, match.team1_id, match.team2_id]);
+
+  const handleSaveAndFinalize = () => {
+    if (!autoWinnerId) return;
+    if (onAutoResult) {
+      onAutoResult(match.id, totalScore1, totalScore2, autoWinnerId);
+    } else {
+      onUpdateScore(match.id, totalScore1, totalScore2);
+      onDeclareWinner(match.id, autoWinnerId);
+    }
+    setIsEditing(false);
+  };
+
+  const handleSaveScoreOnly = () => {
+    onUpdateScore(match.id, totalScore1, totalScore2);
   };
 
   const updateSetScore = (setIdx: number, field: "s1" | "s2", value: string) => {
@@ -264,9 +300,6 @@ const MatchCard = ({
       return copy;
     });
   };
-
-  const totalScore1 = setScores.reduce((sum, s) => sum + (Number(s.s1) || 0), 0);
-  const totalScore2 = setScores.reduce((sum, s) => sum + (Number(s.s2) || 0), 0);
 
   return (
     <motion.div
@@ -288,16 +321,16 @@ const MatchCard = ({
         <Badge className="bg-primary/20 text-primary border-0 text-xs shrink-0">
           {getGroupId(match)}
         </Badge>
-        {isCompleted && <Trophy className="h-4 w-4 text-success ml-auto shrink-0" />}
+        {isCompleted && !isEditing && <Trophy className="h-4 w-4 text-success ml-auto shrink-0" />}
       </div>
 
       {/* Teams */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className={`text-sm font-medium ${isCompleted && match.winner_team_id === match.team1_id ? "text-success font-bold" : ""}`}>
+        <span className={`text-sm font-medium ${isCompleted && !isEditing && match.winner_team_id === match.team1_id ? "text-success font-bold" : ""}`}>
           {team1Name}
         </span>
         <span className="text-xs text-muted-foreground">vs</span>
-        <span className={`text-sm font-medium ${isCompleted && match.winner_team_id === match.team2_id ? "text-success font-bold" : ""}`}>
+        <span className={`text-sm font-medium ${isCompleted && !isEditing && match.winner_team_id === match.team2_id ? "text-success font-bold" : ""}`}>
           {team2Name}
         </span>
       </div>
@@ -326,34 +359,35 @@ const MatchCard = ({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-muted-foreground">Total: {totalScore1} × {totalScore2}</span>
-            <Button size="sm" variant="outline" className="h-6 px-2 text-xs gap-1" onClick={handleSaveScore}>
-              <Save className="h-3 w-3" /> Salvar
-            </Button>
-            {match.team1_id && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 px-2 text-xs"
-                onClick={() => {
-                  handleSaveScore();
-                  onDeclareWinner(match.id, match.team1_id!);
-                }}
-              >
-                <Check className="h-3 w-3 text-success mr-1" /> {getTeamName(match.team1_id).split(" / ")[0]}
-              </Button>
+            <span className="text-xs text-muted-foreground">
+              Total: {totalScore1} × {totalScore2} | Sets: {setsWon.t1} × {setsWon.t2}
+            </span>
+            {autoWinnerId ? (
+              <Badge className="bg-success/20 text-success border-0 text-xs">
+                Vencedor: {getTeamName(autoWinnerId).split(" / ")[0]}...
+              </Badge>
+            ) : (
+              <Badge className="bg-warning/20 text-warning border-0 text-xs">
+                Sem vencedor definido
+              </Badge>
             )}
-            {match.team2_id && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 px-2 text-xs"
-                onClick={() => {
-                  handleSaveScore();
-                  onDeclareWinner(match.id, match.team2_id!);
-                }}
-              >
-                <Check className="h-3 w-3 text-success mr-1" /> {getTeamName(match.team2_id).split(" / ")[0]}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" className="h-6 px-2 text-xs gap-1" onClick={handleSaveScoreOnly}>
+              <Save className="h-3 w-3" /> Salvar Placar
+            </Button>
+            <Button
+              size="sm"
+              className="h-6 px-2 text-xs gap-1 bg-success/90 hover:bg-success text-success-foreground"
+              onClick={handleSaveAndFinalize}
+              disabled={!autoWinnerId}
+            >
+              <Check className="h-3 w-3" /> Finalizar Partida
+            </Button>
+            {isEditing && (
+              <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setIsEditing(false)}>
+                Cancelar
               </Button>
             )}
           </div>
@@ -373,6 +407,11 @@ const MatchCard = ({
           )}
           {!isCompleted && (
             <Badge className="bg-warning/20 text-warning border-0 text-xs">Pendente</Badge>
+          )}
+          {isOwner && isCompleted && (
+            <Button size="sm" variant="ghost" className="h-6 px-2 text-xs gap-1" onClick={() => setIsEditing(true)}>
+              <Pencil className="h-3 w-3" /> Corrigir
+            </Button>
           )}
         </div>
       )}

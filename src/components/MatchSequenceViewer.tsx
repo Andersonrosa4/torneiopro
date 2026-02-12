@@ -138,6 +138,58 @@ const MatchSequenceViewer = ({
     return `Rodada ${round}`;
   };
 
+  // Group sequence into display rounds for headers
+  const groupedRounds = useMemo(() => {
+    if (sequence.length === 0) return [];
+
+    const groups: { label: string; matches: { match: Match; globalIndex: number }[] }[] = [];
+    // For group stage (round === 0), split into sequential "Rodada N" based on position in sequence
+    // For knockout, group by actual round value
+
+    const groupStage = sequence.filter((m) => m.round === 0);
+    const knockoutStage = sequence.filter((m) => m.round > 0);
+
+    // Split group stage into rounds: figure out how many matches per round
+    // by counting unique brackets (groups) — each round has one match per group
+    if (groupStage.length > 0) {
+      const bracketCount = new Set(groupStage.map((m) => m.bracket_number || 1)).size;
+      // Each "round" in the sequence has ~bracketCount matches (one per group)
+      // But after conflict resolution order may shift, so we chunk by bracketCount
+      const matchesPerRound = Math.max(bracketCount, 1);
+      let roundNum = 1;
+      for (let i = 0; i < groupStage.length; i += matchesPerRound) {
+        const chunk = groupStage.slice(i, i + matchesPerRound);
+        groups.push({
+          label: `Rodada ${roundNum}`,
+          matches: chunk.map((m) => ({ match: m, globalIndex: 0 })),
+        });
+        roundNum++;
+      }
+    }
+
+    // Group knockout matches by round
+    if (knockoutStage.length > 0) {
+      const knockoutRounds = [...new Set(knockoutStage.map((m) => m.round))].sort((a, b) => a - b);
+      for (const r of knockoutRounds) {
+        const roundMatches = knockoutStage.filter((m) => m.round === r);
+        groups.push({
+          label: getRoundLabel(r),
+          matches: roundMatches.map((m) => ({ match: m, globalIndex: 0 })),
+        });
+      }
+    }
+
+    // Assign global indices
+    let idx = 1;
+    for (const g of groups) {
+      for (const entry of g.matches) {
+        entry.globalIndex = idx++;
+      }
+    }
+
+    return groups;
+  }, [sequence, maxRound]);
+
   const getGroupId = (match: Match) => {
     if (match.round === 0) return `Grupo ${match.bracket_number || 1}`;
     return `Chave ${match.bracket_number || 1}`;
@@ -190,20 +242,27 @@ const MatchSequenceViewer = ({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      {sequence.map((match, idx) => (
-        <MatchCard
-          key={match.id}
-          match={match}
-          index={idx + 1}
-          getTeamName={getTeamName}
-          getGroupId={getGroupId}
-          getRoundLabel={getRoundLabel}
-          isOwner={isOwner}
-          numSets={numSets}
-          onDeclareWinner={onDeclareWinner}
-          onUpdateScore={onUpdateScore}
-          onAutoResult={onAutoResult}
-        />
+      {groupedRounds.map((group) => (
+        <div key={group.label} className="space-y-2">
+          <h3 className="text-lg font-semibold text-primary mt-4 mb-1 border-b border-border pb-1">
+            {group.label}
+          </h3>
+          {group.matches.map(({ match, globalIndex }) => (
+            <MatchCard
+              key={match.id}
+              match={match}
+              index={globalIndex}
+              getTeamName={getTeamName}
+              getGroupId={getGroupId}
+              getRoundLabel={getRoundLabel}
+              isOwner={isOwner}
+              numSets={numSets}
+              onDeclareWinner={onDeclareWinner}
+              onUpdateScore={onUpdateScore}
+              onAutoResult={onAutoResult}
+            />
+          ))}
+        </div>
       ))}
     </section>
   );

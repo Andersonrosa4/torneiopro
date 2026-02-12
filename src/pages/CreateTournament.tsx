@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { ArrowLeft } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 
 const CreateTournament = () => {
@@ -20,21 +21,10 @@ const CreateTournament = () => {
     description: "",
     sport: "beach_volleyball",
     format: "single_elimination",
-    max_participants: 8,
     category: "",
     event_date: "",
     location: "",
-    registration_value: "",
-    num_sets: 3,
-    games_per_set: 21,
   });
-
-  const getMaxSets = () => {
-    if (form.sport === "beach_tennis") return 3;
-    return 3;
-  };
-
-  const showGamesPerSet = form.sport === "beach_tennis";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,13 +38,9 @@ const CreateTournament = () => {
         description: form.description || null,
         sport: form.sport as any,
         format: form.format,
-        max_participants: form.max_participants,
         category: form.category || null,
         event_date: form.event_date || null,
         location: form.location || null,
-        registration_value: form.registration_value ? Number(form.registration_value) : null,
-        num_sets: form.num_sets,
-        games_per_set: showGamesPerSet ? form.games_per_set : null,
         created_by: user.id,
         status: "draft" as const,
       })
@@ -74,6 +60,9 @@ const CreateTournament = () => {
     <div className="min-h-screen bg-background">
       <AppHeader />
       <main className="container max-w-2xl py-8">
+        <Button variant="ghost" onClick={() => navigate("/dashboard")} className="mb-4 gap-2">
+          <ArrowLeft className="h-4 w-4" /> Voltar
+        </Button>
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="mb-2 text-3xl font-bold tracking-tight">Criar Torneio</h1>
           <p className="mb-8 text-muted-foreground">Preencha os detalhes do torneio</p>
@@ -107,7 +96,7 @@ const CreateTournament = () => {
                 <Select value={form.sport} onValueChange={(v) => setForm({ ...form, sport: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="beach_volleyball">🏐 Beach Volley</SelectItem>
+                    <SelectItem value="beach_volleyball">🏐 Vôlei de Praia</SelectItem>
                     <SelectItem value="futevolei">⚽ Futevôlei</SelectItem>
                     <SelectItem value="beach_tennis">🎾 Beach Tennis</SelectItem>
                   </SelectContent>
@@ -143,61 +132,6 @@ const CreateTournament = () => {
                   placeholder="Ex: Praia de Copacabana"
                 />
               </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="registration_value">Valor da Inscrição (R$)</Label>
-                <Input
-                  id="registration_value"
-                  type="number"
-                  step="0.01"
-                  value={form.registration_value}
-                  onChange={(e) => setForm({ ...form, registration_value: e.target.value })}
-                  placeholder="0,00"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Máx. Duplas</Label>
-                <Select
-                  value={String(form.max_participants)}
-                  onValueChange={(v) => setForm({ ...form, max_participants: Number(v) })}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {[4, 8, 16, 32, 64].map((n) => (
-                      <SelectItem key={n} value={String(n)}>{n} duplas</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Sets do Torneio</Label>
-                <Select value={String(form.num_sets)} onValueChange={(v) => setForm({ ...form, num_sets: Number(v) })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {[1, 2, 3].map((n) => (
-                      <SelectItem key={n} value={String(n)}>{n} set{n > 1 ? 's' : ''}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {showGamesPerSet && (
-                <div className="space-y-2">
-                  <Label>Pontos por Set</Label>
-                  <Select value={String(form.games_per_set)} onValueChange={(v) => setForm({ ...form, games_per_set: Number(v) })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {[15, 21, 25].map((n) => (
-                        <SelectItem key={n} value={String(n)}>{n} pontos</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
             </div>
 
             <Button type="submit" className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90" disabled={loading}>

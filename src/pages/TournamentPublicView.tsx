@@ -8,7 +8,7 @@ import { Trophy, Users, MapPin, Calendar, ArrowLeft } from "lucide-react";
 import BracketView from "@/components/BracketView";
 
 const sportLabels: Record<string, string> = {
-  beach_volleyball: "Beach Volley",
+  beach_volleyball: "Vôlei de Praia",
   futevolei: "Futevôlei",
   beach_tennis: "Beach Tennis",
 };

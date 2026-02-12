@@ -1,0 +1,134 @@
+import { useMemo } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Trophy } from "lucide-react";
+
+interface Match {
+  id: string;
+  round: number;
+  position: number;
+  team1_id: string | null;
+  team2_id: string | null;
+  winner_team_id: string | null;
+  status: string;
+  bracket_number: number;
+  score1: number | null;
+  score2: number | null;
+}
+
+interface Team {
+  id: string;
+  player1_name: string;
+  player2_name: string;
+}
+
+interface MatchSequenceTabProps {
+  matches: Match[];
+  teams: Team[];
+}
+
+const MatchSequenceTab = ({ matches, teams }: MatchSequenceTabProps) => {
+  const getTeamName = (teamId: string | null) => {
+    if (!teamId) return "A definir";
+    const team = teams.find((t) => t.id === teamId);
+    return team ? `${team.player1_name} / ${team.player2_name}` : "A definir";
+  };
+
+  // Generate match sequence: one match per bracket at a time, round by round
+  const sequence = useMemo(() => {
+    if (matches.length === 0) return [];
+
+    const rounds = [...new Set(matches.map((m) => m.round))].sort((a, b) => a - b);
+    const brackets = [...new Set(matches.map((m) => m.bracket_number || 1))].sort((a, b) => a - b);
+
+    const ordered: Match[] = [];
+    for (const round of rounds) {
+      const roundMatches = matches.filter((m) => m.round === round);
+      // Interleave: one match from each bracket
+      const byBracket: Record<number, Match[]> = {};
+      for (const b of brackets) {
+        byBracket[b] = roundMatches.filter((m) => (m.bracket_number || 1) === b).sort((a, b2) => a.position - b2.position);
+      }
+      const maxLen = Math.max(...Object.values(byBracket).map((a) => a.length));
+      for (let i = 0; i < maxLen; i++) {
+        for (const b of brackets) {
+          if (byBracket[b][i]) ordered.push(byBracket[b][i]);
+        }
+      }
+    }
+    return ordered;
+  }, [matches]);
+
+  const maxRound = matches.length > 0 ? Math.max(...matches.map((m) => m.round)) : 0;
+
+  const getRoundLabel = (round: number) => {
+    if (round === maxRound) return "Final";
+    if (round === maxRound - 1) return "Semifinal";
+    if (round === maxRound - 2) return "Quartas";
+    return `Rodada ${round}`;
+  };
+
+  if (sequence.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
+        <p className="text-muted-foreground">Gere o chaveamento primeiro para ver a sequência de partidas.</p>
+      </div>
+    );
+  }
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-xl font-semibold mb-4">Sequência de Partidas</h2>
+      {sequence.map((match, idx) => {
+        const isCompleted = match.status === "completed";
+        const team1Name = getTeamName(match.team1_id);
+        const team2Name = getTeamName(match.team2_id);
+        const hasTeams = match.team1_id && match.team2_id;
+
+        return (
+          <div
+            key={match.id}
+            className={`flex items-center gap-4 rounded-lg border bg-card px-4 py-3 shadow-card transition-all ${
+              isCompleted ? "border-success/30 opacity-80" : hasTeams ? "border-primary/30" : "border-border"
+            }`}
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground shrink-0">
+              {idx + 1}
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="outline" className="text-xs shrink-0">
+                  {getRoundLabel(match.round)}
+                </Badge>
+                <span className="text-sm font-medium truncate">
+                  {team1Name}
+                </span>
+                <span className="text-xs text-muted-foreground">vs</span>
+                <span className="text-sm font-medium truncate">
+                  {team2Name}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {isCompleted && (
+                <>
+                  <span className="text-sm font-mono font-bold">
+                    {match.score1} - {match.score2}
+                  </span>
+                  <Trophy className="h-4 w-4 text-success" />
+                </>
+              )}
+              {!isCompleted && hasTeams && (
+                <Badge className="bg-warning/20 text-warning border-0">Pendente</Badge>
+              )}
+              {!isCompleted && !hasTeams && (
+                <Badge variant="outline" className="text-muted-foreground">Aguardando</Badge>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </section>
+  );
+};
+
+export default MatchSequenceTab;

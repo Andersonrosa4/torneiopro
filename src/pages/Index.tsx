@@ -5,7 +5,7 @@ import { Trophy } from "lucide-react";
 const sports = [
   {
     id: "beach_volleyball",
-    name: "Beach Volley",
+    name: "Vôlei de Praia",
     emoji: "🏐",
     gradient: "from-amber-500 to-orange-600",
     description: "Organize torneios de vôlei de praia",
@@ -40,7 +40,7 @@ const Index = () => {
           <Trophy className="h-10 w-10 text-primary-foreground" />
         </div>
         <h1 className="text-4xl font-bold tracking-tight text-foreground font-display">
-          Arena Pro
+          Gestão Pro
         </h1>
         <p className="mt-2 text-lg text-muted-foreground">
           Gerenciador Profissional de Torneios

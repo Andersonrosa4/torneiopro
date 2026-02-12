@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
-import { Plus, Trophy, Users, Calendar, ArrowRight, MapPin } from "lucide-react";
+import { Plus, Trophy, Users, Calendar, ArrowRight, MapPin, ArrowLeft } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 
 const statusLabels: Record<string, string> = {
@@ -25,7 +25,7 @@ const statusColors: Record<string, string> = {
 };
 
 const sportLabels: Record<string, string> = {
-  beach_volleyball: "🏐 Beach Volley",
+  beach_volleyball: "🏐 Vôlei de Praia",
   futevolei: "⚽ Futevôlei",
   beach_tennis: "🎾 Beach Tennis",
 };
@@ -47,6 +47,7 @@ interface Tournament {
 }
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +70,9 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background">
       <AppHeader />
       <main className="container py-8">
+        <Button variant="ghost" onClick={() => navigate("/")} className="mb-4 gap-2">
+          <ArrowLeft className="h-4 w-4" /> Voltar
+        </Button>
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Painel</h1>
@@ -106,10 +110,12 @@ const Dashboard = () => {
                       <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">{t.description}</p>
                     )}
                     <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Users className="h-3.5 w-3.5" />
-                        Máx {t.max_participants}
-                      </span>
+                      {t.category && (
+                        <span className="flex items-center gap-1">
+                          <Users className="h-3.5 w-3.5" />
+                          {t.category}
+                        </span>
+                      )}
                       {t.event_date && (
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3.5 w-3.5" />

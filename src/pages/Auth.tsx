@@ -58,7 +58,7 @@ const Auth = () => {
             <Trophy className="h-8 w-8 text-primary-foreground" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            Arena Pro
+            Gestão Pro
           </h1>
           <p className="mt-2 text-muted-foreground">
             {isLogin ? "Entre para gerenciar seus torneios" : "Crie sua conta"}

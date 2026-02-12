@@ -128,6 +128,7 @@ const MatchSequenceViewer = ({
     return team ? `${team.player1_name} / ${team.player2_name}` : "A definir";
   };
 
+
   const sequence = useMemo(() => generateSequence(matches), [matches]);
 
   const maxRound = matches.length > 0 ? Math.max(...matches.map((m) => m.round)) : 0;
@@ -200,10 +201,11 @@ const MatchSequenceViewer = ({
 
   const getGroupId = (match: Match & { bracket_type?: string; bracket_half?: string | null }) => {
     if (match.round === 0) return `Grupo ${match.bracket_number || 1}`;
-    if (match.bracket_type === 'winners' && match.bracket_half) return `Vencedores ${match.bracket_half === 'upper' ? 'Superior' : 'Inferior'}`;
+    if (match.bracket_type === 'winners' && match.bracket_half) return `Chave dos Vencedores - ${match.bracket_half === 'upper' ? 'Superior' : 'Inferior'}`;
     if (match.bracket_type === 'winners' && !match.bracket_half) return 'Final dos Vencedores';
-    if (match.bracket_type === 'losers') return `Perdedores ${match.bracket_half === 'upper' ? 'Inferior' : 'Superior'}`;
+    if (match.bracket_type === 'losers') return `Chave dos Perdedores - ${match.bracket_half === 'upper' ? 'Inferior ↓' : 'Superior ↑'}`;
     if (match.bracket_type === 'final') return 'Grande Final';
+    if (match.bracket_type === 'reset_final') return 'Final Extra (Reset)';
     if (match.bracket_type === 'third_place') return 'Disputa 3º Lugar';
     return `Chave ${match.bracket_number || 1}`;
   };
@@ -306,6 +308,14 @@ const MatchCard = ({
   onUpdateScore,
   onAutoResult,
 }: MatchCardProps) => {
+  const getBracketColor = (match: Match & { bracket_type?: string }) => {
+    if (match.bracket_type === 'winners') return 'bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-500/30';
+    if (match.bracket_type === 'losers') return 'bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-500/30';
+    if (match.bracket_type === 'final') return 'bg-purple-500/20 text-purple-700 dark:text-purple-400 border-purple-500/30';
+    if (match.bracket_type === 'reset_final') return 'bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30';
+    return 'bg-primary/20 text-primary border-primary/30';
+  };
+
   const initSets = () => {
     const sets: { s1: string; s2: string }[] = [];
     for (let i = 0; i < numSets; i++) {
@@ -383,14 +393,14 @@ const MatchCard = ({
       }`}
     >
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 flex-wrap">
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground shrink-0">
           {index}
         </span>
-        <Badge variant="outline" className="text-xs shrink-0">
+        <Badge variant="outline" className="text-xs shrink-0 font-semibold">
           {getRoundLabel(match.round)}
         </Badge>
-        <Badge className="bg-primary/20 text-primary border-0 text-xs shrink-0">
+        <Badge className={`text-xs shrink-0 font-semibold border ${getBracketColor(match)}`}>
           {getGroupId(match)}
         </Badge>
         {isCompleted && !isEditing && <Trophy className="h-4 w-4 text-success ml-auto shrink-0" />}

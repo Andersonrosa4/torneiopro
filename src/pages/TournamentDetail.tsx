@@ -434,8 +434,14 @@ const TournamentDetail = () => {
         filters: { id: nextMatch.id },
       });
       toast.success("Avanço automático realizado!");
-    } else {
-      // This is the final match — show confetti and mark tournament complete
+    }
+
+    // Check if ALL matches in the tournament are now completed (after this update)
+    const remainingPending = matches.filter(
+      (m) => m.id !== matchId && m.status !== "completed"
+    );
+    if (remainingPending.length === 0) {
+      // All matches done — tournament is finished
       await organizerQuery({
         table: "tournaments",
         operation: "update",
@@ -451,6 +457,7 @@ const TournamentDetail = () => {
         }
       }, 500);
     }
+
     fetchData();
   };
 

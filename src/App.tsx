@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { SportProvider } from "@/contexts/SportContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -23,19 +24,21 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/athlete-login" element={<AthleteLogin />} />
-            <Route path="/tournament-view/:id" element={<TournamentPublicView />} />
-            <Route path="/ranking/:code" element={<PublicRankingsView />} />
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/tournaments/new" element={<ProtectedRoute><CreateTournament /></ProtectedRoute>} />
-            <Route path="/tournaments/:id" element={<ProtectedRoute><TournamentDetail /></ProtectedRoute>} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
+        <SportProvider>
+          <AuthProvider>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/athlete-login" element={<AthleteLogin />} />
+              <Route path="/tournament-view/:id" element={<TournamentPublicView />} />
+              <Route path="/ranking/:code" element={<PublicRankingsView />} />
+              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/tournaments/new" element={<ProtectedRoute><CreateTournament /></ProtectedRoute>} />
+              <Route path="/tournaments/:id" element={<ProtectedRoute><TournamentDetail /></ProtectedRoute>} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
+        </SportProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

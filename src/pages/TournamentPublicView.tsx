@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useSportTheme } from "@/contexts/SportContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
@@ -27,6 +28,7 @@ const statusLabels: Record<string, string> = {
 const TournamentPublicView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { setSelectedSport } = useSportTheme();
   const [tournament, setTournament] = useState<any>(null);
   const [teams, setTeams] = useState<any[]>([]);
   const [matches, setMatches] = useState<any[]>([]);
@@ -39,11 +41,14 @@ const TournamentPublicView = () => {
       supabase.from("teams").select("*").eq("tournament_id", id).order("seed"),
       supabase.from("matches").select("*").eq("tournament_id", id).order("round").order("position"),
     ]);
-    if (tRes.data) setTournament(tRes.data);
+    if (tRes.data) {
+      setTournament(tRes.data);
+      setSelectedSport(tRes.data.sport);
+    }
     if (teamsRes.data) setTeams(teamsRes.data);
     if (mRes.data) setMatches(mRes.data);
     setLoading(false);
-  }, [id]);
+  }, [id, setSelectedSport]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

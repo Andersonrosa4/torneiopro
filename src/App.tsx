@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,8 +16,19 @@ import Dashboard from "./pages/Dashboard";
 import CreateTournament from "./pages/CreateTournament";
 import TournamentDetail from "./pages/TournamentDetail";
 import NotFound from "./pages/NotFound";
+import { supabase } from "@/integrations/supabase/client";
 
 const queryClient = new QueryClient();
+
+// Seed admin on first load
+const seedAdmin = async () => {
+  try {
+    await supabase.functions.invoke("seed-admin", { method: "POST" });
+  } catch (e) {
+    // Silent fail - admin may already exist
+  }
+};
+seedAdmin();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

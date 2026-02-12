@@ -21,6 +21,7 @@ import { GenerateBracketDialog } from "@/components/GenerateBracketDialog";
 import RankingsTab from "@/components/RankingsTab";
 import { rankTeamsInGroup, selectIndexTeams } from "@/lib/tiebreakLogic";
 import { organizerQuery } from "@/lib/organizerApi";
+import FlowAppsBranding from "@/components/FlowAppsBranding";
 
 const sportLabels: Record<string, string> = {
   beach_volleyball: "🏐 Vôlei de Praia",
@@ -1041,8 +1042,10 @@ const TournamentDetail = () => {
               />
             </TabsContent>
           </Tabs>
+          <FlowAppsBranding variant="tournament-cta" />
         </motion.div>
       </main>
+      <FlowAppsBranding variant="internal-footer" />
     </ThemedBackground>
   );
 };

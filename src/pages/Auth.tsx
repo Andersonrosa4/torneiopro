@@ -7,6 +7,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Trophy, Lock, User, ArrowLeft, Mail } from "lucide-react";
+import FlowAppsBranding from "@/components/FlowAppsBranding";
 import { useSportTheme } from "@/contexts/SportContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -183,6 +184,8 @@ const Auth = () => {
             </p>
           </div>
         </div>
+
+        <FlowAppsBranding variant="login-cta" />
 
         <div className="mt-4 text-center">
           <button

@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AppHeader from "@/components/AppHeader";
 import ThemedBackground from "@/components/ThemedBackground";
 import UserManagementTab from "@/components/UserManagementTab";
+import FlowAppsBranding from "@/components/FlowAppsBranding";
 
 const statusLabels: Record<string, string> = {
   draft: "Rascunho",
@@ -221,6 +222,7 @@ const Dashboard = () => {
             )}
           </TabsContent>
         </Tabs>
+        <FlowAppsBranding variant="internal-footer" />
       </main>
     </ThemedBackground>
   );

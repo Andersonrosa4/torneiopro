@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Trophy, Hash } from "lucide-react";
 import ThemedBackground from "@/components/ThemedBackground";
+import FlowAppsBranding from "@/components/FlowAppsBranding";
 
 const AthleteLogin = () => {
   const [code, setCode] = useState("");
@@ -88,6 +89,8 @@ const AthleteLogin = () => {
             </Button>
           </form>
         </div>
+
+        <FlowAppsBranding variant="login-cta" />
 
         <div className="mt-4 text-center">
           <button

@@ -15,7 +15,7 @@ import AppHeader from "@/components/AppHeader";
 import ThemedBackground from "@/components/ThemedBackground";
 
 const CreateTournament = () => {
-  const { user } = useAuth();
+  const { organizerId, user } = useAuth();
   const navigate = useNavigate();
   const { setSelectedSport } = useSportTheme();
   const [loading, setLoading] = useState(false);
@@ -45,7 +45,7 @@ const CreateTournament = () => {
         category: form.category || null,
         event_date: form.event_date || null,
         location: form.location || null,
-        created_by: user.id,
+        created_by: organizerId || "",
         status: "draft" as const,
       })
       .select()

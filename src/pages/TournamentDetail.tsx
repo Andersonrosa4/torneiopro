@@ -72,7 +72,7 @@ interface Match {
 
 const TournamentDetail = () => {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, organizerId } = useAuth();
   const navigate = useNavigate();
   const { setSelectedSport } = useSportTheme();
   const [tournament, setTournament] = useState<any>(null);
@@ -88,7 +88,7 @@ const TournamentDetail = () => {
   const [fictitiousCount, setFictitiousCount] = useState("4");
   const [fictitiousDialogOpen, setFictitiousDialogOpen] = useState(false);
 
-  const isOwner = tournament?.created_by === user?.id;
+  const isOwner = tournament?.created_by === organizerId;
 
   const fetchData = useCallback(async () => {
     if (!id) return;

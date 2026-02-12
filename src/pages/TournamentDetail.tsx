@@ -778,6 +778,7 @@ const TournamentDetail = () => {
                     matches={matches}
                     teams={teams}
                     isOwner={isOwner}
+                    numSets={tournament?.num_sets || 3}
                     onDeclareWinner={declareWinner}
                     onUpdateScore={updateScore}
                   />

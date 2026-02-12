@@ -182,6 +182,7 @@ const TournamentPublicView = () => {
                 matches={matches}
                 teams={teams}
                 isOwner={false}
+                numSets={tournament?.num_sets || 3}
                 onDeclareWinner={() => {}}
                 onUpdateScore={() => {}}
               />

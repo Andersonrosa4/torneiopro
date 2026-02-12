@@ -12,24 +12,24 @@ const sports = [
     name: "Vôlei de Praia",
     image: beachVolleyImg,
     description: "Organize torneios de vôlei de praia",
-    accent: "from-red-900/80 to-red-700/80",
-    glowColor: "hsl(0 75% 45% / 0.35)",
+    accent: "from-amber-500/80 to-orange-600/80",
+    glowColor: "hsl(35 85% 55% / 0.3)",
   },
   {
     id: "futevolei",
     name: "Futevôlei",
     image: futevoleiImg,
     description: "Organize torneios de futevôlei",
-    accent: "from-red-800/80 to-rose-900/80",
-    glowColor: "hsl(0 70% 40% / 0.35)",
+    accent: "from-emerald-500/80 to-teal-600/80",
+    glowColor: "hsl(155 55% 40% / 0.3)",
   },
   {
     id: "beach_tennis",
     name: "Beach Tennis",
     image: beachTennisImg,
     description: "Organize torneios de beach tennis",
-    accent: "from-rose-900/80 to-red-800/80",
-    glowColor: "hsl(355 70% 42% / 0.35)",
+    accent: "from-sky-500/80 to-blue-600/80",
+    glowColor: "hsl(195 85% 45% / 0.3)",
   },
 ];
 
@@ -38,23 +38,23 @@ const Index = () => {
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4">
-      {/* Dark arena background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[hsl(0_0%_6%)] via-[hsl(0_0%_9%)] to-[hsl(0_5%_8%)]" />
+      {/* Beach arena background */}
+      <div className="absolute inset-0 bg-gradient-to-b from-[hsl(220_15%_8%)] via-[hsl(220_12%_12%)] to-[hsl(25_15%_14%)]" />
 
-      {/* Subtle red ambient at bottom */}
-      <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-[hsl(0_60%_20%/0.15)] to-transparent" />
+      {/* Sand texture at bottom */}
+      <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-[hsl(35_35%_65%/0.3)] to-transparent" />
 
-      {/* Animated light beams — red tinted */}
-      <div className="absolute top-0 left-1/4 w-32 h-full bg-gradient-to-b from-[hsl(0_70%_50%/0.06)] to-transparent rotate-12 animate-light-beam" />
-      <div className="absolute top-0 right-1/3 w-24 h-full bg-gradient-to-b from-[hsl(45_70%_50%/0.04)] to-transparent -rotate-6 animate-light-beam" style={{ animationDelay: "2s" }} />
-      <div className="absolute top-0 left-1/2 w-20 h-full bg-gradient-to-b from-[hsl(0_60%_45%/0.05)] to-transparent rotate-3 animate-light-beam" style={{ animationDelay: "4s" }} />
+      {/* Animated light beams */}
+      <div className="absolute top-0 left-1/4 w-32 h-full bg-gradient-to-b from-[hsl(195_80%_60%/0.08)] to-transparent rotate-12 animate-light-beam" />
+      <div className="absolute top-0 right-1/3 w-24 h-full bg-gradient-to-b from-[hsl(35_80%_60%/0.06)] to-transparent -rotate-6 animate-light-beam" style={{ animationDelay: "2s" }} />
+      <div className="absolute top-0 left-1/2 w-20 h-full bg-gradient-to-b from-[hsl(180_60%_50%/0.05)] to-transparent rotate-3 animate-light-beam" style={{ animationDelay: "4s" }} />
 
-      {/* Stadium light spots — red/gold */}
-      <div className="absolute top-0 left-0 w-96 h-96 bg-[radial-gradient(ellipse_at_center,hsl(0_70%_45%/0.1),transparent_70%)]" />
-      <div className="absolute top-0 right-0 w-96 h-96 bg-[radial-gradient(ellipse_at_center,hsl(45_70%_50%/0.08),transparent_70%)]" />
+      {/* Stadium light spots */}
+      <div className="absolute top-0 left-0 w-96 h-96 bg-[radial-gradient(ellipse_at_center,hsl(195_80%_60%/0.12),transparent_70%)]" />
+      <div className="absolute top-0 right-0 w-96 h-96 bg-[radial-gradient(ellipse_at_center,hsl(22_80%_55%/0.1),transparent_70%)]" />
 
       {/* Net texture line */}
-      <div className="absolute top-[40%] left-0 right-0 h-px bg-gradient-to-r from-transparent via-[hsl(0_0%_100%/0.08)] to-transparent" />
+      <div className="absolute top-[40%] left-0 right-0 h-px bg-gradient-to-r from-transparent via-[hsl(0_0%_100%/0.1)] to-transparent" />
 
       {/* Content */}
       <div className="relative z-10 w-full max-w-4xl">
@@ -69,7 +69,7 @@ const Index = () => {
           <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-white font-display">
             Gestão Pro
           </h1>
-          <p className="mt-3 text-lg text-[hsl(45_50%_75%)]">
+          <p className="mt-3 text-lg text-[hsl(35_30%_80%)]">
             Sistema profissional de gestão de torneios
           </p>
         </motion.div>
@@ -120,7 +120,7 @@ const Index = () => {
         >
           <button
             onClick={() => navigate("/athlete-login")}
-            className="rounded-full border border-[hsl(0_0%_100%/0.15)] bg-[hsl(0_0%_100%/0.06)] px-6 py-2.5 text-sm text-[hsl(45_40%_80%)] hover:bg-[hsl(0_0%_100%/0.12)] hover:text-white transition-all backdrop-blur-sm"
+            className="rounded-full border border-[hsl(0_0%_100%/0.15)] bg-[hsl(0_0%_100%/0.06)] px-6 py-2.5 text-sm text-[hsl(35_30%_85%)] hover:bg-[hsl(0_0%_100%/0.12)] hover:text-white transition-all backdrop-blur-sm"
           >
             Sou atleta → Entrar com código do torneio
           </button>

@@ -6,99 +6,99 @@
 
 @layer base {
   :root {
-    /* Dark Arena Theme — deep graphite, sports red, gold accents */
-    --background: 0 0% 8%;
-    --foreground: 0 0% 95%;
+    /* Dark Arena Theme — deep charcoal, dark sand, sport accents */
+    --background: 220 15% 13%;
+    --foreground: 35 20% 90%;
 
-    --card: 0 0% 12%;
-    --card-foreground: 0 0% 95%;
+    --card: 220 12% 17%;
+    --card-foreground: 35 20% 90%;
 
-    --popover: 0 0% 12%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 220 12% 17%;
+    --popover-foreground: 35 20% 90%;
 
-    --primary: 0 75% 45%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 195 85% 50%;
+    --primary-foreground: 220 15% 10%;
 
-    --secondary: 0 0% 16%;
-    --secondary-foreground: 0 0% 80%;
+    --secondary: 220 10% 22%;
+    --secondary-foreground: 35 15% 80%;
 
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 55%;
+    --muted: 220 10% 20%;
+    --muted-foreground: 35 10% 55%;
 
-    --accent: 45 80% 55%;
-    --accent-foreground: 0 0% 8%;
+    --accent: 22 90% 55%;
+    --accent-foreground: 220 15% 10%;
 
     --destructive: 0 72% 50%;
     --destructive-foreground: 0 0% 100%;
 
     --success: 155 60% 45%;
-    --success-foreground: 0 0% 8%;
+    --success-foreground: 220 15% 10%;
 
-    --warning: 45 90% 55%;
-    --warning-foreground: 0 0% 8%;
+    --warning: 38 90% 55%;
+    --warning-foreground: 220 15% 10%;
 
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
-    --ring: 0 75% 45%;
+    --border: 220 10% 25%;
+    --input: 220 10% 25%;
+    --ring: 195 85% 50%;
 
     --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 10%;
-    --sidebar-foreground: 0 0% 80%;
-    --sidebar-primary: 0 75% 45%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 16%;
-    --sidebar-accent-foreground: 0 0% 80%;
-    --sidebar-border: 0 0% 20%;
-    --sidebar-ring: 0 75% 45%;
+    --sidebar-background: 220 12% 15%;
+    --sidebar-foreground: 35 15% 80%;
+    --sidebar-primary: 195 85% 50%;
+    --sidebar-primary-foreground: 220 15% 10%;
+    --sidebar-accent: 220 10% 22%;
+    --sidebar-accent-foreground: 35 15% 80%;
+    --sidebar-border: 220 10% 25%;
+    --sidebar-ring: 195 85% 50%;
 
-    --gradient-primary: linear-gradient(135deg, hsl(0 75% 45%), hsl(0 65% 35%));
-    --gradient-accent: linear-gradient(135deg, hsl(45 80% 55%), hsl(35 75% 45%));
-    --gradient-surface: linear-gradient(180deg, hsl(0 0% 8%), hsl(0 0% 5%));
-    --shadow-glow: 0 0 20px hsl(0 75% 45% / 0.3);
-    --shadow-card: 0 4px 20px hsl(0 0% 0% / 0.4);
+    --gradient-primary: linear-gradient(135deg, hsl(195 85% 50%), hsl(180 70% 45%));
+    --gradient-accent: linear-gradient(135deg, hsl(22 90% 55%), hsl(35 85% 55%));
+    --gradient-surface: linear-gradient(180deg, hsl(220 15% 13%), hsl(220 12% 10%));
+    --shadow-glow: 0 0 20px hsl(195 85% 50% / 0.25);
+    --shadow-card: 0 4px 20px hsl(0 0% 0% / 0.3);
   }
 
   /* Beach Volleyball Theme */
   :root[data-sport="beach_volleyball"] {
-    --primary: 0 75% 45%;
-    --primary-foreground: 0 0% 100%;
-    --accent: 45 85% 55%;
-    --secondary: 0 5% 15%;
-    --ring: 0 75% 45%;
-    --sidebar-primary: 0 75% 45%;
-    --sidebar-ring: 0 75% 45%;
-    --gradient-primary: linear-gradient(135deg, hsl(0 75% 45%), hsl(0 60% 35%));
-    --gradient-accent: linear-gradient(135deg, hsl(45 85% 55%), hsl(35 80% 50%));
-    --shadow-glow: 0 0 20px hsl(0 75% 45% / 0.3);
+    --primary: 35 85% 55%;
+    --primary-foreground: 220 15% 10%;
+    --accent: 48 95% 50%;
+    --secondary: 35 15% 20%;
+    --ring: 35 85% 55%;
+    --sidebar-primary: 35 85% 55%;
+    --sidebar-ring: 35 85% 55%;
+    --gradient-primary: linear-gradient(135deg, hsl(35 85% 55%), hsl(48 95% 50%));
+    --gradient-accent: linear-gradient(135deg, hsl(48 95% 50%), hsl(35 85% 55%));
+    --shadow-glow: 0 0 20px hsl(35 85% 55% / 0.25);
   }
 
   /* Futevolei Theme */
   :root[data-sport="futevolei"] {
-    --primary: 0 70% 42%;
-    --primary-foreground: 0 0% 100%;
-    --accent: 155 55% 42%;
-    --secondary: 155 10% 14%;
-    --ring: 0 70% 42%;
-    --sidebar-primary: 0 70% 42%;
-    --sidebar-ring: 0 70% 42%;
-    --gradient-primary: linear-gradient(135deg, hsl(0 70% 42%), hsl(355 65% 35%));
-    --gradient-accent: linear-gradient(135deg, hsl(155 55% 42%), hsl(0 70% 42%));
-    --shadow-glow: 0 0 20px hsl(0 70% 42% / 0.3);
+    --primary: 155 60% 45%;
+    --primary-foreground: 220 15% 10%;
+    --accent: 195 80% 45%;
+    --secondary: 155 15% 18%;
+    --ring: 155 60% 45%;
+    --sidebar-primary: 155 60% 45%;
+    --sidebar-ring: 155 60% 45%;
+    --gradient-primary: linear-gradient(135deg, hsl(155 60% 45%), hsl(195 80% 45%));
+    --gradient-accent: linear-gradient(135deg, hsl(195 80% 45%), hsl(155 60% 45%));
+    --shadow-glow: 0 0 20px hsl(155 60% 45% / 0.25);
   }
 
   /* Beach Tennis Theme */
   :root[data-sport="beach_tennis"] {
-    --primary: 355 72% 48%;
-    --primary-foreground: 0 0% 100%;
-    --accent: 180 60% 42%;
-    --secondary: 180 10% 14%;
-    --ring: 355 72% 48%;
-    --sidebar-primary: 355 72% 48%;
-    --sidebar-ring: 355 72% 48%;
-    --gradient-primary: linear-gradient(135deg, hsl(355 72% 48%), hsl(0 65% 38%));
-    --gradient-accent: linear-gradient(135deg, hsl(180 60% 42%), hsl(355 72% 48%));
-    --shadow-glow: 0 0 20px hsl(355 72% 48% / 0.3);
+    --primary: 180 70% 45%;
+    --primary-foreground: 220 15% 10%;
+    --accent: 22 90% 55%;
+    --secondary: 180 15% 18%;
+    --ring: 180 70% 45%;
+    --sidebar-primary: 180 70% 45%;
+    --sidebar-ring: 180 70% 45%;
+    --gradient-primary: linear-gradient(135deg, hsl(180 70% 45%), hsl(22 90% 55%));
+    --gradient-accent: linear-gradient(135deg, hsl(22 90% 55%), hsl(180 70% 45%));
+    --shadow-glow: 0 0 20px hsl(180 70% 45% / 0.25);
   }
 }
 
@@ -137,17 +137,17 @@
     box-shadow: var(--shadow-card);
   }
   .glass {
-    background: hsl(0 0% 12% / 0.85);
+    background: hsl(220 12% 17% / 0.85);
     backdrop-filter: blur(16px);
-    border: 1px solid hsl(0 0% 22% / 0.6);
+    border: 1px solid hsl(220 10% 28% / 0.6);
   }
 
   /* Sand texture overlay — dark version */
   .sand-texture {
     background-image:
-      radial-gradient(circle at 20% 50%, hsl(0 10% 14% / 0.4) 0%, transparent 50%),
-      radial-gradient(circle at 80% 20%, hsl(0 8% 12% / 0.3) 0%, transparent 50%),
-      radial-gradient(circle at 50% 80%, hsl(0 5% 10% / 0.3) 0%, transparent 50%);
+      radial-gradient(circle at 20% 50%, hsl(35 20% 18% / 0.4) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, hsl(35 15% 15% / 0.3) 0%, transparent 50%),
+      radial-gradient(circle at 50% 80%, hsl(25 20% 20% / 0.3) 0%, transparent 50%);
   }
 
   /* Light beam animation for home */
@@ -164,7 +164,7 @@
     transition: all 0.3s ease;
   }
   .sport-card-glow:hover {
-    box-shadow: 0 0 30px hsl(0 75% 45% / 0.35), 0 8px 32px hsl(0 0% 0% / 0.4);
+    box-shadow: 0 0 30px hsl(195 85% 50% / 0.3), 0 8px 32px hsl(0 0% 0% / 0.3);
     transform: translateY(-4px);
   }
 }

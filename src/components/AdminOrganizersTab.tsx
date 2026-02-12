@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Plus, Trash2, Pencil, Check, X, Users, Eye, EyeOff } from "lucide-react";
+import { Plus, Trash2, Pencil, Check, X, Users, Eye, EyeOff, Lock } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { organizerQuery } from "@/lib/organizerApi";
 
@@ -34,6 +34,12 @@ const AdminOrganizersTab = () => {
   const [editDisplayName, setEditDisplayName] = useState("");
   const [editPassword, setEditPassword] = useState("");
 
+  // Admin credential edit state
+  const [adminCredOpen, setAdminCredOpen] = useState(false);
+  const [adminNewUsername, setAdminNewUsername] = useState("");
+  const [adminNewPassword, setAdminNewPassword] = useState("");
+  const [adminShowPassword, setAdminShowPassword] = useState(false);
+
   const fetchOrganizers = async () => {
     const { data, error } = await organizerQuery({
       table: "organizers",
@@ -48,6 +54,49 @@ const AdminOrganizersTab = () => {
   useEffect(() => {
     fetchOrganizers();
   }, []);
+
+  const saveAdminCredentials = async () => {
+    const updates: any = {};
+    if (adminNewUsername.trim()) updates.username = adminNewUsername.trim();
+    if (adminNewPassword.trim()) {
+      if (adminNewPassword.length < 6) {
+        toast.error("Senha deve ter pelo menos 6 caracteres");
+        return;
+      }
+      updates.password_hash = adminNewPassword;
+    }
+    if (Object.keys(updates).length === 0) {
+      toast.error("Nenhuma alteração informada");
+      return;
+    }
+    // Find admin organizer
+    const { data: adminOrg } = await organizerQuery({
+      table: "organizers",
+      operation: "select",
+      select: "id",
+      filters: { id: organizerId || "" },
+      maybeSingle: true,
+    });
+    if (!adminOrg) {
+      toast.error("Admin não encontrado");
+      return;
+    }
+    const { error } = await organizerQuery({
+      table: "organizers",
+      operation: "update",
+      data: updates,
+      filters: { id: adminOrg.id },
+    });
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Credenciais do Admin atualizadas!");
+    setAdminNewUsername("");
+    setAdminNewPassword("");
+    setAdminCredOpen(false);
+  };
+
 
   const createOrganizer = async () => {
     if (!username.trim() || !password.trim()) {
@@ -141,7 +190,62 @@ const AdminOrganizersTab = () => {
   };
 
   return (
-    <section className="rounded-xl border border-border bg-card p-6 shadow-card">
+    <div className="space-y-6">
+      {/* Admin Credentials Section */}
+      <section className="rounded-xl border border-border bg-card p-6 shadow-card">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <Lock className="h-5 w-5" /> Credenciais do Admin
+          </h2>
+          <Dialog open={adminCredOpen} onOpenChange={setAdminCredOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline" className="gap-1">
+                <Pencil className="h-4 w-4" /> Alterar
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Alterar Credenciais do Admin</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Novo usuário (login)</Label>
+                  <Input
+                    value={adminNewUsername}
+                    onChange={(e) => setAdminNewUsername(e.target.value)}
+                    placeholder="Deixe vazio para manter"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Nova senha</Label>
+                  <div className="relative">
+                    <Input
+                      type={adminShowPassword ? "text" : "password"}
+                      value={adminNewPassword}
+                      onChange={(e) => setAdminNewPassword(e.target.value)}
+                      placeholder="Deixe vazio para manter"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setAdminShowPassword(!adminShowPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {adminShowPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+                <Button onClick={saveAdminCredentials} className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90">
+                  Salvar Alterações
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+        <p className="text-sm text-muted-foreground">Apenas o Admin pode alterar suas próprias credenciais de acesso.</p>
+      </section>
+
+      {/* Organizers Management Section */}
+      <section className="rounded-xl border border-border bg-card p-6 shadow-card">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-xl font-semibold flex items-center gap-2">
           <Users className="h-5 w-5" /> Gestão de Organizadores
@@ -272,6 +376,7 @@ const AdminOrganizersTab = () => {
         </div>
       )}
     </section>
+    </div>
   );
 };
 

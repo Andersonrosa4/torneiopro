@@ -88,6 +88,8 @@ const TournamentDetail = () => {
   const [editP2, setEditP2] = useState("");
   const [fictitiousCount, setFictitiousCount] = useState("4");
   const [fictitiousDialogOpen, setFictitiousDialogOpen] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [newName, setNewName] = useState("");
 
   const isOwner = tournament?.created_by === organizerId;
 
@@ -507,10 +509,65 @@ const TournamentDetail = () => {
         </Button>
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
           {/* Header */}
-          <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+           <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-bold tracking-tight">{tournament.name}</h1>
+                {editingName ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      className="h-9 text-lg font-bold w-64"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          if (newName.trim()) {
+                            organizerQuery({
+                              table: "tournaments",
+                              operation: "update",
+                              data: { name: newName.trim() },
+                              filters: { id },
+                            }).then(() => {
+                              toast.success("Nome atualizado!");
+                              setEditingName(false);
+                              fetchData();
+                            });
+                          }
+                        }
+                        if (e.key === "Escape") setEditingName(false);
+                      }}
+                    />
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => {
+                      if (newName.trim()) {
+                        organizerQuery({
+                          table: "tournaments",
+                          operation: "update",
+                          data: { name: newName.trim() },
+                          filters: { id },
+                        }).then(() => {
+                          toast.success("Nome atualizado!");
+                          setEditingName(false);
+                          fetchData();
+                        });
+                      }
+                    }}>
+                      <Check className="h-4 w-4 text-success" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setEditingName(false)}>
+                      <X className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <h1 className="text-3xl font-bold tracking-tight">{tournament.name}</h1>
+                    {isOwner && (
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setNewName(tournament.name); setEditingName(true); }}>
+                        <Pencil className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    )}
+                  </>
+                )}
                 <Badge className={statusColors[tournament.status] || ""}>
                   {statusLabels[tournament.status] || tournament.status}
                 </Badge>

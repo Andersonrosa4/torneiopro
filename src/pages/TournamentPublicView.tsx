@@ -1,11 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Trophy, Users, MapPin, Calendar, ArrowLeft } from "lucide-react";
-import BracketView from "@/components/BracketView";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import BracketTreeView from "@/components/BracketTreeView";
+import MatchSequenceTab from "@/components/MatchSequenceTab";
+import RankingsTab from "@/components/RankingsTab";
 
 const sportLabels: Record<string, string> = {
   beach_volleyball: "Vôlei de Praia",
@@ -29,21 +32,31 @@ const TournamentPublicView = () => {
   const [matches, setMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchData = useCallback(async () => {
+    if (!id) return;
+    const [tRes, teamsRes, mRes] = await Promise.all([
+      supabase.from("tournaments").select("*").eq("id", id).single(),
+      supabase.from("teams").select("*").eq("tournament_id", id).order("seed"),
+      supabase.from("matches").select("*").eq("tournament_id", id).order("round").order("position"),
+    ]);
+    if (tRes.data) setTournament(tRes.data);
+    if (teamsRes.data) setTeams(teamsRes.data);
+    if (mRes.data) setMatches(mRes.data);
+    setLoading(false);
+  }, [id]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Real-time updates for athlete view
   useEffect(() => {
     if (!id) return;
-    const fetchData = async () => {
-      const [tRes, teamsRes, mRes] = await Promise.all([
-        supabase.from("tournaments").select("*").eq("id", id).single(),
-        supabase.from("teams").select("*").eq("tournament_id", id).order("seed"),
-        supabase.from("matches").select("*").eq("tournament_id", id).order("round").order("position"),
-      ]);
-      if (tRes.data) setTournament(tRes.data);
-      if (teamsRes.data) setTeams(teamsRes.data);
-      if (mRes.data) setMatches(mRes.data);
-      setLoading(false);
-    };
-    fetchData();
-  }, [id]);
+    const channel = supabase
+      .channel(`public-rt-${id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `tournament_id=eq.${id}` }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "teams", filter: `tournament_id=eq.${id}` }, () => fetchData())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [id, fetchData]);
 
   if (loading) {
     return (
@@ -62,7 +75,6 @@ const TournamentPublicView = () => {
     );
   }
 
-  // Map teams to participants format for BracketView
   const participants = teams.map((t) => ({
     id: t.id,
     name: `${t.player1_name} / ${t.player2_name}`,
@@ -101,42 +113,92 @@ const TournamentPublicView = () => {
             )}
           </div>
 
-          {/* Duplas */}
-          <section className="mb-8">
-            <h2 className="mb-3 text-xl font-semibold flex items-center gap-2">
-              <Users className="h-5 w-5" /> Duplas ({teams.length})
-            </h2>
-            {teams.length === 0 ? (
-              <p className="text-muted-foreground text-sm">Nenhuma dupla inscrita ainda.</p>
-            ) : (
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {teams.map((t, i) => (
-                  <div key={t.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
-                      {i + 1}
-                    </span>
-                    <span className="font-medium">{t.player1_name} / {t.player2_name}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+          {/* All tabs visible for athlete */}
+          <Tabs defaultValue="teams" className="w-full">
+            <TabsList className="mb-4 flex-wrap">
+              <TabsTrigger value="teams">Duplas</TabsTrigger>
+              <TabsTrigger value="bracket">Chaveamento</TabsTrigger>
+              <TabsTrigger value="sequence">Sequência</TabsTrigger>
+              <TabsTrigger value="classification">Classificação</TabsTrigger>
+              <TabsTrigger value="rankings">Ranking</TabsTrigger>
+            </TabsList>
 
-          {/* Chaveamento */}
-          {matches.length > 0 && (
-            <section>
-              <h2 className="mb-3 text-xl font-semibold flex items-center gap-2">
-                <Trophy className="h-5 w-5" /> Chaveamento
-              </h2>
-              <BracketView
-                matches={matches}
-                participants={participants}
+            <TabsContent value="teams">
+              <section className="rounded-xl border border-border bg-card p-6 shadow-card">
+                <h2 className="mb-3 text-xl font-semibold flex items-center gap-2">
+                  <Users className="h-5 w-5" /> Duplas ({teams.length})
+                </h2>
+                {teams.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">Nenhuma dupla inscrita ainda.</p>
+                ) : (
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {teams.map((t, i) => (
+                      <div key={t.id} className="flex items-center gap-3 rounded-lg border border-border bg-secondary/50 px-4 py-3">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
+                          {i + 1}
+                        </span>
+                        <span className="font-medium">{t.player1_name} / {t.player2_name}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </TabsContent>
+
+            <TabsContent value="bracket">
+              {matches.length > 0 ? (
+                <section>
+                  <h2 className="mb-3 text-xl font-semibold flex items-center gap-2">
+                    <Trophy className="h-5 w-5" /> Chaveamento
+                  </h2>
+                  <BracketTreeView
+                    matches={matches}
+                    participants={participants}
+                    isOwner={false}
+                    onDeclareWinner={() => {}}
+                    onUpdateScore={() => {}}
+                  />
+                </section>
+              ) : (
+                <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
+                  <p className="text-muted-foreground">Chaveamento ainda não gerado.</p>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="sequence">
+              <MatchSequenceTab matches={matches} teams={teams} />
+            </TabsContent>
+
+            <TabsContent value="classification">
+              {matches.length > 0 ? (
+                <section>
+                  <h2 className="mb-3 text-xl font-semibold flex items-center gap-2">
+                    <Trophy className="h-5 w-5" /> Classificação
+                  </h2>
+                  <BracketTreeView
+                    matches={matches}
+                    participants={participants}
+                    isOwner={false}
+                    onDeclareWinner={() => {}}
+                    onUpdateScore={() => {}}
+                  />
+                </section>
+              ) : (
+                <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
+                  <p className="text-muted-foreground">Classificação disponível após gerar o chaveamento.</p>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="rankings">
+              <RankingsTab
+                tournamentId={id || ""}
                 isOwner={false}
-                onDeclareWinner={() => {}}
-                onUpdateScore={() => {}}
+                sport={tournament.sport}
               />
-            </section>
-          )}
+            </TabsContent>
+          </Tabs>
         </motion.div>
       </div>
     </div>

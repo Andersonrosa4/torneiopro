@@ -55,7 +55,7 @@ const AppHeader = () => {
         </div>
         <div className="flex items-center gap-3">
           <span className="hidden text-sm text-muted-foreground md:block">
-            {user.email}
+            Organizador
           </span>
           <Button variant="ghost" size="sm" onClick={handleSignOut} className="gap-2">
             <LogOut className="h-4 w-4" />

@@ -17,7 +17,7 @@ interface Organizer {
 }
 
 const AdminOrganizersTab = () => {
-  const { user } = useAuth();
+  const { user, organizerId } = useAuth();
   const [organizers, setOrganizers] = useState<Organizer[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -61,7 +61,7 @@ const AdminOrganizersTab = () => {
       username: username.trim(),
       password_hash: password, // In production, hash on server side
       display_name: displayName.trim() || null,
-      created_by: user?.id || "",
+      created_by: organizerId || "",
     });
 
     if (error) {

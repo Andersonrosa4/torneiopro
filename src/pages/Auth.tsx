@@ -6,14 +6,12 @@ import { Label } from "@/components/ui/label";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Trophy, Mail, Lock, User } from "lucide-react";
+import { Trophy, Lock, User } from "lucide-react";
 import { useSportTheme } from "@/contexts/SportContext";
 
 const Auth = () => {
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -31,25 +29,21 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        toast.success("Bem-vindo de volta!");
-        navigate("/dashboard");
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { display_name: displayName },
-            emailRedirectTo: window.location.origin,
-          },
-        });
-        if (error) throw error;
-        toast.success("Verifique seu email para confirmar sua conta!");
+      // Login via organizer-login edge function
+      const { data, error } = await supabase.functions.invoke("organizer-login", {
+        body: { username, password },
+      });
+
+      if (error || !data?.success) {
+        throw new Error(data?.error || "Falha na autenticação");
       }
+
+      toast.success("Bem-vindo!");
+      sessionStorage.setItem("organizer_token", data.token);
+      sessionStorage.setItem("organizer_id", data.organizerId);
+      navigate("/dashboard");
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error(error.message || "Usuário ou senha incorretos");
     } finally {
       setLoading(false);
     }
@@ -88,43 +82,28 @@ const Auth = () => {
             Gestão Pro
           </h1>
           <p className="mt-2 text-muted-foreground">
-            {isLogin ? "Entre para gerenciar seus torneios" : "Crie sua conta"}
+            Entre para gerenciar seus torneios
           </p>
         </div>
 
         <div className="rounded-xl border border-border bg-card p-6 shadow-card">
           <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
-              <div className="space-y-2">
-                <Label htmlFor="displayName">Nome</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="displayName"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="Seu nome"
-                    className="pl-10"
-                    required={!isLogin}
-                  />
-                </div>
-              </div>
-            )}
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="username">Usuário</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="voce@exemplo.com"
+                  id="username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Seu usuário"
                   className="pl-10"
                   required
                 />
               </div>
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="password">Senha</Label>
               <div className="relative">
@@ -134,36 +113,30 @@ const Auth = () => {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="Sua senha"
                   className="pl-10"
                   required
-                  minLength={6}
                 />
               </div>
             </div>
-            <Button type="submit" className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90" disabled={loading}>
-              {loading ? "Carregando..." : isLogin ? "Entrar" : "Criar Conta"}
+
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90"
+            >
+              {loading ? "Autenticando..." : "Entrar"}
             </Button>
           </form>
 
-          <div className="mt-4 text-center">
-            <button
-              type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-sm text-primary hover:underline"
-            >
-              {isLogin ? "Não tem conta? Cadastre-se" : "Já tem conta? Entre"}
-            </button>
+          <div className="mt-6 text-center">
+            <p className="text-sm text-muted-foreground mb-3">
+              Novo organizador?
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Solicite ao Administrador para criar sua conta
+            </p>
           </div>
-        </div>
-
-        <div className="mt-4 text-center">
-          <button
-            onClick={() => navigate("/")}
-            className="text-sm text-muted-foreground hover:text-primary transition-colors"
-          >
-            ← Voltar ao início
-          </button>
         </div>
       </motion.div>
     </div>

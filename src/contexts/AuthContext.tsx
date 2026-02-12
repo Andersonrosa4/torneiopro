@@ -1,50 +1,71 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { User, Session } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { createContext, useContext, useState, ReactNode } from "react";
+
+interface User {
+  id: string;
+}
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
+  organizerId: string | null;
+  isAuthenticated: boolean;
   loading: boolean;
+  login: (token: string, organizerId: string) => void;
+  logout: () => void;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
-  session: null,
-  loading: true,
+  organizerId: null,
+  isAuthenticated: false,
+  loading: false,
+  login: () => {},
+  logout: () => {},
   signOut: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const storedOrganizerId = sessionStorage.getItem("organizer_id");
+  const storedToken = sessionStorage.getItem("organizer_token");
 
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+  const [organizerId, setOrganizerId] = useState<string | null>(storedOrganizerId);
+  const [user, setUser] = useState<User | null>(
+    storedOrganizerId ? { id: storedOrganizerId } : null
+  );
+  const [loading] = useState(false);
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+  const login = (newToken: string, newOrganizerId: string) => {
+    sessionStorage.setItem("organizer_token", newToken);
+    sessionStorage.setItem("organizer_id", newOrganizerId);
+    setOrganizerId(newOrganizerId);
+    setUser({ id: newOrganizerId });
+  };
 
-    return () => subscription.unsubscribe();
-  }, []);
+  const logout = () => {
+    sessionStorage.removeItem("organizer_token");
+    sessionStorage.removeItem("organizer_id");
+    setOrganizerId(null);
+    setUser(null);
+  };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    logout();
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signOut }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        organizerId,
+        isAuthenticated: !!storedToken && !!organizerId,
+        loading,
+        login,
+        logout,
+        signOut,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

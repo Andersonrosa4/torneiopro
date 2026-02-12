@@ -24,7 +24,7 @@ interface RankingsTabProps {
 }
 
 const RankingsTab = ({ tournamentId, isOwner, sport }: RankingsTabProps) => {
-  const { user } = useAuth();
+  const { user, organizerId } = useAuth();
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [athleteName, setAthleteName] = useState("");
@@ -83,7 +83,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport }: RankingsTabProps) => {
       points: Number(points),
       sport: sport as any,
       tournament_id: tournamentId,
-      created_by: user.id,
+      created_by: organizerId || "",
     });
 
     if (error) {

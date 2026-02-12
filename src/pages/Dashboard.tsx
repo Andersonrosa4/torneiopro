@@ -51,7 +51,7 @@ interface Tournament {
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, organizerId } = useAuth();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -61,7 +61,7 @@ const Dashboard = () => {
       const { data, error } = await supabase
         .from("tournaments")
         .select("*")
-        .eq("created_by", user?.id || "")
+        .eq("created_by", organizerId || "")
         .order("created_at", { ascending: false });
 
       if (!error && data) setTournaments(data);
@@ -72,7 +72,7 @@ const Dashboard = () => {
       const { data } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", user.id)
+        .eq("user_id", organizerId || "")
         .eq("role", "admin")
         .maybeSingle();
       setIsAdmin(!!data);

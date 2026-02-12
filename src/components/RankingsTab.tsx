@@ -33,9 +33,10 @@ interface RankingsTabProps {
   sport: string;
   tournamentName?: string;
   eventDate?: string;
+  modalityId?: string | null;
 }
 
-const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventDate }: RankingsTabProps) => {
+const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventDate, modalityId }: RankingsTabProps) => {
   const { user, organizerId } = useAuth();
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -61,11 +62,15 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
   };
 
   const fetchTeams = async () => {
-    const { data } = await supabase
+    let query = supabase
       .from("teams")
       .select("*")
       .eq("tournament_id", tournamentId)
       .order("seed");
+    if (modalityId) {
+      query = query.eq("modality_id", modalityId);
+    }
+    const { data } = await query;
     if (data) setTeams(data);
   };
 
@@ -79,7 +84,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [tournamentId]);
+  }, [tournamentId, modalityId]);
 
   // Build athlete options from teams (individual player names)
   const athleteOptions = useMemo(() => {

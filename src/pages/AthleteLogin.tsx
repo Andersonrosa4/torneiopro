@@ -39,12 +39,12 @@ const AthleteLogin = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-[hsl(220_15%_10%)] via-[hsl(220_12%_14%)] to-[hsl(25_15%_12%)] px-4 relative overflow-hidden">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-[hsl(0_0%_7%)] via-[hsl(0_0%_10%)] to-[hsl(0_5%_8%)] px-4 relative overflow-hidden">
       {/* Sand texture */}
       <div className="absolute inset-0 sand-texture pointer-events-none" />
       {/* Light beams */}
-      <div className="absolute top-0 left-1/4 w-32 h-full bg-gradient-to-b from-[hsl(195_80%_60%/0.08)] to-transparent rotate-12 animate-light-beam" />
-      <div className="absolute top-0 right-1/3 w-24 h-full bg-gradient-to-b from-[hsl(35_80%_60%/0.06)] to-transparent -rotate-6 animate-light-beam" style={{ animationDelay: "2s" }} />
+      <div className="absolute top-0 left-1/4 w-32 h-full bg-gradient-to-b from-[hsl(0_70%_50%/0.06)] to-transparent rotate-12 animate-light-beam" />
+      <div className="absolute top-0 right-1/3 w-24 h-full bg-gradient-to-b from-[hsl(45_70%_50%/0.04)] to-transparent -rotate-6 animate-light-beam" style={{ animationDelay: "2s" }} />
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

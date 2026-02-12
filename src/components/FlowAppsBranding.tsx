@@ -22,10 +22,10 @@ const FlowAppsBranding = ({ variant }: FlowAppsBrandingProps) => {
   if (variant === "home-footer") {
     return (
       <footer className="mt-12 pb-6 text-center space-y-2">
-        <p className="text-sm text-[hsl(35_30%_70%)]">
-          Desenvolvido por <span className="font-semibold text-[hsl(35_30%_85%)]">FlowApps</span>
+        <p className="text-sm text-[hsl(0_0%_60%)]">
+          Desenvolvido por <span className="font-semibold text-[hsl(0_0%_85%)]">FlowApps</span>
         </p>
-        <div className="text-sm text-[hsl(35_30%_70%)]">{instagramLink}</div>
+        <div className="text-sm text-[hsl(0_0%_60%)]">{instagramLink}</div>
         <a
           href={INSTAGRAM_URL}
           target="_blank"

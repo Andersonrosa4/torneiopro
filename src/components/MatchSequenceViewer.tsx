@@ -2,8 +2,10 @@ import { useState, useMemo, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Check, Save } from "lucide-react";
+import { Trophy, Check, Save, Download, FileText, Sheet } from "lucide-react";
 import { motion } from "framer-motion";
+import { exportMatchSequence } from "@/lib/exportUtils";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface Match {
   id: string;
@@ -29,6 +31,9 @@ interface MatchSequenceViewerProps {
   teams: Team[];
   isOwner: boolean;
   numSets: number;
+  tournamentName?: string;
+  sport?: string;
+  eventDate?: string;
   onDeclareWinner: (matchId: string, winnerId: string) => void;
   onUpdateScore: (matchId: string, score1: number, score2: number) => void;
 }
@@ -107,6 +112,9 @@ const MatchSequenceViewer = ({
   teams,
   isOwner,
   numSets,
+  tournamentName = "",
+  sport = "",
+  eventDate,
   onDeclareWinner,
   onUpdateScore,
 }: MatchSequenceViewerProps) => {
@@ -143,8 +151,43 @@ const MatchSequenceViewer = ({
     );
   }
 
+  const handleExport = (format: "pdf" | "xlsx" | "csv") => {
+    const meta = { tournamentName, sport, date: eventDate };
+    const rows = sequence.map((m, idx) => ({
+      order: idx + 1,
+      round: getRoundLabel(m.round),
+      group: getGroupId(m),
+      team1: getTeamName(m.team1_id),
+      team2: getTeamName(m.team2_id),
+      score: m.status === "completed" ? `${m.score1 ?? 0} × ${m.score2 ?? 0}` : "-",
+      winner: m.winner_team_id ? getTeamName(m.winner_team_id) : "-",
+      status: m.status === "completed" ? "Finalizado" : "Pendente",
+    }));
+    exportMatchSequence(format, rows, meta);
+  };
+
   return (
     <section className="space-y-3">
+      <div className="flex justify-end">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-1">
+              <Download className="h-4 w-4" /> Exportar
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => handleExport("pdf")}>
+              <FileText className="h-4 w-4 mr-2" /> PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("xlsx")}>
+              <Sheet className="h-4 w-4 mr-2" /> Excel (.xlsx)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("csv")}>
+              <FileText className="h-4 w-4 mr-2" /> CSV
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
       {sequence.map((match, idx) => (
         <MatchCard
           key={match.id}

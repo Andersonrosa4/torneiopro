@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Trash2, TrendingUp } from "lucide-react";
+import { Plus, Trash2, TrendingUp, Download, FileText, Sheet } from "lucide-react";
 import { motion } from "framer-motion";
 import { organizerQuery } from "@/lib/organizerApi";
+import { exportRankings } from "@/lib/exportUtils";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface RankingEntry {
   id: string;
@@ -22,9 +24,11 @@ interface RankingsTabProps {
   tournamentId: string;
   isOwner: boolean;
   sport: string;
+  tournamentName?: string;
+  eventDate?: string;
 }
 
-const RankingsTab = ({ tournamentId, isOwner, sport }: RankingsTabProps) => {
+const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventDate }: RankingsTabProps) => {
   const { user, organizerId } = useAuth();
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -191,6 +195,36 @@ const RankingsTab = ({ tournamentId, isOwner, sport }: RankingsTabProps) => {
             Nenhum atleta no ranking ainda.
           </p>
         ) : (
+          <>
+            <div className="flex justify-end mb-3">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1">
+                    <Download className="h-4 w-4" /> Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => {
+                    const rows = rankings.map((r, i) => ({ position: i + 1, athlete_name: r.athlete_name, points: r.points }));
+                    exportRankings("pdf", rows, { tournamentName, sport, date: eventDate });
+                  }}>
+                    <FileText className="h-4 w-4 mr-2" /> PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    const rows = rankings.map((r, i) => ({ position: i + 1, athlete_name: r.athlete_name, points: r.points }));
+                    exportRankings("xlsx", rows, { tournamentName, sport, date: eventDate });
+                  }}>
+                    <Sheet className="h-4 w-4 mr-2" /> Excel (.xlsx)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    const rows = rankings.map((r, i) => ({ position: i + 1, athlete_name: r.athlete_name, points: r.points }));
+                    exportRankings("csv", rows, { tournamentName, sport, date: eventDate });
+                  }}>
+                    <FileText className="h-4 w-4 mr-2" /> CSV
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           <div className="space-y-2">
             {rankings.map((ranking, idx) => (
               <motion.div
@@ -248,6 +282,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport }: RankingsTabProps) => {
               </motion.div>
             ))}
           </div>
+          </>
         )}
       </motion.section>
 

@@ -22,6 +22,9 @@ import RankingsTab from "@/components/RankingsTab";
 import { rankTeamsInGroup, selectIndexTeams } from "@/lib/tiebreakLogic";
 import { organizerQuery } from "@/lib/organizerApi";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
+import ModalityTabs from "@/components/ModalityTabs";
+import { useModalities } from "@/hooks/useModalities";
+import { generateDoubleEliminationBracket } from "@/lib/doubleEliminationLogic";
 
 const sportLabels: Record<string, string> = {
   beach_volleyball: "🏐 Vôlei de Praia",
@@ -53,6 +56,7 @@ interface Team {
   seed: number | null;
   is_fictitious: boolean;
   payment_status: string;
+  modality_id: string | null;
 }
 
 interface Match {
@@ -70,6 +74,11 @@ interface Match {
   team2_id: string | null;
   winner_team_id: string | null;
   bracket_number: number;
+  modality_id: string | null;
+  bracket_type: string | null;
+  bracket_half: string | null;
+  next_win_match_id: string | null;
+  next_lose_match_id: string | null;
 }
 
 const TournamentDetail = () => {
@@ -92,7 +101,17 @@ const TournamentDetail = () => {
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState("");
 
+  const { modalities, selectedModality, setSelectedModality, updateModality } = useModalities(id);
+
   const isOwner = tournament?.created_by === organizerId || isAdmin;
+
+  // Filtered data by selected modality
+  const filteredTeams = selectedModality
+    ? teams.filter(t => t.modality_id === selectedModality.id || !t.modality_id)
+    : teams;
+  const filteredMatches = selectedModality
+    ? matches.filter(m => m.modality_id === selectedModality.id || !m.modality_id)
+    : matches;
 
   // Reads use direct supabase (SELECT policies are true)
   const fetchData = useCallback(async () => {
@@ -138,6 +157,7 @@ const TournamentDetail = () => {
         player1_name: player1.trim(),
         player2_name: player2.trim(),
         seed: teams.length + 1,
+        modality_id: selectedModality?.id || null,
       },
     });
     if (error) { toast.error(error.message); return; }
@@ -159,6 +179,7 @@ const TournamentDetail = () => {
         player2_name: `Jogador ${num}B`,
         seed: num,
         is_fictitious: true,
+        modality_id: selectedModality?.id || null,
       });
     }
     const { error } = await organizerQuery({
@@ -691,7 +712,7 @@ const TournamentDetail = () => {
     );
   }
 
-  const participants = teams.map((t) => ({
+  const participants = filteredTeams.map((t) => ({
     id: t.id,
     name: `${t.player1_name} / ${t.player2_name}`,
     seed: t.seed,
@@ -777,7 +798,7 @@ const TournamentDetail = () => {
                 {tournament.category && <span>• {tournament.category}</span>}
                 <span className="flex items-center gap-1">
                   <Users className="h-4 w-4" />
-                  {teams.length} duplas
+                  {filteredTeams.length} duplas {selectedModality ? `(${selectedModality.name})` : ""}
                 </span>
               </div>
             </div>
@@ -816,6 +837,15 @@ const TournamentDetail = () => {
               )}
             </div>
           </div>
+
+          {/* Modality Tabs */}
+          <ModalityTabs
+            modalities={modalities}
+            selectedModality={selectedModality}
+            onSelect={setSelectedModality}
+            isOwner={isOwner}
+            onUpdateModality={updateModality}
+          />
 
           {/* All tabs always visible */}
           <Tabs defaultValue="teams" className="w-full">
@@ -877,7 +907,7 @@ const TournamentDetail = () => {
                         </div>
                       </DialogContent>
                     </Dialog>
-                    {teams.length >= 2 && (
+                    {filteredTeams.length >= 2 && (
                       <Button variant="outline" size="sm" onClick={shuffleTeams} className="gap-1">
                         <Shuffle className="h-4 w-4" /> Embaralhar
                       </Button>
@@ -887,13 +917,13 @@ const TournamentDetail = () => {
               )}
 
               {/* Team list always visible */}
-              {teams.length === 0 ? (
-                <p className="text-sm text-muted-foreground mt-4">Nenhuma dupla cadastrada.</p>
+              {filteredTeams.length === 0 ? (
+                <p className="text-sm text-muted-foreground mt-4">Nenhuma dupla cadastrada nesta modalidade.</p>
               ) : (
                 <section className="mt-4 rounded-xl border border-border bg-card p-6 shadow-card">
-                  <h2 className="mb-4 text-xl font-semibold">Duplas ({teams.length})</h2>
+                  <h2 className="mb-4 text-xl font-semibold">Duplas ({filteredTeams.length})</h2>
                   <div className="space-y-2">
-                    {teams.map((t, i) => (
+                    {filteredTeams.map((t, i) => (
                       <div key={t.id} className="flex items-center justify-between rounded-lg border border-border bg-secondary/50 px-4 py-2">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground shrink-0">
@@ -936,19 +966,19 @@ const TournamentDetail = () => {
 
             {/* Chaveamento Tab - Structural view only (no scores/results) */}
             <TabsContent value="bracket">
-              {isOwner && matches.length === 0 && teams.length >= 2 && (
+              {isOwner && filteredMatches.length === 0 && filteredTeams.length >= 2 && (
                 <div className="mb-4">
                   <GenerateBracketDialog
                     onGenerate={generateBracket}
-                    teamCount={teams.length}
-                    teams={teams}
+                    teamCount={filteredTeams.length}
+                    teams={filteredTeams}
                     isDisabled={false}
-                    sport={tournament.sport}
+                    sport={selectedModality?.sport || tournament.sport}
                   />
                 </div>
               )}
 
-              {isOwner && matches.length > 0 && (
+              {isOwner && filteredMatches.length > 0 && (
                 <div className="mb-4 flex justify-end">
                   <Button variant="destructive" size="sm" className="gap-1" onClick={undoBracket}>
                     <Undo2 className="h-4 w-4" /> Desfazer Chaveamento
@@ -956,13 +986,13 @@ const TournamentDetail = () => {
                 </div>
               )}
 
-              {matches.length > 0 ? (
+              {filteredMatches.length > 0 ? (
                 <section>
                   <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
                     <Trophy className="h-5 w-5" /> Chaveamento
                   </h2>
                   <BracketTreeView
-                    matches={matches}
+                    matches={filteredMatches}
                     participants={participants}
                     isOwner={false}
                     onDeclareWinner={() => {}}
@@ -973,7 +1003,7 @@ const TournamentDetail = () => {
               ) : (
                 <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
                   <p className="text-muted-foreground">
-                    {teams.length < 2
+                    {filteredTeams.length < 2
                       ? "Adicione pelo menos 2 duplas para gerar o chaveamento."
                       : "Clique em \"Gerar Chaveamento\" para começar."}
                   </p>
@@ -983,21 +1013,21 @@ const TournamentDetail = () => {
 
             {/* Sequência Tab - Match sequence with group identification */}
             <TabsContent value="sequence">
-              {isOwner && matches.length > 0 && (
+              {isOwner && filteredMatches.length > 0 && (
                 <div className="mb-4 flex justify-end">
                   <Button variant="destructive" size="sm" className="gap-1" onClick={undoBracket}>
                     <Undo2 className="h-4 w-4" /> Desfazer Sequência
                   </Button>
                 </div>
               )}
-              {matches.length > 0 ? (
+              {filteredMatches.length > 0 ? (
                 <section>
                   <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
                     <Trophy className="h-5 w-5" /> Sequência de Partidas
                   </h2>
                   <MatchSequenceViewer
-                    matches={matches}
-                    teams={teams}
+                    matches={filteredMatches}
+                    teams={filteredTeams}
                     isOwner={isOwner}
                     numSets={tournament?.num_sets || 3}
                     tournamentName={tournament?.name || ""}
@@ -1017,12 +1047,12 @@ const TournamentDetail = () => {
 
             {/* Classificação Tab - Read-only standings */}
             <TabsContent value="classification">
-              {matches.length > 0 ? (
+              {filteredMatches.length > 0 ? (
                 <section>
                   <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
                     <Trophy className="h-5 w-5" /> Classificação
                   </h2>
-                  <ClassificationTab matches={matches} teams={teams} />
+                  <ClassificationTab matches={filteredMatches} teams={filteredTeams} />
                 </section>
               ) : (
                 <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">

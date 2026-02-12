@@ -16,9 +16,14 @@ export type Database = {
     Tables: {
       matches: {
         Row: {
+          bracket_half: string | null
           bracket_number: number | null
+          bracket_type: string | null
           created_at: string
           id: string
+          modality_id: string | null
+          next_lose_match_id: string | null
+          next_win_match_id: string | null
           participant1_id: string | null
           participant2_id: string | null
           position: number
@@ -33,9 +38,14 @@ export type Database = {
           winner_team_id: string | null
         }
         Insert: {
+          bracket_half?: string | null
           bracket_number?: number | null
+          bracket_type?: string | null
           created_at?: string
           id?: string
+          modality_id?: string | null
+          next_lose_match_id?: string | null
+          next_win_match_id?: string | null
           participant1_id?: string | null
           participant2_id?: string | null
           position: number
@@ -50,9 +60,14 @@ export type Database = {
           winner_team_id?: string | null
         }
         Update: {
+          bracket_half?: string | null
           bracket_number?: number | null
+          bracket_type?: string | null
           created_at?: string
           id?: string
+          modality_id?: string | null
+          next_lose_match_id?: string | null
+          next_win_match_id?: string | null
           participant1_id?: string | null
           participant2_id?: string | null
           position?: number
@@ -67,6 +82,27 @@ export type Database = {
           winner_team_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "matches_modality_id_fkey"
+            columns: ["modality_id"]
+            isOneToOne: false
+            referencedRelation: "modalities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matches_next_lose_match_id_fkey"
+            columns: ["next_lose_match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matches_next_win_match_id_fkey"
+            columns: ["next_win_match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "matches_participant1_id_fkey"
             columns: ["participant1_id"]
@@ -114,6 +150,41 @@ export type Database = {
             columns: ["winner_team_id"]
             isOneToOne: false
             referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      modalities: {
+        Row: {
+          created_at: string
+          game_system: string
+          id: string
+          name: string
+          sport: string
+          tournament_id: string
+        }
+        Insert: {
+          created_at?: string
+          game_system?: string
+          id?: string
+          name: string
+          sport?: string
+          tournament_id: string
+        }
+        Update: {
+          created_at?: string
+          game_system?: string
+          id?: string
+          name?: string
+          sport?: string
+          tournament_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "modalities_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
             referencedColumns: ["id"]
           },
         ]
@@ -256,6 +327,7 @@ export type Database = {
           created_at: string
           id: string
           is_fictitious: boolean | null
+          modality_id: string | null
           payment_status: string | null
           player1_name: string
           player2_name: string
@@ -266,6 +338,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_fictitious?: boolean | null
+          modality_id?: string | null
           payment_status?: string | null
           player1_name: string
           player2_name: string
@@ -276,6 +349,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_fictitious?: boolean | null
+          modality_id?: string | null
           payment_status?: string | null
           player1_name?: string
           player2_name?: string
@@ -283,6 +357,13 @@ export type Database = {
           tournament_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "teams_modality_id_fkey"
+            columns: ["modality_id"]
+            isOneToOne: false
+            referencedRelation: "modalities"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "teams_tournament_id_fkey"
             columns: ["tournament_id"]

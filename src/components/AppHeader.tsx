@@ -27,7 +27,7 @@ const AppHeader = () => {
               <Trophy className="h-5 w-5 text-primary-foreground" />
             </div>
             <span className="text-lg font-bold tracking-tight text-foreground font-display">
-              Arena Pro
+              Gestão Pro
             </span>
           </Link>
           <nav className="hidden items-center gap-1 md:flex">

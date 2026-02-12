@@ -5,20 +5,21 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Plus, Trash2, Trophy, Users, Shuffle, Copy, DollarSign } from "lucide-react";
+import { Plus, Trash2, Trophy, Users, Shuffle, Copy, Pencil, Check, X, ArrowLeft } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import AppHeader from "@/components/AppHeader";
 import BracketView from "@/components/BracketView";
 import BracketTreeView from "@/components/BracketTreeView";
 import { GenerateBracketDialog } from "@/components/GenerateBracketDialog";
 import RankingsTab from "@/components/RankingsTab";
+import MatchSequenceTab from "@/components/MatchSequenceTab";
 import confetti from "canvas-confetti";
 
 const sportLabels: Record<string, string> = {
-  beach_volleyball: "🏐 Beach Volley",
+  beach_volleyball: "🏐 Vôlei de Praia",
   futevolei: "⚽ Futevôlei",
   beach_tennis: "🎾 Beach Tennis",
 };
@@ -77,6 +78,11 @@ const TournamentDetail = () => {
   const [player2, setPlayer2] = useState("");
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"list" | "tree">("tree");
+  const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
+  const [editP1, setEditP1] = useState("");
+  const [editP2, setEditP2] = useState("");
+  const [fictitiousCount, setFictitiousCount] = useState("4");
+  const [fictitiousDialogOpen, setFictitiousDialogOpen] = useState(false);
 
   const isOwner = tournament?.created_by === user?.id;
 
@@ -107,10 +113,6 @@ const TournamentDetail = () => {
 
   const addTeam = async () => {
     if (!player1.trim() || !player2.trim() || !id) return;
-    if (teams.length >= (tournament?.max_participants || 0)) {
-      toast.error("Máximo de duplas atingido");
-      return;
-    }
     const { error } = await supabase.from("teams").insert({
       tournament_id: id,
       player1_name: player1.trim(),
@@ -123,23 +125,53 @@ const TournamentDetail = () => {
     fetchData();
   };
 
-  const addFictitiousTeam = async () => {
+  const addFictitiousTeams = async () => {
     if (!id) return;
-    const num = teams.length + 1;
-    const { error } = await supabase.from("teams").insert({
-      tournament_id: id,
-      player1_name: `Jogador ${num}A`,
-      player2_name: `Jogador ${num}B`,
-      seed: num,
-      is_fictitious: true,
-    });
+    const count = Number(fictitiousCount);
+    if (count < 1 || count > 64) { toast.error("Quantidade inválida"); return; }
+
+    const newTeams = [];
+    for (let i = 0; i < count; i++) {
+      const num = teams.length + i + 1;
+      newTeams.push({
+        tournament_id: id,
+        player1_name: `Jogador ${num}A`,
+        player2_name: `Jogador ${num}B`,
+        seed: num,
+        is_fictitious: true,
+      });
+    }
+    const { error } = await supabase.from("teams").insert(newTeams);
     if (error) { toast.error(error.message); return; }
+    toast.success(`${count} dupla(s) fictícia(s) criada(s)!`);
+    setFictitiousDialogOpen(false);
     fetchData();
   };
 
   const removeTeam = async (tid: string) => {
     await supabase.from("teams").delete().eq("id", tid);
     fetchData();
+  };
+
+  const startEdit = (team: Team) => {
+    setEditingTeamId(team.id);
+    setEditP1(team.player1_name);
+    setEditP2(team.player2_name);
+  };
+
+  const saveEdit = async () => {
+    if (!editingTeamId || !editP1.trim() || !editP2.trim()) return;
+    await supabase.from("teams").update({
+      player1_name: editP1.trim(),
+      player2_name: editP2.trim(),
+    }).eq("id", editingTeamId);
+    setEditingTeamId(null);
+    toast.success("Dupla atualizada!");
+    fetchData();
+  };
+
+  const cancelEdit = () => {
+    setEditingTeamId(null);
   };
 
   const shuffleTeams = async () => {
@@ -152,60 +184,56 @@ const TournamentDetail = () => {
     fetchData();
   };
 
-  const togglePayment = async (teamId: string, current: string) => {
-    const next = current === "paid" ? "pending" : "paid";
-    await supabase.from("teams").update({ payment_status: next }).eq("id", teamId);
-    fetchData();
-  };
-
-  const generateBracket = async (startRound: number = 1, useSeeds: boolean = true) => {
+  const generateBracket = async (config: { startRound: number; useSeeds: boolean; numSets: number; gamesPerSet?: number }) => {
     if (!id || !tournament) return;
     if (teams.length < 2) { toast.error("Precisa de pelo menos 2 duplas"); return; }
 
     await supabase.from("matches").delete().eq("tournament_id", id);
 
+    // Update tournament with set config
+    await supabase.from("tournaments").update({
+      num_sets: config.numSets,
+      games_per_set: config.gamesPerSet || null,
+    }).eq("id", id);
+
     const totalSlots = Math.pow(2, Math.ceil(Math.log2(teams.length)));
     const maxRounds = Math.ceil(Math.log2(totalSlots));
-    
-    // Arranjar times para seed ou shuffle
+
     let arranged = [...teams];
-    if (useSeeds) {
+    if (config.useSeeds) {
       arranged.sort((a, b) => (a.seed || 0) - (b.seed || 0));
     } else {
       arranged.sort(() => Math.random() - 0.5);
     }
 
     const newMatches: any[] = [];
-
-    // Gerar primeira rodada
     const matchesInFirstRound = totalSlots / 2;
     for (let i = 0; i < matchesInFirstRound; i++) {
       const t1 = arranged[i] || null;
       const t2 = arranged[totalSlots - 1 - i] || null;
       newMatches.push({
         tournament_id: id,
-        round: startRound,
+        round: config.startRound,
         position: i + 1,
-        participant1_id: t1?.id || null,
-        participant2_id: t2?.id || null,
         team1_id: t1?.id || null,
         team2_id: t2?.id || null,
+        participant1_id: t1?.id || null,
+        participant2_id: t2?.id || null,
         status: "pending" as const,
       });
     }
 
-    // Gerar rodadas seguintes
-    for (let r = startRound + 1; r <= maxRounds; r++) {
+    for (let r = config.startRound + 1; r <= maxRounds; r++) {
       const count = totalSlots / Math.pow(2, r);
       for (let p = 0; p < count; p++) {
         newMatches.push({
           tournament_id: id,
           round: r,
           position: p + 1,
-          participant1_id: null,
-          participant2_id: null,
           team1_id: null,
           team2_id: null,
+          participant1_id: null,
+          participant2_id: null,
           status: "pending" as const,
         });
       }
@@ -218,66 +246,46 @@ const TournamentDetail = () => {
     fetchData();
   };
 
-   const declareWinner = async (matchId: string, winnerId: string) => {
-     const match = matches.find((m) => m.id === matchId);
-     if (!match || !id) return;
+  const declareWinner = async (matchId: string, winnerId: string) => {
+    const match = matches.find((m) => m.id === matchId);
+    if (!match || !id) return;
 
-     // Efeito visual ao declarar vencedor
-     const triggerConfetti = () => {
-       confetti({
-         particleCount: 50,
-         spread: 60,
-         origin: { y: 0.6 },
-         duration: 1500,
-       });
-     };
-     triggerConfetti();
+    confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
 
-     // Atualiza o match com o vencedor
-     await supabase.from("matches").update({
-       winner_id: winnerId,
-       winner_team_id: winnerId,
-       status: "completed" as const,
-     }).eq("id", matchId);
+    await supabase.from("matches").update({
+      winner_id: winnerId,
+      winner_team_id: winnerId,
+      status: "completed" as const,
+    }).eq("id", matchId);
 
-     const nextRound = match.round + 1;
-     const nextPosition = Math.ceil(match.position / 2);
-     const isTop = match.position % 2 === 1;
+    const nextRound = match.round + 1;
+    const nextPosition = Math.ceil(match.position / 2);
+    const isTop = match.position % 2 === 1;
+    const bracket_number = match.bracket_number || 1;
 
-     // Encontra o próximo match na mesma chave (bracket)
-     const bracket_number = match.bracket_number || 1;
-     const nextMatch = matches.find(
-       (m) => m.round === nextRound && m.position === nextPosition && (m.bracket_number || 1) === bracket_number
-     );
+    const nextMatch = matches.find(
+      (m) => m.round === nextRound && m.position === nextPosition && (m.bracket_number || 1) === bracket_number
+    );
 
-     if (nextMatch) {
-       // Avanço automático: time vencedor sobe para próxima rodada
-       const update = isTop
-         ? { participant1_id: winnerId, team1_id: winnerId }
-         : { participant2_id: winnerId, team2_id: winnerId };
-       await supabase.from("matches").update(update).eq("id", nextMatch.id);
-       toast.success("Avanço automático realizado!");
-     } else {
-       // Se não há próximo match, torneio está finalizado (ou chave está finalizada)
-       await supabase.from("tournaments").update({ status: "completed" as const }).eq("id", id);
-       toast.success("Torneio finalizado! 🏆");
-       
-       // Confete especial para finalização do torneio
-       setTimeout(() => {
-         for (let i = 0; i < 3; i++) {
-           setTimeout(() => {
-             confetti({
-               particleCount: 100,
-               spread: 70,
-               origin: { y: 0.5, x: Math.random() },
-               duration: 2000,
-             });
-           }, i * 300);
-         }
-       }, 500);
-     }
-     fetchData();
-   };
+    if (nextMatch) {
+      const update = isTop
+        ? { participant1_id: winnerId, team1_id: winnerId }
+        : { participant2_id: winnerId, team2_id: winnerId };
+      await supabase.from("matches").update(update).eq("id", nextMatch.id);
+      toast.success("Avanço automático realizado!");
+    } else {
+      await supabase.from("tournaments").update({ status: "completed" as const }).eq("id", id);
+      toast.success("Torneio finalizado! 🏆");
+      setTimeout(() => {
+        for (let i = 0; i < 3; i++) {
+          setTimeout(() => {
+            confetti({ particleCount: 100, spread: 70, origin: { y: 0.5, x: Math.random() } });
+          }, i * 300);
+        }
+      }, 500);
+    }
+    fetchData();
+  };
 
   const updateScore = async (matchId: string, score1: number, score2: number) => {
     await supabase.from("matches").update({ score1, score2 }).eq("id", matchId);
@@ -323,6 +331,9 @@ const TournamentDetail = () => {
     <div className="min-h-screen bg-background">
       <AppHeader />
       <main className="container py-8">
+        <Button variant="ghost" onClick={() => navigate("/dashboard")} className="mb-4 gap-2">
+          <ArrowLeft className="h-4 w-4" /> Voltar
+        </Button>
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
           {/* Header */}
           <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -341,7 +352,7 @@ const TournamentDetail = () => {
                 {tournament.category && <span>• {tournament.category}</span>}
                 <span className="flex items-center gap-1">
                   <Users className="h-4 w-4" />
-                  {teams.length} / {tournament.max_participants} duplas
+                  {teams.length} duplas
                 </span>
               </div>
             </div>
@@ -360,16 +371,18 @@ const TournamentDetail = () => {
                   onGenerate={generateBracket}
                   teamCount={teams.length}
                   isDisabled={false}
+                  sport={tournament.sport}
                 />
               )}
             </div>
           </div>
 
           <Tabs defaultValue="teams" className="w-full">
-            <TabsList className="mb-4">
+            <TabsList className="mb-4 flex-wrap">
               <TabsTrigger value="teams">Duplas</TabsTrigger>
-              <TabsTrigger value="registrations">Inscrições</TabsTrigger>
               <TabsTrigger value="bracket" disabled={matches.length === 0}>Chaveamento</TabsTrigger>
+              <TabsTrigger value="sequence" disabled={matches.length === 0}>Sequência</TabsTrigger>
+              <TabsTrigger value="classification" disabled={matches.length === 0}>Classificação</TabsTrigger>
               <TabsTrigger value="rankings">Ranking</TabsTrigger>
             </TabsList>
 
@@ -396,9 +409,33 @@ const TournamentDetail = () => {
                     </Button>
                   </div>
                   <div className="flex gap-2 mb-4">
-                    <Button variant="outline" size="sm" onClick={addFictitiousTeam} className="gap-1">
-                      <Plus className="h-4 w-4" /> Dupla Fictícia
-                    </Button>
+                    <Dialog open={fictitiousDialogOpen} onOpenChange={setFictitiousDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="gap-1">
+                          <Plus className="h-4 w-4" /> Duplas Fictícias
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-sm">
+                        <DialogHeader>
+                          <DialogTitle>Criar Duplas Fictícias</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Quantas duplas fictícias?</label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={64}
+                              value={fictitiousCount}
+                              onChange={(e) => setFictitiousCount(e.target.value)}
+                            />
+                          </div>
+                          <Button onClick={addFictitiousTeams} className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90">
+                            Criar {fictitiousCount} dupla(s)
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                     {teams.length >= 2 && (
                       <Button variant="outline" size="sm" onClick={shuffleTeams} className="gap-1">
                         <Shuffle className="h-4 w-4" /> Embaralhar
@@ -412,64 +449,71 @@ const TournamentDetail = () => {
                     <div className="space-y-2">
                       {teams.map((t, i) => (
                         <div key={t.id} className="flex items-center justify-between rounded-lg border border-border bg-secondary/50 px-4 py-2">
-                          <div className="flex items-center gap-3">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground shrink-0">
                               {i + 1}
                             </span>
-                            <span className="font-medium">
-                              {t.player1_name} / {t.player2_name}
-                              {t.is_fictitious && <span className="ml-2 text-xs text-muted-foreground">(fictícia)</span>}
-                            </span>
+                            {editingTeamId === t.id ? (
+                              <div className="flex items-center gap-2 flex-1">
+                                <Input
+                                  value={editP1}
+                                  onChange={(e) => setEditP1(e.target.value)}
+                                  className="h-8 text-sm"
+                                  placeholder="Jogador 1"
+                                />
+                                <Input
+                                  value={editP2}
+                                  onChange={(e) => setEditP2(e.target.value)}
+                                  className="h-8 text-sm"
+                                  placeholder="Jogador 2"
+                                />
+                                <Button variant="ghost" size="sm" onClick={saveEdit} className="h-7 w-7 p-0">
+                                  <Check className="h-4 w-4 text-success" />
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={cancelEdit} className="h-7 w-7 p-0">
+                                  <X className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <span className="font-medium truncate">
+                                {t.player1_name} / {t.player2_name}
+                                {t.is_fictitious && <span className="ml-2 text-xs text-muted-foreground">(fictícia)</span>}
+                              </span>
+                            )}
                           </div>
-                          <Button variant="ghost" size="sm" onClick={() => removeTeam(t.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                          {editingTeamId !== t.id && (
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Button variant="ghost" size="sm" onClick={() => startEdit(t)} className="h-7 w-7 p-0">
+                                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => removeTeam(t.id)} className="h-7 w-7 p-0">
+                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
                   )}
                 </section>
               )}
-            </TabsContent>
 
-            {/* Inscrições Tab */}
-            <TabsContent value="registrations">
-              <section className="rounded-xl border border-border bg-card p-6 shadow-card">
-                <h2 className="mb-4 text-xl font-semibold">Inscrições</h2>
-                {teams.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Nenhuma dupla inscrita.</p>
-                ) : (
+              {/* Read-only view for non-owners */}
+              {!isOwner && teams.length > 0 && (
+                <section className="rounded-xl border border-border bg-card p-6 shadow-card">
+                  <h2 className="mb-4 text-xl font-semibold">Duplas ({teams.length})</h2>
                   <div className="space-y-2">
                     {teams.map((t, i) => (
-                      <div key={t.id} className="flex items-center justify-between rounded-lg border border-border bg-secondary/50 px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
-                            {i + 1}
-                          </span>
-                          <span className="font-medium">{t.player1_name} / {t.player2_name}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {isOwner ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => togglePayment(t.id, t.payment_status)}
-                              className={`gap-1 ${t.payment_status === "paid" ? "border-success text-success" : "border-warning text-warning"}`}
-                            >
-                              <DollarSign className="h-3.5 w-3.5" />
-                              {t.payment_status === "paid" ? "Pago" : "Pendente"}
-                            </Button>
-                          ) : (
-                            <Badge variant={t.payment_status === "paid" ? "default" : "outline"}>
-                              {t.payment_status === "paid" ? "Pago" : "Pendente"}
-                            </Badge>
-                          )}
-                        </div>
+                      <div key={t.id} className="flex items-center gap-3 rounded-lg border border-border bg-secondary/50 px-4 py-2">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
+                          {i + 1}
+                        </span>
+                        <span className="font-medium">{t.player1_name} / {t.player2_name}</span>
                       </div>
                     ))}
                   </div>
-                )}
-              </section>
+                </section>
+              )}
             </TabsContent>
 
             {/* Chaveamento Tab */}
@@ -486,14 +530,14 @@ const TournamentDetail = () => {
                         variant={viewMode === "tree" ? "default" : "outline"}
                         onClick={() => setViewMode("tree")}
                       >
-                        Visão em Árvore
+                        Árvore
                       </Button>
                       <Button
                         size="sm"
                         variant={viewMode === "list" ? "default" : "outline"}
                         onClick={() => setViewMode("list")}
                       >
-                        Visão em Lista
+                        Lista
                       </Button>
                     </div>
                   </div>
@@ -515,6 +559,29 @@ const TournamentDetail = () => {
                       onUpdateScore={updateScore}
                     />
                   )}
+                </section>
+              )}
+            </TabsContent>
+
+            {/* Sequência Tab */}
+            <TabsContent value="sequence">
+              <MatchSequenceTab matches={matches} teams={teams} />
+            </TabsContent>
+
+            {/* Classificação Tab - Tree view (left to right genealogy style) */}
+            <TabsContent value="classification">
+              {matches.length > 0 && (
+                <section>
+                  <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
+                    <Trophy className="h-5 w-5" /> Classificação
+                  </h2>
+                  <BracketTreeView
+                    matches={matches}
+                    participants={participants}
+                    isOwner={isOwner}
+                    onDeclareWinner={declareWinner}
+                    onUpdateScore={updateScore}
+                  />
                 </section>
               )}
             </TabsContent>

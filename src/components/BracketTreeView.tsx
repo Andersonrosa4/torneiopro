@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Trophy, Check } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface Participant {
   id: string;
@@ -99,6 +99,9 @@ const BracketTreeView = ({ matches, participants, isOwner, onDeclareWinner, onUp
                     const nextMatches = !isLastRound ? getMatchesByRound(round + 1) : [];
                     const nextMatchIndex = Math.floor(idx / 2);
                     
+                    // Animação para matches que receberam avanço (tem participante preenchido)
+                    const hasAdvance = match.participant1_id && !match.participant2_id || !match.participant1_id && match.participant2_id;
+                    
                     return (
                       <div key={match.id} className="relative">
                         {/* Conectores (linhas) para próxima rodada */}
@@ -118,14 +121,20 @@ const BracketTreeView = ({ matches, participants, isOwner, onDeclareWinner, onUp
                           </svg>
                         )}
 
-                        <TreeMatchCard
-                          match={match}
-                          getName={getName}
-                          isOwner={isOwner}
-                          onDeclareWinner={onDeclareWinner}
-                          onUpdateScore={onUpdateScore}
-                          isFinal={round === rounds}
-                        />
+                        <motion.div
+                          animate={hasAdvance ? { borderColor: "hsl(var(--success))" } : {}}
+                          transition={{ duration: 0.8, ease: "easeOut" }}
+                          className="inline-block"
+                        >
+                          <TreeMatchCard
+                            match={match}
+                            getName={getName}
+                            isOwner={isOwner}
+                            onDeclareWinner={onDeclareWinner}
+                            onUpdateScore={onUpdateScore}
+                            isFinal={round === rounds}
+                          />
+                        </motion.div>
                       </div>
                     );
                   })}
@@ -156,6 +165,7 @@ const TreeMatchCard = ({
 }) => {
   const [s1, setS1] = useState(match.score1?.toString() || "0");
   const [s2, setS2] = useState(match.score2?.toString() || "0");
+  const [winnerPulse, setWinnerPulse] = useState(false);
 
   const p1Name = getName(match.participant1_id);
   const p2Name = getName(match.participant2_id);
@@ -164,6 +174,12 @@ const TreeMatchCard = ({
 
   const handleScoreBlur = () => {
     onUpdateScore(match.id, Number(s1) || 0, Number(s2) || 0);
+  };
+
+  const handleDeclareWinner = (winnerId: string, participantNum: 1 | 2) => {
+    setWinnerPulse(true);
+    setTimeout(() => setWinnerPulse(false), 600);
+    onDeclareWinner(match.id, winnerId);
   };
 
   return (
@@ -181,13 +197,15 @@ const TreeMatchCard = ({
         </div>
       )}
 
-      <div
+      <motion.div
         className={`flex items-center justify-between gap-3 border-b border-border px-4 py-3 transition-colors ${
           match.winner_id === match.participant1_id ? "bg-success/15" : ""
         }`}
+        animate={winnerPulse && match.winner_id === match.participant1_id ? { scale: [1, 1.05, 1] } : {}}
+        transition={{ duration: 0.6 }}
       >
         <div className="flex-1 min-w-0">
-          <p
+          <motion.p
             className={`text-sm font-medium truncate ${
               match.winner_id === match.participant1_id
                 ? "text-success font-bold"
@@ -195,9 +213,10 @@ const TreeMatchCard = ({
                 ? "text-muted-foreground"
                 : ""
             }`}
+            animate={match.winner_id === match.participant1_id ? { color: "var(--success)" } : {}}
           >
             {p1Name}
-          </p>
+          </motion.p>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
@@ -216,24 +235,31 @@ const TreeMatchCard = ({
               size="sm"
               variant="ghost"
               className="h-8 w-8 p-0"
-              onClick={() => onDeclareWinner(match.id, match.participant1_id!)}
+              onClick={() => handleDeclareWinner(match.participant1_id!, 1)}
             >
               <Check className="h-4 w-4 text-success" />
             </Button>
           )}
           {isCompleted && match.winner_id === match.participant1_id && (
-            <Trophy className="h-4 w-4 text-success shrink-0" />
+            <motion.div
+              animate={{ rotate: [0, 10, -10, 0] }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+            >
+              <Trophy className="h-4 w-4 text-success shrink-0" />
+            </motion.div>
           )}
         </div>
-      </div>
+      </motion.div>
 
-      <div
+      <motion.div
         className={`flex items-center justify-between gap-3 px-4 py-3 transition-colors ${
           match.winner_id === match.participant2_id ? "bg-success/15" : ""
         }`}
+        animate={winnerPulse && match.winner_id === match.participant2_id ? { scale: [1, 1.05, 1] } : {}}
+        transition={{ duration: 0.6 }}
       >
         <div className="flex-1 min-w-0">
-          <p
+          <motion.p
             className={`text-sm font-medium truncate ${
               match.winner_id === match.participant2_id
                 ? "text-success font-bold"
@@ -241,9 +267,10 @@ const TreeMatchCard = ({
                 ? "text-muted-foreground"
                 : ""
             }`}
+            animate={match.winner_id === match.participant2_id ? { color: "var(--success)" } : {}}
           >
             {p2Name}
-          </p>
+          </motion.p>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
@@ -262,16 +289,21 @@ const TreeMatchCard = ({
               size="sm"
               variant="ghost"
               className="h-8 w-8 p-0"
-              onClick={() => onDeclareWinner(match.id, match.participant2_id!)}
+              onClick={() => handleDeclareWinner(match.participant2_id!, 2)}
             >
               <Check className="h-4 w-4 text-success" />
             </Button>
           )}
           {isCompleted && match.winner_id === match.participant2_id && (
-            <Trophy className="h-4 w-4 text-success shrink-0" />
+            <motion.div
+              animate={{ rotate: [0, 10, -10, 0] }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+            >
+              <Trophy className="h-4 w-4 text-success shrink-0" />
+            </motion.div>
           )}
         </div>
-      </div>
+      </motion.div>
     </motion.div>
   );
 };

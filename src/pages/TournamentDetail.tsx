@@ -235,6 +235,7 @@ const TournamentDetail = () => {
   };
 
   const generateBracket = async (config: {
+    bracketMode: "normal" | "double_elimination";
     startRound: number;
     useSeeds: boolean;
     numSets: number;
@@ -325,8 +326,62 @@ const TournamentDetail = () => {
       
       toast.success(`Fase de grupos gerada! ${config.numGroups} grupo(s) criado(s)${config.useIndex ? ` + ${config.numIndexTeams} índice` : ""}.`);
       fetchData();
+    } else if (config.bracketMode === "double_elimination") {
+      // === DOUBLE ELIMINATION ===
+      const result = generateDoubleEliminationBracket({
+        tournamentId: id!,
+        modalityId: currentModalityId || "",
+        teams: filteredTeams.map(t => ({ id: t.id, player1_name: t.player1_name, player2_name: t.player2_name, seed: t.seed })),
+        useSeeds: config.useSeeds,
+        seedTeamIds: config.seedTeamIds,
+        allowThirdPlace: false,
+      });
+
+      // Add modality_id to all matches
+      const matchesWithModality = result.matches.map(m => ({
+        ...m,
+        modality_id: currentModalityId,
+      }));
+
+      const { error } = await organizerQuery({ table: "matches", operation: "insert", data: matchesWithModality });
+      if (error) { toast.error(error.message); return; }
+
+      // Re-fetch to get IDs then advance BYEs
+      const { data: insertedMatches } = await organizerQuery({
+        table: "matches",
+        operation: "select",
+        filters: { tournament_id: id },
+        order: [{ column: "round" }, { column: "position" }],
+      });
+
+      if (insertedMatches) {
+        const winnersMatches = insertedMatches.filter((m: any) => m.bracket_type === "winners" && m.bracket_half);
+        for (const m of winnersMatches) {
+          if (m.winner_team_id && m.status === "completed") {
+            const nextRound = m.round + 1;
+            const nextPosition = Math.ceil(m.position / 2);
+            const isTop = m.position % 2 === 1;
+            const nextMatch = winnersMatches.find(
+              (nm: any) => nm.round === nextRound && nm.position === nextPosition && nm.bracket_half === m.bracket_half
+            );
+            if (nextMatch) {
+              const update = isTop ? { team1_id: m.winner_team_id } : { team2_id: m.winner_team_id };
+              await organizerQuery({ table: "matches", operation: "update", data: update, filters: { id: nextMatch.id } });
+            }
+          }
+        }
+      }
+
+      await organizerQuery({
+        table: "tournaments",
+        operation: "update",
+        data: { status: "in_progress" },
+        filters: { id },
+      });
+      toast.success("Dupla Eliminação gerada! Winners e Losers brackets criados.");
+      fetchData();
     } else {
-      // === DIRECT KNOCKOUT ===
+      // === NORMAL KNOCKOUT (structured phases) ===
       const totalSlots = Math.pow(2, Math.ceil(Math.log2(filteredTeams.length)));
       const maxRounds = Math.ceil(Math.log2(totalSlots));
 

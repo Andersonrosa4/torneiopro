@@ -69,6 +69,22 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Beach sport accents
+        ocean: {
+          DEFAULT: "hsl(195 85% 42%)",
+          light: "hsl(195 75% 55%)",
+        },
+        sand: {
+          DEFAULT: "hsl(35 30% 88%)",
+          dark: "hsl(35 25% 75%)",
+        },
+        sunset: {
+          DEFAULT: "hsl(22 90% 55%)",
+          light: "hsl(30 85% 65%)",
+        },
+        turquoise: {
+          DEFAULT: "hsl(180 70% 45%)",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -89,8 +105,8 @@ export default {
           to: { opacity: "1", transform: "translateY(0)" },
         },
         "pulse-glow": {
-          "0%, 100%": { boxShadow: "0 0 10px hsl(185 80% 50% / 0.2)" },
-          "50%": { boxShadow: "0 0 25px hsl(185 80% 50% / 0.4)" },
+          "0%, 100%": { boxShadow: "0 0 10px hsl(195 85% 42% / 0.2)" },
+          "50%": { boxShadow: "0 0 25px hsl(195 85% 42% / 0.4)" },
         },
       },
       animation: {

@@ -93,6 +93,13 @@ const Dashboard = () => {
     e.preventDefault();
     e.stopPropagation();
     await organizerQuery({ table: "rankings", operation: "delete", filters: { tournament_id: tournamentId } });
+    // Nullify FK refs before deleting matches
+    const { data: tournamentMatches } = await supabase.from("matches").select("id").eq("tournament_id", tournamentId);
+    if (tournamentMatches) {
+      for (const m of tournamentMatches) {
+        await organizerQuery({ table: "matches", operation: "update", data: { next_win_match_id: null, next_lose_match_id: null }, filters: { id: m.id } });
+      }
+    }
     await organizerQuery({ table: "matches", operation: "delete", filters: { tournament_id: tournamentId } });
     await organizerQuery({ table: "teams", operation: "delete", filters: { tournament_id: tournamentId } });
     await organizerQuery({ table: "tournaments", operation: "delete", filters: { id: tournamentId } });

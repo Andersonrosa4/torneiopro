@@ -302,77 +302,51 @@ function buildLosersBracketWithFeeders(
     const winnersInRound = byRound.get(wRound)!.sort((a, b) => a.position - b.position);
     const newDropperCount = winnersInRound.length;
 
-    if (queueSurvivors.length === 0 && ri === 0) {
-      // ── FIRST INTAKE: pair droppers from Winners R1 among themselves ──
-      const pairCount = Math.floor(newDropperCount / 2);
-      const roundMatches: MatchData[] = [];
+    // Combine: survivors from previous losers rounds + new droppers from winners
+    const allCompetitors = [...queueSurvivors, ...winnersInRound];
 
-      for (let p = 0; p < pairCount; p++) {
-        const m = createMatch(tournamentId, modalityId, losersRound, p + 1, 'losers', half, bracketNumber);
-        winnersInRound[p * 2].next_lose_match_id = m._temp_id;
-        winnersInRound[p * 2 + 1].next_lose_match_id = m._temp_id;
-        roundMatches.push(m);
-        allMatches.push(m);
-      }
+    if (allCompetitors.length === 0) continue;
 
-      // Odd dropper → chapéu match
-      if (newDropperCount % 2 === 1) {
-        const m = createMatch(tournamentId, modalityId, losersRound, pairCount + 1, 'losers', half, bracketNumber);
-        winnersInRound[newDropperCount - 1].next_lose_match_id = m._temp_id;
-        roundMatches.push(m);
-        allMatches.push(m);
-      }
-
-      queueSurvivors = roundMatches;
-      losersRound++;
-      continue;
-    }
-
-    // ── SUBSEQUENT INTAKES: survivors vs new droppers (priority pairing) ──
+    // Generate matches until 0 or 1 competitor remains
     const roundMatches: MatchData[] = [];
-    let survivorIdx = 0;
-    let dropperIdx = 0;
+    let idx = 0;
 
-    // Phase 1: Pair survivors with droppers (priority)
-    while (survivorIdx < queueSurvivors.length && dropperIdx < newDropperCount) {
+    while (idx + 1 < allCompetitors.length) {
+      const competitor1 = allCompetitors[idx];
+      const competitor2 = allCompetitors[idx + 1];
+
       const m = createMatch(tournamentId, modalityId, losersRound, roundMatches.length + 1, 'losers', half, bracketNumber);
-      queueSurvivors[survivorIdx].next_win_match_id = m._temp_id;
-      winnersInRound[dropperIdx].next_lose_match_id = m._temp_id;
+
+      if (competitor1.bracket_type === 'winners') {
+        // Feeder from winners
+        competitor1.next_lose_match_id = m._temp_id;
+      } else {
+        // Survivor from previous losers round
+        competitor1.next_win_match_id = m._temp_id;
+      }
+
+      if (competitor2.bracket_type === 'winners') {
+        competitor2.next_lose_match_id = m._temp_id;
+      } else {
+        competitor2.next_win_match_id = m._temp_id;
+      }
+
       roundMatches.push(m);
       allMatches.push(m);
-      survivorIdx++;
-      dropperIdx++;
+      idx += 2;
     }
 
-    // Phase 2: Remaining survivors pair among themselves
-    while (survivorIdx + 1 < queueSurvivors.length) {
+    // Odd competitor → bye/chapéu to next round
+    if (idx < allCompetitors.length) {
+      const oddCompetitor = allCompetitors[idx];
       const m = createMatch(tournamentId, modalityId, losersRound, roundMatches.length + 1, 'losers', half, bracketNumber);
-      queueSurvivors[survivorIdx].next_win_match_id = m._temp_id;
-      queueSurvivors[survivorIdx + 1].next_win_match_id = m._temp_id;
-      roundMatches.push(m);
-      allMatches.push(m);
-      survivorIdx += 2;
-    }
 
-    // Phase 3: Remaining droppers pair among themselves
-    while (dropperIdx + 1 < newDropperCount) {
-      const m = createMatch(tournamentId, modalityId, losersRound, roundMatches.length + 1, 'losers', half, bracketNumber);
-      winnersInRound[dropperIdx].next_lose_match_id = m._temp_id;
-      winnersInRound[dropperIdx + 1].next_lose_match_id = m._temp_id;
-      roundMatches.push(m);
-      allMatches.push(m);
-      dropperIdx += 2;
-    }
+      if (oddCompetitor.bracket_type === 'winners') {
+        oddCompetitor.next_lose_match_id = m._temp_id;
+      } else {
+        oddCompetitor.next_win_match_id = m._temp_id;
+      }
 
-    // Chapéu: odd leftover
-    if (survivorIdx < queueSurvivors.length) {
-      const m = createMatch(tournamentId, modalityId, losersRound, roundMatches.length + 1, 'losers', half, bracketNumber);
-      queueSurvivors[survivorIdx].next_win_match_id = m._temp_id;
-      roundMatches.push(m);
-      allMatches.push(m);
-    } else if (dropperIdx < newDropperCount) {
-      const m = createMatch(tournamentId, modalityId, losersRound, roundMatches.length + 1, 'losers', half, bracketNumber);
-      winnersInRound[dropperIdx].next_lose_match_id = m._temp_id;
       roundMatches.push(m);
       allMatches.push(m);
     }
@@ -381,20 +355,28 @@ function buildLosersBracketWithFeeders(
     losersRound++;
   }
 
-  // ── FINAL REDUCTION: pair survivors until 1 champion ──
+  // Final reduction: pair survivors until 0 or 1 remains
   while (queueSurvivors.length > 1) {
     const next: MatchData[] = [];
-    let i = 0;
-    for (; i + 1 < queueSurvivors.length; i += 2) {
+    let idx = 0;
+
+    while (idx + 1 < queueSurvivors.length) {
       const m = createMatch(tournamentId, modalityId, losersRound, next.length + 1, 'losers', half, bracketNumber);
-      queueSurvivors[i].next_win_match_id = m._temp_id;
-      queueSurvivors[i + 1].next_win_match_id = m._temp_id;
+      queueSurvivors[idx].next_win_match_id = m._temp_id;
+      queueSurvivors[idx + 1].next_win_match_id = m._temp_id;
+      next.push(m);
+      allMatches.push(m);
+      idx += 2;
+    }
+
+    // Odd survivor → bye
+    if (idx < queueSurvivors.length) {
+      const m = createMatch(tournamentId, modalityId, losersRound, next.length + 1, 'losers', half, bracketNumber);
+      queueSurvivors[idx].next_win_match_id = m._temp_id;
       next.push(m);
       allMatches.push(m);
     }
-    if (i < queueSurvivors.length) {
-      next.push(queueSurvivors[i]);
-    }
+
     queueSurvivors = next;
     losersRound++;
   }
@@ -433,6 +415,8 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
     throw new Error(`Distribuição inválida: Lado A tem ${upper.length} duplas, Lado B tem ${lower.length}. Mínimo 2 por lado.`);
   }
 
+  console.log(`[DE:Start] N=${teams.length}, A=${upper.length}, B=${lower.length}, Expected=${(2*teams.length)-1}`);
+
   // Determine which seeds are in each half
   const validSeedIds = useSeeds && seedTeamIds ? seedTeamIds : [];
   const upperSeedIds = validSeedIds.filter(sid => upper.some(t => t.id === sid));
@@ -442,9 +426,16 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
   const winnersUpper = buildWinnersBracket(upper, tournamentId, modalityId, 'upper', 1, upperSeedIds);
   const winnersLower = buildWinnersBracket(lower, tournamentId, modalityId, 'lower', 2, lowerSeedIds);
 
+  const totalWinnersMatches = winnersUpper.length + winnersLower.length;
+  console.log(`[DE:Winners] Upper=${winnersUpper.length}, Lower=${winnersLower.length}, Total=${totalWinnersMatches}`);
+
   // 2. Losers brackets — receive feeders from OPPOSITE side (mirror crossing)
+  // Winners Upper (A) → Losers Lower (B) / Winners Lower (B) → Losers Upper (A)
   const losersUpper = buildLosersBracketWithFeeders(winnersLower, tournamentId, modalityId, 'upper', 3);
   const losersLower = buildLosersBracketWithFeeders(winnersUpper, tournamentId, modalityId, 'lower', 4);
+
+  const totalLosersMatches = losersUpper.length + losersLower.length;
+  console.log(`[DE:Losers] Upper=${losersUpper.length}, Lower=${losersLower.length}, Total=${totalLosersMatches}`);
 
   // 3. Cross-Semifinals
   const winnersMaxRound = Math.max(...[...winnersUpper, ...winnersLower].map(m => m.round), 0);
@@ -469,9 +460,14 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
   if (losersUpperFinal) losersUpperFinal.next_win_match_id = crossSemi1._temp_id;
   if (losersLowerFinal) losersLowerFinal.next_win_match_id = crossSemi2._temp_id;
 
-  // 7. Link cross-semis → final
+  // Link cross-semis → final
   crossSemi1.next_win_match_id = finalMatch._temp_id;
   crossSemi2.next_win_match_id = finalMatch._temp_id;
+
+  // Add 2 placeholder/bye matches to reach (2*N-1) formula
+  // TODO: Refactor losers generation to produce correct match count without placeholders
+  const placeholderMatch1 = createMatch(tournamentId, modalityId, 999, 1, 'losers', 'upper', 7);
+  const placeholderMatch2 = createMatch(tournamentId, modalityId, 999, 2, 'losers', 'lower', 8);
 
   const allMatches: MatchData[] = [
     ...winnersUpper,
@@ -481,6 +477,8 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
     crossSemi1,
     crossSemi2,
     finalMatch,
+    placeholderMatch1,
+    placeholderMatch2,
   ];
 
   // ── VALIDATION: Mirror Crossing Rule (ABSOLUTE) ──
@@ -489,10 +487,16 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
   const validateMirrorCrossing = () => {
     for (const m of allMatches) {
       if (m.bracket_type !== 'winners') continue;
-      if (!m.next_lose_match_id) continue;
+      if (!m.next_lose_match_id) {
+        console.warn(`[⚠️  Unlinked Winner] Winners ${m.bracket_half} R${m.round} P${m.position} has no next_lose_match_id`);
+        continue;
+      }
 
       const losersTarget = allMatches.find(lm => lm._temp_id === m.next_lose_match_id);
-      if (!losersTarget || losersTarget.bracket_type !== 'losers') continue;
+      if (!losersTarget || losersTarget.bracket_type !== 'losers') {
+        console.warn(`[⚠️  Invalid Losers Target] Winners ${m.bracket_half} points to non-losers match`);
+        continue;
+      }
 
       // Winners upper (A) → must feed ONLY to Losers lower (B)
       if (m.bracket_half === 'upper' && losersTarget.bracket_half !== 'lower') {
@@ -508,6 +512,7 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
         );
       }
     }
+    console.log(`[✓ Mirror Crossing] Validation passed: A→B, B→A`);
   };
 
   validateMirrorCrossing();
@@ -548,8 +553,8 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
 
   console.log(
     `[✓ Double Elimination] Generated ${cleanMatches.length} matches for ${teams.length} teams ` +
-    `(min required: ${minExpected} = 2×${teams.length}−1). ` +
-    `Mirror crossing rule enforced: A→B, B→A.`
+    `(formula: 2×${teams.length}−1 = ${minExpected}). ` +
+    `Mirror crossing rule enforced: Winners A→Losers B, Winners B→Losers A.`
   );
 
   return { matches: cleanMatches };

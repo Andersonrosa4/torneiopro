@@ -43,17 +43,109 @@ interface MatchSequenceViewerProps {
 }
 
 /**
- * Generates a match sequence with round-based interleaving:
- * - One match from each group per round
- * - No team plays back-to-back matches
+ * Generates a match sequence based on tournament format.
+ * 
+ * DOUBLE ELIMINATION:
+ *   - Executa TODOS os jogos de uma chave antes de avançar para outra
+ *   - Proibido intercalar partidas entre chaves diferentes
+ *   - Dupla em chapéu entra por último na rodada/chave
+ * 
+ * OTHER FORMATS (group_stage, single_elimination):
+ *   - Alterna partidas entre chaves (interleaving)
+ *   - Sem obrigatoriedade de concluir chave inteira
  */
-function generateSequence(matches: Match[]): Match[] {
+function generateSequence(matches: Match[], tournamentFormat: string): Match[] {
   if (matches.length === 0) return [];
 
+  if (tournamentFormat === 'double_elimination') {
+    return generateDoubleEliminationSequence(matches);
+  }
+  return generateInterleavedSequence(matches);
+}
+
+/**
+ * ELIMINATÓRIA DUPLA: Todos os jogos de uma chave antes de avançar para outra.
+ * Ordem das chaves: Vencedores A → Vencedores B → Perdedores A → Perdedores B → Semifinais Cruzadas → Final
+ * Dentro de cada chave: por rodada, depois por posição.
+ * Chapéu: partidas com apenas 1 equipe definida ficam por último na sua rodada/chave.
+ */
+function generateDoubleEliminationSequence(matches: Match[]): Match[] {
+  // Define a ordem prioritária das chaves
+  const bracketOrder: Record<string, number> = {
+    'winners_upper': 1,
+    'winners_lower': 2,
+    'winners_null': 3, // winners sem bracket_half (final dos vencedores)
+    'losers_upper': 4,
+    'losers_lower': 5,
+    'cross_semi_upper': 6,
+    'cross_semi_lower': 7,
+    'third_place': 8,
+    'final': 9,
+    'other': 10,
+  };
+
+  const getBracketKey = (m: Match): string => {
+    const bt = m.bracket_type || 'winners';
+    const bh = m.bracket_half || 'null';
+    const key = `${bt}_${bh}`;
+    return bracketOrder[key] !== undefined ? key : 'other';
+  };
+
+  const getBracketPriority = (m: Match): number => {
+    return bracketOrder[getBracketKey(m)] ?? 10;
+  };
+
+  // Identifica partidas de "chapéu" (apenas 1 equipe definida)
+  const isByeMatch = (m: Match): boolean => {
+    return (m.team1_id && !m.team2_id) || (!m.team1_id && m.team2_id) ? true : false;
+  };
+
+  // Agrupa partidas por chave
+  const bracketGroups: Record<string, Match[]> = {};
+  for (const m of matches) {
+    const key = getBracketKey(m);
+    if (!bracketGroups[key]) bracketGroups[key] = [];
+    bracketGroups[key].push(m);
+  }
+
+  // Ordena as chaves pela prioridade
+  const sortedKeys = Object.keys(bracketGroups).sort(
+    (a, b) => (bracketOrder[a] ?? 10) - (bracketOrder[b] ?? 10)
+  );
+
+  const result: Match[] = [];
+
+  for (const key of sortedKeys) {
+    const groupMatches = bracketGroups[key];
+    
+    // Dentro de cada chave: ordena por rodada, depois por posição
+    // Chapéu fica por último na rodada
+    const rounds = [...new Set(groupMatches.map((m) => m.round))].sort((a, b) => a - b);
+    
+    for (const round of rounds) {
+      const roundMatches = groupMatches
+        .filter((m) => m.round === round)
+        .sort((a, b) => a.position - b.position);
+      
+      // Separa: partidas normais primeiro, chapéu por último
+      const normal = roundMatches.filter((m) => !isByeMatch(m));
+      const byes = roundMatches.filter((m) => isByeMatch(m));
+      
+      result.push(...normal, ...byes);
+    }
+  }
+
+  // Post-process: verificar que dupla em chapéu nunca joga consecutivamente
+  return resolveByeConflicts(result);
+}
+
+/**
+ * FASE DE GRUPOS / MATA-MATA NORMAL: Alternância entre chaves (interleaving).
+ */
+function generateInterleavedSequence(matches: Match[]): Match[] {
   const rounds = [...new Set(matches.map((m) => m.round))].sort((a, b) => a - b);
   const brackets = [...new Set(matches.map((m) => m.bracket_number || 1))].sort((a, b) => a - b);
 
-  // Build round-robin interleaved sequence
   const interleaved: Match[] = [];
   for (const round of rounds) {
     const roundMatches = matches.filter((m) => m.round === round);
@@ -71,8 +163,39 @@ function generateSequence(matches: Match[]): Match[] {
     }
   }
 
-  // Post-process: ensure no team plays back-to-back
   return resolveConsecutiveConflicts(interleaved);
+}
+
+/**
+ * Garante que dupla em chapéu nunca jogue duas consecutivas.
+ */
+function resolveByeConflicts(sequence: Match[]): Match[] {
+  const result = [...sequence];
+  
+  for (let i = 1; i < result.length; i++) {
+    if (hasTeamOverlap(result[i - 1], result[i])) {
+      // Tenta mover para posição posterior dentro da mesma chave
+      const currentBracketType = result[i].bracket_type;
+      const currentBracketHalf = result[i].bracket_half;
+      
+      let swapIdx = -1;
+      for (let j = i + 1; j < result.length; j++) {
+        // Só troca dentro da mesma chave
+        if (result[j].bracket_type !== currentBracketType || result[j].bracket_half !== currentBracketHalf) break;
+        if (
+          !hasTeamOverlap(result[i - 1], result[j]) &&
+          (i + 1 >= result.length || !hasTeamOverlap(result[j], result[i + 1]))
+        ) {
+          swapIdx = j;
+          break;
+        }
+      }
+      if (swapIdx !== -1) {
+        [result[i], result[swapIdx]] = [result[swapIdx], result[i]];
+      }
+    }
+  }
+  return result;
 }
 
 function resolveConsecutiveConflicts(sequence: Match[]): Match[] {
@@ -83,7 +206,6 @@ function resolveConsecutiveConflicts(sequence: Match[]): Match[] {
     let swapped = false;
     for (let i = 1; i < result.length; i++) {
       if (hasTeamOverlap(result[i - 1], result[i])) {
-        // Find next non-conflicting match to swap
         let swapIdx = -1;
         for (let j = i + 1; j < result.length; j++) {
           if (
@@ -131,7 +253,7 @@ const MatchSequenceViewer = ({
   };
 
 
-  const sequence = useMemo(() => generateSequence(matches), [matches]);
+  const sequence = useMemo(() => generateSequence(matches, tournamentFormat), [matches, tournamentFormat]);
 
   const maxRound = matches.length > 0 ? Math.max(...matches.map((m) => m.round)) : 0;
 

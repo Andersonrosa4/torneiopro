@@ -53,17 +53,57 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
     return 'bg-primary/20 text-primary border-primary/30';
   };
 
-  // Generate match sequence: one match per bracket at a time, round by round
+  // Generate match sequence based on tournament format
   const sequence = useMemo(() => {
     if (matches.length === 0) return [];
 
+    if (tournamentFormat === 'double_elimination') {
+      // DUPLA ELIMINAÇÃO: todos os jogos de uma chave antes de avançar para outra
+      const bracketOrder: Record<string, number> = {
+        'winners_upper': 1, 'winners_lower': 2, 'winners_null': 3,
+        'losers_upper': 4, 'losers_lower': 5,
+        'cross_semi_upper': 6, 'cross_semi_lower': 7,
+        'third_place': 8, 'final': 9, 'other': 10,
+      };
+      const getBracketKey = (m: Match): string => {
+        const bt = (m as any).bracket_type || 'winners';
+        const bh = (m as any).bracket_half || 'null';
+        const key = `${bt}_${bh}`;
+        return bracketOrder[key] !== undefined ? key : 'other';
+      };
+      const isByeMatch = (m: Match): boolean =>
+        (m.team1_id && !m.team2_id) || (!m.team1_id && m.team2_id) ? true : false;
+
+      const bracketGroups: Record<string, Match[]> = {};
+      for (const m of matches) {
+        const key = getBracketKey(m);
+        if (!bracketGroups[key]) bracketGroups[key] = [];
+        bracketGroups[key].push(m);
+      }
+      const sortedKeys = Object.keys(bracketGroups).sort(
+        (a, b) => (bracketOrder[a] ?? 10) - (bracketOrder[b] ?? 10)
+      );
+      const result: Match[] = [];
+      for (const key of sortedKeys) {
+        const rounds = [...new Set(bracketGroups[key].map((m) => m.round))].sort((a, b) => a - b);
+        for (const round of rounds) {
+          const roundMatches = bracketGroups[key]
+            .filter((m) => m.round === round)
+            .sort((a, b2) => a.position - b2.position);
+          const normal = roundMatches.filter((m) => !isByeMatch(m));
+          const byes = roundMatches.filter((m) => isByeMatch(m));
+          result.push(...normal, ...byes);
+        }
+      }
+      return result;
+    }
+
+    // OUTROS FORMATOS: Interleaving entre chaves
     const rounds = [...new Set(matches.map((m) => m.round))].sort((a, b) => a - b);
     const brackets = [...new Set(matches.map((m) => m.bracket_number || 1))].sort((a, b) => a - b);
-
     const ordered: Match[] = [];
     for (const round of rounds) {
       const roundMatches = matches.filter((m) => m.round === round);
-      // Interleave: one match from each bracket
       const byBracket: Record<number, Match[]> = {};
       for (const b of brackets) {
         byBracket[b] = roundMatches.filter((m) => (m.bracket_number || 1) === b).sort((a, b2) => a.position - b2.position);
@@ -76,7 +116,7 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
       }
     }
     return ordered;
-  }, [matches]);
+  }, [matches, tournamentFormat]);
 
   const maxRound = matches.length > 0 ? Math.max(...matches.map((m) => m.round)) : 0;
 

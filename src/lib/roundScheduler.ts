@@ -1,0 +1,253 @@
+/**
+ * Double Elimination Round Scheduler
+ * 
+ * Enforces strict execution order per round:
+ *   W-A R1 → W-B R1 → L-A R1 → L-B R1 → W-A R2 → W-B R2 → L-A R2 → L-B R2 → ... → Semis → Final
+ * 
+ * Dependencies:
+ *   - Losers R only unlocks when Winners A R AND Winners B R are both completed
+ *   - Winners R+1 only unlocks when Losers A R AND Losers B R are both completed
+ */
+
+interface SchedulerMatch {
+  id: string;
+  round: number;
+  position: number;
+  team1_id: string | null;
+  team2_id: string | null;
+  winner_team_id: string | null;
+  status: string;
+  bracket_number?: number;
+  bracket_type?: string;
+  bracket_half?: string | null;
+}
+
+export interface SchedulerBlock {
+  key: string;           // e.g. "WA_R1", "LB_R2", "SEMI", "FINAL"
+  label: string;         // Display label
+  round: number;
+  blockOrder: number;    // Global sort order
+  matches: SchedulerMatch[];
+  isCompleted: boolean;
+  isUnlocked: boolean;
+  dependencies: string[]; // Keys of blocks that must be completed first
+}
+
+type BlockCategory = 'WA' | 'WB' | 'LA' | 'LB' | 'SEMI' | 'FINAL' | 'OTHER';
+
+function categorizeMatch(m: SchedulerMatch): BlockCategory {
+  const bt = m.bracket_type || 'winners';
+  const bh = m.bracket_half;
+  if (bt === 'winners' && bh === 'upper') return 'WA';
+  if (bt === 'winners' && bh === 'lower') return 'WB';
+  if (bt === 'losers' && bh === 'lower') return 'LA';  // mirror: losers lower = side A display
+  if (bt === 'losers' && bh === 'upper') return 'LB';  // mirror: losers upper = side B display
+  if (bt === 'semi_final') return 'SEMI';
+  if (bt === 'final') return 'FINAL';
+  return 'OTHER';
+}
+
+function blockLabel(cat: BlockCategory, round: number): string {
+  switch (cat) {
+    case 'WA': return `Vencedores A — Rodada ${round}`;
+    case 'WB': return `Vencedores B — Rodada ${round}`;
+    case 'LA': return `Perdedores A — Rodada ${round}`;
+    case 'LB': return `Perdedores B — Rodada ${round}`;
+    case 'SEMI': return 'Semifinais';
+    case 'FINAL': return 'Final';
+    default: return `Outros — Rodada ${round}`;
+  }
+}
+
+/**
+ * Build the global scheduler blocks in strict round-interleaved order.
+ */
+export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[] {
+  // Group matches by category + round
+  const groups = new Map<string, SchedulerMatch[]>();
+
+  for (const m of matches) {
+    if (m.round === 0) continue; // skip group stage
+    const cat = categorizeMatch(m);
+    const key = cat === 'SEMI' || cat === 'FINAL' ? cat : `${cat}_R${m.round}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(m);
+  }
+
+  // Determine all rounds used by winners/losers
+  const allRounds = new Set<number>();
+  for (const m of matches) {
+    if (m.round > 0) {
+      const cat = categorizeMatch(m);
+      if (['WA', 'WB', 'LA', 'LB'].includes(cat)) allRounds.add(m.round);
+    }
+  }
+  const sortedRounds = [...allRounds].sort((a, b) => a - b);
+
+  const blocks: SchedulerBlock[] = [];
+  let order = 0;
+
+  // For each round: WA → WB → LA → LB
+  for (const r of sortedRounds) {
+    const roundCats: BlockCategory[] = ['WA', 'WB', 'LA', 'LB'];
+    for (const cat of roundCats) {
+      const key = `${cat}_R${r}`;
+      const catMatches = groups.get(key) || [];
+      if (catMatches.length === 0) continue;
+
+      const deps: string[] = [];
+
+      if (cat === 'LA' || cat === 'LB') {
+        // Losers R depends on Winners A R + Winners B R
+        if (groups.has(`WA_R${r}`)) deps.push(`WA_R${r}`);
+        if (groups.has(`WB_R${r}`)) deps.push(`WB_R${r}`);
+      }
+
+      if (cat === 'WA' || cat === 'WB') {
+        if (r > sortedRounds[0]) {
+          // Winners R+1 depends on Losers A R-1 + Losers B R-1
+          const prevR = sortedRounds[sortedRounds.indexOf(r) - 1];
+          if (prevR !== undefined) {
+            if (groups.has(`LA_R${prevR}`)) deps.push(`LA_R${prevR}`);
+            if (groups.has(`LB_R${prevR}`)) deps.push(`LB_R${prevR}`);
+          }
+        }
+      }
+
+      // Within same round: WB depends on WA, LA depends on WB, LB depends on LA
+      if (cat === 'WB' && groups.has(`WA_R${r}`)) deps.push(`WA_R${r}`);
+      if (cat === 'LA') {
+        if (groups.has(`WB_R${r}`)) deps.push(`WB_R${r}`);
+      }
+      if (cat === 'LB') {
+        if (groups.has(`LA_R${r}`)) deps.push(`LA_R${r}`);
+      }
+
+      const isCompleted = catMatches.every(m => m.status === 'completed');
+
+      blocks.push({
+        key,
+        label: blockLabel(cat, r),
+        round: r,
+        blockOrder: order++,
+        matches: catMatches.sort((a, b) => a.position - b.position),
+        isCompleted,
+        isUnlocked: false, // computed below
+        dependencies: [...new Set(deps)],
+      });
+    }
+  }
+
+  // Semifinals
+  const semiMatches = groups.get('SEMI') || [];
+  if (semiMatches.length > 0) {
+    const lastRound = sortedRounds[sortedRounds.length - 1];
+    const semiDeps: string[] = [];
+    // Semis depend on all losers blocks of last round
+    if (lastRound !== undefined) {
+      for (const cat of ['WA', 'WB', 'LA', 'LB'] as BlockCategory[]) {
+        const k = `${cat}_R${lastRound}`;
+        if (groups.has(k)) semiDeps.push(k);
+      }
+    }
+    blocks.push({
+      key: 'SEMI',
+      label: 'Semifinais',
+      round: 999,
+      blockOrder: order++,
+      matches: semiMatches.sort((a, b) => a.position - b.position),
+      isCompleted: semiMatches.every(m => m.status === 'completed'),
+      isUnlocked: false,
+      dependencies: semiDeps,
+    });
+  }
+
+  // Final
+  const finalMatches = groups.get('FINAL') || [];
+  if (finalMatches.length > 0) {
+    blocks.push({
+      key: 'FINAL',
+      label: 'Final',
+      round: 1000,
+      blockOrder: order++,
+      matches: finalMatches.sort((a, b) => a.position - b.position),
+      isCompleted: finalMatches.every(m => m.status === 'completed'),
+      isUnlocked: false,
+      dependencies: semiMatches.length > 0 ? ['SEMI'] : [],
+    });
+  }
+
+  // Compute unlock status
+  const blockMap = new Map(blocks.map(b => [b.key, b]));
+  for (const block of blocks) {
+    block.isUnlocked = block.dependencies.every(dep => {
+      const depBlock = blockMap.get(dep);
+      return !depBlock || depBlock.isCompleted;
+    });
+  }
+
+  return blocks;
+}
+
+/**
+ * Flatten scheduler blocks into an ordered match array for display.
+ */
+export function schedulerSequence(matches: SchedulerMatch[]): SchedulerMatch[] {
+  const blocks = buildSchedulerBlocks(matches);
+  return blocks.flatMap(b => b.matches);
+}
+
+/**
+ * Check if a match can be started according to the scheduler.
+ * Returns null if allowed, or an error message if blocked.
+ */
+export function validateMatchStart(matchId: string, matches: SchedulerMatch[]): string | null {
+  const blocks = buildSchedulerBlocks(matches);
+  
+  for (const block of blocks) {
+    const matchInBlock = block.matches.find(m => m.id === matchId);
+    if (!matchInBlock) continue;
+    
+    if (!block.isUnlocked) {
+      const pendingDeps = block.dependencies.filter(dep => {
+        const depBlock = blocks.find(b => b.key === dep);
+        return depBlock && !depBlock.isCompleted;
+      });
+      const depLabels = pendingDeps.map(dep => {
+        const depBlock = blocks.find(b => b.key === dep);
+        return depBlock?.label || dep;
+      });
+      return `Violação de ordem de rodada detectada. Blocos pendentes: ${depLabels.join(', ')}`;
+    }
+    
+    return null;
+  }
+  
+  return null; // Match not found in any block, allow it
+}
+
+/**
+ * Get the block color for UI display.
+ */
+export function getSchedulerBlockColor(key: string): string {
+  if (key.startsWith('WA')) return 'border-l-blue-500';
+  if (key.startsWith('WB')) return 'border-l-sky-400';
+  if (key.startsWith('LA')) return 'border-l-orange-500';
+  if (key.startsWith('LB')) return 'border-l-amber-400';
+  if (key === 'SEMI') return 'border-l-purple-500';
+  if (key === 'FINAL') return 'border-l-yellow-500';
+  return 'border-l-primary';
+}
+
+/**
+ * Get badge color for a block key.
+ */
+export function getSchedulerBadgeColor(key: string): string {
+  if (key.startsWith('WA')) return 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30';
+  if (key.startsWith('WB')) return 'bg-sky-400/20 text-sky-600 dark:text-sky-400 border-sky-400/30';
+  if (key.startsWith('LA')) return 'bg-orange-500/20 text-orange-600 dark:text-orange-400 border-orange-500/30';
+  if (key.startsWith('LB')) return 'bg-amber-400/20 text-amber-600 dark:text-amber-400 border-amber-400/30';
+  if (key === 'SEMI') return 'bg-purple-500/20 text-purple-600 dark:text-purple-400 border-purple-500/30';
+  if (key === 'FINAL') return 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border-yellow-500/30';
+  return 'bg-primary/20 text-primary border-primary/30';
+}

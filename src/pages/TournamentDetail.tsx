@@ -603,6 +603,17 @@ const TournamentDetail = () => {
     const match = matches.find((m) => m.id === matchId);
     if (!match || !id) return;
 
+    // Validate round order for double elimination
+    const isDE = matches.some(m => m.bracket_type === 'losers' || m.bracket_type === 'final' || m.bracket_type === 'semi_final');
+    if (isDE) {
+      const { validateMatchStart } = await import("@/lib/roundScheduler");
+      const violation = validateMatchStart(matchId, matches as any);
+      if (violation) {
+        toast.error(`⚠️ ${violation}`);
+        return;
+      }
+    }
+
     // Get loser ID
     const loserId = match.team1_id === winnerId ? match.team2_id : match.team1_id;
 

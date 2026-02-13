@@ -2,11 +2,12 @@ import { useState, useMemo, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Save, Download, FileText, Sheet, Pencil } from "lucide-react";
+import { Trophy, Save, Download, FileText, Sheet, Pencil, Lock } from "lucide-react";
 import { motion } from "framer-motion";
 import { exportMatchSequence } from "@/lib/exportUtils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getEliminationRoundLabel, getEliminationRoundShortLabel } from "@/lib/roundLabels";
+import { buildSchedulerBlocks, getSchedulerBlockColor, getSchedulerBadgeColor, type SchedulerBlock } from "@/lib/roundScheduler";
 
 interface Match {
   id: string;
@@ -54,85 +55,9 @@ function generateSequence(matches: Match[], tournamentFormat: string): Match[] {
 }
 
 function generateDoubleEliminationSequence(matches: Match[]): Match[] {
-  // Ordem: Vencedores A → Perdedores A → Vencedores B → Perdedores B → Semi → Final
-  const bracketOrder: Record<string, number> = {
-    'winners_upper': 1,
-    'losers_upper': 2,
-    'winners_lower': 3,
-    'losers_lower': 4,
-    'winners_null': 5,
-    'semi_final_upper': 6,
-    'semi_final_lower': 7,
-    'third_place': 8,
-    'final': 9,
-    'other': 10,
-  };
-
-  const getBracketKey = (m: Match): string => {
-    const bt = m.bracket_type || 'winners';
-    const bh = m.bracket_half || 'null';
-    const key = `${bt}_${bh}`;
-    return bracketOrder[key] !== undefined ? key : 'other';
-  };
-
-  const isByeMatch = (m: Match): boolean =>
-    (m.team1_id && !m.team2_id) || (!m.team1_id && m.team2_id) ? true : false;
-
-  const bracketGroups: Record<string, Match[]> = {};
-  for (const m of matches) {
-    const key = getBracketKey(m);
-    if (!bracketGroups[key]) bracketGroups[key] = [];
-    bracketGroups[key].push(m);
-  }
-
-  const sortedKeys = Object.keys(bracketGroups).sort(
-    (a, b) => (bracketOrder[a] ?? 10) - (bracketOrder[b] ?? 10)
-  );
-
-  const result: Match[] = [];
-  for (const key of sortedKeys) {
-    const groupMatches = bracketGroups[key];
-    const rounds = [...new Set(groupMatches.map((m) => m.round))].sort((a, b) => a - b);
-    for (const round of rounds) {
-      const roundMatches = groupMatches
-        .filter((m) => m.round === round)
-        .sort((a, b) => a.position - b.position);
-      const normal = roundMatches.filter((m) => !isByeMatch(m));
-      const byes = roundMatches.filter((m) => isByeMatch(m));
-      result.push(...normal, ...byes);
-    }
-  }
-
-  // Resolve consecutive conflicts within each bracket group
-  let offset = 0;
-  for (const key of sortedKeys) {
-    const groupLen = bracketGroups[key].length;
-    for (let pass = 0; pass < groupLen * 2; pass++) {
-      let swapped = false;
-      for (let i = offset + 1; i < offset + groupLen; i++) {
-        if (hasTeamOverlap(result[i - 1], result[i])) {
-          let swapIdx = -1;
-          for (let j = i + 1; j < offset + groupLen; j++) {
-            if (
-              !hasTeamOverlap(result[i - 1], result[j]) &&
-              (i + 1 >= offset + groupLen || !hasTeamOverlap(result[j], result[i + 1]))
-            ) {
-              swapIdx = j;
-              break;
-            }
-          }
-          if (swapIdx !== -1) {
-            [result[i], result[swapIdx]] = [result[swapIdx], result[i]];
-            swapped = true;
-          }
-        }
-      }
-      if (!swapped) break;
-    }
-    offset += groupLen;
-  }
-
-  return resolveByeConflicts(result);
+  // Use round scheduler for strict ordering
+  const blocks = buildSchedulerBlocks(matches as any);
+  return blocks.flatMap(b => b.matches as Match[]);
 }
 
 function resolveByeConflicts(sequence: Match[]): Match[] {
@@ -299,32 +224,22 @@ const MatchSequenceViewer = ({
     if (displaySequence.length === 0) return [];
 
     if (tournamentFormat === 'double_elimination') {
-      // Group by bracket block
-      const blocks: { label: string; matches: { match: Match; globalIndex: number }[] }[] = [];
-      let currentBlock = '';
-      let currentMatches: { match: Match; globalIndex: number }[] = [];
-
-      for (const m of displaySequence) {
-        const blockLabel = getBracketBlockLabel(m);
-        if (blockLabel !== currentBlock) {
-          if (currentMatches.length > 0) {
-            blocks.push({ label: currentBlock, matches: currentMatches });
-          }
-          currentBlock = blockLabel;
-          currentMatches = [];
-        }
-        currentMatches.push({ match: m, globalIndex: 0 });
-      }
-      if (currentMatches.length > 0) {
-        blocks.push({ label: currentBlock, matches: currentMatches });
-      }
-
-      // Assign global indices
+      // Use round scheduler for strict block ordering
+      const schedulerBlocks = buildSchedulerBlocks(matches);
+      const blocks: { label: string; matches: { match: Match; globalIndex: number }[]; blockKey: string; isUnlocked: boolean; isCompleted: boolean }[] = [];
+      
       let idx = 1;
-      for (const b of blocks) {
-        for (const entry of b.matches) {
-          entry.globalIndex = idx++;
-        }
+      for (const sb of schedulerBlocks) {
+        const blockMatches = sb.matches.filter(m => m.team1_id && m.team2_id);
+        if (blockMatches.length === 0) continue;
+        const entries = blockMatches.map(m => ({ match: m as Match, globalIndex: idx++ }));
+        blocks.push({ 
+          label: sb.label, 
+          matches: entries, 
+          blockKey: sb.key, 
+          isUnlocked: sb.isUnlocked, 
+          isCompleted: sb.isCompleted 
+        });
       }
       return blocks;
     }
@@ -410,15 +325,31 @@ const MatchSequenceViewer = ({
         </DropdownMenu>
       </div>
 
-      {bracketBlocks.map((block) => (
+      {bracketBlocks.map((block) => {
+        const blockKey = (block as any).blockKey;
+        const isUnlocked = (block as any).isUnlocked ?? true;
+        const isBlockCompleted = (block as any).isCompleted ?? false;
+        const borderColor = isDoubleElim && blockKey ? getSchedulerBlockColor(blockKey) : getBracketBlockColor(block.label);
+        
+        return (
         <div
           key={block.label}
-          className={`rounded-lg border bg-card/30 overflow-hidden ${isDoubleElim ? `border-l-4 ${getBracketBlockColor(block.label)}` : ''}`}
+          className={`rounded-lg border bg-card/30 overflow-hidden ${isDoubleElim ? `border-l-4 ${borderColor}` : ''} ${!isUnlocked && isDoubleElim ? 'opacity-50' : ''}`}
         >
           <div className="px-4 py-3 border-b border-border bg-muted/30">
-            <h3 className="text-base font-bold text-foreground tracking-tight">
-              {block.label}
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-bold text-foreground tracking-tight">
+                {block.label}
+              </h3>
+              {isDoubleElim && !isUnlocked && (
+                <Badge variant="outline" className="text-[10px] gap-1 text-muted-foreground">
+                  <Lock className="h-3 w-3" /> Bloqueado
+                </Badge>
+              )}
+              {isDoubleElim && isBlockCompleted && (
+                <Badge className="bg-success/20 text-success border-0 text-[10px]">✓ Concluído</Badge>
+              )}
+            </div>
             <span className="text-xs text-muted-foreground">
               {block.matches.length} {block.matches.length === 1 ? 'partida' : 'partidas'}
             </span>
@@ -440,7 +371,7 @@ const MatchSequenceViewer = ({
             ))}
           </div>
         </div>
-      ))}
+      )})}
     </section>
   );
 };

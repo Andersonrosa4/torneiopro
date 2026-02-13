@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Trophy } from "lucide-react";
+import { Trophy, Lock } from "lucide-react";
 import { getEliminationRoundLabel } from "@/lib/roundLabels";
+import { buildSchedulerBlocks, getSchedulerBlockColor } from "@/lib/roundScheduler";
 
 interface Match {
   id: string;
@@ -59,45 +60,11 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
     if (matches.length === 0) return [];
 
     if (tournamentFormat === 'double_elimination') {
-      // DUPLA ELIMINAÇÃO: todos os jogos de uma chave antes de avançar para outra
-      const bracketOrder: Record<string, number> = {
-        'winners_upper': 1,   // 1º Vencedores Lado A
-        'losers_upper': 2,    // 2º Perdedores Lado A
-        'winners_lower': 3,   // 3º Vencedores Lado B
-        'losers_lower': 4,    // 4º Perdedores Lado B
-        'winners_null': 5,
-        'cross_semi_upper': 6, 'cross_semi_lower': 7,
-        'third_place': 8, 'final': 9, 'other': 10,
-      };
-      const getBracketKey = (m: Match): string => {
-        const bt = (m as any).bracket_type || 'winners';
-        const bh = (m as any).bracket_half || 'null';
-        const key = `${bt}_${bh}`;
-        return bracketOrder[key] !== undefined ? key : 'other';
-      };
-      const isByeMatch = (m: Match): boolean =>
-        (m.team1_id && !m.team2_id) || (!m.team1_id && m.team2_id) ? true : false;
-
-      const bracketGroups: Record<string, Match[]> = {};
-      for (const m of matches) {
-        const key = getBracketKey(m);
-        if (!bracketGroups[key]) bracketGroups[key] = [];
-        bracketGroups[key].push(m);
-      }
-      const sortedKeys = Object.keys(bracketGroups).sort(
-        (a, b) => (bracketOrder[a] ?? 10) - (bracketOrder[b] ?? 10)
-      );
+      // Use round scheduler for strict W-A R1 → W-B R1 → L-A R1 → L-B R1 → ... ordering
+      const schedulerBlocks = buildSchedulerBlocks(matches as any);
       const result: Match[] = [];
-      for (const key of sortedKeys) {
-        const rounds = [...new Set(bracketGroups[key].map((m) => m.round))].sort((a, b) => a - b);
-        for (const round of rounds) {
-          const roundMatches = bracketGroups[key]
-            .filter((m) => m.round === round)
-            .sort((a, b2) => a.position - b2.position);
-          const normal = roundMatches.filter((m) => !isByeMatch(m));
-          const byes = roundMatches.filter((m) => isByeMatch(m));
-          result.push(...normal, ...byes);
-        }
+      for (const block of schedulerBlocks) {
+        result.push(...(block.matches as Match[]));
       }
       return result;
     }
@@ -142,10 +109,8 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
   const groupedRounds = useMemo(() => {
     if (displaySequence.length === 0) return [];
 
-    const groups: { label: string; items: { match: Match; idx: number }[] }[] = [];
+    const groups: { label: string; items: { match: Match; idx: number }[]; blockKey?: string; isUnlocked?: boolean; isCompleted?: boolean }[] = [];
 
-    // DOUBLE_ELIMINATION: never has round 0 (no group stage)
-    // GROUPS_PLUS_ELIMINATION: round 0 = group stage
     const groupStage = tournamentFormat !== 'double_elimination'
       ? displaySequence.filter((m) => m.round === 0)
       : [];
@@ -164,51 +129,18 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
 
     if (knockoutStage.length > 0) {
       if (tournamentFormat === 'double_elimination') {
-        // Group by bracket_type + bracket_half + round
-        const bracketOrder: Record<string, number> = {
-          'winners_upper': 1, 'winners_lower': 2,
-          'losers_upper': 3, 'losers_lower': 4,
-          'cross_semi_upper': 5, 'cross_semi_lower': 6,
-          'final_null': 7,
-        };
-        const getBracketLabel = (m: Match): string => {
-          const bt = (m as any).bracket_type || 'winners';
-          const bh = (m as any).bracket_half;
-          if (bt === 'winners' && bh === 'upper') return 'Vencedores A';
-          if (bt === 'winners' && bh === 'lower') return 'Vencedores B';
-          if (bt === 'losers' && bh === 'upper') return 'Perdedores A';
-          if (bt === 'losers' && bh === 'lower') return 'Perdedores B';
-          if (bt === 'cross_semi') return 'Semifinal Cruzada';
-          if (bt === 'final') return 'Final';
-          return 'Jogos';
-        };
-        const getBracketKey = (m: Match): string => {
-          const bt = (m as any).bracket_type || 'winners';
-          const bh = (m as any).bracket_half || 'null';
-          return `${bt}_${bh}`;
-        };
-
-        // Group matches by bracket section
-        const sections = new Map<string, Match[]>();
-        for (const m of knockoutStage) {
-          const key = getBracketKey(m);
-          if (!sections.has(key)) sections.set(key, []);
-          sections.get(key)!.push(m);
-        }
-        const sortedKeys = [...sections.keys()].sort(
-          (a, b) => (bracketOrder[a] ?? 10) - (bracketOrder[b] ?? 10)
-        );
-        for (const key of sortedKeys) {
-          const sectionMatches = sections.get(key)!;
-          const label = getBracketLabel(sectionMatches[0]);
-          const rounds = [...new Set(sectionMatches.map(m => m.round))].sort((a, b) => a - b);
-          for (const r of rounds) {
-            const roundMatches = sectionMatches.filter(m => m.round === r);
-            groups.push({
-              label: `${label} — Rodada ${r}`,
-              items: roundMatches.map((m) => ({ match: m, idx: 0 })),
-            });
-          }
+        // Use round scheduler blocks
+        const schedulerBlocks = buildSchedulerBlocks(matches as any);
+        for (const sb of schedulerBlocks) {
+          const blockMatches = (sb.matches as Match[]).filter(m => m.team1_id && m.team2_id);
+          if (blockMatches.length === 0) continue;
+          groups.push({
+            label: sb.label,
+            items: blockMatches.map((m) => ({ match: m, idx: 0 })),
+            blockKey: sb.key,
+            isUnlocked: sb.isUnlocked,
+            isCompleted: sb.isCompleted,
+          });
         }
       } else {
         const rounds = [...new Set(knockoutStage.map((m) => m.round))].sort((a, b) => a - b);
@@ -228,7 +160,7 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
       }
     }
     return groups;
-  }, [displaySequence, matchCountByRound, tournamentFormat]);
+  }, [displaySequence, matches, matchCountByRound, tournamentFormat]);
 
   if (displaySequence.length === 0) {
     return (
@@ -241,11 +173,24 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
   return (
     <section className="space-y-3">
       <h2 className="text-xl font-semibold mb-4">Sequência de Partidas</h2>
-      {groupedRounds.map((group) => (
-        <div key={group.label} className="space-y-2">
-          <h3 className="text-lg font-semibold text-primary mt-4 mb-1 border-b border-border pb-1">
-            {group.label}
-          </h3>
+      {groupedRounds.map((group) => {
+        const isDE = tournamentFormat === 'double_elimination';
+        const borderColor = isDE && group.blockKey ? `border-l-4 ${getSchedulerBlockColor(group.blockKey)}` : '';
+        return (
+        <div key={group.label} className={`space-y-2 ${borderColor} ${isDE && group.isUnlocked === false ? 'opacity-50' : ''} ${borderColor ? 'pl-3 rounded-lg' : ''}`}>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-primary mt-4 mb-1 border-b border-border pb-1">
+              {group.label}
+            </h3>
+            {isDE && group.isUnlocked === false && (
+              <Badge variant="outline" className="text-[10px] gap-1 text-muted-foreground mt-3">
+                <Lock className="h-3 w-3" /> Bloqueado
+              </Badge>
+            )}
+            {isDE && group.isCompleted && (
+              <Badge className="bg-success/20 text-success border-0 text-[10px] mt-3">✓ Concluído</Badge>
+            )}
+          </div>
           {group.items.map(({ match, idx }) => {
             const isCompleted = match.status === "completed";
             const team1Name = getTeamName(match.team1_id);
@@ -295,7 +240,7 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
             );
           })}
         </div>
-      ))}
+      )})}
     </section>
   );
 };

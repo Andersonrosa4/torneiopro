@@ -177,12 +177,14 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
     });
   }
 
-  // Compute unlock status
+  // Compute unlock status — based SOLELY on match status
   const blockMap = new Map(blocks.map(b => [b.key, b]));
   for (const block of blocks) {
     block.isUnlocked = block.dependencies.every(dep => {
       const depBlock = blockMap.get(dep);
-      return !depBlock || depBlock.isCompleted;
+      if (!depBlock) return true; // no dependency block = unlocked
+      // Check EVERY match in the dependency block — ALL must be 'completed'
+      return depBlock.matches.every(m => m.status === 'completed');
     });
   }
 
@@ -203,27 +205,26 @@ export function schedulerSequence(matches: SchedulerMatch[]): SchedulerMatch[] {
  */
 export function validateMatchStart(matchId: string, matches: SchedulerMatch[]): string | null {
   const blocks = buildSchedulerBlocks(matches);
-  
+
   for (const block of blocks) {
     const matchInBlock = block.matches.find(m => m.id === matchId);
     if (!matchInBlock) continue;
-    
-    if (!block.isUnlocked) {
-      const pendingDeps = block.dependencies.filter(dep => {
-        const depBlock = blocks.find(b => b.key === dep);
-        return depBlock && !depBlock.isCompleted;
-      });
-      const depLabels = pendingDeps.map(dep => {
-        const depBlock = blocks.find(b => b.key === dep);
-        return depBlock?.label || dep;
-      });
-      return `Violação de ordem de rodada detectada. Blocos pendentes: ${depLabels.join(', ')}`;
+
+    // For each dependency, check if ANY match has status != 'completed'
+    for (const dep of block.dependencies) {
+      const depBlock = blocks.find(b => b.key === dep);
+      if (!depBlock) continue;
+
+      const pending = depBlock.matches.filter(m => m.status !== 'completed');
+      if (pending.length > 0) {
+        return `Violação de ordem de rodada detectada. Bloco pendente: ${depBlock.label} (${pending.length} jogo(s) não finalizado(s))`;
+      }
     }
-    
+
     return null;
   }
-  
-  return null; // Match not found in any block, allow it
+
+  return null;
 }
 
 /**

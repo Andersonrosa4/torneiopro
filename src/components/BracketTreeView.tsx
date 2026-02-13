@@ -501,13 +501,15 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
   const { winnersA, winnersB, losersA, losersB, semiFinals, finalMatches, isDoubleElimination } = useMemo(() => {
     const wA = matches.filter((m) => m.bracket_type === "winners" && m.bracket_half === "upper");
     const wB = matches.filter((m) => m.bracket_type === "winners" && m.bracket_half === "lower");
-    const lA = matches.filter((m) => m.bracket_type === "losers" && m.bracket_half === "lower");
-    const lB = matches.filter((m) => m.bracket_type === "losers" && m.bracket_half === "upper");
+    // Perdedores Superiores = losers upper (recebe de Winners B)
+    // Perdedores Inferiores = losers lower (recebe de Winners A)
+    const losersSuperiores = matches.filter((m) => m.bracket_type === "losers" && m.bracket_half === "upper");
+    const losersInferiores = matches.filter((m) => m.bracket_type === "losers" && m.bracket_half === "lower");
     const sf = matches.filter((m) => m.bracket_type === "semi_final");
     const f = matches.filter((m) => m.bracket_type === "final");
     const isDE = wA.length > 0 || wB.length > 0 || sf.length > 0;
 
-    return { winnersA: wA, winnersB: wB, losersA: lA, losersB: lB, semiFinals: sf, finalMatches: f, isDoubleElimination: isDE };
+    return { winnersA: wA, winnersB: wB, losersA: losersSuperiores, losersB: losersInferiores, semiFinals: sf, finalMatches: f, isDoubleElimination: isDE };
   }, [matches]);
 
   if (!hasGroupStage && !hasElimination) {
@@ -579,7 +581,7 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
               <BracketColumn
                 bracketMatches={losersA}
                 getName={getName}
-                label="Perdedores A"
+                label="Perdedores Superiores"
                 icon="⬇"
                 colorAccent="border-destructive/15 bg-destructive/[0.03]"
                 reversed={true}
@@ -589,7 +591,7 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
               <BracketColumn
                 bracketMatches={losersB}
                 getName={getName}
-                label="Perdedores B"
+                label="Perdedores Inferiores"
                 icon="⬇"
                 colorAccent="border-destructive/10 bg-destructive/[0.02]"
                 reversed={true}

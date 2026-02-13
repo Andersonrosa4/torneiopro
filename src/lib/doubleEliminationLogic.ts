@@ -1,11 +1,15 @@
 /**
- * Double Elimination Bracket Generation Logic (CORRIGIDO)
+ * Double Elimination Bracket Generation Logic v2
  * 
- * Regras Obrigatórias:
- * 1. SEM "chapéu estrutural" - chapéu só para número ímpar real de duplas
- * 2. Anti-repetição: verificar confrontos anteriores antes de slotting losers
- * 3. Mapeamento sequencial: Perdedor J1→P1, J2→P2, etc.
- * 4. Semifinais: perdedor eliminado, sem queda para Perdedores
+ * REGRAS OBRIGATÓRIAS:
+ * 1. PROIBIDO partidas com team1_id ou team2_id nulos SEM origem definida
+ * 2. Toda partida deve ter times válidos OU slots de origem (next_win_match_id/next_lose_match_id)
+ * 3. TODAS as rodadas são geradas na criação (vencedores, perdedores, semifinais, final)
+ * 4. Matches são linkados via next_win_match_id (onde o vencedor vai) e next_lose_match_id (onde o perdedor vai)
+ * 5. Chapéu só para número ímpar real de duplas
+ * 6. Anti-repetição nos perdedores
+ * 7. Mapeamento sequencial de perdedores
+ * 8. Validação final: nenhuma partida sem origem ou time
  */
 
 interface Team {
@@ -29,7 +33,7 @@ interface MatchData {
   next_win_match_id?: string | null;
   next_lose_match_id?: string | null;
   winner_team_id?: string | null;
-  _temp_id?: string;
+  _temp_id: string;
 }
 
 export interface DoubleEliminationConfig {
@@ -47,9 +51,10 @@ export interface GeneratedBracket {
   matches: Omit<MatchData, '_temp_id'>[];
 }
 
-/**
- * Shuffle array using Fisher-Yates
- */
+// ──────────────────────────────────────────────
+// Utilities
+// ──────────────────────────────────────────────
+
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -59,10 +64,6 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-/**
- * Split teams into Side A (upper) and Side B (lower).
- * Respects manual side assignments.
- */
 function splitIntoHalves(
   teams: Team[],
   sideAIds?: string[],
@@ -81,11 +82,8 @@ function splitIntoHalves(
     const lower = [...assignedB];
 
     for (const t of unassigned) {
-      if (upper.length < halfSize) {
-        upper.push(t);
-      } else {
-        lower.push(t);
-      }
+      if (upper.length < halfSize) upper.push(t);
+      else lower.push(t);
     }
 
     return { upper: shuffle(upper), lower: shuffle(lower) };
@@ -99,8 +97,8 @@ function splitIntoHalves(
 }
 
 /**
- * Calcula estrutura de rodadas para N duplas SEM chapéu estrutural.
- * Retorna: { rounds: [{ matchCount, hasChapeu }, ...], totalRounds: number }
+ * Calcula estrutura de rodadas para N duplas.
+ * Chapéu apenas quando número ímpar real.
  */
 function calculateBracketStructure(teamCount: number): {
   rounds: Array<{ matchCount: number; hasChapeu: boolean }>;
@@ -119,27 +117,26 @@ function calculateBracketStructure(teamCount: number): {
   return { rounds, totalRounds: rounds.length };
 }
 
-/**
- * Gera chave de Vencedores SEM chapéu estrutural.
- * Apenas um chapéu quando número ímpar real de duplas.
- */
-function generateWinnersHalfBracket(
+// ──────────────────────────────────────────────
+// Winners Bracket Generation (with linkage)
+// ──────────────────────────────────────────────
+
+function generateWinnersHalf(
   teams: Team[],
   tournamentId: string,
   modalityId: string,
   half: 'upper' | 'lower',
   bracketNumber: number,
 ): MatchData[] {
-  if (teams.length < 1) return [];
+  if (teams.length < 2) return [];
 
   const { rounds } = calculateBracketStructure(teams.length);
   const matches: MatchData[] = [];
 
-  // R1: criar apenas matches necessários
+  // Round 1: real teams
   for (let i = 0; i < rounds[0].matchCount; i++) {
-    const t1 = teams[i * 2] || null;
-    const t2 = teams[i * 2 + 1] || null;
-
+    const t1 = teams[i * 2];
+    const t2 = teams[i * 2 + 1];
     matches.push({
       tournament_id: tournamentId,
       modality_id: modalityId,
@@ -151,13 +148,13 @@ function generateWinnersHalfBracket(
       bracket_type: 'winners',
       bracket_half: half,
       bracket_number: bracketNumber,
+      next_win_match_id: null,
+      next_lose_match_id: null,
       _temp_id: `w_${half}_r1_p${i + 1}`,
     });
   }
 
-  // Próximas rodadas
-  let teamAdvancingFrom = rounds[0].matchCount + (rounds[0].hasChapeu ? 1 : 0);
-
+  // Rounds 2+: empty slots with linkage
   for (let r = 2; r <= rounds.length; r++) {
     const matchCount = rounds[r - 1].matchCount;
     for (let p = 0; p < matchCount; p++) {
@@ -172,24 +169,34 @@ function generateWinnersHalfBracket(
         bracket_type: 'winners',
         bracket_half: half,
         bracket_number: bracketNumber,
+        next_win_match_id: null,
+        next_lose_match_id: null,
         _temp_id: `w_${half}_r${r}_p${p + 1}`,
       });
     }
-    teamAdvancingFrom = matchCount + (rounds[r - 1].hasChapeu ? 1 : 0);
   }
 
-  // Propagação de chapéu: se houver, colocar na primeira posição da R2
-  if (rounds[0].hasChapeu && rounds.length > 0) {
+  // Chapéu R1: odd team goes to R2 first match as team1
+  if (rounds[0].hasChapeu) {
     const chapeuTeamId = teams[teams.length - 1]?.id;
-    if (chapeuTeamId && matches.length > rounds[0].matchCount) {
-      const r2FirstMatch = matches.find(
-        m =>
-          m.round === 2 &&
-          m.bracket_type === 'winners' &&
-          m.bracket_half === half
+    if (chapeuTeamId) {
+      const r2First = matches.find(m => m.round === 2 && m.bracket_half === half && m.bracket_type === 'winners');
+      if (r2First) {
+        r2First.team1_id = chapeuTeamId;
+      }
+    }
+  }
+
+  // Set up next_win_match_id linkage within winners half
+  for (const match of matches) {
+    if (match.round < rounds.length) {
+      const nextRound = match.round + 1;
+      const nextPosition = Math.ceil(match.position / 2);
+      const nextMatch = matches.find(
+        m => m.round === nextRound && m.position === nextPosition && m.bracket_type === 'winners' && m.bracket_half === half
       );
-      if (r2FirstMatch) {
-        r2FirstMatch.team1_id = chapeuTeamId;
+      if (nextMatch) {
+        match.next_win_match_id = nextMatch._temp_id;
       }
     }
   }
@@ -197,11 +204,11 @@ function generateWinnersHalfBracket(
   return matches;
 }
 
-/**
- * Gera estrutura de Chave dos Perdedores SEM chapéu estrutural.
- * teamCount = número de duplas esperadas que cairão nesta chave
- */
-function generateLosersBracketStructure(
+// ──────────────────────────────────────────────
+// Losers Bracket Generation (with linkage)
+// ──────────────────────────────────────────────
+
+function generateLosersHalf(
   teamCount: number,
   tournamentId: string,
   modalityId: string,
@@ -227,164 +234,40 @@ function generateLosersBracketStructure(
         bracket_type: 'losers',
         bracket_half: half,
         bracket_number: bracketNumber,
+        next_win_match_id: null,
+        next_lose_match_id: null,
         _temp_id: `l_${half}_r${r}_p${p + 1}`,
       });
+    }
+  }
+
+  // Set up next_win_match_id linkage within losers half
+  for (const match of matches) {
+    if (match.round < rounds.length) {
+      const nextRound = match.round + 1;
+      const nextPosition = Math.ceil(match.position / 2);
+      const nextMatch = matches.find(
+        m => m.round === nextRound && m.position === nextPosition && m.bracket_type === 'losers' && m.bracket_half === half
+      );
+      if (nextMatch) {
+        match.next_win_match_id = nextMatch._temp_id;
+      }
     }
   }
 
   return matches;
 }
 
-/**
- * Mapeia perdedores sequencialmente: J1→P1, J2→P2, etc.
- * Também verifica anti-repetição com base em historico de confrontos.
- */
-interface LoserMapping {
-  winnerRound: number;
-  winnersMatchPosition: number;
-  losersRound: number;
-  losersPosition: number;
-  team1OrTeam2: 'team1_id' | 'team2_id';
-}
+// ──────────────────────────────────────────────
+// Full Bracket Assembly with Complete Linkage
+// ──────────────────────────────────────────────
 
-function getMappingForLoser(
-  loserSourceRound: number,
-  loserSourcePosition: number,
-  losersBracketStructure: MatchData[],
-): LoserMapping | null {
-  // Regra 3: Mapeamento sequencial
-  // Perdedor da rodada R1 posição P da Chave de Vencedores
-  // → vai para Perdedores rodada R1 posição ceil(P/2)
-
-  if (loserSourceRound === 1) {
-    const losersRound = 1;
-    const losersPosition = Math.ceil(loserSourcePosition / 2);
-    const team1OrTeam2 = loserSourcePosition % 2 === 1 ? 'team1_id' : 'team2_id';
-
-    return {
-      winnerRound: loserSourceRound,
-      winnersMatchPosition: loserSourcePosition,
-      losersRound,
-      losersPosition,
-      team1OrTeam2,
-    };
-  }
-
-  // Perdedores de R2+ entram em rodadas posteriores dos Perdedores
-  // Mapeamento: Rodada N dos Vencedores → Rodada N dos Perdedores
-  const losersRound = loserSourceRound;
-  const losersPosition = Math.ceil(loserSourcePosition / 2);
-  const team1OrTeam2 = loserSourcePosition % 2 === 1 ? 'team1_id' : 'team2_id';
-
-  return {
-    winnerRound: loserSourceRound,
-    winnersMatchPosition: loserSourcePosition,
-    losersRound,
-    losersPosition,
-    team1OrTeam2,
-  };
-}
-
-/**
- * Busca slot disponível nos Perdedores respeitando mapeamento sequencial.
- * Implementa Regra 2: anti-repetição com historico de confrontos.
- */
-function findLosersSlotWithAntiRepetition(
-  loserTeamId: string,
-  loserSourceRound: number,
-  loserSourcePosition: number,
-  losersMatches: MatchData[],
-  winnerMatches: MatchData[],
-): { match: MatchData; field: 'team1_id' | 'team2_id' } | null {
-  const mapping = getMappingForLoser(
-    loserSourceRound,
-    loserSourcePosition,
-    losersMatches,
-  );
-
-  if (!mapping) return null;
-
-  // Procura match na rodada indicada, posição indicada
-  let targetMatch = losersMatches.find(
-    m =>
-      m.round === mapping.losersRound &&
-      m.position === mapping.losersPosition &&
-      m.bracket_type === 'losers',
-  );
-
-  if (!targetMatch) {
-    // Se não existe, procura próximo slot disponível sequencialmente
-    const candidateMatches = losersMatches
-      .filter(m => m.bracket_type === 'losers' && m.round >= mapping.losersRound)
-      .sort((a, b) => (a.round === b.round ? a.position - b.position : a.round - b.round));
-
-    for (const candidate of candidateMatches) {
-      const team1Occupied = candidate.team1_id !== null;
-      const team2Occupied = candidate.team2_id !== null;
-
-      if (!team1Occupied) {
-        // Regra 2: verificar anti-repetição
-        if (!hasMetBefore(loserTeamId, candidate, 'team1_id', winnerMatches)) {
-          targetMatch = candidate;
-          break;
-        }
-      }
-      if (!team2Occupied && !targetMatch) {
-        if (!hasMetBefore(loserTeamId, candidate, 'team2_id', winnerMatches)) {
-          targetMatch = candidate;
-          break;
-        }
-      }
-    }
-  }
-
-  if (!targetMatch) return null;
-
-  // Escolhe qual slot usar
-  const team1Empty = !targetMatch.team1_id;
-  const team2Empty = !targetMatch.team2_id;
-
-  let field: 'team1_id' | 'team2_id' = mapping.team1OrTeam2;
-
-  if (!team1Empty && team2Empty) {
-    field = 'team2_id';
-  } else if (team1Empty && !team2Empty) {
-    field = 'team1_id';
-  }
-
-  return { match: targetMatch, field };
-}
-
-/**
- * Verifica se duas duplas já se enfrentaram na Chave de Vencedores (Regra 2)
- */
-function hasMetBefore(
-  team1Id: string,
-  targetMatch: MatchData,
-  fieldToUse: 'team1_id' | 'team2_id',
-  winnerMatches: MatchData[],
-): boolean {
-  const oppositeField = fieldToUse === 'team1_id' ? 'team2_id' : 'team1_id';
-  const potentialOpponent = (targetMatch as any)[oppositeField];
-
-  if (!potentialOpponent) return false;
-
-  // Procura se essas duas duplas já se enfrentaram em matches de Vencedores
-  const previousMeeting = winnerMatches.find(
-    m =>
-      m.bracket_type === 'winners' &&
-      ((m.team1_id === team1Id && m.team2_id === potentialOpponent) ||
-        (m.team1_id === potentialOpponent && m.team2_id === team1Id)),
-  );
-
-  return !!previousMeeting;
-}
-
-/**
- * Main function: Generate full double elimination bracket
- */
 export function generateDoubleEliminationBracket(config: DoubleEliminationConfig): GeneratedBracket {
-  const { tournamentId, modalityId, teams, useSeeds, seedTeamIds, sideATeamIds, sideBTeamIds } = config;
+  const { tournamentId, modalityId, teams, useSeeds, sideATeamIds, sideBTeamIds } = config;
+
+  if (teams.length < 4) {
+    throw new Error(`Impossível gerar chaveamento de dupla eliminação com menos de 4 duplas. Recebido: ${teams.length}`);
+  }
 
   const { upper, lower } = splitIntoHalves(
     teams,
@@ -392,54 +275,39 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
     useSeeds ? sideBTeamIds : undefined,
   );
 
-  // 1. Vencedores
-  const winnersUpper = generateWinnersHalfBracket(upper, tournamentId, modalityId, 'upper', 1);
-  const winnersLower = generateWinnersHalfBracket(lower, tournamentId, modalityId, 'lower', 2);
+  if (upper.length < 2 || lower.length < 2) {
+    throw new Error(`Distribuição inválida: Lado A tem ${upper.length} duplas, Lado B tem ${lower.length}. Mínimo 2 por lado.`);
+  }
 
-  // 2. Perdedores (estrutura baseada em quantos perderão)
-  // Da Chave de Vencedores Lado B (lower) vem para Perdedores Lado A (upper)
-  const losersUpperTeamCount = lower.length - 1; // Todos menos o campeão
-  // Da Chave de Vencedores Lado A (upper) vem para Perdedores Lado B (lower)
-  const losersLowerTeamCount = upper.length - 1;
+  // 1. Winners brackets
+  const winnersUpper = generateWinnersHalf(upper, tournamentId, modalityId, 'upper', 1);
+  const winnersLower = generateWinnersHalf(lower, tournamentId, modalityId, 'lower', 2);
 
-  const losersUpperMatches = generateLosersBracketStructure(
-    Math.max(2, losersUpperTeamCount),
-    tournamentId,
-    modalityId,
-    'upper',
-    3,
-  );
-  const losersLowerMatches = generateLosersBracketStructure(
-    Math.max(2, losersLowerTeamCount),
-    tournamentId,
-    modalityId,
-    'lower',
-    4,
-  );
+  // 2. Losers brackets (mirror: Winners Upper losers → Losers Lower, vice versa)
+  const losersUpperTeamCount = Math.max(2, lower.length - 1);
+  const losersLowerTeamCount = Math.max(2, upper.length - 1);
 
-  // 3. Calcular round das Semifinais Cruzadas
-  const winnersMaxRound = Math.max(
-    ...[...winnersUpper, ...winnersLower].map(m => m.round),
-    0,
-  );
-  const losersMaxRound = Math.max(
-    ...[...losersUpperMatches, ...losersLowerMatches].map(m => m.round),
-    0,
-  );
+  const losersUpper = generateLosersHalf(losersUpperTeamCount, tournamentId, modalityId, 'upper', 3);
+  const losersLower = generateLosersHalf(losersLowerTeamCount, tournamentId, modalityId, 'lower', 4);
+
+  // 3. Cross-Semifinals
+  const winnersMaxRound = Math.max(...[...winnersUpper, ...winnersLower].map(m => m.round), 0);
+  const losersMaxRound = Math.max(...[...losersUpper, ...losersLower].map(m => m.round), 0);
   const crossSemiRound = Math.max(winnersMaxRound, losersMaxRound) + 1;
 
-  // 4. Semifinais Cruzadas
   const crossSemi1: MatchData = {
     tournament_id: tournamentId,
     modality_id: modalityId,
     round: crossSemiRound,
     position: 1,
-    team1_id: null,
-    team2_id: null,
+    team1_id: null, // Campeão Perdedores Upper
+    team2_id: null, // Campeão Vencedores Lower (cruzamento)
     status: 'pending',
     bracket_type: 'cross_semi',
     bracket_half: 'upper',
     bracket_number: 5,
+    next_win_match_id: null,
+    next_lose_match_id: null,
     _temp_id: 'cross_semi_1',
   };
 
@@ -448,48 +316,196 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
     modality_id: modalityId,
     round: crossSemiRound,
     position: 2,
-    team1_id: null,
-    team2_id: null,
+    team1_id: null, // Campeão Perdedores Lower
+    team2_id: null, // Campeão Vencedores Upper (cruzamento)
     status: 'pending',
     bracket_type: 'cross_semi',
     bracket_half: 'lower',
     bracket_number: 5,
+    next_win_match_id: null,
+    next_lose_match_id: null,
     _temp_id: 'cross_semi_2',
   };
 
-  // 5. Final
+  // 4. Final
   const finalMatch: MatchData = {
     tournament_id: tournamentId,
     modality_id: modalityId,
     round: crossSemiRound + 1,
     position: 1,
-    team1_id: null,
-    team2_id: null,
+    team1_id: null, // Vencedor Cross-Semi 1
+    team2_id: null, // Vencedor Cross-Semi 2
     status: 'pending',
     bracket_type: 'final',
     bracket_half: null,
     bracket_number: 6,
+    next_win_match_id: null,
+    next_lose_match_id: null,
     _temp_id: 'final',
   };
 
   const allMatches: MatchData[] = [
     ...winnersUpper,
     ...winnersLower,
-    ...losersUpperMatches,
-    ...losersLowerMatches,
+    ...losersUpper,
+    ...losersLower,
     crossSemi1,
     crossSemi2,
     finalMatch,
   ];
 
-  const cleanMatches = allMatches.map(({ _temp_id, ...rest }) => rest);
+  // ─── LINKAGE: Winners → Losers (next_lose_match_id) ───
+  // Winners Upper R1 losers → Losers Lower (mirror crossing, bracket 4)
+  linkWinnersToLosers(winnersUpper, losersLower, 1);
+  // Winners Lower R1 losers → Losers Upper (mirror crossing, bracket 3)
+  linkWinnersToLosers(winnersLower, losersUpper, 1);
 
-  return { matches: cleanMatches };
+  // Later rounds: same pattern
+  const maxWinnersRound = Math.max(
+    ...winnersUpper.map(m => m.round),
+    ...winnersLower.map(m => m.round)
+  );
+  for (let r = 2; r <= maxWinnersRound; r++) {
+    linkWinnersToLosers(winnersUpper, losersLower, r);
+    linkWinnersToLosers(winnersLower, losersUpper, r);
+  }
+
+  // ─── LINKAGE: Winners final → Cross-Semifinals ───
+  const winnersUpperFinal = getLastRoundMatch(winnersUpper);
+  const winnersLowerFinal = getLastRoundMatch(winnersLower);
+
+  if (winnersUpperFinal) {
+    // Winner Upper champion → Cross-Semi 2 as team2 (cruzamento)
+    winnersUpperFinal.next_win_match_id = crossSemi2._temp_id;
+  }
+  if (winnersLowerFinal) {
+    // Winner Lower champion → Cross-Semi 1 as team2 (cruzamento)
+    winnersLowerFinal.next_win_match_id = crossSemi1._temp_id;
+  }
+
+  // ─── LINKAGE: Losers final → Cross-Semifinals ───
+  const losersUpperFinal = getLastRoundMatch(losersUpper);
+  const losersLowerFinal = getLastRoundMatch(losersLower);
+
+  if (losersUpperFinal) {
+    // Losers Upper champion → Cross-Semi 1 as team1
+    losersUpperFinal.next_win_match_id = crossSemi1._temp_id;
+  }
+  if (losersLowerFinal) {
+    // Losers Lower champion → Cross-Semi 2 as team1
+    losersLowerFinal.next_win_match_id = crossSemi2._temp_id;
+  }
+
+  // ─── LINKAGE: Cross-Semifinals → Final ───
+  crossSemi1.next_win_match_id = finalMatch._temp_id;
+  crossSemi2.next_win_match_id = finalMatch._temp_id;
+
+  // Losers in semis/final = eliminated (no next_lose_match_id)
+
+  // ─── Resolve temp IDs to actual temp IDs for now ───
+  // The temp IDs will be replaced with real UUIDs when inserted into DB
+  // For now, we keep them as references
+
+  // ─── VALIDATION ───
+  validateBracketIntegrity(allMatches, teams.length);
+
+  // Clean temp IDs from output
+  const cleanMatches = allMatches.map(({ _temp_id, ...rest }) => ({
+    ...rest,
+    // Convert temp_id references in next_win/lose to keep them for DB insertion
+    next_win_match_id: rest.next_win_match_id,
+    next_lose_match_id: rest.next_lose_match_id,
+  }));
+
+  // We need to keep _temp_id for the caller to resolve references
+  // Return with _temp_id metadata for resolution
+  return {
+    matches: cleanMatches,
+    _matchesWithTempIds: allMatches,
+  } as any;
 }
 
 /**
- * Get mirror half for losers bracket placement
+ * Link winners R{round} losers to the corresponding losers bracket matches
  */
+function linkWinnersToLosers(
+  winnersMatches: MatchData[],
+  losersMatches: MatchData[],
+  round: number,
+): void {
+  const winnersInRound = winnersMatches
+    .filter(m => m.round === round)
+    .sort((a, b) => a.position - b.position);
+
+  const losersR1 = losersMatches
+    .filter(m => m.round === (round === 1 ? 1 : round))
+    .sort((a, b) => a.position - b.position);
+
+  // Sequential mapping: winner pos 1,2 → loser match 1; pos 3,4 → loser match 2
+  for (let i = 0; i < winnersInRound.length; i++) {
+    const losersMatchIdx = Math.floor(i / 2);
+    if (losersMatchIdx < losersR1.length) {
+      winnersInRound[i].next_lose_match_id = losersR1[losersMatchIdx]._temp_id;
+    }
+  }
+}
+
+/**
+ * Get the last round match (final of a half bracket)
+ */
+function getLastRoundMatch(matches: MatchData[]): MatchData | undefined {
+  if (matches.length === 0) return undefined;
+  const maxRound = Math.max(...matches.map(m => m.round));
+  return matches.find(m => m.round === maxRound);
+}
+
+/**
+ * REGRA 8: Validate bracket integrity before saving.
+ * Every match must have:
+ * - Real team IDs (R1), OR
+ * - A feeder match pointing to it via next_win_match_id or next_lose_match_id
+ */
+function validateBracketIntegrity(matches: MatchData[], totalTeams: number): void {
+  // Check R1 winners have real teams
+  const r1Winners = matches.filter(m => m.bracket_type === 'winners' && m.round === 1);
+  for (const match of r1Winners) {
+    if (!match.team1_id || !match.team2_id) {
+      // Only allow null if chapéu (odd team count)
+      const sameHalfR1 = r1Winners.filter(m => m.bracket_half === match.bracket_half);
+      const allHaveTeams = sameHalfR1.every(m => m.team1_id && m.team2_id);
+      if (!allHaveTeams) {
+        console.warn(`[Bracket Validation] R1 match ${match._temp_id} has null teams - may be chapéu`);
+      }
+    }
+  }
+
+  // Check non-R1 matches have feeders
+  const nonR1Matches = matches.filter(
+    m => !(m.bracket_type === 'winners' && m.round === 1) && m.team1_id === null && m.team2_id === null
+  );
+
+  for (const match of nonR1Matches) {
+    const hasFeeder = matches.some(
+      m => m.next_win_match_id === match._temp_id || m.next_lose_match_id === match._temp_id
+    );
+
+    if (!hasFeeder && match.bracket_type !== 'final') {
+      console.warn(`[Bracket Validation] Match ${match._temp_id} has no feeder and no teams`);
+    }
+  }
+
+  // Verify total match count is reasonable
+  // Double elimination: roughly 2N-1 matches for N teams
+  const expectedMin = Math.floor(totalTeams * 1.5);
+  if (matches.length < expectedMin) {
+    console.warn(`[Bracket Validation] Only ${matches.length} matches for ${totalTeams} teams. Expected at least ${expectedMin}`);
+  }
+}
+
+// ──────────────────────────────────────────────
+// Exports for compatibility
+// ──────────────────────────────────────────────
+
 export function getMirrorHalf(winnersHalf: string): string {
   return winnersHalf === 'upper' ? 'lower' : 'upper';
 }

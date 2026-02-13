@@ -195,8 +195,7 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
               </button>
 
               <div className="rounded-lg border border-primary/30 bg-primary/10 p-3">
-                <p className="text-sm font-bold text-primary">Fase de Grupos</p>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-muted-foreground">
                   {teamCount} duplas inscritas
                 </p>
               </div>
@@ -321,9 +320,9 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
               {/* Phase info for non-group normal mode */}
               {bracketMode === "normal" && !useGroupStage && (
                 <div className="rounded-lg border border-border bg-secondary/50 p-3">
-                  <p className="text-sm font-bold text-primary">Fase de Grupos</p>
+                  <p className="text-sm font-bold text-primary">Eliminatória Direta</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {teamCount} duplas inscritas
+                    {teamCount} duplas inscritas — sem fase de grupos
                   </p>
                 </div>
               )}
@@ -354,9 +353,8 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                     </p>
                   </div>
                   <div className="rounded-lg border border-primary/30 bg-primary/10 p-3">
-                    <p className="text-xs text-muted-foreground">Fase inicial detectada:</p>
-                    <p className="text-sm font-bold text-primary">{getKnockoutPhase(teamCount)}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{teamCount} duplas cadastradas</p>
+                    <p className="text-sm font-bold text-primary">Chave dos Vencedores</p>
+                    <p className="text-xs text-muted-foreground mt-1">{teamCount} duplas cadastradas — início direto no chaveamento</p>
                   </div>
                 </div>
               )}

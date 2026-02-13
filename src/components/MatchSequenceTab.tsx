@@ -60,8 +60,11 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
     if (tournamentFormat === 'double_elimination') {
       // DUPLA ELIMINAÇÃO: todos os jogos de uma chave antes de avançar para outra
       const bracketOrder: Record<string, number> = {
-        'winners_upper': 1, 'winners_lower': 2, 'winners_null': 3,
-        'losers_upper': 4, 'losers_lower': 5,
+        'winners_upper': 1,   // 1º Vencedores Lado A
+        'losers_upper': 2,    // 2º Perdedores Lado A
+        'winners_lower': 3,   // 3º Vencedores Lado B
+        'losers_lower': 4,    // 4º Perdedores Lado B
+        'winners_null': 5,
         'cross_semi_upper': 6, 'cross_semi_lower': 7,
         'third_place': 8, 'final': 9, 'other': 10,
       };

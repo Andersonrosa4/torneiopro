@@ -756,6 +756,71 @@ const TournamentDetail = () => {
         return;
       }
 
+      // ── BYE AUTO-COMPLETION ──
+      // After propagation, check if any pending matches now have exactly 1 team
+      // and no more feeders will fill the empty slot (= BYE match)
+      const { data: postPropMatches } = await organizerQuery({
+        table: "matches",
+        operation: "select",
+        filters: { tournament_id: id },
+        order: [{ column: "round" }, { column: "position" }],
+      });
+      
+      if (postPropMatches) {
+        const modalityMatches = match.modality_id
+          ? (postPropMatches as typeof matches).filter(m => m.modality_id === match.modality_id)
+          : (postPropMatches as typeof matches);
+        
+        let byeProcessed = true;
+        while (byeProcessed) {
+          byeProcessed = false;
+          for (const pm of modalityMatches) {
+            if (pm.status !== 'pending') continue;
+            const hasTeam1 = !!pm.team1_id;
+            const hasTeam2 = !!pm.team2_id;
+            if (hasTeam1 === hasTeam2) continue; // Both filled or both empty — skip
+            
+            // Check if any incomplete match feeds into this one
+            const pendingFeeders = modalityMatches.filter(
+              fm => fm.status !== 'completed' && fm.id !== pm.id &&
+                (fm.next_win_match_id === pm.id || fm.next_lose_match_id === pm.id)
+            );
+            
+            if (pendingFeeders.length === 0) {
+              // No more feeders → this is a BYE, auto-complete
+              const byeWinner = pm.team1_id || pm.team2_id;
+              console.log(`[BYE] Auto-completing match ${pm.id} (${pm.bracket_type} ${pm.bracket_half} R${pm.round}P${pm.position}) → winner=${byeWinner}`);
+              
+              await organizerQuery({
+                table: "matches",
+                operation: "update",
+                data: { winner_team_id: byeWinner, status: "completed", score1: 0, score2: 0 },
+                filters: { id: pm.id },
+              });
+              pm.status = 'completed' as any;
+              pm.winner_team_id = byeWinner;
+              
+              // Propagate BYE winner forward
+              const byeAdvancement = processDoubleEliminationAdvance(modalityMatches, pm, byeWinner!, null);
+              for (const upd of [...byeAdvancement.winnerUpdates, ...byeAdvancement.loserUpdates]) {
+                await organizerQuery({
+                  table: "matches",
+                  operation: "update",
+                  data: upd.data,
+                  filters: { id: upd.matchId },
+                });
+                // Update in-memory
+                const targetMatch = modalityMatches.find(m => m.id === upd.matchId);
+                if (targetMatch) Object.assign(targetMatch, upd.data);
+                console.log(`[BYE:Propagate] → Match ${upd.matchId} (${JSON.stringify(upd.data)})`);
+              }
+              
+              byeProcessed = true; // Loop again to catch cascading BYEs
+            }
+          }
+        }
+      }
+
       toast.success("Avanço automático realizado!");
     } else {
       // Normal bracket: dynamic next-round generation

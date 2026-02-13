@@ -421,8 +421,149 @@ const GroupStageView = ({
 };
 
 /* ────────────────────────────────────────────────────
-   Normal Knockout (non-DE fallback)
+   Normal Knockout — proper tree bracket with connectors
    ──────────────────────────────────────────────────── */
+const KNOCKOUT_CARD_H = 94;
+const KNOCKOUT_CARD_GAP = 16;
+
+const NormalKnockoutConnectors = ({
+  containerRef,
+  knockoutMatches,
+}: {
+  containerRef: React.RefObject<HTMLDivElement>;
+  knockoutMatches: Match[];
+}) => {
+  const [paths, setPaths] = useState<{ d: string; completed: boolean }[]>([]);
+
+  const computePaths = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const containerRect = container.getBoundingClientRect();
+    const newPaths: { d: string; completed: boolean }[] = [];
+
+    const hasExplicitLinks = knockoutMatches.some(m => m.next_win_match_id);
+
+    const roundGroups: Record<number, Match[]> = {};
+    knockoutMatches.forEach(m => {
+      if (!roundGroups[m.round]) roundGroups[m.round] = [];
+      roundGroups[m.round].push(m);
+    });
+    Object.values(roundGroups).forEach(arr => arr.sort((a, b) => a.position - b.position));
+    const rounds = Object.keys(roundGroups).map(Number).sort((a, b) => a - b);
+
+    const drawLine = (srcId: string, dstId: string, completed: boolean) => {
+      const srcEl = container.querySelector(`[data-match-id="${srcId}"]`);
+      const dstEl = container.querySelector(`[data-match-id="${dstId}"]`);
+      if (!srcEl || !dstEl) return;
+
+      const srcR = srcEl.getBoundingClientRect();
+      const dstR = dstEl.getBoundingClientRect();
+
+      const x1 = srcR.right - containerRect.left;
+      const y1 = srcR.top + srcR.height / 2 - containerRect.top;
+      const x2 = dstR.left - containerRect.left;
+      const y2 = dstR.top + dstR.height / 2 - containerRect.top;
+
+      const midX = (x1 + x2) / 2;
+      newPaths.push({ d: `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`, completed });
+    };
+
+    if (hasExplicitLinks) {
+      for (const m of knockoutMatches) {
+        if (!m.next_win_match_id) continue;
+        const next = knockoutMatches.find(n => n.id === m.next_win_match_id);
+        if (next) drawLine(m.id, next.id, m.status === "completed");
+      }
+    } else {
+      for (let ri = 0; ri < rounds.length - 1; ri++) {
+        const currentRound = roundGroups[rounds[ri]];
+        const nextRound = roundGroups[rounds[ri + 1]];
+        if (!nextRound) continue;
+        for (let i = 0; i < currentRound.length; i++) {
+          const targetIdx = Math.floor(i / 2);
+          if (targetIdx < nextRound.length) {
+            drawLine(currentRound[i].id, nextRound[targetIdx].id, currentRound[i].status === "completed");
+          }
+        }
+      }
+    }
+
+    setPaths(newPaths);
+  }, [containerRef, knockoutMatches]);
+
+  useEffect(() => {
+    const timer = setTimeout(computePaths, 300);
+    window.addEventListener("resize", computePaths);
+    return () => { clearTimeout(timer); window.removeEventListener("resize", computePaths); };
+  }, [computePaths]);
+
+  if (paths.length === 0) return null;
+
+  return (
+    <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 0, overflow: "visible" }}>
+      {paths.map((p, i) => (
+        <path
+          key={i}
+          d={p.d}
+          fill="none"
+          stroke={p.completed ? "hsl(var(--success) / 0.45)" : "hsl(var(--primary) / 0.35)"}
+          strokeWidth="2"
+          strokeDasharray={p.completed ? "none" : "5 3"}
+        />
+      ))}
+    </svg>
+  );
+};
+
+function buildKnockoutTreePositions(knockoutMatches: Match[]) {
+  const roundGroups: Record<number, Match[]> = {};
+  knockoutMatches.forEach(m => {
+    if (!roundGroups[m.round]) roundGroups[m.round] = [];
+    roundGroups[m.round].push(m);
+  });
+  Object.values(roundGroups).forEach(arr => arr.sort((a, b) => a.position - b.position));
+  const rounds = Object.keys(roundGroups).map(Number).sort((a, b) => a - b);
+  if (rounds.length === 0) return { rounds: [], roundGroups, positions: new Map<string, number>() };
+
+  const positions = new Map<string, number>();
+  const slotH = KNOCKOUT_CARD_H + KNOCKOUT_CARD_GAP;
+  const firstRound = rounds[0];
+  roundGroups[firstRound].forEach((m, i) => { positions.set(m.id, i * slotH); });
+
+  const hasExplicitLinks = knockoutMatches.some(m => m.next_win_match_id);
+
+  for (let ri = 1; ri < rounds.length; ri++) {
+    const round = rounds[ri];
+    const roundMatches = roundGroups[round];
+    const prevRound = roundGroups[rounds[ri - 1]];
+
+    for (let mi = 0; mi < roundMatches.length; mi++) {
+      const match = roundMatches[mi];
+      let feederPositions: number[] = [];
+
+      if (hasExplicitLinks) {
+        const feeders = knockoutMatches.filter(m => m.next_win_match_id === match.id);
+        feederPositions = feeders.map(f => positions.get(f.id)).filter((p): p is number => p !== undefined);
+      }
+
+      if (feederPositions.length === 0 && prevRound) {
+        const idx1 = mi * 2;
+        const idx2 = mi * 2 + 1;
+        if (idx1 < prevRound.length) { const p = positions.get(prevRound[idx1].id); if (p !== undefined) feederPositions.push(p); }
+        if (idx2 < prevRound.length) { const p = positions.get(prevRound[idx2].id); if (p !== undefined) feederPositions.push(p); }
+      }
+
+      if (feederPositions.length > 0) {
+        positions.set(match.id, feederPositions.reduce((a, b) => a + b, 0) / feederPositions.length);
+      } else {
+        positions.set(match.id, mi * slotH);
+      }
+    }
+  }
+
+  return { rounds, roundGroups, positions };
+}
+
 const NormalKnockout = ({
   matches,
   getName,
@@ -437,13 +578,13 @@ const NormalKnockout = ({
 
   if (knockoutMatches.length === 0) return null;
 
-  const roundGroups: Record<number, Match[]> = {};
-  knockoutMatches.forEach((m) => {
-    if (!roundGroups[m.round]) roundGroups[m.round] = [];
-    roundGroups[m.round].push(m);
-  });
-  const rounds = Object.keys(roundGroups).map(Number).sort((a, b) => a - b);
+  const { rounds, roundGroups, positions } = buildKnockoutTreePositions(knockoutMatches);
+  const maxY = Math.max(0, ...Array.from(positions.values()));
+  const totalHeight = maxY + KNOCKOUT_CARD_H + 24;
   const maxRound = Math.max(...rounds);
+
+  const matchCountByRound: Record<number, number> = {};
+  knockoutMatches.forEach(m => { matchCountByRound[m.round] = (matchCountByRound[m.round] || 0) + 1; });
 
   return (
     <div className="rounded-xl border border-border bg-card/50 p-4">
@@ -451,21 +592,40 @@ const NormalKnockout = ({
         🏆 Eliminatória
       </div>
       <div ref={containerRef} className="relative overflow-x-auto">
-        <BracketConnectors containerRef={containerRef} matches={knockoutMatches} />
-        <div className="flex gap-8 relative" style={{ zIndex: 1 }}>
+        <NormalKnockoutConnectors containerRef={containerRef} knockoutMatches={knockoutMatches} />
+        <div className="flex gap-10 relative" style={{ zIndex: 1, minHeight: totalHeight }}>
           {rounds.map((round) => {
-            const roundMatches = roundGroups[round].sort((a, b) => a.position - b.position);
-            const scale = round === maxRound && roundMatches.length === 1 ? "final" : round === maxRound - 1 ? "semi" : "normal";
+            const roundMatches = roundGroups[round];
+            const matchCount = roundMatches.length;
+            const isFinal = matchCount === 1 && round === maxRound;
+            const isSemi = matchCount <= 2 && round === maxRound - 1 && !isFinal;
+            const roundLabel = getEliminationRoundLabel(round, matchCountByRound[round] || 0);
+            const scale = isFinal ? "final" : isSemi ? "semi" : "normal";
+
             return (
-              <div key={round} className="flex flex-col items-center shrink-0" style={{ minWidth: 170 }}>
-                <div className="text-[9px] uppercase font-semibold text-muted-foreground/60 mb-2">
-                  R{round}
+              <div key={round} className="flex flex-col shrink-0 relative" style={{ minWidth: 175 }}>
+                <div className={`text-[9px] uppercase font-semibold mb-3 whitespace-nowrap rounded-full px-3 py-0.5 text-center ${
+                  isFinal || isSemi ? "bg-primary/15 text-primary" : "bg-muted/50 text-muted-foreground"
+                }`}>
+                  {roundLabel}
                 </div>
-                <div className="flex flex-col justify-around gap-3 flex-1">
-                   {roundMatches.map((match) => (
-                     <MatchCard key={match.id} match={match} getName={getName} scale={scale as any} allMatches={matches} matchNumber={matchNumberMap?.get(match.id)} matchNumberMap={matchNumberMap} />
-                   ))}
-                 </div>
+                <div className="relative flex-1">
+                  {roundMatches.map((match) => {
+                    const top = positions.get(match.id) ?? 0;
+                    return (
+                      <div key={match.id} className="absolute left-0" style={{ top }}>
+                        <MatchCard
+                          match={match}
+                          getName={getName}
+                          scale={scale as any}
+                          allMatches={matches}
+                          matchNumber={matchNumberMap?.get(match.id)}
+                          matchNumberMap={matchNumberMap}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             );
           })}

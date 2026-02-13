@@ -63,16 +63,7 @@ Deno.serve(async (req) => {
       .eq("id", organizerId)
       .then(() => {});
 
-    // Allowed tables
-    const allowedTables = ["tournaments", "teams", "matches", "participants", "rankings", "organizers", "user_roles", "modalities"];
-    if (!allowedTables.includes(table)) {
-      return new Response(
-        JSON.stringify({ error: `Tabela '${table}' não permitida` }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Custom bulk operations
+    // Custom bulk operations (checked BEFORE table validation)
     if (operation === "undo_bracket") {
       const { tournament_id, modality_id } = body;
       if (!tournament_id) {
@@ -82,7 +73,6 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Step 1: Nullify FK refs
       let updateQuery = supabase.from("matches").update({ next_win_match_id: null, next_lose_match_id: null }).eq("tournament_id", tournament_id);
       if (modality_id) updateQuery = updateQuery.eq("modality_id", modality_id);
       const { error: updateErr } = await updateQuery;
@@ -90,7 +80,6 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: updateErr.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      // Step 2: Delete matches
       let deleteQuery = supabase.from("matches").delete().eq("tournament_id", tournament_id);
       if (modality_id) deleteQuery = deleteQuery.eq("modality_id", modality_id);
       const { error: deleteErr } = await deleteQuery;
@@ -101,7 +90,6 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ data: null }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Custom bulk reset results
     if (operation === "reset_results") {
       const { tournament_id, modality_id } = body;
       if (!tournament_id) {
@@ -121,6 +109,15 @@ Deno.serve(async (req) => {
       }
 
       return new Response(JSON.stringify({ data: null }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Allowed tables
+    const allowedTables = ["tournaments", "teams", "matches", "participants", "rankings", "organizers", "user_roles", "modalities"];
+    if (!allowedTables.includes(table)) {
+      return new Response(
+        JSON.stringify({ error: `Tabela '${table}' não permitida` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     let query: any;

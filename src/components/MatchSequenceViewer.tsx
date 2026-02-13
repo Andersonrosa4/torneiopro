@@ -504,7 +504,7 @@ const MatchCard = ({
       <div className="flex flex-col gap-0.5">
         {/* Team 1 */}
         <div className="flex items-center gap-1.5 min-h-[24px]">
-          <span className={`text-xs font-medium flex-1 truncate ${isCompleted && !isEditing && match.winner_team_id === match.team1_id ? "text-success font-bold" : ""}`}>
+          <span className={`text-xs flex-1 truncate ${isCompleted && !isEditing && match.winner_team_id === match.team1_id ? "text-success font-bold" : team1Name === "A definir" ? "text-muted-foreground" : "team-name"}`}>
             {team1Name}
           </span>
           {isOwner && hasTeams && !isCompleted && match.team1_id && (
@@ -521,7 +521,7 @@ const MatchCard = ({
         <span className="text-[10px] text-muted-foreground pl-0.5">vs</span>
         {/* Team 2 */}
         <div className="flex items-center gap-1.5 min-h-[24px]">
-          <span className={`text-xs font-medium flex-1 truncate ${isCompleted && !isEditing && match.winner_team_id === match.team2_id ? "text-success font-bold" : ""}`}>
+          <span className={`text-xs flex-1 truncate ${isCompleted && !isEditing && match.winner_team_id === match.team2_id ? "text-success font-bold" : team2Name === "A definir" ? "text-muted-foreground" : "team-name"}`}>
             {team2Name}
           </span>
           {isOwner && hasTeams && !isCompleted && match.team2_id && (

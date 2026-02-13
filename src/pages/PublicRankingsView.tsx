@@ -138,7 +138,7 @@ const PublicRankingsView = () => {
                     <p className="text-sm font-medium text-center text-muted-foreground mb-2">
                       2º Lugar
                     </p>
-                    <p className="text-lg font-bold text-center">
+                    <p className="text-lg text-center team-name">
                       {rankings[1].athlete_name}
                     </p>
                     <Badge variant="secondary" className="mt-3 text-base font-bold">
@@ -154,7 +154,7 @@ const PublicRankingsView = () => {
                     <p className="text-sm font-medium text-center text-primary-foreground/80 mb-2">
                       1º Lugar
                     </p>
-                    <p className="text-xl font-bold text-center text-primary-foreground">
+                    <p className="text-xl text-center team-name">
                       {rankings[0].athlete_name}
                     </p>
                     <Badge className="mt-3 text-base font-bold bg-primary-foreground text-primary">
@@ -172,7 +172,7 @@ const PublicRankingsView = () => {
                     <p className="text-sm font-medium text-center text-muted-foreground mb-2">
                       3º Lugar
                     </p>
-                    <p className="text-lg font-bold text-center">
+                    <p className="text-lg text-center team-name">
                       {rankings[2].athlete_name}
                     </p>
                     <Badge variant="secondary" className="mt-3 text-base font-bold">
@@ -212,7 +212,7 @@ const PublicRankingsView = () => {
                         {idx + 1}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium truncate">
+                        <p className="truncate team-name">
                           {ranking.athlete_name}
                         </p>
                       </div>

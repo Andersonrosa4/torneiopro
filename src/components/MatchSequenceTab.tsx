@@ -215,9 +215,9 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
                     <Badge className={`text-xs shrink-0 font-semibold border ${getBracketColor(match)}`}>
                       {getGroupId(match)}
                     </Badge>
-                    <span className="text-sm font-medium truncate">{team1Name}</span>
+                    <span className={`text-sm truncate ${team1Name === "A definir" ? "text-muted-foreground" : "team-name"}`}>{team1Name}</span>
                     <span className="text-xs text-muted-foreground">vs</span>
-                    <span className="text-sm font-medium truncate">{team2Name}</span>
+                    <span className={`text-sm truncate ${team2Name === "A definir" ? "text-muted-foreground" : "team-name"}`}>{team2Name}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">

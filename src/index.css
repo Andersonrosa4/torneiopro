@@ -167,4 +167,11 @@
     box-shadow: 0 0 30px hsl(195 85% 50% / 0.3), 0 8px 32px hsl(0 0% 0% / 0.3);
     transform: translateY(-4px);
   }
+
+  /* Team/player name styling */
+  .team-name {
+    color: #F5F7FA;
+    font-weight: 600;
+    text-shadow: 0px 0px 4px rgba(0, 0, 0, 0.7);
+  }
 }

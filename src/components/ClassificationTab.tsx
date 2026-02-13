@@ -133,7 +133,7 @@ const ClassificationTab = ({ matches, teams }: ClassificationTabProps) => {
                   {idx + 1}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium truncate">{team.name}</p>
+                  <p className="truncate team-name">{team.name}</p>
                 </div>
               </div>
 

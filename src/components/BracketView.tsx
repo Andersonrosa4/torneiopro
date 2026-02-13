@@ -113,7 +113,7 @@ const MatchCard = ({
         </div>
       )}
       <div className={`flex items-center gap-2 border-b border-border px-3 py-2 ${match.winner_team_id === match.team1_id && isCompleted ? "bg-success/10" : ""}`}>
-        <span className={`flex-1 text-sm font-medium truncate ${match.winner_team_id === match.team1_id && isCompleted ? "text-success" : p1Name === "A definir" ? "text-muted-foreground" : ""}`}>
+        <span className={`flex-1 text-sm truncate ${match.winner_team_id === match.team1_id && isCompleted ? "text-success font-bold" : p1Name === "A definir" ? "text-muted-foreground" : "team-name"}`}>
           {p1Name}
         </span>
         {canScore ? (
@@ -131,7 +131,7 @@ const MatchCard = ({
         )}
       </div>
       <div className={`flex items-center gap-2 px-3 py-2 ${match.winner_team_id === match.team2_id && isCompleted ? "bg-success/10" : ""}`}>
-        <span className={`flex-1 text-sm font-medium truncate ${match.winner_team_id === match.team2_id && isCompleted ? "text-success" : p2Name === "A definir" ? "text-muted-foreground" : ""}`}>
+        <span className={`flex-1 text-sm truncate ${match.winner_team_id === match.team2_id && isCompleted ? "text-success font-bold" : p2Name === "A definir" ? "text-muted-foreground" : "team-name"}`}>
           {p2Name}
         </span>
         {canScore ? (

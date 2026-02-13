@@ -2,6 +2,7 @@ import { useMemo, useRef, useEffect, useState, useCallback } from "react";
 import { Trophy, ChevronRight, ChevronLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { getSlotFeeders } from "@/lib/feederLabels";
+import { schedulerSequence } from "@/lib/roundScheduler";
 
 interface Participant {
   id: string;
@@ -45,11 +46,13 @@ const MatchCard = ({
   getName,
   scale = "normal",
   allMatches,
+  matchNumber,
 }: {
   match: Match;
   getName: (id: string | null) => string;
   scale?: "small" | "normal" | "semi" | "final";
   allMatches?: Match[];
+  matchNumber?: number;
 }) => {
   const isCompleted = match.status === "completed";
   const t1Win = match.winner_team_id === match.team1_id && isCompleted;
@@ -86,6 +89,12 @@ const MatchCard = ({
       data-match-id={match.id}
       className={`rounded-lg border bg-card/90 backdrop-blur-sm shrink-0 transition-all ${sizeClasses[scale]} ${borderClasses}`}
     >
+      {/* Match number label */}
+      {matchNumber != null && (
+        <div className="px-2 pt-1 text-[8px] font-semibold text-muted-foreground/70 leading-none">
+          Jogo {matchNumber}
+        </div>
+      )}
       {scale === "final" && (
         <div className="flex items-center justify-center gap-1 rounded-t-lg bg-gradient-primary px-2 py-0.5 text-[9px] font-bold text-primary-foreground tracking-wider">
           <Trophy className="h-2.5 w-2.5" /> GRANDE FINAL
@@ -231,6 +240,7 @@ const BracketColumn = ({
   colorAccent,
   reversed,
   allMatches,
+  matchNumberMap,
 }: {
   bracketMatches: Match[];
   getName: (id: string | null) => string;
@@ -239,6 +249,7 @@ const BracketColumn = ({
   colorAccent: string;
   reversed?: boolean;
   allMatches: Match[];
+  matchNumberMap?: Map<string, number>;
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -277,7 +288,7 @@ const BracketColumn = ({
                 </div>
                 <div className="flex flex-col justify-around gap-3 flex-1">
                    {roundMatches.map((match) => (
-                     <MatchCard key={match.id} match={match} getName={getName} scale={getScale(round)} allMatches={allMatches} />
+                     <MatchCard key={match.id} match={match} getName={getName} scale={getScale(round)} allMatches={allMatches} matchNumber={matchNumberMap?.get(match.id)} />
                    ))}
                  </div>
               </div>
@@ -297,11 +308,13 @@ const CenterColumn = ({
   finalMatches,
   getName,
   allMatches,
+  matchNumberMap,
 }: {
   crossSemis: Match[];
   finalMatches: Match[];
   getName: (id: string | null) => string;
   allMatches: Match[];
+  matchNumberMap?: Map<string, number>;
 }) => {
   if (crossSemis.length === 0 && finalMatches.length === 0) return null;
 
@@ -320,7 +333,7 @@ const CenterColumn = ({
                 <div className="text-[9px] text-center text-muted-foreground/60 font-medium">
                   Semi {i + 1}
                 </div>
-                <MatchCard match={m} getName={getName} scale="semi" allMatches={allMatches} />
+                <MatchCard match={m} getName={getName} scale="semi" allMatches={allMatches} matchNumber={matchNumberMap?.get(m.id)} />
               </div>
             ))}
         </div>
@@ -333,7 +346,7 @@ const CenterColumn = ({
 
       {/* Final */}
       {finalMatches.map((m) => (
-        <MatchCard key={m.id} match={m} getName={getName} scale="final" allMatches={allMatches} />
+        <MatchCard key={m.id} match={m} getName={getName} scale="final" allMatches={allMatches} matchNumber={matchNumberMap?.get(m.id)} />
       ))}
     </div>
   );
@@ -407,9 +420,11 @@ const GroupStageView = ({
 const NormalKnockout = ({
   matches,
   getName,
+  matchNumberMap,
 }: {
   matches: Match[];
   getName: (id: string | null) => string;
+  matchNumberMap?: Map<string, number>;
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const knockoutMatches = matches.filter((m) => m.round > 0);
@@ -442,7 +457,7 @@ const NormalKnockout = ({
                 </div>
                 <div className="flex flex-col justify-around gap-3 flex-1">
                    {roundMatches.map((match) => (
-                     <MatchCard key={match.id} match={match} getName={getName} scale={scale as any} allMatches={matches} />
+                     <MatchCard key={match.id} match={match} getName={getName} scale={scale as any} allMatches={matches} matchNumber={matchNumberMap?.get(match.id)} />
                    ))}
                  </div>
               </div>
@@ -463,6 +478,19 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
     return participants.find((p) => p.id === id)?.name || "A definir";
   };
 
+  // Build global match numbering from scheduler sequence
+  const matchNumberMap = useMemo(() => {
+    const seq = schedulerSequence(matches);
+    const map = new Map<string, number>();
+    seq.forEach((m, i) => map.set(m.id, i + 1));
+    // Also number group stage matches not in scheduler
+    let next = map.size + 1;
+    for (const m of matches) {
+      if (!map.has(m.id)) map.set(m.id, next++);
+    }
+    return map;
+  }, [matches]);
+
   const groupMatches = useMemo(() => matches.filter((m) => m.round === 0), [matches]);
   const hasGroupStage = groupMatches.length > 0;
   const hasElimination = useMemo(() => matches.some((m) => m.round > 0), [matches]);
@@ -471,7 +499,6 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
   const { winnersA, winnersB, losersA, losersB, semiFinals, finalMatches, isDoubleElimination } = useMemo(() => {
     const wA = matches.filter((m) => m.bracket_type === "winners" && m.bracket_half === "upper");
     const wB = matches.filter((m) => m.bracket_type === "winners" && m.bracket_half === "lower");
-    // Losers: mirror crossing display
     const lA = matches.filter((m) => m.bracket_type === "losers" && m.bracket_half === "lower");
     const lB = matches.filter((m) => m.bracket_type === "losers" && m.bracket_half === "upper");
     const sf = matches.filter((m) => m.bracket_type === "semi_final");
@@ -516,6 +543,7 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
                 colorAccent="border-primary/20 bg-primary/[0.03]"
                 reversed={false}
                 allMatches={matches}
+                matchNumberMap={matchNumberMap}
               />
               <BracketColumn
                 bracketMatches={winnersB}
@@ -525,6 +553,7 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
                 colorAccent="border-primary/15 bg-primary/[0.02]"
                 reversed={false}
                 allMatches={matches}
+                matchNumberMap={matchNumberMap}
               />
             </div>
 
@@ -535,7 +564,7 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
                   Fase Final
                 </span>
               </div>
-              <CenterColumn crossSemis={semiFinals} finalMatches={finalMatches} getName={getName} allMatches={matches} />
+              <CenterColumn crossSemis={semiFinals} finalMatches={finalMatches} getName={getName} allMatches={matches} matchNumberMap={matchNumberMap} />
             </div>
 
             {/* ── RIGHT: Losers (R → L) ── */}
@@ -553,6 +582,7 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
                 colorAccent="border-destructive/15 bg-destructive/[0.03]"
                 reversed={true}
                 allMatches={matches}
+                matchNumberMap={matchNumberMap}
               />
               <BracketColumn
                 bracketMatches={losersB}
@@ -562,6 +592,7 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
                 colorAccent="border-destructive/10 bg-destructive/[0.02]"
                 reversed={true}
                 allMatches={matches}
+                matchNumberMap={matchNumberMap}
               />
             </div>
           </div>
@@ -578,7 +609,7 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
 
       {/* Normal Knockout (non-DE) */}
       {!isDoubleElimination && hasElimination && (
-        <NormalKnockout matches={matches.filter(m => m.round > 0)} getName={getName} />
+        <NormalKnockout matches={matches.filter(m => m.round > 0)} getName={getName} matchNumberMap={matchNumberMap} />
       )}
     </div>
   );

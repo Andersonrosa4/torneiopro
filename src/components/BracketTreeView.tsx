@@ -43,6 +43,13 @@ interface BracketTreeViewProps {
 }
 
 /* ────────────────────────────────────────────────────
+   Helper: Convert number to letter (1→A, 2→B, etc)
+   ──────────────────────────────────────────────────── */
+const numberToLetter = (num: number): string => {
+  return String.fromCharCode(64 + num); // A=65, so 64+1=65
+};
+
+/* ────────────────────────────────────────────────────
    Match Card — compact, status-aware, with feeder labels
    ──────────────────────────────────────────────────── */
 const MatchCard = ({
@@ -515,8 +522,8 @@ function buildGroupKnockoutPreview(groupNumbers: number[]) {
       
       firstRound.push({
         id: `knockout-0-${i}`,
-        label1: `${seed1}º Grupo ${g1}`,
-        label2: `${seed2}º Grupo ${g2}`,
+        label1: `${seed1}º Grupo ${numberToLetter(g1)}`,
+        label2: `${seed2}º Grupo ${numberToLetter(g2)}`,
         scale: rounds[0].scale,
       });
     }
@@ -612,7 +619,7 @@ const GroupStageView = ({
               key={gNum}
               bracketMatches={gMatches}
               getName={getName}
-              label={`Grupo ${gNum}`}
+              label={`Grupo ${numberToLetter(gNum)}`}
               icon="⚽"
               colorAccent="border-primary/20 bg-primary/[0.03]"
               reversed={false}

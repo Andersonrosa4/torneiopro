@@ -446,19 +446,17 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
   const hasElimination = useMemo(() => matches.some((m) => m.round > 0), [matches]);
 
   // Categorize matches for DE layout
-  const { winnersA, winnersB, losersA, losersB, crossSemis, finalMatches, isDoubleElimination } = useMemo(() => {
+  const { winnersA, winnersB, losersA, losersB, semiFinals, finalMatches, isDoubleElimination } = useMemo(() => {
     const wA = matches.filter((m) => m.bracket_type === "winners" && m.bracket_half === "upper");
     const wB = matches.filter((m) => m.bracket_type === "winners" && m.bracket_half === "lower");
     // Losers: mirror crossing display
-    // bracket_half='lower' = receives losers from Winners Upper = displayed as "Perdedores A"
-    // bracket_half='upper' = receives losers from Winners Lower = displayed as "Perdedores B"
     const lA = matches.filter((m) => m.bracket_type === "losers" && m.bracket_half === "lower");
     const lB = matches.filter((m) => m.bracket_type === "losers" && m.bracket_half === "upper");
-    const cs = matches.filter((m) => m.bracket_type === "cross_semi");
+    const sf = matches.filter((m) => m.bracket_type === "semi_final");
     const f = matches.filter((m) => m.bracket_type === "final");
-    const isDE = wA.length > 0 || wB.length > 0 || cs.length > 0;
+    const isDE = wA.length > 0 || wB.length > 0 || sf.length > 0;
 
-    return { winnersA: wA, winnersB: wB, losersA: lA, losersB: lB, crossSemis: cs, finalMatches: f, isDoubleElimination: isDE };
+    return { winnersA: wA, winnersB: wB, losersA: lA, losersB: lB, semiFinals: sf, finalMatches: f, isDoubleElimination: isDE };
   }, [matches]);
 
   if (!hasGroupStage && !hasElimination) {
@@ -515,7 +513,7 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
                   Fase Final
                 </span>
               </div>
-              <CenterColumn crossSemis={crossSemis} finalMatches={finalMatches} getName={getName} />
+              <CenterColumn crossSemis={semiFinals} finalMatches={finalMatches} getName={getName} />
             </div>
 
             {/* ── RIGHT: Losers (R → L) ── */}

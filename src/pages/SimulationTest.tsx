@@ -78,7 +78,7 @@ const SimulationTest = () => {
 
       const sortedMatches = [...allMatches].sort((a, b) => {
         if (a.round !== b.round) return a.round - b.round;
-        const bracketOrder = { winners: 0, losers: 1, cross_semi: 2, final: 3 };
+        const bracketOrder = { winners: 0, losers: 1, semi_final: 2, final: 3 };
         const orderA = bracketOrder[a.bracket_type as keyof typeof bracketOrder] ?? 4;
         const orderB = bracketOrder[b.bracket_type as keyof typeof bracketOrder] ?? 4;
         if (orderA !== orderB) return orderA - orderB;
@@ -107,7 +107,7 @@ const SimulationTest = () => {
         if (match.bracket_type === 'final') {
           podiumData.push({ place: '🥇 Campeão', team: winnerName });
           podiumData.push({ place: '🥈 Vice-campeão', team: loserName });
-        } else if (match.bracket_type === 'cross_semi') {
+        } else if (match.bracket_type === 'semi_final') {
           const count3rd = podiumData.filter(f => f.place === '🥉 Terceiro lugar').length;
           if (count3rd === 0) {
             podiumData.push({ place: '🥉 Terceiro lugar', team: loserName });
@@ -221,7 +221,7 @@ const SimulationTest = () => {
                   {data.events
                     .filter(e => e.round === round)
                     .sort((a, b) => {
-                      const bracketOrder = { winners: 0, losers: 1, cross_semi: 2, final: 3 };
+                      const bracketOrder = { winners: 0, losers: 1, semi_final: 2, final: 3 };
                       const orderA = bracketOrder[a.bracket as keyof typeof bracketOrder] ?? 4;
                       const orderB = bracketOrder[b.bracket as keyof typeof bracketOrder] ?? 4;
                       if (orderA !== orderB) return orderA - orderB;
@@ -237,7 +237,7 @@ const SimulationTest = () => {
                             >
                               {event.bracket === 'winners' && '👑 Vencedores'}
                               {event.bracket === 'losers' && '⬇️ Perdedores'}
-                              {event.bracket === 'cross_semi' && '⚔️ Semi-final'}
+                              {event.bracket === 'semi_final' && '⚔️ Semifinal'}
                               {event.bracket === 'final' && '🏅 Final'}
                             </Badge>
                             <span className="text-xs text-muted-foreground">Posição {event.position}</span>

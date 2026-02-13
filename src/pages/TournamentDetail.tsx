@@ -605,7 +605,7 @@ const TournamentDetail = () => {
     });
 
     // Determine if this is a double elimination bracket
-    const isDoubleElimination = matches.some(m => m.bracket_type === 'losers' || m.bracket_type === 'final' || m.bracket_type === 'cross_semi');
+    const isDoubleElimination = matches.some(m => m.bracket_type === 'losers' || m.bracket_type === 'final' || m.bracket_type === 'semi_final');
 
     if (isDoubleElimination) {
       // Use new advancement logic

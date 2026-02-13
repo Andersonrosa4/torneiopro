@@ -847,15 +847,27 @@ const TournamentDetail = () => {
             // GROUP STAGE completed → auto-generate knockout
             await generateKnockoutFromGroups();
           } else {
-            // GUARD: Check if next round already exists (prevent duplicates)
+            // KNOCKOUT round completed → generate next round
             const nextRound = currentRound + 1;
-            const existingNextRound = relevantMatches.filter((m: any) => m.round === nextRound);
+            
+            // FRESH CHECK: Query DB right before insert to prevent race-condition duplicates
+            const { data: freshCheckMatches } = await organizerQuery({
+              table: "matches",
+              operation: "select",
+              filters: { tournament_id: id },
+              order: [{ column: "round" }, { column: "position" }],
+            });
+            
+            const freshRelevant = freshCheckMatches
+              ? (modalityId ? freshCheckMatches.filter((m: any) => m.modality_id === modalityId) : freshCheckMatches)
+              : [];
+            const existingNextRound = (freshRelevant as any[]).filter((m: any) => m.round === nextRound);
             
             if (existingNextRound.length > 0) {
               console.log(`[NextRound] Round ${nextRound} already exists (${existingNextRound.length} matches), skipping generation.`);
             } else {
-              // KNOCKOUT round completed → generate next round
-              const winners = roundMatches
+              const freshRoundMatches = (freshRelevant as any[]).filter((m: any) => m.round === currentRound);
+              const winners = freshRoundMatches
                 .filter((m: any) => m.winner_team_id)
                 .map((m: any) => m.winner_team_id as string);
 

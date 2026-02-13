@@ -603,14 +603,23 @@ const TournamentDetail = () => {
     const match = matches.find((m) => m.id === matchId);
     if (!match || !id) return;
 
-    // Validate round order for double elimination
+    // Validate round order for double elimination — use FRESH data from DB
     const isDE = matches.some(m => m.bracket_type === 'losers' || m.bracket_type === 'final' || m.bracket_type === 'semi_final');
     if (isDE) {
-      const { validateMatchStart } = await import("@/lib/roundScheduler");
-      const violation = validateMatchStart(matchId, matches as any);
-      if (violation) {
-        toast.error(`⚠️ ${violation}`);
-        return;
+      // Fetch latest match statuses to avoid stale-state blocking
+      const { data: freshMatches } = await supabase
+        .from("matches")
+        .select("*")
+        .eq("tournament_id", id);
+      
+      if (freshMatches && freshMatches.length > 0) {
+        const { validateMatchStart } = await import("@/lib/roundScheduler");
+        const violation = validateMatchStart(matchId, freshMatches as any);
+        if (violation) {
+          toast.error(`⚠️ ${violation}`);
+          fetchData(); // Sync UI with fresh data
+          return;
+        }
       }
     }
 

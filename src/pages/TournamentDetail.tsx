@@ -1284,7 +1284,20 @@ const TournamentDetail = () => {
               )}
 
               {isOwner && filteredMatches.length > 0 && (
-                <div className="mb-4 flex justify-end">
+                <div className="mb-4 flex justify-end gap-2">
+                  {(() => {
+                    const groupMatches = filteredMatches.filter((m: any) => m.round === 0);
+                    const knockoutMatches = filteredMatches.filter((m: any) => m.round > 0);
+                    const allGroupsDone = groupMatches.length > 0 && groupMatches.every((m: any) => m.status === "completed");
+                    if (allGroupsDone && knockoutMatches.length === 0) {
+                      return (
+                        <Button size="sm" className="gap-1 bg-gradient-primary text-primary-foreground" onClick={generateKnockoutFromGroups}>
+                          <Trophy className="h-4 w-4" /> Gerar Mata-Mata
+                        </Button>
+                      );
+                    }
+                    return null;
+                  })()}
                   <Button variant="destructive" size="sm" className="gap-1" onClick={undoBracket}>
                     <Undo2 className="h-4 w-4" /> Desfazer Chaveamento
                   </Button>

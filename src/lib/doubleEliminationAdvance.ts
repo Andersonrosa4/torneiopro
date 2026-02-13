@@ -28,7 +28,14 @@ interface Match {
 }
 
 export function getMirrorHalf(winnersHalf: string): string {
+  // STRICT: losers side MUST be opposite of winners side
+  if (winnersHalf === 'upper') return 'lower';
+  if (winnersHalf === 'lower') return 'upper';
   return winnersHalf === 'upper' ? 'lower' : 'upper';
+}
+
+function oppositeSide(side: string): string {
+  return side === 'upper' ? 'lower' : 'upper';
 }
 
 /**
@@ -114,10 +121,25 @@ export function processDoubleEliminationAdvance(
     }
   }
 
-  // ── LOSER PLACEMENT ──
+  // ── LOSER PLACEMENT — MIRROR CROSSING ENFORCED ──
   if (loserId && currentMatch.next_lose_match_id) {
     const nextLoseMatch = matches.find(m => m.id === currentMatch.next_lose_match_id);
     if (nextLoseMatch) {
+      // VALIDATE: If current match is winners, losers target MUST be opposite side
+      if (currentMatch.bracket_type === 'winners' && currentMatch.bracket_half && nextLoseMatch.bracket_half) {
+        const expectedSide = oppositeSide(currentMatch.bracket_half);
+        if (nextLoseMatch.bracket_half !== expectedSide) {
+          console.error(
+            `[❌ MIRROR VIOLATION at runtime] Winners ${currentMatch.bracket_half} R${currentMatch.round}P${currentMatch.position} ` +
+            `→ Losers ${nextLoseMatch.bracket_half} (expected ${expectedSide}). Blocking placement.`
+          );
+          return result; // Block invalid placement
+        }
+        console.log(
+          `[✓ Mirror Route] Winners ${currentMatch.bracket_half} → Losers ${nextLoseMatch.bracket_half} (correct)`
+        );
+      }
+
       let slot = determineSlotInNextMatch(currentMatch, nextLoseMatch, false);
 
       // Anti-repetition check for losers bracket R1-R2
@@ -126,7 +148,6 @@ export function processDoubleEliminationAdvance(
         const existingOpponent = nextLoseMatch[oppositeSlot];
 
         if (existingOpponent && haveTeamsPlayedBefore(matches, loserId, existingOpponent)) {
-          // Try to find an alternative slot in adjacent matches
           const altSlot = findAntiRepetitionAlternative(
             matches, nextLoseMatch, loserId, slot
           );
@@ -248,10 +269,17 @@ function processLegacyAdvancement(
       }
     }
 
-    // Loser → mirror losers bracket
+    // Loser → mirror losers bracket (STRICT: oppositeSide)
     if (loserId && bh) {
-      const mirrorBN = bh === 'upper' ? 4 : 3;
+      const mirrorHalf = oppositeSide(bh);
+      const mirrorBN = bh === 'upper' ? 4 : 3; // upper→4(losers lower), lower→3(losers upper)
       const losersInMirror = matches.filter(m => m.bracket_type === 'losers' && m.bracket_number === mirrorBN);
+      
+      // Validate mirror routing
+      if (losersInMirror.length > 0 && losersInMirror[0].bracket_half !== mirrorHalf) {
+        console.error(`[❌ Legacy Mirror] Expected losers half=${mirrorHalf}, found=${losersInMirror[0].bracket_half}`);
+      }
+      
       const targetRound = currentMatch.round === 1 ? 1 : currentMatch.round;
       const targetMatches = losersInMirror.filter(m => m.round === targetRound).sort((a, b) => a.position - b.position);
 

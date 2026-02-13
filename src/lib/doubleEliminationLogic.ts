@@ -69,6 +69,14 @@ export interface GeneratedBracket {
 }
 
 // ──────────────────────────────────────────────
+// Mirror Crossing Helper — MANDATORY
+// ──────────────────────────────────────────────
+
+function oppositeSide(side: 'upper' | 'lower'): 'upper' | 'lower' {
+  return side === 'upper' ? 'lower' : 'upper';
+}
+
+// ──────────────────────────────────────────────
 // Utilities
 // ──────────────────────────────────────────────
 
@@ -405,11 +413,16 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
   const totalWinnersMatches = winnersUpper.length + winnersLower.length;
   console.log(`[DE:Winners] Upper=${winnersUpper.length}, Lower=${winnersLower.length}, Total=${totalWinnersMatches}`);
 
-  // 2. Losers brackets — feeders do lado OPOSTO (mirror crossing)
-  //    Winners Upper (A) → Losers Lower (B)
-  //    Winners Lower (B) → Losers Upper (A)
-  const losersUpper = buildLosersBracketWithFeeders(winnersLower, tournamentId, modalityId, 'upper', 3);
-  const losersLower = buildLosersBracketWithFeeders(winnersUpper, tournamentId, modalityId, 'lower', 4);
+  // 2. Losers brackets — MIRROR CROSSING OBRIGATÓRIO
+  //    oppositeSide('upper') = 'lower' → Winners A feeds Losers B
+  //    oppositeSide('lower') = 'upper' → Winners B feeds Losers A
+  const losersDestinationForA = oppositeSide('upper'); // = 'lower' (Losers B)
+  const losersDestinationForB = oppositeSide('lower'); // = 'upper' (Losers A)
+
+  console.log(`[Mirror Routing] Winners A (upper) → Losers ${losersDestinationForA} | Winners B (lower) → Losers ${losersDestinationForB}`);
+
+  const losersUpper = buildLosersBracketWithFeeders(winnersLower, tournamentId, modalityId, losersDestinationForB, 3);
+  const losersLower = buildLosersBracketWithFeeders(winnersUpper, tournamentId, modalityId, losersDestinationForA, 4);
 
   const totalLosersMatches = losersUpper.length + losersLower.length;
   console.log(`[DE:Losers] Upper=${losersUpper.length}, Lower=${losersLower.length}, Total=${totalLosersMatches}`);
@@ -478,9 +491,10 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
     }
   };
 
-  // ── VALIDAÇÃO 2: Mirror Crossing Obrigatório ──
+  // ── VALIDAÇÃO 2: Mirror Crossing Obrigatório — HARD BLOCK ──
   const validateMirrorCrossing = () => {
     const violations: string[] = [];
+    let routedCount = 0;
     
     for (const m of allMatches) {
       if (m.bracket_type !== 'winners') continue;
@@ -489,24 +503,34 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
       const losersTarget = allMatches.find(lm => lm._temp_id === m.next_lose_match_id);
       if (!losersTarget || losersTarget.bracket_type !== 'losers') continue;
 
-      // Mirror Crossing: Winners A (upper) → Losers B (lower), Winners B (lower) → Losers A (upper)
-      if (m.bracket_half === 'upper' && losersTarget.bracket_half !== 'lower') {
-        violations.push(
-          `Winners A (upper) sem rota para Losers B (lower): encontrado Losers ${losersTarget.bracket_half || 'null'}`
-        );
-      }
+      const winnerSide = m.bracket_half as 'upper' | 'lower';
+      const expectedLoserSide = oppositeSide(winnerSide);
+      const actualLoserSide = losersTarget.bracket_half;
 
-      if (m.bracket_half === 'lower' && losersTarget.bracket_half !== 'upper') {
+      // Per-match log
+      console.log(
+        `[Mirror Route] Match ${m._temp_id.slice(0, 8)} | ` +
+        `Winners ${winnerSide} R${m.round}P${m.position} → ` +
+        `Losers ${actualLoserSide} R${losersTarget.round}P${losersTarget.position} | ` +
+        `Expected: ${expectedLoserSide} | ${actualLoserSide === expectedLoserSide ? '✓' : '❌ VIOLATION'}`
+      );
+
+      // STRICT: loser side MUST be opposite of winner side
+      if (actualLoserSide !== expectedLoserSide) {
         violations.push(
-          `Winners B (lower) sem rota para Losers A (upper): encontrado Losers ${losersTarget.bracket_half || 'null'}`
+          `Winners ${winnerSide} R${m.round}P${m.position} → Losers ${actualLoserSide} (expected ${expectedLoserSide})`
         );
       }
+      routedCount++;
     }
 
     if (violations.length > 0) {
-      throw new Error(`[❌ Mirror Crossing] Violações detectadas:\n${violations.join('\n')}`);
+      throw new Error(
+        `[❌ MIRROR CROSSING BLOCKED] ${violations.length} violation(s) detected. ` +
+        `Bracket generation ABORTED.\n${violations.join('\n')}`
+      );
     }
-    console.log(`[✓ Mirror Crossing] Validado: Winners A→Losers B, Winners B→Losers A`);
+    console.log(`[✓ Mirror Crossing] ${routedCount} routes validated: Winners A→Losers B, Winners B→Losers A`);
   };
 
   // ── VALIDAÇÃO 3: Integridade de Feeders ──
@@ -617,7 +641,8 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
 // ──────────────────────────────────────────────
 
 export function getMirrorHalf(winnersHalf: string): string {
-  return winnersHalf === 'upper' ? 'lower' : 'upper';
+  // STRICT mirror: always return opposite side
+  return oppositeSide(winnersHalf as 'upper' | 'lower');
 }
 
 export function canTeamsMeet(): boolean {

@@ -249,23 +249,29 @@ const TournamentDetail = () => {
     useIndex: boolean;
     numIndexTeams?: number;
   }) => {
-
-    // Delete only matches for the current modality
-    if (selectedModality) {
-      const modalityMatches = matches.filter(m => m.modality_id === selectedModality.id);
-      for (const m of modalityMatches) {
-        await organizerQuery({ table: "matches", operation: "delete", filters: { id: m.id } });
+    try {
+      // VALIDATION: Check minimum team count
+      if (filteredTeams.length < 2) {
+        toast.error("❌ Erro: Cadastre pelo menos 2 duplas antes de gerar o chaveamento.");
+        return;
       }
-    } else {
-      await organizerQuery({ table: "matches", operation: "delete", filters: { tournament_id: id } });
-    }
 
-    await organizerQuery({
-      table: "tournaments",
-      operation: "update",
-      data: { num_sets: config.numSets, games_per_set: config.gamesPerSet || null },
-      filters: { id },
-    });
+      // Delete only matches for the current modality
+      if (selectedModality) {
+        const modalityMatches = matches.filter(m => m.modality_id === selectedModality.id);
+        for (const m of modalityMatches) {
+          await organizerQuery({ table: "matches", operation: "delete", filters: { id: m.id } });
+        }
+      } else {
+        await organizerQuery({ table: "matches", operation: "delete", filters: { tournament_id: id } });
+      }
+
+      await organizerQuery({
+        table: "tournaments",
+        operation: "update",
+        data: { num_sets: config.numSets, games_per_set: config.gamesPerSet || null },
+        filters: { id },
+      });
 
     const currentModalityId = selectedModality?.id || null;
 
@@ -329,16 +335,21 @@ const TournamentDetail = () => {
       fetchData();
     } else if (config.bracketMode === "double_elimination") {
       // === DOUBLE ELIMINATION ===
-      const result = generateDoubleEliminationBracket({
-        tournamentId: id!,
-        modalityId: currentModalityId || "",
-        teams: filteredTeams.map(t => ({ id: t.id, player1_name: t.player1_name, player2_name: t.player2_name, seed: t.seed })),
-        useSeeds: config.useSeeds,
-        seedTeamIds: config.seedTeamIds,
-        sideATeamIds: (config as any).sideATeamIds,
-        sideBTeamIds: (config as any).sideBTeamIds,
-        allowThirdPlace: false,
-      });
+      let result;
+      try {
+        result = generateDoubleEliminationBracket({
+          tournamentId: id!,
+          modalityId: currentModalityId || "",
+          teams: filteredTeams.map(t => ({ id: t.id, player1_name: t.player1_name, player2_name: t.player2_name, seed: t.seed })),
+          useSeeds: config.useSeeds,
+          seedTeamIds: config.seedTeamIds,
+          sideATeamIds: (config as any).sideATeamIds,
+          sideBTeamIds: (config as any).sideBTeamIds,
+          allowThirdPlace: false,
+        });
+      } catch (bracketError: any) {
+        throw new Error(`Erro ao gerar estrutura de dupla eliminação: ${bracketError.message}`);
+      }
 
       // Add modality_id to all matches
       const matchesWithModality = result.matches.map(m => ({
@@ -346,8 +357,9 @@ const TournamentDetail = () => {
         modality_id: currentModalityId,
       }));
 
+      const matchCount = matchesWithModality.length;
       const { error } = await organizerQuery({ table: "matches", operation: "insert", data: matchesWithModality });
-      if (error) { toast.error(error.message); return; }
+      if (error) { throw new Error(`Erro ao salvar partidas: ${error.message}`); }
 
       // Re-fetch to get IDs then advance BYEs
       const { data: insertedMatches } = await organizerQuery({
@@ -381,7 +393,7 @@ const TournamentDetail = () => {
         data: { status: "in_progress" },
         filters: { id },
       });
-      toast.success("Dupla Eliminação gerada! Winners e Losers brackets criados.");
+      toast.success(`✅ Dupla Eliminação gerada! ${matchCount} partidas criadas.`);
       fetchData();
     } else {
       // === NORMAL KNOCKOUT (structured phases) ===
@@ -442,7 +454,7 @@ const TournamentDetail = () => {
       }
 
       const { error } = await organizerQuery({ table: "matches", operation: "insert", data: newMatches });
-      if (error) { toast.error(error.message); return; }
+      if (error) { throw new Error(`Erro ao salvar partidas: ${error.message}`); }
 
       // Re-fetch matches to get IDs for bye advancement
       const { data: insertedMatches } = await organizerQuery({
@@ -480,8 +492,12 @@ const TournamentDetail = () => {
         data: { status: "in_progress" },
         filters: { id },
       });
-      toast.success("Chaveamento gerado!");
+      toast.success(`✅ Chaveamento gerado! ${newMatches.length} partidas criadas.`);
       fetchData();
+    }
+    } catch (error: any) {
+      console.error("[generateBracket] Error:", error);
+      toast.error(`❌ Erro ao gerar chaveamento: ${error?.message || "Erro desconhecido"}`);
     }
   };
 

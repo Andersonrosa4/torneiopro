@@ -731,32 +731,38 @@ const TournamentDetail = () => {
         const allRoundDone = roundMatches.every((m: any) => m.status === "completed");
 
         if (allRoundDone) {
-          const winners = roundMatches
-            .filter((m: any) => m.winner_team_id)
-            .map((m: any) => m.winner_team_id as string);
+          if (currentRound === 0) {
+            // GROUP STAGE completed → auto-generate knockout
+            await generateKnockoutFromGroups();
+          } else {
+            // KNOCKOUT round completed → generate next round
+            const winners = roundMatches
+              .filter((m: any) => m.winner_team_id)
+              .map((m: any) => m.winner_team_id as string);
 
-          if (winners.length >= 2) {
-            const nextRound = currentRound + 1;
-            const nextMatches: any[] = [];
-            const pairCount = Math.floor(winners.length / 2);
+            if (winners.length >= 2) {
+              const nextRound = currentRound + 1;
+              const nextMatches: any[] = [];
+              const pairCount = Math.floor(winners.length / 2);
 
-            for (let i = 0; i < pairCount; i++) {
-              nextMatches.push({
-                tournament_id: id,
-                round: nextRound,
-                position: i + 1,
-                team1_id: winners[i * 2],
-                team2_id: winners[i * 2 + 1],
-                status: "pending",
-                bracket_number: match.bracket_number || 1,
-                modality_id: modalityId,
-              });
+              for (let i = 0; i < pairCount; i++) {
+                nextMatches.push({
+                  tournament_id: id,
+                  round: nextRound,
+                  position: i + 1,
+                  team1_id: winners[i * 2],
+                  team2_id: winners[i * 2 + 1],
+                  status: "pending",
+                  bracket_number: match.bracket_number || 1,
+                  modality_id: modalityId,
+                });
+              }
+
+              await organizerQuery({ table: "matches", operation: "insert", data: nextMatches });
+              toast.success(`Próxima fase gerada! ${nextMatches.length} partida(s) criada(s).`);
+            } else if (winners.length === 1) {
+              toast.success("🏆 Torneio finalizado! Campeão definido!");
             }
-
-            await organizerQuery({ table: "matches", operation: "insert", data: nextMatches });
-            toast.success(`Próxima fase gerada! ${nextMatches.length} partida(s) criada(s).`);
-          } else if (winners.length === 1) {
-            toast.success("🏆 Torneio finalizado! Campeão definido!");
           }
         }
       }

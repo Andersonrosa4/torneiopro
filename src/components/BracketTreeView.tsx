@@ -1,11 +1,12 @@
 import { useMemo, useRef, useEffect, useState, useCallback } from "react";
-import { Trophy, ChevronRight, ChevronLeft, LayoutGrid, List } from "lucide-react";
+import { Trophy, ChevronRight, ChevronLeft, LayoutGrid, List, GitBranch } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getSlotFeeders } from "@/lib/feederLabels";
 import { schedulerSequence } from "@/lib/roundScheduler";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { getEliminationRoundLabel } from "@/lib/roundLabels";
+import HorizontalTreeView from "@/components/HorizontalTreeView";
 
 interface Participant {
   id: string;
@@ -586,9 +587,9 @@ const MobileListView = ({
    ════════════════════════════════════════════════════ */
 const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
   const isMobile = useIsMobile();
-  const [viewMode, setViewMode] = useState<'bracket' | 'list'>(() => {
+  const [viewMode, setViewMode] = useState<'bracket' | 'list' | 'tree'>(() => {
     try {
-      return (localStorage.getItem('bracket-view-mode') as 'bracket' | 'list') || 'bracket';
+      return (localStorage.getItem('bracket-view-mode') as 'bracket' | 'list' | 'tree') || 'bracket';
     } catch { return 'bracket'; }
   });
   const zoomContainerRef = useRef<HTMLDivElement>(null);
@@ -656,8 +657,8 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
 
   return (
     <div className="w-full space-y-4">
-      {/* Mobile view mode toggle */}
-      {isMobile && hasElimination && (
+      {/* View mode toggle */}
+      {hasElimination && (
         <div className="flex items-center justify-center gap-1 bg-muted/50 rounded-lg p-1">
           <Button
             variant={viewMode === 'bracket' ? 'default' : 'ghost'}
@@ -665,16 +666,26 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
             className="h-7 text-xs gap-1.5 flex-1"
             onClick={() => setViewMode('bracket')}
           >
-            <LayoutGrid className="h-3.5 w-3.5" /> Modo Chave
+            <LayoutGrid className="h-3.5 w-3.5" /> Modo Atual
           </Button>
           <Button
-            variant={viewMode === 'list' ? 'default' : 'ghost'}
+            variant={viewMode === 'tree' ? 'default' : 'ghost'}
             size="sm"
             className="h-7 text-xs gap-1.5 flex-1"
-            onClick={() => setViewMode('list')}
+            onClick={() => setViewMode('tree')}
           >
-            <List className="h-3.5 w-3.5" /> Modo Lista
+            <GitBranch className="h-3.5 w-3.5" /> Modo Árvore
           </Button>
+          {isMobile && (
+            <Button
+              variant={viewMode === 'list' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-7 text-xs gap-1.5 flex-1"
+              onClick={() => setViewMode('list')}
+            >
+              <List className="h-3.5 w-3.5" /> Modo Lista
+            </Button>
+          )}
         </div>
       )}
 
@@ -686,8 +697,20 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
         <MobileListView matches={matches} getName={getName} matchNumberMap={matchNumberMap} />
       )}
 
-      {/* Double Elimination — 3-column layout */}
-      {(!isMobile || viewMode === 'bracket') && isDoubleElimination && (
+      {/* Horizontal Tree Mode */}
+      {viewMode === 'tree' && hasElimination && (
+        <div
+          className="overflow-x-auto overflow-y-hidden pb-4"
+          style={{ touchAction: "pan-x pinch-zoom", WebkitOverflowScrolling: "touch" }}
+        >
+          <div style={isMobile ? { transform: `scale(${mobileZoom})`, transformOrigin: 'top left', width: `${100 / mobileZoom}%` } : undefined}>
+            <HorizontalTreeView matches={matches} getName={getName} matchNumberMap={matchNumberMap} />
+          </div>
+        </div>
+      )}
+
+      {/* Double Elimination — 3-column layout (original mode) */}
+      {viewMode === 'bracket' && isDoubleElimination && (
         <div
           ref={zoomContainerRef}
           className="overflow-x-auto overflow-y-hidden pb-4"
@@ -777,8 +800,8 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
         </div>
       )}
 
-      {/* Normal Knockout (non-DE) */}
-      {(!isMobile || viewMode === 'bracket') && !isDoubleElimination && hasElimination && (
+      {/* Normal Knockout (non-DE, original mode) */}
+      {viewMode === 'bracket' && !isDoubleElimination && hasElimination && (
         <div
           ref={!isDoubleElimination ? zoomContainerRef : undefined}
           className={isMobile ? "overflow-x-auto overflow-y-hidden" : ""}

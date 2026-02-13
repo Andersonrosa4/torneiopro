@@ -60,6 +60,13 @@ Deno.serve(async (req) => {
     // Create a simple token
     const token = btoa(`${organizer.id}:${Date.now()}`);
 
+    // Update last_online_at asynchronously (fire-and-forget)
+    supabase
+      .from("organizers")
+      .update({ last_online_at: new Date().toISOString() })
+      .eq("id", organizer.id)
+      .then(() => {});
+
     return new Response(
       JSON.stringify({
         success: true,

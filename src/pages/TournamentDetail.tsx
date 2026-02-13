@@ -1049,12 +1049,12 @@ const TournamentDetail = () => {
 
           {/* All tabs always visible */}
           <Tabs defaultValue="teams" className="w-full">
-            <TabsList className="mb-4 flex-wrap">
-              <TabsTrigger value="teams">Duplas</TabsTrigger>
-              <TabsTrigger value="bracket">Chaveamento</TabsTrigger>
-              <TabsTrigger value="sequence">Sequência</TabsTrigger>
-              <TabsTrigger value="classification">Classificação</TabsTrigger>
-              <TabsTrigger value="rankings">Ranking</TabsTrigger>
+            <TabsList className="flex flex-wrap gap-2 mb-5 h-auto bg-secondary/50 p-1.5 rounded-lg w-full">
+              <TabsTrigger value="teams" className="flex-1 min-w-[80px] text-center text-sm font-medium h-9 rounded-md data-[state=active]:bg-card data-[state=active]:border data-[state=active]:border-primary/40 data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground">Duplas</TabsTrigger>
+              <TabsTrigger value="bracket" className="flex-1 min-w-[80px] text-center text-sm font-medium h-9 rounded-md data-[state=active]:bg-card data-[state=active]:border data-[state=active]:border-primary/40 data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground">Chaveamento</TabsTrigger>
+              <TabsTrigger value="sequence" className="flex-1 min-w-[80px] text-center text-sm font-medium h-9 rounded-md data-[state=active]:bg-card data-[state=active]:border data-[state=active]:border-primary/40 data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground">Sequência</TabsTrigger>
+              <TabsTrigger value="classification" className="flex-1 min-w-[80px] text-center text-sm font-medium h-9 rounded-md data-[state=active]:bg-card data-[state=active]:border data-[state=active]:border-primary/40 data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground">Classificação</TabsTrigger>
+              <TabsTrigger value="rankings" className="flex-1 min-w-[80px] text-center text-sm font-medium h-9 rounded-md data-[state=active]:bg-card data-[state=active]:border data-[state=active]:border-primary/40 data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground">Ranking</TabsTrigger>
             </TabsList>
 
             {/* Duplas Tab */}

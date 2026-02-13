@@ -61,7 +61,7 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
   // Calculate knockout phase based on advancing teams
   const groups = Number(numGroups) || 2;
   const advancing = Number(teamsPerGroupAdvancing) || 2;
-  const totalAdvancing = groups * advancing + byeTeamIds.length;
+  const totalAdvancing = groups * advancing;
 
   const getKnockoutPhase = (count: number) => {
     if (count <= 2) return "Final";
@@ -105,7 +105,7 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
       useGroupStage: bracketMode === "normal" ? useGroupStage : false,
       numGroups: groups,
       teamsPerGroupAdvancing: advancing,
-      byeTeamIds,
+      byeTeamIds: [], // BYEs disabled
       useIndex: supportsIndex && useIndex,
       numIndexTeams: supportsIndex && useIndex ? Number(numIndexTeams) : 0,
       ...(bracketMode === "double_elimination" && useSeeds === "true" ? {
@@ -164,7 +164,7 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <span className="text-xs rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Fase de Grupos</span>
-                      <span className="text-xs rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">BYE Automático</span>
+                      <span className="text-xs rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Eliminatória Direta</span>
                       <span className="text-xs rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Cabeças de Chave</span>
                     </div>
                   </div>
@@ -269,28 +269,7 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                         </div>
                       </div>
 
-                      {/* Bye teams */}
-                      <div className="space-y-2">
-                        <Label className="text-sm font-semibold">Duplas que avançam por BYE (índice)</Label>
-                        <p className="text-xs text-muted-foreground">Selecione duplas que avançam direto para a eliminatória</p>
-                        <div className="max-h-36 overflow-y-auto space-y-1 rounded-lg border border-border p-2 bg-card/50">
-                          {teams.map((t) => (
-                            <label
-                              key={t.id}
-                              className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-secondary/50 cursor-pointer text-sm"
-                            >
-                              <Checkbox
-                                checked={byeTeamIds.includes(t.id)}
-                                onCheckedChange={() => toggleByeTeam(t.id)}
-                              />
-                              <span className="text-foreground">{t.player1_name} / {t.player2_name}</span>
-                            </label>
-                          ))}
-                        </div>
-                        {byeTeamIds.length > 0 && (
-                          <p className="text-xs text-primary">{byeTeamIds.length} dupla(s) com BYE</p>
-                        )}
-                      </div>
+                      {/* BYE removido — todas as duplas devem jogar */}
 
                       {/* Index advancement (Volleyball/Futevolei only) */}
                       {supportsIndex && (
@@ -332,7 +311,7 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                       <div className="rounded-lg border border-primary/30 bg-primary/10 p-3">
                         <p className="text-sm font-bold text-primary">Fase de Grupos</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {groups} grupo(s) × {advancing} avançando{byeTeamIds.length > 0 ? ` + ${byeTeamIds.length} BYE` : ""} = {totalAdvancing} duplas na eliminatória
+                          {groups} grupo(s) × {advancing} avançando = {totalAdvancing} duplas na eliminatória
                         </p>
                       </div>
                     </div>

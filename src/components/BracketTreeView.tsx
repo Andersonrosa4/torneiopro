@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Trophy } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -34,172 +33,289 @@ interface BracketTreeViewProps {
   structuralOnly?: boolean;
 }
 
+/** Compact match card */
+const MatchCard = ({
+  match,
+  getName,
+  reverse,
+}: {
+  match: Match;
+  getName: (id: string | null) => string;
+  reverse?: boolean;
+}) => {
+  const t1Win = match.winner_team_id === match.team1_id;
+  const t2Win = match.winner_team_id === match.team2_id;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className={`rounded border text-[11px] leading-tight transition-all w-full min-w-[130px] max-w-[180px] ${
+        match.status === "completed"
+          ? "border-success/40 bg-success/5"
+          : match.team1_id && match.team2_id
+            ? "border-primary/30 bg-primary/5"
+            : "border-border bg-secondary/20"
+      }`}
+    >
+      <div className={`flex items-center justify-between px-2 py-1 ${t1Win ? "bg-success/10" : ""}`}>
+        <span className={`truncate ${t1Win ? "font-bold text-success" : "text-foreground"}`}>
+          {getName(match.team1_id)}
+        </span>
+        {match.status === "completed" && match.score1 !== null && (
+          <span className="font-mono ml-1 text-success font-bold">{match.score1}</span>
+        )}
+      </div>
+      <div className="border-t border-border/50" />
+      <div className={`flex items-center justify-between px-2 py-1 ${t2Win ? "bg-success/10" : ""}`}>
+        <span className={`truncate ${t2Win ? "font-bold text-success" : "text-foreground"}`}>
+          {getName(match.team2_id)}
+        </span>
+        {match.status === "completed" && match.score2 !== null && (
+          <span className="font-mono ml-1 text-success font-bold">{match.score2}</span>
+        )}
+      </div>
+    </motion.div>
+  );
+};
+
+/**
+ * Renders a single bracket half as horizontal rounds (columns).
+ * direction="ltr" = round 1 on left, advancing right (Lado A)
+ * direction="rtl" = round 1 on right, advancing left (Lado B)
+ */
+const BracketColumns = ({
+  bracketMatches,
+  getName,
+  direction,
+  label,
+  colorClass,
+}: {
+  bracketMatches: Match[];
+  getName: (id: string | null) => string;
+  direction: "ltr" | "rtl";
+  label: string;
+  colorClass: string;
+}) => {
+  const roundGroups: Record<number, Match[]> = {};
+  bracketMatches.forEach((m) => {
+    if (!roundGroups[m.round]) roundGroups[m.round] = [];
+    roundGroups[m.round].push(m);
+  });
+  let rounds = Object.keys(roundGroups).map(Number).sort((a, b) => a - b);
+  if (direction === "rtl") rounds = [...rounds].reverse();
+
+  if (bracketMatches.length === 0) return null;
+
+  return (
+    <div className={`rounded-lg border border-border ${colorClass} p-3 flex-1`}>
+      <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
+        {label}
+      </div>
+      <div className={`flex gap-3 ${direction === "rtl" ? "flex-row-reverse" : ""} overflow-x-auto`}>
+        {rounds.map((round) => (
+          <div key={round} className="flex flex-col gap-2 items-center justify-center min-w-[140px]">
+            <div className="text-[9px] uppercase font-semibold text-muted-foreground/70 whitespace-nowrap">
+              R{round}
+            </div>
+            {roundGroups[round]
+              .sort((a, b) => a.position - b.position)
+              .map((match) => (
+                <MatchCard key={match.id} match={match} getName={getName} />
+              ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
-  const groupMatches = useMemo(() => matches.filter(m => m.round === 0), [matches]);
+  const groupMatches = useMemo(() => matches.filter((m) => m.round === 0), [matches]);
   const hasGroupStage = groupMatches.length > 0;
-  const hasElimination = useMemo(() => matches.some(m => m.round > 0), [matches]);
+  const hasElimination = useMemo(() => matches.some((m) => m.round > 0), [matches]);
 
   const getName = (id: string | null) => {
     if (!id) return "A definir";
     return participants.find((p) => p.id === id)?.name || "A definir";
   };
 
-  // Group standings
   const getGroupStandings = (groupNum: number) => {
-    const gMatches = groupMatches.filter(m => (m.bracket_number || 1) === groupNum);
+    const gMatches = groupMatches.filter((m) => (m.bracket_number || 1) === groupNum);
     const teamIds = new Set<string>();
-    gMatches.forEach(m => {
+    gMatches.forEach((m) => {
       if (m.team1_id) teamIds.add(m.team1_id);
       if (m.team2_id) teamIds.add(m.team2_id);
     });
-    const standings = Array.from(teamIds).map(tid => {
-      const wins = gMatches.filter(m => m.winner_team_id === tid).length;
-      const played = gMatches.filter(m => (m.team1_id === tid || m.team2_id === tid) && m.status === "completed").length;
+    const standings = Array.from(teamIds).map((tid) => {
+      const wins = gMatches.filter((m) => m.winner_team_id === tid).length;
+      const played = gMatches.filter(
+        (m) => (m.team1_id === tid || m.team2_id === tid) && m.status === "completed"
+      ).length;
       return { id: tid, name: getName(tid), wins, played };
     });
     return standings.sort((a, b) => b.wins - a.wins);
   };
 
-  const groupNumbers = Array.from(new Set(groupMatches.map(m => m.bracket_number || 1))).sort();
+  const groupNumbers = Array.from(new Set(groupMatches.map((m) => m.bracket_number || 1))).sort();
 
-  // Match card component
-  const MatchCard = ({ match }: { match: Match }) => (
-    <motion.div
-      key={match.id}
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`text-xs rounded border p-2 transition-all ${
-        match.status === 'completed'
-          ? 'border-success/30 bg-success/5'
-          : match.team1_id && match.team2_id
-            ? 'border-primary/30 bg-primary/5'
-            : 'border-border bg-secondary/30'
-      }`}
-    >
-      <div className="flex justify-between items-center">
-        <div className={`font-medium truncate flex-1 ${match.winner_team_id === match.team1_id ? 'text-success font-bold' : ''}`}>
-          {getName(match.team1_id)}
-        </div>
-        {match.status === 'completed' && match.score1 !== null && (
-          <span className="text-xs font-mono ml-2 text-success">{match.score1}</span>
-        )}
-      </div>
-      <div className="border-t border-border my-1" />
-      <div className="flex justify-between items-center">
-        <div className={`font-medium truncate flex-1 ${match.winner_team_id === match.team2_id ? 'text-success font-bold' : ''}`}>
-          {getName(match.team2_id)}
-        </div>
-        {match.status === 'completed' && match.score2 !== null && (
-          <span className="text-xs font-mono ml-2 text-success">{match.score2}</span>
-        )}
-      </div>
-    </motion.div>
-  );
+  // === MIRRORED BRACKET LAYOUT ===
+  const renderMirroredBracket = () => {
+    // Lado A = upper (left side, advances left→right toward center)
+    // Lado B = lower (right side, advances right→left toward center)
+    const winnersA = matches.filter((m) => m.bracket_type === "winners" && m.bracket_half === "upper");
+    const winnersB = matches.filter((m) => m.bracket_type === "winners" && m.bracket_half === "lower");
+    const losersA = matches.filter((m) => m.bracket_type === "losers" && m.bracket_half === "lower");
+    // Losers A = Perdedores que vieram de Vencedores Superior (mirror → losers lower bracket_number=4)
+    const losersB = matches.filter((m) => m.bracket_type === "losers" && m.bracket_half === "upper");
+    // Losers B = Perdedores que vieram de Vencedores Inferior (mirror → losers upper bracket_number=3)
+    const crossSemis = matches.filter((m) => m.bracket_type === "cross_semi");
+    const finalMatches = matches.filter((m) => m.bracket_type === "final");
 
-  // Render a bracket section
-  const renderBracketSection = (title: string, bracketMatches: Match[], bgColor: string) => {
-    const roundGroups: Record<number, Match[]> = {};
-    bracketMatches.forEach(m => {
-      if (!roundGroups[m.round]) roundGroups[m.round] = [];
-      roundGroups[m.round].push(m);
-    });
-    const rounds = Object.keys(roundGroups).map(Number).sort((a, b) => a - b);
-
-    return (
-      <div className={`flex-1 ${bgColor} rounded-lg p-4 border border-border`}>
-        <h4 className="text-sm font-bold text-primary mb-3 uppercase tracking-wider">{title}</h4>
-        <div className="space-y-4">
-          {rounds.map(round => (
-            <div key={round} className="space-y-2">
-              <div className="text-xs font-semibold text-muted-foreground uppercase">Rodada {round}</div>
-              {roundGroups[round].sort((a, b) => a.position - b.position).map(match => (
-                <MatchCard key={match.id} match={match} />
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  // Double elimination visualization
-  const renderDoubleEliminationBrackets = () => {
-    const winnersUpper = matches.filter(m => m.bracket_type === 'winners' && m.bracket_half === 'upper');
-    const winnersLower = matches.filter(m => m.bracket_type === 'winners' && m.bracket_half === 'lower');
-    const losersUpper = matches.filter(m => m.bracket_type === 'losers' && m.bracket_half === 'upper');
-    const losersLower = matches.filter(m => m.bracket_type === 'losers' && m.bracket_half === 'lower');
-    const crossSemis = matches.filter(m => m.bracket_type === 'cross_semi');
-    const finalMatches = matches.filter(m => m.bracket_type === 'final');
+    const hasAnyBracket = winnersA.length > 0 || winnersB.length > 0;
+    if (!hasAnyBracket && crossSemis.length === 0 && finalMatches.length === 0) {
+      // Fallback for normal knockout (no bracket_type)
+      const knockoutMatches = matches.filter((m) => m.round > 0);
+      return (
+        <BracketColumns
+          bracketMatches={knockoutMatches}
+          getName={getName}
+          direction="ltr"
+          label="Eliminatória"
+          colorClass="bg-card/50"
+        />
+      );
+    }
 
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-        {/* Winners Bracket */}
-        {(winnersUpper.length > 0 || winnersLower.length > 0) && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-bold text-primary">Chave dos Vencedores</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {winnersUpper.length > 0 && renderBracketSection('Vencedores (Superior)', winnersUpper, 'bg-blue-950/20')}
-              {winnersLower.length > 0 && renderBracketSection('Vencedores (Inferior)', winnersLower, 'bg-cyan-950/20')}
-            </div>
+        {/* === MAIN MIRRORED LAYOUT === */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-0 items-start">
+          {/* ====== LADO A (Left) ====== */}
+          <div className="space-y-4">
+            {/* Vencedores – Lado A (top-left) */}
+            <BracketColumns
+              bracketMatches={winnersA}
+              getName={getName}
+              direction="ltr"
+              label="🏆 Vencedores — Lado A"
+              colorClass="bg-blue-950/20"
+            />
+            {/* Perdedores – Lado A (bottom-left) */}
+            {losersA.length > 0 && (
+              <BracketColumns
+                bracketMatches={losersA}
+                getName={getName}
+                direction="ltr"
+                label="⬇ Perdedores — Lado A"
+                colorClass="bg-orange-950/20"
+              />
+            )}
           </div>
-        )}
 
-        {/* Losers Bracket */}
-        {(losersUpper.length > 0 || losersLower.length > 0) && (
-          <div className="space-y-3">
-            <h3 className="text-lg font-bold text-accent">Chave dos Perdedores</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {losersUpper.length > 0 && renderBracketSection('Perdedores (Superior) — vem de Vencedores Inferior', losersUpper, 'bg-orange-950/20')}
-              {losersLower.length > 0 && renderBracketSection('Perdedores (Inferior) — vem de Vencedores Superior', losersLower, 'bg-red-950/20')}
-            </div>
-          </div>
-        )}
+          {/* ====== EIXO CENTRAL ====== */}
+          <div className="hidden lg:flex flex-col items-center justify-center px-2 min-h-[200px]">
+            <div className="w-px bg-border flex-1" />
 
-        {/* Cross-Semifinals */}
-        {crossSemis.length > 0 && (
-          <div className="space-y-3">
-            <h3 className="text-lg font-bold text-primary flex items-center gap-2">
-              <Trophy className="h-5 w-5" /> Semifinais Cruzadas
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {crossSemis.sort((a, b) => a.position - b.position).map(match => (
-                <div key={match.id} className="bg-gradient-to-r from-primary/10 to-accent/10 rounded-lg p-4 border border-primary/30">
-                  <div className="text-xs text-muted-foreground mb-2">
-                    {match.bracket_half === 'upper'
-                      ? 'Campeão Perdedores (Superior) vs Campeão Vencedores (Inferior)'
-                      : 'Campeão Perdedores (Inferior) vs Campeão Vencedores (Superior)'}
-                  </div>
-                  <MatchCard match={match} />
+            {/* Cross-Semifinals at center */}
+            {crossSemis.length > 0 && (
+              <div className="py-3 space-y-2">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-primary text-center whitespace-nowrap">
+                  Semifinais
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+                {crossSemis
+                  .sort((a, b) => a.position - b.position)
+                  .map((match) => (
+                    <div key={match.id} className="relative">
+                      <div className="text-[9px] text-muted-foreground text-center mb-1 whitespace-nowrap">
+                        {match.bracket_half === "upper"
+                          ? "Camp. Perd. A × Camp. Venc. B"
+                          : "Camp. Perd. B × Camp. Venc. A"}
+                      </div>
+                      <MatchCard match={match} getName={getName} />
+                    </div>
+                  ))}
+              </div>
+            )}
 
-        {/* Final */}
-        {finalMatches.length > 0 && (
-          <div className="space-y-3">
-            <h3 className="text-lg font-bold text-primary flex items-center gap-2">
-              <Trophy className="h-5 w-5" /> Final
-            </h3>
-            <div className="bg-gradient-to-r from-primary/10 to-accent/10 rounded-lg p-4 border border-primary/30">
-              {finalMatches.map(match => (
-                <MatchCard key={match.id} match={match} />
+            {/* Final at center */}
+            {finalMatches.length > 0 && (
+              <div className="py-3">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-primary text-center flex items-center gap-1 justify-center mb-1">
+                  <Trophy className="h-3 w-3" /> Final
+                </div>
+                {finalMatches.map((match) => (
+                  <MatchCard key={match.id} match={match} getName={getName} />
+                ))}
+              </div>
+            )}
+
+            <div className="w-px bg-border flex-1" />
+          </div>
+
+          {/* ====== LADO B (Right) ====== */}
+          <div className="space-y-4">
+            {/* Vencedores – Lado B (top-right) */}
+            <BracketColumns
+              bracketMatches={winnersB}
+              getName={getName}
+              direction="rtl"
+              label="🏆 Vencedores — Lado B"
+              colorClass="bg-cyan-950/20"
+            />
+            {/* Perdedores – Lado B (bottom-right) */}
+            {losersB.length > 0 && (
+              <BracketColumns
+                bracketMatches={losersB}
+                getName={getName}
+                direction="rtl"
+                label="⬇ Perdedores — Lado B"
+                colorClass="bg-red-950/20"
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Mobile: show cross-semis + final separately */}
+        <div className="lg:hidden space-y-4">
+          {crossSemis.length > 0 && (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
+              <div className="text-xs font-bold uppercase tracking-wider text-primary">
+                Semifinais Cruzadas
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {crossSemis.sort((a, b) => a.position - b.position).map((match) => (
+                  <div key={match.id}>
+                    <div className="text-[9px] text-muted-foreground mb-1">
+                      {match.bracket_half === "upper"
+                        ? "Camp. Perdedores A × Camp. Vencedores B"
+                        : "Camp. Perdedores B × Camp. Vencedores A"}
+                    </div>
+                    <MatchCard match={match} getName={getName} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {finalMatches.length > 0 && (
+            <div className="rounded-lg border border-primary/30 bg-gradient-to-r from-primary/10 to-accent/10 p-3 space-y-2">
+              <div className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1">
+                <Trophy className="h-3 w-3" /> Final
+              </div>
+              {finalMatches.map((match) => (
+                <MatchCard key={match.id} match={match} getName={getName} />
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Legend */}
-        <div className="rounded-lg bg-muted/30 border border-border p-3 text-xs space-y-1">
-          <div className="font-semibold text-muted-foreground mb-2">📍 Regras de Cruzamento:</div>
-          <div className="text-muted-foreground">→ Perdedor Vencedores (Superior) → Perdedores (Inferior)</div>
-          <div className="text-muted-foreground">← Perdedor Vencedores (Inferior) → Perdedores (Superior)</div>
+        <div className="rounded-lg bg-muted/30 border border-border p-3 text-[10px] space-y-1">
+          <div className="font-semibold text-muted-foreground mb-1">📍 Regras de Cruzamento:</div>
+          <div className="text-muted-foreground">→ Perdedor Vencedores A → Perdedores A (lado oposto invertido)</div>
+          <div className="text-muted-foreground">← Perdedor Vencedores B → Perdedores B (lado oposto invertido)</div>
           <div className="text-muted-foreground mt-1">🏆 Semifinais: Campeão Perdedores enfrenta Campeão Vencedores do lado oposto</div>
-          <div className="text-muted-foreground">⚠️ Qualquer derrota na Chave dos Perdedores = Eliminação definitiva</div>
+          <div className="text-muted-foreground">⚠️ Derrota na Chave dos Perdedores = Eliminação definitiva</div>
         </div>
       </motion.div>
     );
@@ -222,7 +338,7 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
             <Trophy className="h-5 w-5" /> Fase de Grupos
           </h3>
           <div className="grid gap-4 sm:grid-cols-2">
-            {groupNumbers.map(gNum => {
+            {groupNumbers.map((gNum) => {
               const standings = getGroupStandings(gNum);
               return (
                 <div key={gNum} className="rounded-xl border border-border bg-card p-4 shadow-card">
@@ -231,12 +347,17 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
                   </h4>
                   <div className="space-y-1">
                     {standings.map((s, i) => (
-                      <div key={s.id} className="flex items-center justify-between rounded-md bg-secondary/50 px-3 py-1.5 text-xs">
+                      <div
+                        key={s.id}
+                        className="flex items-center justify-between rounded-md bg-secondary/50 px-3 py-1.5 text-xs"
+                      >
                         <span className="flex items-center gap-2">
                           <span className="font-bold text-muted-foreground">{i + 1}.</span>
                           <span className="font-medium text-foreground">{s.name}</span>
                         </span>
-                        <span className="font-bold text-primary">{s.wins}V / {s.played}J</span>
+                        <span className="font-bold text-primary">
+                          {s.wins}V / {s.played}J
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -247,8 +368,8 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
         </div>
       )}
 
-      {/* Elimination Stage */}
-      {hasElimination && renderDoubleEliminationBrackets()}
+      {/* Elimination Stage - Mirrored Layout */}
+      {hasElimination && renderMirroredBracket()}
     </div>
   );
 };

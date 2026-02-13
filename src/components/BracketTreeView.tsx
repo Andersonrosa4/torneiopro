@@ -114,7 +114,7 @@ const MatchCard = ({
       {/* Team 1 + Feeder */}
       <div className="space-y-0.5">
         <div className={`flex items-center justify-between px-2 py-1.5 ${t1Win ? "bg-success/10" : ""}`}>
-          <span className={`truncate flex-1 ${t1Win ? "font-bold text-success" : isWaiting && !match.team1_id ? "text-muted-foreground/50 italic" : "text-foreground"}`}>
+          <span className={`truncate flex-1 ${t1Win ? "font-bold text-success" : isWaiting && !match.team1_id ? "text-muted-foreground/50 italic" : "team-name"}`}>
             {getName(match.team1_id)}
           </span>
           {match.score1 !== null && isCompleted && (
@@ -135,7 +135,7 @@ const MatchCard = ({
       {/* Team 2 + Feeder */}
       <div className="space-y-0.5">
         <div className={`flex items-center justify-between px-2 py-1.5 ${t2Win ? "bg-success/10" : ""}`}>
-          <span className={`truncate flex-1 ${t2Win ? "font-bold text-success" : isWaiting && !match.team2_id ? "text-muted-foreground/50 italic" : "text-foreground"}`}>
+          <span className={`truncate flex-1 ${t2Win ? "font-bold text-success" : isWaiting && !match.team2_id ? "text-muted-foreground/50 italic" : "team-name"}`}>
             {getName(match.team2_id)}
           </span>
           {match.score2 !== null && isCompleted && (
@@ -405,7 +405,7 @@ const GroupStageView = ({
                   <div key={s.id} className="flex items-center justify-between rounded-md bg-secondary/50 px-3 py-1.5 text-xs">
                     <span className="flex items-center gap-2">
                       <span className="font-bold text-muted-foreground">{i + 1}.</span>
-                      <span className="font-medium text-foreground">{s.name}</span>
+                      <span className="team-name">{s.name}</span>
                     </span>
                     <span className="font-bold text-primary">{s.wins}V / {s.played}J</span>
                   </div>
@@ -558,14 +558,14 @@ const MobileListView = ({
                   </div>
                   <div className="space-y-0.5">
                     <div className="flex items-center justify-between">
-                      <span className={`text-sm font-medium truncate ${t1Win ? 'text-success font-bold' : ''}`}>
+                      <span className={`text-sm truncate ${t1Win ? 'text-success font-bold' : 'team-name'}`}>
                         {getName(match.team1_id)}
                       </span>
                       {isCompleted && <span className={`font-mono text-sm font-bold ${t1Win ? 'text-success' : 'text-muted-foreground'}`}>{match.score1}</span>}
                     </div>
                     <span className="text-[10px] text-muted-foreground">vs</span>
                     <div className="flex items-center justify-between">
-                      <span className={`text-sm font-medium truncate ${t2Win ? 'text-success font-bold' : ''}`}>
+                      <span className={`text-sm truncate ${t2Win ? 'text-success font-bold' : 'team-name'}`}>
                         {getName(match.team2_id)}
                       </span>
                       {isCompleted && <span className={`font-mono text-sm font-bold ${t2Win ? 'text-success' : 'text-muted-foreground'}`}>{match.score2}</span>}

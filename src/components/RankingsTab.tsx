@@ -280,7 +280,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                       {idx + 1}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium truncate">{ranking.athlete_name}</p>
+                      <p className="truncate team-name">{ranking.athlete_name}</p>
                     </div>
                   </div>
 
@@ -352,21 +352,21 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
             {sortedRankings[1] && (
               <div className="flex flex-col items-center rounded-lg border border-border bg-card p-4 shadow-card order-first sm:order-none">
                 <div className="mb-2 text-3xl font-bold text-secondary">🥈</div>
-                <p className="text-sm font-medium text-center truncate">{sortedRankings[1].athlete_name}</p>
+                <p className="text-sm text-center truncate team-name">{sortedRankings[1].athlete_name}</p>
                 <p className="text-lg font-bold text-primary">{sortedRankings[1].points} pts</p>
               </div>
             )}
             {sortedRankings[0] && (
               <div className="flex flex-col items-center rounded-lg border-2 border-primary bg-gradient-primary p-4 shadow-lg order-none sm:order-first">
                 <div className="mb-2 text-4xl font-bold">🥇</div>
-                <p className="text-sm font-medium text-center text-primary-foreground truncate">{sortedRankings[0].athlete_name}</p>
+                <p className="text-sm text-center truncate team-name">{sortedRankings[0].athlete_name}</p>
                 <p className="text-xl font-bold text-primary-foreground">{sortedRankings[0].points} pts</p>
               </div>
             )}
             {sortedRankings[2] && (
               <div className="flex flex-col items-center rounded-lg border border-border bg-card p-4 shadow-card order-last">
                 <div className="mb-2 text-3xl font-bold text-muted">🥉</div>
-                <p className="text-sm font-medium text-center truncate">{sortedRankings[2].athlete_name}</p>
+                <p className="text-sm text-center truncate team-name">{sortedRankings[2].athlete_name}</p>
                 <p className="text-lg font-bold text-primary">{sortedRankings[2].points} pts</p>
               </div>
             )}

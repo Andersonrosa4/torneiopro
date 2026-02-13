@@ -153,7 +153,7 @@ const TournamentPublicView = () => {
                         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
                           {i + 1}
                         </span>
-                        <span className="font-medium">{t.player1_name} / {t.player2_name}</span>
+                        <span className="team-name">{t.player1_name} / {t.player2_name}</span>
                       </div>
                     ))}
                   </div>

@@ -1128,7 +1128,7 @@ const TournamentDetail = () => {
                               </Button>
                             </div>
                           ) : (
-                            <span className="font-medium truncate">
+                            <span className="truncate team-name">
                               {t.player1_name} / {t.player2_name}
                               {t.is_fictitious && <span className="ml-2 text-xs text-muted-foreground">(fictícia)</span>}
                             </span>

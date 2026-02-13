@@ -335,6 +335,8 @@ const TournamentDetail = () => {
         teams: filteredTeams.map(t => ({ id: t.id, player1_name: t.player1_name, player2_name: t.player2_name, seed: t.seed })),
         useSeeds: config.useSeeds,
         seedTeamIds: config.seedTeamIds,
+        sideATeamIds: (config as any).sideATeamIds,
+        sideBTeamIds: (config as any).sideBTeamIds,
         allowThirdPlace: false,
       });
 

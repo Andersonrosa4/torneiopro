@@ -1,14 +1,13 @@
 /**
- * Double Elimination Advancement Logic (NEW MODEL)
+ * Double Elimination Advancement Logic
  * 
- * Structure:
- * - Winners Upper/Lower: teams play within their half only
- * - Losers Upper: receives losers from Winners LOWER (mirror)
- * - Losers Lower: receives losers from Winners UPPER (mirror)
- * - Cross-Semifinals: Losers champ vs opposite Winners champ
- * - Final: winners of cross-semifinals
- * 
- * Any loss in Losers bracket = eliminated
+ * Rules:
+ * - Winners: teams play within their half only
+ * - Losers: mirror crossing (Winners Upper losers → Losers Lower, vice versa)
+ * - Sequential pairing: L(J1) vs L(J2), L(J3) vs L(J4)
+ * - Anti-repetition: rounds 1-2 of losers, no rematches from winners
+ * - Chapéu: odd team waits, no auto-win
+ * - Any loss in Losers = eliminated
  */
 
 interface Match {
@@ -27,23 +26,16 @@ interface Match {
   modality_id?: string | null;
 }
 
-/**
- * Get the mirror half for losers bracket placement
- * Winners Upper loser → Losers LOWER (bracket_number=4)
- * Winners Lower loser → Losers UPPER (bracket_number=3)
- */
 export function getMirrorHalf(winnersHalf: string): string {
   return winnersHalf === 'upper' ? 'lower' : 'upper';
 }
 
 function getMirrorBracketNumber(winnersHalf: string): number {
-  // Winners Upper (bn=1) losers → Losers Lower (bn=4)
-  // Winners Lower (bn=2) losers → Losers Upper (bn=3)
   return winnersHalf === 'upper' ? 4 : 3;
 }
 
 /**
- * Find the next match for a winner within the same bracket/half
+ * Find next match for winner within same bracket/half
  */
 function findNextWinnerMatch(
   matches: Match[],
@@ -68,9 +60,6 @@ function findNextWinnerMatch(
   return null;
 }
 
-/**
- * Check if a match is the final match of its bracket half
- */
 function isFinalOfHalf(matches: Match[], match: Match): boolean {
   const sameHalfMatches = matches.filter(
     m =>
@@ -83,59 +72,156 @@ function isFinalOfHalf(matches: Match[], match: Match): boolean {
 }
 
 /**
- * Find the first available slot in losers bracket for a dropping team
+ * Check if two teams have already played each other in any completed match
+ */
+function haveTeamsPlayedBefore(matches: Match[], teamA: string, teamB: string): boolean {
+  return matches.some(
+    m =>
+      m.status === 'completed' &&
+      m.winner_team_id && // has a real result (not chapéu)
+      ((m.team1_id === teamA && m.team2_id === teamB) ||
+       (m.team1_id === teamB && m.team2_id === teamA))
+  );
+}
+
+/**
+ * Find losers bracket slot using sequential pairing.
+ * Losers from consecutive winners matches pair up:
+ * L(J1) vs L(J2), L(J3) vs L(J4), etc.
+ * 
+ * Anti-repetition: in rounds 1-2 of losers, avoid rematches.
  */
 function findLosersSlot(
   matches: Match[],
   losersBracketNumber: number,
-  losersHalf: string,
   winnersRound: number,
   winnersPosition: number,
+  loserId: string,
 ): { matchId: string; field: 'team1_id' | 'team2_id' } | null {
-  // Find losers bracket matches for this half
   const losersMatches = matches.filter(
     m => m.bracket_type === 'losers' && m.bracket_number === losersBracketNumber
   );
-  
+
   if (losersMatches.length === 0) return null;
 
-  // First round losers: map to losers bracket round 1
-  // Position mapping: winners position → losers position
-  const round1Matches = losersMatches.filter(m => m.round === 1).sort((a, b) => a.position - b.position);
-  
   if (winnersRound === 1) {
-    // First round: pair up losers
+    // Sequential pairing: positions 1,2 → losers match 1; positions 3,4 → losers match 2
+    const round1Matches = losersMatches
+      .filter(m => m.round === 1)
+      .sort((a, b) => a.position - b.position);
+
     const targetIdx = Math.floor((winnersPosition - 1) / 2);
-    const isTop = (winnersPosition - 1) % 2 === 0;
-    const targetMatch = round1Matches[targetIdx];
-    
+    const isFirst = (winnersPosition - 1) % 2 === 0;
+    let targetMatch = round1Matches[targetIdx];
+    let field: 'team1_id' | 'team2_id' = isFirst ? 'team1_id' : 'team2_id';
+
     if (targetMatch) {
-      return { matchId: targetMatch.id, field: isTop ? 'team1_id' : 'team2_id' };
+      // Anti-repetition check for round 1
+      const existingTeamId = isFirst ? targetMatch.team2_id : targetMatch.team1_id;
+      if (existingTeamId && haveTeamsPlayedBefore(matches, loserId, existingTeamId)) {
+        // Try to swap with adjacent match
+        const swapResult = findAntiRepetitionSwap(
+          round1Matches, targetIdx, field, loserId, matches
+        );
+        if (swapResult) return swapResult;
+      }
+
+      return { matchId: targetMatch.id, field };
+    }
+
+    // Chapéu: odd number of losers, no match available
+    // Find any empty slot in round 1 or create waiting position
+    for (const m of round1Matches) {
+      if (!m.team1_id) return { matchId: m.id, field: 'team1_id' };
+      if (!m.team2_id) return { matchId: m.id, field: 'team2_id' };
+    }
+
+    // If all round 1 matches are full, place in round 2 as chapéu (waiting)
+    const round2Matches = losersMatches
+      .filter(m => m.round === 2)
+      .sort((a, b) => a.position - b.position);
+    for (const m of round2Matches) {
+      if (!m.team1_id) return { matchId: m.id, field: 'team1_id' };
+      if (!m.team2_id) return { matchId: m.id, field: 'team2_id' };
     }
   } else {
-    // Later round losers: find a match in the appropriate losers round
-    // They enter at a later losers round
+    // Later round losers from winners
+    const targetRound = winnersRound;
     const laterMatches = losersMatches
-      .filter(m => m.round === winnersRound)
+      .filter(m => m.round === targetRound)
       .sort((a, b) => a.position - b.position);
-    
+
     if (laterMatches.length > 0) {
       const targetIdx = Math.min(winnersPosition - 1, laterMatches.length - 1);
       const targetMatch = laterMatches[targetIdx];
-      // Find an empty slot
       if (targetMatch) {
-        if (!targetMatch.team1_id) return { matchId: targetMatch.id, field: 'team1_id' };
-        if (!targetMatch.team2_id) return { matchId: targetMatch.id, field: 'team2_id' };
+        if (!targetMatch.team1_id) {
+          // Anti-repetition check for round 2
+          if (targetRound <= 2 && targetMatch.team2_id &&
+            haveTeamsPlayedBefore(matches, loserId, targetMatch.team2_id)) {
+            const swap = findAntiRepetitionSwap(laterMatches, targetIdx, 'team1_id', loserId, matches);
+            if (swap) return swap;
+          }
+          return { matchId: targetMatch.id, field: 'team1_id' };
+        }
+        if (!targetMatch.team2_id) {
+          if (targetRound <= 2 && targetMatch.team1_id &&
+            haveTeamsPlayedBefore(matches, loserId, targetMatch.team1_id)) {
+            const swap = findAntiRepetitionSwap(laterMatches, targetIdx, 'team2_id', loserId, matches);
+            if (swap) return swap;
+          }
+          return { matchId: targetMatch.id, field: 'team2_id' };
+        }
       }
     }
 
-    // Fallback: find any empty slot in losers bracket
+    // Fallback: any empty slot
     for (const m of losersMatches.sort((a, b) => a.round - b.round || a.position - b.position)) {
       if (!m.team1_id) return { matchId: m.id, field: 'team1_id' };
       if (!m.team2_id) return { matchId: m.id, field: 'team2_id' };
     }
   }
 
+  return null;
+}
+
+/**
+ * Try to find an alternative match to avoid anti-repetition conflict.
+ * Swaps with adjacent matches in the same round.
+ */
+function findAntiRepetitionSwap(
+  roundMatches: Match[],
+  originalIdx: number,
+  originalField: 'team1_id' | 'team2_id',
+  loserId: string,
+  allMatches: Match[],
+): { matchId: string; field: 'team1_id' | 'team2_id' } | null {
+  // Try adjacent matches
+  const tryOrder = [];
+  for (let offset = 1; offset < roundMatches.length; offset++) {
+    if (originalIdx + offset < roundMatches.length) tryOrder.push(originalIdx + offset);
+    if (originalIdx - offset >= 0) tryOrder.push(originalIdx - offset);
+  }
+
+  for (const idx of tryOrder) {
+    const m = roundMatches[idx];
+    // Check team1 slot
+    if (!m.team1_id) {
+      const opponent = m.team2_id;
+      if (!opponent || !haveTeamsPlayedBefore(allMatches, loserId, opponent)) {
+        return { matchId: m.id, field: 'team1_id' };
+      }
+    }
+    // Check team2 slot
+    if (!m.team2_id) {
+      const opponent = m.team1_id;
+      if (!opponent || !haveTeamsPlayedBefore(allMatches, loserId, opponent)) {
+        return { matchId: m.id, field: 'team2_id' };
+      }
+    }
+  }
+
+  // No swap found - allow the original placement (conflict unavoidable)
   return null;
 }
 
@@ -161,7 +247,6 @@ export function processDoubleEliminationAdvance(
 
   // === WINNERS BRACKET ===
   if (bt === 'winners' && bh) {
-    // Winner advances within same Winners half
     const nextWin = findNextWinnerMatch(matches, currentMatch);
     if (nextWin) {
       result.winnerUpdates.push({
@@ -169,18 +254,14 @@ export function processDoubleEliminationAdvance(
         data: { [nextWin.field]: winnerId },
       });
     } else if (isFinalOfHalf(matches, currentMatch)) {
-      // Champion of Winners half → goes to cross-semifinal
-      // Winners Upper champion → cross_semi position 2 (as team2 in cross_semi lower)
-      // Winners Lower champion → cross_semi position 1 (as team2 in cross_semi upper)
+      // Champion → cross-semifinal
       const crossSemis = matches.filter(m => m.bracket_type === 'cross_semi');
       if (bh === 'upper') {
-        // Winners Upper champ → cross_semi_2 (lower) as team2
         const semi = crossSemis.find(m => m.bracket_half === 'lower');
         if (semi) {
           result.winnerUpdates.push({ matchId: semi.id, data: { team2_id: winnerId } });
         }
       } else {
-        // Winners Lower champ → cross_semi_1 (upper) as team2
         const semi = crossSemis.find(m => m.bracket_half === 'upper');
         if (semi) {
           result.winnerUpdates.push({ matchId: semi.id, data: { team2_id: winnerId } });
@@ -188,11 +269,12 @@ export function processDoubleEliminationAdvance(
       }
     }
 
-    // Loser drops to Losers bracket (mirror crossing)
+    // Loser drops to Losers bracket (mirror crossing) with sequential pairing
     if (loserId && bh) {
       const mirrorBN = getMirrorBracketNumber(bh);
-      const mirrorHalf = getMirrorHalf(bh);
-      const slot = findLosersSlot(matches, mirrorBN, mirrorHalf, currentMatch.round, currentMatch.position);
+      const slot = findLosersSlot(
+        matches, mirrorBN, currentMatch.round, currentMatch.position, loserId
+      );
       if (slot) {
         result.loserUpdates.push({
           matchId: slot.matchId,
@@ -204,7 +286,6 @@ export function processDoubleEliminationAdvance(
 
   // === LOSERS BRACKET ===
   if (bt === 'losers' && bh) {
-    // Winner advances within same Losers half
     const nextWin = findNextWinnerMatch(matches, currentMatch);
     if (nextWin) {
       result.winnerUpdates.push({
@@ -212,9 +293,7 @@ export function processDoubleEliminationAdvance(
         data: { [nextWin.field]: winnerId },
       });
     } else if (isFinalOfHalf(matches, currentMatch)) {
-      // Champion of Losers half → goes to cross-semifinal
-      // Losers Upper champion → cross_semi_1 (upper) as team1
-      // Losers Lower champion → cross_semi_2 (lower) as team1
+      // Champion → cross-semifinal
       const crossSemis = matches.filter(m => m.bracket_type === 'cross_semi');
       if (bh === 'upper') {
         const semi = crossSemis.find(m => m.bracket_half === 'upper');
@@ -228,12 +307,11 @@ export function processDoubleEliminationAdvance(
         }
       }
     }
-    // Loser in losers bracket = eliminated, no updates needed
+    // Loser in losers = eliminated
   }
 
   // === CROSS-SEMIFINAL ===
   if (bt === 'cross_semi') {
-    // Winner advances to Final
     const finalMatch = matches.find(m => m.bracket_type === 'final');
     if (finalMatch) {
       const field = currentMatch.position === 1 ? 'team1_id' : 'team2_id';
@@ -242,18 +320,12 @@ export function processDoubleEliminationAdvance(
         data: { [field]: winnerId },
       });
     }
-    // Loser is eliminated
   }
-
-  // === FINAL ===
-  // No advancement needed from final - winner is champion
 
   return result;
 }
 
-/**
- * Legacy compatibility - no longer used but kept to avoid import errors
- */
+// Legacy compatibility
 export function handleResetFinal(
   _matches: Match[],
   _grandFinalMatch: Match

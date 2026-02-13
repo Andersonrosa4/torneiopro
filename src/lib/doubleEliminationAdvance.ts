@@ -261,7 +261,8 @@ function processLegacyAdvancement(
       const field = currentMatch.position % 2 === 1 ? 'team1_id' : 'team2_id';
       result.winnerUpdates.push({ matchId: nextMatch.id, data: { [field]: winnerId } });
     } else if (isFinalOfHalf()) {
-      // Campeão Winners → semifinal do mesmo lado
+      // Campeão Winners → semifinal CRUZADA
+      // Winners A (upper) → Semi 1 (upper), Winners B (lower) → Semi 2 (lower)
       const semis = matches.filter(m => m.bracket_type === 'semi_final');
       const targetSemi = semis.find(m => m.bracket_half === bh);
       if (targetSemi) {
@@ -299,9 +300,11 @@ function processLegacyAdvancement(
       const field = currentMatch.position % 2 === 1 ? 'team1_id' : 'team2_id';
       result.winnerUpdates.push({ matchId: nextMatch.id, data: { [field]: winnerId } });
     } else if (isFinalOfHalf()) {
-      // Campeão Losers → semifinal do mesmo lado
+      // Campeão Losers → semifinal CRUZADA (lado oposto)
+      // Losers A (upper) → Semi 2 (lower), Losers B (lower) → Semi 1 (upper)
       const semis = matches.filter(m => m.bracket_type === 'semi_final');
-      const targetSemi = semis.find(m => m.bracket_half === bh);
+      const crossHalf = oppositeSide(bh);
+      const targetSemi = semis.find(m => m.bracket_half === crossHalf);
       if (targetSemi) {
         result.winnerUpdates.push({ matchId: targetSemi.id, data: { team2_id: winnerId } });
       }

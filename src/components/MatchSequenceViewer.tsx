@@ -72,11 +72,11 @@ function generateSequence(matches: Match[], tournamentFormat: string): Match[] {
 function generateDoubleEliminationSequence(matches: Match[]): Match[] {
   // Define a ordem prioritária das chaves
   const bracketOrder: Record<string, number> = {
-    'winners_upper': 1,
-    'winners_lower': 2,
-    'winners_null': 3, // winners sem bracket_half (final dos vencedores)
-    'losers_upper': 4,
-    'losers_lower': 5,
+    'winners_upper': 1,   // 1º Vencedores Lado A
+    'losers_upper': 2,    // 2º Perdedores Lado A
+    'winners_lower': 3,   // 3º Vencedores Lado B
+    'losers_lower': 4,    // 4º Perdedores Lado B
+    'winners_null': 5,    // Final dos Vencedores
     'cross_semi_upper': 6,
     'cross_semi_lower': 7,
     'third_place': 8,
@@ -119,7 +119,6 @@ function generateDoubleEliminationSequence(matches: Match[]): Match[] {
     const groupMatches = bracketGroups[key];
     
     // Dentro de cada chave: ordena por rodada, depois por posição
-    // Chapéu fica por último na rodada
     const rounds = [...new Set(groupMatches.map((m) => m.round))].sort((a, b) => a - b);
     
     for (const round of rounds) {
@@ -135,8 +134,10 @@ function generateDoubleEliminationSequence(matches: Match[]): Match[] {
     }
   }
 
-  // Post-process: verificar que dupla em chapéu nunca joga consecutivamente
-  return resolveByeConflicts(result);
+  // Post-process: resolve consecutive conflicts within each bracket group,
+  // then resolve bye-specific conflicts
+  const withRestResolved = resolveConsecutiveWithinBrackets(result, bracketGroups, sortedKeys);
+  return resolveByeConflicts(withRestResolved);
 }
 
 /**
@@ -164,6 +165,50 @@ function generateInterleavedSequence(matches: Match[]): Match[] {
   }
 
   return resolveConsecutiveConflicts(interleaved);
+}
+
+/**
+ * Resolve consecutive team conflicts within each bracket group for double elimination.
+ * Ensures no team plays two matches in a row within the Winners bracket.
+ */
+function resolveConsecutiveWithinBrackets(
+  sequence: Match[],
+  bracketGroups: Record<string, Match[]>,
+  sortedKeys: string[]
+): Match[] {
+  const result = [...sequence];
+  
+  // For each bracket group, find its range in the result and resolve conflicts
+  let offset = 0;
+  for (const key of sortedKeys) {
+    const groupLen = bracketGroups[key].length;
+    // Resolve consecutive conflicts within this bracket slice
+    for (let pass = 0; pass < groupLen * 2; pass++) {
+      let swapped = false;
+      for (let i = offset + 1; i < offset + groupLen; i++) {
+        if (hasTeamOverlap(result[i - 1], result[i])) {
+          let swapIdx = -1;
+          for (let j = i + 1; j < offset + groupLen; j++) {
+            if (
+              !hasTeamOverlap(result[i - 1], result[j]) &&
+              (i + 1 >= offset + groupLen || !hasTeamOverlap(result[j], result[i + 1]))
+            ) {
+              swapIdx = j;
+              break;
+            }
+          }
+          if (swapIdx !== -1) {
+            [result[i], result[swapIdx]] = [result[swapIdx], result[i]];
+            swapped = true;
+          }
+        }
+      }
+      if (!swapped) break;
+    }
+    offset += groupLen;
+  }
+  
+  return result;
 }
 
 /**

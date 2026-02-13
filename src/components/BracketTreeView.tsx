@@ -509,22 +509,27 @@ function buildGroupKnockoutPreview(groupNumbers: number[]) {
   const connections: { srcId: string; dstId: string }[] = [];
 
   // First knockout round: fed by group standings
-  // Cross-pairing: 1st of group pairs with 2nd of mirror group (A↔D, B↔C, etc.)
+  // Cross-pairing: 1st of group A always vs 2nd of last group (Z)
+  //                2nd of group A always vs 1st of last group (Z)
+  //                Then 1st B vs 2nd (penultimate), etc.
   if (rounds.length > 0) {
     const firstRound: PlaceholderMatch[] = [];
     const firstRoundCount = rounds[0].matchCount;
     
-    // Build cross-pairings: group[i] mirrors group[numGroups - 1 - i]
+    // Build cross-pairings using extremo-oposto pattern
     const pairings: { g1: number; seed1: number; g2: number; seed2: number }[] = [];
+    
     for (let i = 0; i < numGroups; i++) {
-      const mirrorIdx = numGroups - 1 - i;
-      if (mirrorIdx <= i) break; // avoid duplicates
-      // 1st of group i vs 2nd of mirror group
-      pairings.push({ g1: groupNumbers[i], seed1: 1, g2: groupNumbers[mirrorIdx], seed2: 2 });
-      // 2nd of group i vs 1st of mirror group
-      pairings.push({ g1: groupNumbers[i], seed1: 2, g2: groupNumbers[mirrorIdx], seed2: 1 });
+      const rightIdx = numGroups - 1 - i;
+      if (rightIdx < i) break; // avoid duplicates
+      
+      // 1st of group[i] vs 2nd of group[rightIdx]
+      pairings.push({ g1: groupNumbers[i], seed1: 1, g2: groupNumbers[rightIdx], seed2: 2 });
+      // 2nd of group[i] vs 1st of group[rightIdx]
+      pairings.push({ g1: groupNumbers[i], seed1: 2, g2: groupNumbers[rightIdx], seed2: 1 });
     }
-    // If odd number of groups, handle middle group pairing with itself or neighbors
+    
+    // If odd number of groups, handle middle group
     if (numGroups % 2 === 1) {
       const midIdx = Math.floor(numGroups / 2);
       pairings.push({ g1: groupNumbers[midIdx], seed1: 1, g2: groupNumbers[midIdx], seed2: 2 });

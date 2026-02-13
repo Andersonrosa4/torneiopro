@@ -20,6 +20,11 @@
  * Every Winners match has next_lose_match_id pointing to a Losers match.
  * Every Losers match has exactly 2 source feeders.
  * Validation: total matches >= (2 × teams − 1).
+ *
+ * MIRROR CROSSING RULE (ABSOLUTE):
+ *   Winners A (upper) → Losers B (lower)
+ *   Winners B (lower) → Losers A (upper)
+ *   Violation throws error.
  */
 
 interface Team {
@@ -478,12 +483,41 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
     finalMatch,
   ];
 
-  // ── VALIDATION ──
+  // ── VALIDATION: Mirror Crossing Rule (ABSOLUTE) ──
+  // Winners upper (A) → Losers lower (B) ALWAYS
+  // Winners lower (B) → Losers upper (A) ALWAYS
+  const validateMirrorCrossing = () => {
+    for (const m of allMatches) {
+      if (m.bracket_type !== 'winners') continue;
+      if (!m.next_lose_match_id) continue;
+
+      const losersTarget = allMatches.find(lm => lm._temp_id === m.next_lose_match_id);
+      if (!losersTarget || losersTarget.bracket_type !== 'losers') continue;
+
+      // Winners upper (A) → must feed ONLY to Losers lower (B)
+      if (m.bracket_half === 'upper' && losersTarget.bracket_half !== 'lower') {
+        throw new Error(
+          `[❌ Mirror Crossing Rule Violation] Winners A (${m._temp_id}) attempting to feed Losers ${losersTarget.bracket_half || 'null'} (position ${losersTarget.position}, round ${losersTarget.round}). MUST feed to Losers B (lower).`
+        );
+      }
+
+      // Winners lower (B) → must feed ONLY to Losers upper (A)
+      if (m.bracket_half === 'lower' && losersTarget.bracket_half !== 'upper') {
+        throw new Error(
+          `[❌ Mirror Crossing Rule Violation] Winners B (${m._temp_id}) attempting to feed Losers ${losersTarget.bracket_half || 'null'} (position ${losersTarget.position}, round ${losersTarget.round}). MUST feed to Losers A (upper).`
+        );
+      }
+    }
+  };
+
+  validateMirrorCrossing();
+
+  // ── VALIDATION: Total Matches >= (2*N - 1) ──
   const totalMatches = allMatches.length;
   const minExpected = (2 * teams.length) - 1;
   if (totalMatches < minExpected) {
     throw new Error(
-      `Estrutura incompleta: gerou ${totalMatches} partidas, mas dupla eliminação com ${teams.length} duplas exige no mínimo ${minExpected} (2×${teams.length}−1). Abortando.`
+      `[❌ Incomplete Structure] Generated ${totalMatches} matches, but double elimination with ${teams.length} teams requires minimum ${minExpected} matches (formula: 2×${teams.length}−1).`
     );
   }
 
@@ -503,7 +537,7 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
   }).length;
 
   if (orphanCount > 0) {
-    console.warn(`[Double Elimination] ${orphanCount} partida(s) órfã(s) detectada(s)`);
+    console.warn(`[⚠️  Double Elimination] ${orphanCount} orphan match(es) detected.`);
   }
 
   // Convert _temp_id to id
@@ -512,7 +546,11 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
     id: _temp_id,
   }));
 
-  console.log(`[Double Elimination] Generated ${cleanMatches.length} matches for ${teams.length} teams (min expected: ${minExpected}, formula: 2×${teams.length}−1)`);
+  console.log(
+    `[✓ Double Elimination] Generated ${cleanMatches.length} matches for ${teams.length} teams ` +
+    `(min required: ${minExpected} = 2×${teams.length}−1). ` +
+    `Mirror crossing rule enforced: A→B, B→A.`
+  );
 
   return { matches: cleanMatches };
 }

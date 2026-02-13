@@ -584,12 +584,25 @@ const TournamentDetail = () => {
     });
     if (!latestMatches) return;
 
-    const groupMatches = latestMatches.filter((m: any) => m.round === 0);
+    // GUARD: Only matches for the current modality
+    const modalityId = selectedModality?.id || null;
+    const relevantMatches = modalityId
+      ? latestMatches.filter((m: any) => m.modality_id === modalityId)
+      : latestMatches;
+
+    const groupMatches = relevantMatches.filter((m: any) => m.round === 0);
+
+    // GUARD: ALL group matches must be completed
+    const allGroupsDone = groupMatches.length > 0 && groupMatches.every((m: any) => m.status === "completed");
+    if (!allGroupsDone) {
+      toast.error("❌ Todos os jogos da fase de grupos devem estar finalizados antes de gerar a eliminatória.");
+      return;
+    }
+
     const brackets = Array.from(new Set<number>(groupMatches.map((m: any) => (m.bracket_number || 1) as number))).sort((a, b) => a - b);
 
     // Get tournament config for index
     const numIndexTeams = tournament?.num_brackets || 0;
-    const teamsPerGroupAdvancing = tournament?.num_sets ? undefined : 2; // default 2
 
     // Build team names map
     const teamNames: Record<string, string> = {};
@@ -599,8 +612,7 @@ const TournamentDetail = () => {
     const groupRankings: Record<string, { teamId: string; rank: number; pointDifferential: number }[]> = {};
     const advancingTeamIds: string[] = [];
 
-    // Determine how many advance per group (use config or default to 2)
-    const advPerGroup = 2; // Default; could be stored in tournament config
+    const advPerGroup = 2;
 
     for (const bracket of brackets) {
       const gMatches = groupMatches.filter((m: any) => (m.bracket_number || 1) === bracket);
@@ -608,7 +620,6 @@ const TournamentDetail = () => {
       const ranking = rankTeamsInGroup(gTeamIds, teamNames, gMatches);
       groupRankings[String(bracket)] = ranking;
 
-      // Top N advance
       ranking.slice(0, advPerGroup).forEach((r) => advancingTeamIds.push(r.teamId));
     }
 
@@ -620,93 +631,134 @@ const TournamentDetail = () => {
 
     const allAdvancing = [...advancingTeamIds, ...indexTeamIds];
 
-    // Also include BYE teams that went straight to knockout
-    const byeTeams = filteredTeams.filter((t) => !groupMatches.some((m: any) => m.team1_id === t.id || m.team2_id === t.id));
-    byeTeams.forEach((t) => allAdvancing.push(t.id));
-
     if (allAdvancing.length < 2) {
       toast.error("Duplas insuficientes para fase eliminatória.");
       return;
     }
 
-    // Determine knockout size
-    const totalSlots = Math.pow(2, Math.ceil(Math.log2(allAdvancing.length)));
-    const maxRounds = Math.ceil(Math.log2(totalSlots));
-
-    // Shuffle advancing teams (could seed by rank later)
+    // Shuffle advancing teams
     const arranged = [...allAdvancing].sort(() => Math.random() - 0.5);
+    const n = arranged.length;
 
     const newMatches: any[] = [];
-    const matchesInFirstRound = totalSlots / 2;
-    for (let i = 0; i < matchesInFirstRound; i++) {
-      const t1 = arranged[i] || null;
-      const t2 = arranged[totalSlots - 1 - i] || null;
-      newMatches.push({
-        tournament_id: id,
-        round: 1,
-        position: i + 1,
-        team1_id: t1 || null,
-        team2_id: t2 || null,
-        status: "pending",
-        bracket_number: 1,
-        modality_id: selectedModality?.id || null,
-      });
-    }
 
-    for (let r = 2; r <= maxRounds; r++) {
-      const count = totalSlots / Math.pow(2, r);
-      for (let p = 0; p < count; p++) {
+    // Organic knockout: NO BYEs, NO power-of-2 padding
+    // If N is a power of 2, all play in round 1
+    // Otherwise, excess teams play a preliminary round
+    const nextPow2 = Math.pow(2, Math.ceil(Math.log2(Math.max(n, 2))));
+    const mainRoundTeams = nextPow2 / 2;
+    const preliminaryMatchCount = n - mainRoundTeams;
+
+    if (preliminaryMatchCount > 0) {
+      // Preliminary round: excess teams play first
+      const numPrelimTeams = preliminaryMatchCount * 2;
+      const directTeams = arranged.slice(0, n - numPrelimTeams);
+      const prelimTeams = arranged.slice(n - numPrelimTeams);
+
+      for (let i = 0; i < prelimTeams.length; i += 2) {
         newMatches.push({
           tournament_id: id,
-          round: r,
-          position: p + 1,
-          team1_id: null,
-          team2_id: null,
+          round: 1,
+          position: Math.floor(i / 2) + 1,
+          team1_id: prelimTeams[i],
+          team2_id: prelimTeams[i + 1],
           status: "pending",
           bracket_number: 1,
-          modality_id: selectedModality?.id || null,
+          modality_id: modalityId,
         });
       }
-    }
 
-    // Auto-advance byes
-    for (const m of newMatches) {
-      if (m.team1_id && !m.team2_id) {
-        m.winner_team_id = m.team1_id;
-        m.status = "completed";
-      } else if (!m.team1_id && m.team2_id) {
-        m.winner_team_id = m.team2_id;
-        m.status = "completed";
+      // Round 2: direct teams + preliminary winners
+      let pos = 1;
+      const directPairCount = Math.floor(directTeams.length / 2);
+      for (let i = 0; i < directPairCount; i++) {
+        newMatches.push({
+          tournament_id: id,
+          round: 2,
+          position: pos++,
+          team1_id: directTeams[i * 2],
+          team2_id: directTeams[i * 2 + 1],
+          status: "pending",
+          bracket_number: 1,
+          modality_id: modalityId,
+        });
+      }
+      // Slots for preliminary winners vs remaining direct teams
+      let directIdx = directPairCount * 2;
+      for (let i = 0; i < preliminaryMatchCount; i++) {
+        newMatches.push({
+          tournament_id: id,
+          round: 2,
+          position: pos++,
+          team1_id: directIdx < directTeams.length ? directTeams[directIdx++] : null,
+          team2_id: null, // filled by preliminary winner
+          status: "pending",
+          bracket_number: 1,
+          modality_id: modalityId,
+        });
+      }
+
+      // Subsequent rounds
+      let currentRoundCount = pos - 1;
+      let round = 3;
+      while (currentRoundCount > 1) {
+        const count = Math.ceil(currentRoundCount / 2);
+        for (let p = 0; p < count; p++) {
+          newMatches.push({
+            tournament_id: id,
+            round,
+            position: p + 1,
+            team1_id: null,
+            team2_id: null,
+            status: "pending",
+            bracket_number: 1,
+            modality_id: modalityId,
+          });
+        }
+        currentRoundCount = count;
+        round++;
+      }
+    } else {
+      // Perfect power of 2 — all teams play in round 1
+      for (let i = 0; i < n; i += 2) {
+        newMatches.push({
+          tournament_id: id,
+          round: 1,
+          position: Math.floor(i / 2) + 1,
+          team1_id: arranged[i],
+          team2_id: arranged[i + 1],
+          status: "pending",
+          bracket_number: 1,
+          modality_id: modalityId,
+        });
+      }
+
+      // Subsequent rounds
+      let currentRoundCount = n / 2;
+      let round = 2;
+      while (currentRoundCount > 1) {
+        const count = Math.ceil(currentRoundCount / 2);
+        for (let p = 0; p < count; p++) {
+          newMatches.push({
+            tournament_id: id,
+            round,
+            position: p + 1,
+            team1_id: null,
+            team2_id: null,
+            status: "pending",
+            bracket_number: 1,
+            modality_id: modalityId,
+          });
+        }
+        currentRoundCount = count;
+        round++;
       }
     }
 
     const { error } = await organizerQuery({ table: "matches", operation: "insert", data: newMatches });
     if (error) { toast.error(error.message); return; }
 
-    // Advance byes in knockout
-    const { data: insertedMatches } = await organizerQuery({
-      table: "matches",
-      operation: "select",
-      filters: { tournament_id: id },
-      order: [{ column: "round" }, { column: "position" }],
-    });
-    if (insertedMatches) {
-      const knockoutMatches = insertedMatches.filter((m: any) => m.round > 0);
-      for (const m of knockoutMatches) {
-        if (m.winner_team_id && m.status === "completed") {
-          const nextRound = m.round + 1;
-          const nextPosition = Math.ceil(m.position / 2);
-          const isTop = m.position % 2 === 1;
-          const nextMatch = knockoutMatches.find((nm: any) => nm.round === nextRound && nm.position === nextPosition);
-          if (nextMatch) {
-            const update = isTop ? { team1_id: m.winner_team_id } : { team2_id: m.winner_team_id };
-            await organizerQuery({ table: "matches", operation: "update", data: update, filters: { id: nextMatch.id } });
-          }
-        }
-      }
-    }
-
-    toast.success(`Fase de grupos concluída! Eliminatória gerada automaticamente com ${allAdvancing.length} duplas.`);
+    toast.success(`Fase de grupos concluída! Eliminatória gerada com ${allAdvancing.length} duplas classificadas.`);
     fetchData();
   };
 

@@ -302,34 +302,68 @@ function buildLosersBracketWithFeeders(
     if (allCompetitors.length === 0) continue;
 
     const roundMatches: MatchData[] = [];
-    let idx = 0;
 
-    while (idx + 1 < allCompetitors.length) {
-      const competitor1 = allCompetitors[idx];
-      const competitor2 = allCompetitors[idx + 1];
+    // Rodada 1 dos perdedores: espelhamento reverso dentro do bloco
+    if (ri === 0 && queueSurvivors.length === 0 && allCompetitors.length >= 2) {
+      let i = 0;
+      let j = allCompetitors.length - 1;
+      while (i < j) {
+        const competitor1 = allCompetitors[i];
+        const competitor2 = allCompetitors[j];
 
-      const m = createMatch(tournamentId, modalityId, losersRound, roundMatches.length + 1, 'losers', half, bracketNumber);
+        const m = createMatch(tournamentId, modalityId, losersRound, roundMatches.length + 1, 'losers', half, bracketNumber);
 
-      if (competitor1.bracket_type === 'winners') {
-        competitor1.next_lose_match_id = m._temp_id;
-      } else {
-        competitor1.next_win_match_id = m._temp_id;
+        if (competitor1.bracket_type === 'winners') {
+          competitor1.next_lose_match_id = m._temp_id;
+        } else {
+          competitor1.next_win_match_id = m._temp_id;
+        }
+
+        if (competitor2.bracket_type === 'winners') {
+          competitor2.next_lose_match_id = m._temp_id;
+        } else {
+          competitor2.next_win_match_id = m._temp_id;
+        }
+
+        roundMatches.push(m);
+        allMatches.push(m);
+        i++;
+        j--;
+      }
+      // Competidor ímpar central → chapéu
+      if (i === j) {
+        roundMatches.push(allCompetitors[i]);
+      }
+    } else {
+      // Rodadas subsequentes: pareamento sequencial normal
+      let idx = 0;
+      while (idx + 1 < allCompetitors.length) {
+        const competitor1 = allCompetitors[idx];
+        const competitor2 = allCompetitors[idx + 1];
+
+        const m = createMatch(tournamentId, modalityId, losersRound, roundMatches.length + 1, 'losers', half, bracketNumber);
+
+        if (competitor1.bracket_type === 'winners') {
+          competitor1.next_lose_match_id = m._temp_id;
+        } else {
+          competitor1.next_win_match_id = m._temp_id;
+        }
+
+        if (competitor2.bracket_type === 'winners') {
+          competitor2.next_lose_match_id = m._temp_id;
+        } else {
+          competitor2.next_win_match_id = m._temp_id;
+        }
+
+        roundMatches.push(m);
+        allMatches.push(m);
+        idx += 2;
       }
 
-      if (competitor2.bracket_type === 'winners') {
-        competitor2.next_lose_match_id = m._temp_id;
-      } else {
-        competitor2.next_win_match_id = m._temp_id;
+      // Competidor ímpar → chapéu (carrega para próxima rodada sem criar partida)
+      if (idx < allCompetitors.length) {
+        roundMatches.push(allCompetitors[idx]);
       }
-
-      roundMatches.push(m);
-      allMatches.push(m);
-      idx += 2;
-    }
-
-    // Competidor ímpar → chapéu (carrega para próxima rodada sem criar partida)
-    if (idx < allCompetitors.length) {
-      roundMatches.push(allCompetitors[idx]);
     }
 
     queueSurvivors = roundMatches;

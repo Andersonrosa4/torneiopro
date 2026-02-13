@@ -277,8 +277,7 @@ const TournamentDetail = () => {
 
     if (config.useGroupStage) {
       // === GROUP STAGE ===
-      const nonByeTeams = filteredTeams.filter(t => !config.byeTeamIds.includes(t.id));
-      let arranged = [...nonByeTeams];
+      let arranged = [...filteredTeams];
       if (config.useSeeds && config.seedTeamIds && config.seedTeamIds.length > 0) {
         const seeds = arranged.filter(t => config.seedTeamIds!.includes(t.id));
         const nonSeeds = arranged.filter(t => !config.seedTeamIds!.includes(t.id)).sort(() => Math.random() - 0.5);
@@ -361,7 +360,7 @@ const TournamentDetail = () => {
       const { error } = await organizerQuery({ table: "matches", operation: "insert", data: matchesWithModality });
       if (error) { throw new Error(`Erro ao salvar partidas: ${error.message}`); }
 
-      // Re-fetch to get IDs then advance BYEs
+      // Re-fetch to get IDs then advance completed matches
       const { data: insertedMatches } = await organizerQuery({
         table: "matches",
         operation: "select",

@@ -9,7 +9,7 @@
  * - 3-4 jogos → "Quartas de Final"
  * - 5-8 jogos → "Oitavas de Final"
  * - 9-16 jogos → "16 avos de Final"
- * - Acima → "Rodada Eliminatória"
+ * - Acima → "Jogos"
  */
 export function getEliminationRoundLabel(
   round: number,
@@ -21,7 +21,7 @@ export function getEliminationRoundLabel(
   if (matchCountInRound >= 3 && matchCountInRound <= 4) return "Quartas de Final";
   if (matchCountInRound >= 5 && matchCountInRound <= 8) return "Oitavas de Final";
   if (matchCountInRound >= 9 && matchCountInRound <= 16) return "16 avos de Final";
-  return "Rodada Eliminatória";
+  return "Jogos";
 }
 
 /**
@@ -37,5 +37,5 @@ export function getEliminationRoundShortLabel(
   if (matchCountInRound >= 3 && matchCountInRound <= 4) return "Quartas";
   if (matchCountInRound >= 5 && matchCountInRound <= 8) return "Oitavas";
   if (matchCountInRound >= 9 && matchCountInRound <= 16) return "16 avos";
-  return "Elim.";
+  return "Jogos";
 }

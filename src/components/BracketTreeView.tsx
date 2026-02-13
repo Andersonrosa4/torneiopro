@@ -30,6 +30,7 @@ interface BracketTreeViewProps {
   onDeclareWinner: (matchId: string, winnerId: string) => void;
   onUpdateScore: (matchId: string, score1: number, score2: number) => void;
   structuralOnly?: boolean;
+  tournamentFormat?: string; // 'single_elimination' | 'double_elimination' | 'group_stage'
 }
 
 /* ── Compact Match Card ── */

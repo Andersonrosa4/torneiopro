@@ -27,9 +27,10 @@ interface BracketViewProps {
   isOwner: boolean;
   onDeclareWinner: (matchId: string, winnerId: string) => void;
   onUpdateScore: (matchId: string, score1: number, score2: number) => void;
+  tournamentFormat?: string; // 'single_elimination' | 'double_elimination' | 'group_stage'
 }
 
-const BracketView = ({ matches, participants, isOwner, onDeclareWinner, onUpdateScore }: BracketViewProps) => {
+const BracketView = ({ matches, participants, isOwner, onDeclareWinner, onUpdateScore, tournamentFormat = 'single_elimination' }: BracketViewProps) => {
   const rounds = matches.length > 0 ? Math.max(...matches.map((m) => m.round)) : 0;
   const minRound = matches.length > 0 ? Math.min(...matches.map((m) => m.round)) : 1;
   const roundNumbers = Array.from({ length: rounds - minRound + 1 }, (_, i) => i + minRound);
@@ -40,6 +41,11 @@ const BracketView = ({ matches, participants, isOwner, onDeclareWinner, onUpdate
   };
 
   const getRoundLabel = (round: number) => {
+    // Group stage: sempre exibir "Fase de Grupos"
+    if (tournamentFormat === 'group_stage') {
+      return "Fase de Grupos";
+    }
+    
     if (round === rounds) return "Final";
     if (round === rounds - 1) return "Semifinal";
     if (round === rounds - 2) return "Quartas de Final";

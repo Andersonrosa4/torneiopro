@@ -1,6 +1,7 @@
 import { useMemo, useRef, useEffect, useState, useCallback } from "react";
 import { Trophy, ChevronRight, ChevronLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { getSlotFeeders } from "@/lib/feederLabels";
 
 interface Participant {
   id: string;
@@ -37,22 +38,27 @@ interface BracketTreeViewProps {
 }
 
 /* ────────────────────────────────────────────────────
-   Match Card — compact, status-aware, no action buttons
+   Match Card — compact, status-aware, with feeder labels
    ──────────────────────────────────────────────────── */
 const MatchCard = ({
   match,
   getName,
   scale = "normal",
+  allMatches,
 }: {
   match: Match;
   getName: (id: string | null) => string;
   scale?: "small" | "normal" | "semi" | "final";
+  allMatches?: Match[];
 }) => {
   const isCompleted = match.status === "completed";
   const t1Win = match.winner_team_id === match.team1_id && isCompleted;
   const t2Win = match.winner_team_id === match.team2_id && isCompleted;
   const hasBothTeams = match.team1_id && match.team2_id;
   const isWaiting = !hasBothTeams;
+
+  // Compute feeders from actual feeder mapping
+  const feeders = allMatches ? getSlotFeeders(match, allMatches) : { team1: null, team2: null };
 
   const sizeClasses = {
     small: "w-[140px] text-[10px]",
@@ -91,29 +97,43 @@ const MatchCard = ({
         </div>
       )}
 
-      {/* Team 1 */}
-      <div className={`flex items-center justify-between px-2 py-1.5 ${t1Win ? "bg-success/10" : ""}`}>
-        <span className={`truncate flex-1 ${t1Win ? "font-bold text-success" : isWaiting && !match.team1_id ? "text-muted-foreground/50 italic" : "text-foreground"}`}>
-          {getName(match.team1_id)}
-        </span>
-        {match.score1 !== null && isCompleted && (
-          <span className={`font-mono ml-1 font-bold ${t1Win ? "text-success" : "text-muted-foreground"}`}>
-            {match.score1}
+      {/* Team 1 + Feeder */}
+      <div className="space-y-0.5">
+        <div className={`flex items-center justify-between px-2 py-1.5 ${t1Win ? "bg-success/10" : ""}`}>
+          <span className={`truncate flex-1 ${t1Win ? "font-bold text-success" : isWaiting && !match.team1_id ? "text-muted-foreground/50 italic" : "text-foreground"}`}>
+            {getName(match.team1_id)}
           </span>
+          {match.score1 !== null && isCompleted && (
+            <span className={`font-mono ml-1 font-bold ${t1Win ? "text-success" : "text-muted-foreground"}`}>
+              {match.score1}
+            </span>
+          )}
+        </div>
+        {feeders.team1 && (
+          <div className="px-2 pb-1 text-[7px] text-muted-foreground/60 font-medium">
+            ({feeders.team1.label})
+          </div>
         )}
       </div>
 
       <div className="border-t border-border/30" />
 
-      {/* Team 2 */}
-      <div className={`flex items-center justify-between px-2 py-1.5 ${t2Win ? "bg-success/10" : ""}`}>
-        <span className={`truncate flex-1 ${t2Win ? "font-bold text-success" : isWaiting && !match.team2_id ? "text-muted-foreground/50 italic" : "text-foreground"}`}>
-          {getName(match.team2_id)}
-        </span>
-        {match.score2 !== null && isCompleted && (
-          <span className={`font-mono ml-1 font-bold ${t2Win ? "text-success" : "text-muted-foreground"}`}>
-            {match.score2}
+      {/* Team 2 + Feeder */}
+      <div className="space-y-0.5">
+        <div className={`flex items-center justify-between px-2 py-1.5 ${t2Win ? "bg-success/10" : ""}`}>
+          <span className={`truncate flex-1 ${t2Win ? "font-bold text-success" : isWaiting && !match.team2_id ? "text-muted-foreground/50 italic" : "text-foreground"}`}>
+            {getName(match.team2_id)}
           </span>
+          {match.score2 !== null && isCompleted && (
+            <span className={`font-mono ml-1 font-bold ${t2Win ? "text-success" : "text-muted-foreground"}`}>
+              {match.score2}
+            </span>
+          )}
+        </div>
+        {feeders.team2 && (
+          <div className="px-2 pb-1 text-[7px] text-muted-foreground/60 font-medium">
+            ({feeders.team2.label})
+          </div>
         )}
       </div>
 
@@ -256,10 +276,10 @@ const BracketColumn = ({
                   Rodada {round}
                 </div>
                 <div className="flex flex-col justify-around gap-3 flex-1">
-                  {roundMatches.map((match) => (
-                    <MatchCard key={match.id} match={match} getName={getName} scale={getScale(round)} />
-                  ))}
-                </div>
+                   {roundMatches.map((match) => (
+                     <MatchCard key={match.id} match={match} getName={getName} scale={getScale(round)} allMatches={allMatches} />
+                   ))}
+                 </div>
               </div>
             );
           })}
@@ -276,10 +296,12 @@ const CenterColumn = ({
   crossSemis,
   finalMatches,
   getName,
+  allMatches,
 }: {
   crossSemis: Match[];
   finalMatches: Match[];
   getName: (id: string | null) => string;
+  allMatches: Match[];
 }) => {
   if (crossSemis.length === 0 && finalMatches.length === 0) return null;
 
@@ -298,7 +320,7 @@ const CenterColumn = ({
                 <div className="text-[9px] text-center text-muted-foreground/60 font-medium">
                   Semi {i + 1}
                 </div>
-                <MatchCard match={m} getName={getName} scale="semi" />
+                <MatchCard match={m} getName={getName} scale="semi" allMatches={allMatches} />
               </div>
             ))}
         </div>
@@ -311,7 +333,7 @@ const CenterColumn = ({
 
       {/* Final */}
       {finalMatches.map((m) => (
-        <MatchCard key={m.id} match={m} getName={getName} scale="final" />
+        <MatchCard key={m.id} match={m} getName={getName} scale="final" allMatches={allMatches} />
       ))}
     </div>
   );
@@ -419,10 +441,10 @@ const NormalKnockout = ({
                   R{round}
                 </div>
                 <div className="flex flex-col justify-around gap-3 flex-1">
-                  {roundMatches.map((match) => (
-                    <MatchCard key={match.id} match={match} getName={getName} scale={scale as any} />
-                  ))}
-                </div>
+                   {roundMatches.map((match) => (
+                     <MatchCard key={match.id} match={match} getName={getName} scale={scale as any} allMatches={matches} />
+                   ))}
+                 </div>
               </div>
             );
           })}
@@ -513,7 +535,7 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
                   Fase Final
                 </span>
               </div>
-              <CenterColumn crossSemis={semiFinals} finalMatches={finalMatches} getName={getName} />
+              <CenterColumn crossSemis={semiFinals} finalMatches={finalMatches} getName={getName} allMatches={matches} />
             </div>
 
             {/* ── RIGHT: Losers (R → L) ── */}

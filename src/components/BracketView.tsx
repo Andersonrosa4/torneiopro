@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Trophy, Check } from "lucide-react";
+import { getEliminationRoundLabel } from "@/lib/roundLabels";
 
 interface Participant {
   id: string;
@@ -40,10 +41,14 @@ const BracketView = ({ matches, participants, isOwner, onDeclareWinner, onUpdate
     return participants.find((p) => p.id === id)?.name || "A definir";
   };
 
+  const matchCountByRound = useMemo(() => {
+    const counts: Record<number, number> = {};
+    matches.forEach(m => { counts[m.round] = (counts[m.round] || 0) + 1; });
+    return counts;
+  }, [matches]);
+
   const getRoundLabel = (round: number) => {
-    if (round === rounds) return "Final";
-    if (round === rounds - 1) return "Semifinal";
-    return "Fase de Grupos";
+    return getEliminationRoundLabel(round, matchCountByRound[round] || 0);
   };
 
   return (

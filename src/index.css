@@ -179,17 +179,20 @@
 /* ─── Mobile-only button adjustments (< 768px) ─── */
 @media (max-width: 767px) {
   button,
-  [role="button"],
-  a[class*="btn"],
-  .inline-flex[class*="button"] {
-    min-height: 48px;
-    width: 100%;
-    margin-bottom: 12px;
-    border-radius: 14px;
-    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.25);
-    font-size: 110%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  [role="button"] {
+    margin-bottom: 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.25);
+  }
+
+  .flex.gap-2,
+  .flex.gap-3,
+  .flex.gap-4,
+  .space-x-2,
+  .space-x-3 {
+    flex-direction: column;
+    gap: 10px;
+    overflow: visible;
   }
 }

@@ -359,8 +359,68 @@ const CenterColumn = ({
 };
 
 /* ────────────────────────────────────────────────────
-   Group Stage View (preserved for non-DE formats)
+   Group Stage View — match cards + standings per group
    ──────────────────────────────────────────────────── */
+const GroupMatchCard = ({
+  match,
+  getName,
+}: {
+  match: Match;
+  getName: (id: string | null) => string;
+}) => {
+  const isCompleted = match.status === "completed";
+  const t1Win = match.winner_team_id === match.team1_id && isCompleted;
+  const t2Win = match.winner_team_id === match.team2_id && isCompleted;
+  const hasBothTeams = match.team1_id && match.team2_id;
+
+  const borderClass = isCompleted
+    ? "border-success/40"
+    : hasBothTeams
+    ? "border-primary/25"
+    : "border-border/60";
+
+  const statusBadge = isCompleted
+    ? <Badge className="bg-success/20 text-success border-0 text-[8px] px-1.5 py-0 leading-tight">Finalizado</Badge>
+    : hasBothTeams
+    ? <Badge className="bg-warning/20 text-warning border-0 text-[8px] px-1.5 py-0 leading-tight">Pendente</Badge>
+    : <Badge variant="outline" className="text-muted-foreground text-[8px] px-1.5 py-0 leading-tight border-border/40">Aguardando</Badge>;
+
+  return (
+    <div className={`rounded-lg border bg-card/90 backdrop-blur-sm transition-all text-[11px] ${borderClass}`}>
+      {/* Team 1 */}
+      <div className={`flex items-center justify-between px-3 py-2 ${t1Win ? "bg-success/10" : ""}`}>
+        <span className={`truncate flex-1 ${t1Win ? "font-bold text-success" : !match.team1_id ? "text-muted-foreground/50 italic" : "team-name"}`}>
+          {getName(match.team1_id)}
+        </span>
+        {match.score1 !== null && isCompleted && (
+          <span className={`font-mono ml-1 font-bold ${t1Win ? "text-success" : "text-muted-foreground"}`}>
+            {match.score1}
+          </span>
+        )}
+      </div>
+
+      <div className="border-t border-border/30" />
+
+      {/* Team 2 */}
+      <div className={`flex items-center justify-between px-3 py-2 ${t2Win ? "bg-success/10" : ""}`}>
+        <span className={`truncate flex-1 ${t2Win ? "font-bold text-success" : !match.team2_id ? "text-muted-foreground/50 italic" : "team-name"}`}>
+          {getName(match.team2_id)}
+        </span>
+        {match.score2 !== null && isCompleted && (
+          <span className={`font-mono ml-1 font-bold ${t2Win ? "text-success" : "text-muted-foreground"}`}>
+            {match.score2}
+          </span>
+        )}
+      </div>
+
+      {/* Status */}
+      <div className="flex justify-center border-t border-border/20 px-2 py-1">
+        {statusBadge}
+      </div>
+    </div>
+  );
+};
+
 const GroupStageView = ({
   groupMatches,
   getName,
@@ -368,6 +428,7 @@ const GroupStageView = ({
   groupMatches: Match[];
   getName: (id: string | null) => string;
 }) => {
+  const [showStandings, setShowStandings] = useState(false);
   const groupNumbers = Array.from(new Set(groupMatches.map((m) => m.bracket_number || 1))).sort();
 
   const getGroupStandings = (groupNum: number) => {
@@ -390,32 +451,67 @@ const GroupStageView = ({
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-bold text-primary flex items-center gap-2">
-        <Trophy className="h-5 w-5" /> Fase de Grupos
-      </h3>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {groupNumbers.map((gNum) => {
-          const standings = getGroupStandings(gNum);
-          return (
-            <div key={gNum} className="rounded-xl border border-border bg-card p-4 shadow-card">
-              <h4 className="mb-3 text-sm font-bold text-primary uppercase tracking-wider">
-                Grupo {gNum}
-              </h4>
-              <div className="space-y-1">
-                {standings.map((s, i) => (
-                  <div key={s.id} className="flex items-center justify-between rounded-md bg-secondary/50 px-3 py-1.5 text-xs">
-                    <span className="flex items-center gap-2">
-                      <span className="font-bold text-muted-foreground">{i + 1}.</span>
-                      <span className="team-name">{s.name}</span>
-                    </span>
-                    <span className="font-bold text-primary">{s.wins}V / {s.played}J</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-bold text-primary flex items-center gap-2">
+          <Trophy className="h-5 w-5" /> Fase de Grupos
+        </h3>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-xs text-muted-foreground h-7"
+          onClick={() => setShowStandings(!showStandings)}
+        >
+          {showStandings ? "Ver Jogos" : "Ver Classificação"}
+        </Button>
       </div>
+
+      {showStandings ? (
+        /* ── Standings view ── */
+        <div className="grid gap-4 sm:grid-cols-2">
+          {groupNumbers.map((gNum) => {
+            const standings = getGroupStandings(gNum);
+            return (
+              <div key={gNum} className="rounded-xl border border-border bg-card p-4 shadow-card">
+                <h4 className="mb-3 text-sm font-bold text-primary uppercase tracking-wider">
+                  Grupo {gNum}
+                </h4>
+                <div className="space-y-1">
+                  {standings.map((s, i) => (
+                    <div key={s.id} className="flex items-center justify-between rounded-md bg-secondary/50 px-3 py-1.5 text-xs">
+                      <span className="flex items-center gap-2">
+                        <span className="font-bold text-muted-foreground">{i + 1}.</span>
+                        <span className="team-name">{s.name}</span>
+                      </span>
+                      <span className="font-bold text-primary">{s.wins}V / {s.played}J</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* ── Match cards view ── */
+        <div className="grid gap-4 sm:grid-cols-2">
+          {groupNumbers.map((gNum) => {
+            const gMatches = groupMatches
+              .filter((m) => (m.bracket_number || 1) === gNum)
+              .sort((a, b) => a.position - b.position);
+            return (
+              <div key={gNum} className="rounded-xl border border-border bg-card/50 p-4 space-y-3">
+                <h4 className="text-sm font-bold text-primary uppercase tracking-wider">
+                  Grupo {gNum}
+                </h4>
+                <div className="grid gap-2">
+                  {gMatches.map((match) => (
+                    <GroupMatchCard key={match.id} match={match} getName={getName} />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

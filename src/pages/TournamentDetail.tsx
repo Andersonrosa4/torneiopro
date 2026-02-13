@@ -357,13 +357,6 @@ const TournamentDetail = () => {
       }));
 
       const matchCount = matchesWithModality.length;
-      const teamCount = filteredTeams.length;
-      const expectedMin = (2 * teamCount) - 5;
-      if (matchCount < expectedMin) {
-        throw new Error(
-          `Estrutura inválida: gerou ${matchCount} partidas, mas dupla eliminação com ${teamCount} duplas exige no mínimo ${expectedMin}. Verifique a configuração.`
-        );
-      }
 
       const { error } = await organizerQuery({ table: "matches", operation: "insert", data: matchesWithModality });
       if (error) { throw new Error(`Erro ao salvar partidas: ${error.message}`); }

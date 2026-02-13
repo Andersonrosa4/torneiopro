@@ -359,74 +359,18 @@ const CenterColumn = ({
 };
 
 /* ────────────────────────────────────────────────────
-   Group Stage View — match cards + standings per group
+   Group Stage View — uses same MatchCard + BracketColumn style as DE
    ──────────────────────────────────────────────────── */
-const GroupMatchCard = ({
-  match,
-  getName,
-}: {
-  match: Match;
-  getName: (id: string | null) => string;
-}) => {
-  const isCompleted = match.status === "completed";
-  const t1Win = match.winner_team_id === match.team1_id && isCompleted;
-  const t2Win = match.winner_team_id === match.team2_id && isCompleted;
-  const hasBothTeams = match.team1_id && match.team2_id;
-
-  const borderClass = isCompleted
-    ? "border-success/40"
-    : hasBothTeams
-    ? "border-primary/25"
-    : "border-border/60";
-
-  const statusBadge = isCompleted
-    ? <Badge className="bg-success/20 text-success border-0 text-[8px] px-1.5 py-0 leading-tight">Finalizado</Badge>
-    : hasBothTeams
-    ? <Badge className="bg-warning/20 text-warning border-0 text-[8px] px-1.5 py-0 leading-tight">Pendente</Badge>
-    : <Badge variant="outline" className="text-muted-foreground text-[8px] px-1.5 py-0 leading-tight border-border/40">Aguardando</Badge>;
-
-  return (
-    <div className={`rounded-lg border bg-card/90 backdrop-blur-sm transition-all text-[11px] ${borderClass}`}>
-      {/* Team 1 */}
-      <div className={`flex items-center justify-between px-3 py-2 ${t1Win ? "bg-success/10" : ""}`}>
-        <span className={`truncate flex-1 ${t1Win ? "font-bold text-success" : !match.team1_id ? "text-muted-foreground/50 italic" : "team-name"}`}>
-          {getName(match.team1_id)}
-        </span>
-        {match.score1 !== null && isCompleted && (
-          <span className={`font-mono ml-1 font-bold ${t1Win ? "text-success" : "text-muted-foreground"}`}>
-            {match.score1}
-          </span>
-        )}
-      </div>
-
-      <div className="border-t border-border/30" />
-
-      {/* Team 2 */}
-      <div className={`flex items-center justify-between px-3 py-2 ${t2Win ? "bg-success/10" : ""}`}>
-        <span className={`truncate flex-1 ${t2Win ? "font-bold text-success" : !match.team2_id ? "text-muted-foreground/50 italic" : "team-name"}`}>
-          {getName(match.team2_id)}
-        </span>
-        {match.score2 !== null && isCompleted && (
-          <span className={`font-mono ml-1 font-bold ${t2Win ? "text-success" : "text-muted-foreground"}`}>
-            {match.score2}
-          </span>
-        )}
-      </div>
-
-      {/* Status */}
-      <div className="flex justify-center border-t border-border/20 px-2 py-1">
-        {statusBadge}
-      </div>
-    </div>
-  );
-};
-
 const GroupStageView = ({
   groupMatches,
   getName,
+  allMatches,
+  matchNumberMap,
 }: {
   groupMatches: Match[];
   getName: (id: string | null) => string;
+  allMatches: Match[];
+  matchNumberMap?: Map<string, number>;
 }) => {
   const [showStandings, setShowStandings] = useState(false);
   const groupNumbers = Array.from(new Set(groupMatches.map((m) => m.bracket_number || 1))).sort();
@@ -466,7 +410,6 @@ const GroupStageView = ({
       </div>
 
       {showStandings ? (
-        /* ── Standings view ── */
         <div className="grid gap-4 sm:grid-cols-2">
           {groupNumbers.map((gNum) => {
             const standings = getGroupStandings(gNum);
@@ -491,21 +434,32 @@ const GroupStageView = ({
           })}
         </div>
       ) : (
-        /* ── Match cards view ── */
-        <div className="grid gap-4 sm:grid-cols-2">
+        /* ── Match cards view — same MatchCard as DE ── */
+        <div className="space-y-4">
           {groupNumbers.map((gNum) => {
             const gMatches = groupMatches
               .filter((m) => (m.bracket_number || 1) === gNum)
               .sort((a, b) => a.position - b.position);
             return (
-              <div key={gNum} className="rounded-xl border border-border bg-card/50 p-4 space-y-3">
-                <h4 className="text-sm font-bold text-primary uppercase tracking-wider">
-                  Grupo {gNum}
-                </h4>
-                <div className="grid gap-2">
-                  {gMatches.map((match) => (
-                    <GroupMatchCard key={match.id} match={match} getName={getName} />
-                  ))}
+              <div key={gNum} className="rounded-xl border border-primary/20 bg-primary/[0.03] p-3 space-y-2">
+                <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground flex items-center gap-1.5">
+                  <span>🏆</span>
+                  <span>Grupo {gNum}</span>
+                </div>
+                <div className="flex gap-6 overflow-x-auto pb-2">
+                  <div className="flex flex-col gap-3 shrink-0" style={{ minWidth: 160 }}>
+                    {gMatches.map((match) => (
+                      <MatchCard
+                        key={match.id}
+                        match={match}
+                        getName={getName}
+                        scale="normal"
+                        allMatches={allMatches}
+                        matchNumber={matchNumberMap?.get(match.id)}
+                        matchNumberMap={matchNumberMap}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
             );
@@ -946,7 +900,7 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
       )}
 
       {/* Group Stage */}
-      {hasGroupStage && <GroupStageView groupMatches={groupMatches} getName={getName} />}
+      {hasGroupStage && <GroupStageView groupMatches={groupMatches} getName={getName} allMatches={matches} matchNumberMap={matchNumberMap} />}
 
       {/* Mobile List Mode */}
       {isMobile && viewMode === 'list' && hasElimination && (

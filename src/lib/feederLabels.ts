@@ -70,12 +70,7 @@ export function getSlotFeeders(
     }
   });
 
-  if (feeders.team1 === null && feeders.team2 === null) {
-    if (targetMatch.round === 1) {
-      feeders.team1 = { label: 'Seed 1', type: 'seed', matchNumber: '' };
-      feeders.team2 = { label: 'Seed 2', type: 'seed', matchNumber: '' };
-    }
-  }
+  // Round 1 matches have no feeders — leave null (no labels shown)
 
   return feeders;
 }

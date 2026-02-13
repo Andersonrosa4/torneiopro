@@ -33,15 +33,15 @@ export interface SchedulerBlock {
   dependencies: string[]; // Keys of blocks that must be completed first
 }
 
-type BlockCategory = 'WA' | 'WB' | 'LA' | 'LB' | 'SEMI' | 'FINAL' | 'OTHER';
+type BlockCategory = 'WA' | 'WB' | 'LS' | 'LI' | 'SEMI' | 'FINAL' | 'OTHER';
 
 function categorizeMatch(m: SchedulerMatch): BlockCategory {
   const bt = m.bracket_type || 'winners';
   const bh = m.bracket_half;
   if (bt === 'winners' && bh === 'upper') return 'WA';
   if (bt === 'winners' && bh === 'lower') return 'WB';
-  if (bt === 'losers' && bh === 'lower') return 'LA';  // mirror: losers lower = side A display
-  if (bt === 'losers' && bh === 'upper') return 'LB';  // mirror: losers upper = side B display
+  if (bt === 'losers' && bh === 'upper') return 'LS';  // losers upper = Perdedores Superiores (recebe de Winners B)
+  if (bt === 'losers' && bh === 'lower') return 'LI';  // losers lower = Perdedores Inferiores (recebe de Winners A)
   if (bt === 'semi_final') return 'SEMI';
   if (bt === 'final') return 'FINAL';
   return 'OTHER';
@@ -51,8 +51,8 @@ function blockLabel(cat: BlockCategory, round: number): string {
   switch (cat) {
     case 'WA': return `Vencedores A — Rodada ${round}`;
     case 'WB': return `Vencedores B — Rodada ${round}`;
-    case 'LA': return `Perdedores A — Rodada ${round}`;
-    case 'LB': return `Perdedores B — Rodada ${round}`;
+    case 'LS': return `Perdedores Superiores — Rodada ${round}`;
+    case 'LI': return `Perdedores Inferiores — Rodada ${round}`;
     case 'SEMI': return 'Semifinais';
     case 'FINAL': return 'Final';
     default: return `Outros — Rodada ${round}`;
@@ -79,7 +79,7 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
   for (const m of matches) {
     if (m.round > 0) {
       const cat = categorizeMatch(m);
-      if (['WA', 'WB', 'LA', 'LB'].includes(cat)) allRounds.add(m.round);
+      if (['WA', 'WB', 'LS', 'LI'].includes(cat)) allRounds.add(m.round);
     }
   }
   const sortedRounds = [...allRounds].sort((a, b) => a - b);
@@ -89,7 +89,7 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
 
   // For each round: WA → WB → LA → LB
   for (const r of sortedRounds) {
-    const roundCats: BlockCategory[] = ['WA', 'WB', 'LA', 'LB'];
+    const roundCats: BlockCategory[] = ['WA', 'WB', 'LS', 'LI'];
     for (const cat of roundCats) {
       const key = `${cat}_R${r}`;
       const catMatches = groups.get(key) || [];
@@ -97,7 +97,7 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
 
       const deps: string[] = [];
 
-      if (cat === 'LA' || cat === 'LB') {
+      if (cat === 'LS' || cat === 'LI') {
         // Losers R depends on Winners A R + Winners B R
         if (groups.has(`WA_R${r}`)) deps.push(`WA_R${r}`);
         if (groups.has(`WB_R${r}`)) deps.push(`WB_R${r}`);
@@ -105,22 +105,22 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
 
       if (cat === 'WA' || cat === 'WB') {
         if (r > sortedRounds[0]) {
-          // Winners R+1 depends on Losers A R-1 + Losers B R-1
+          // Winners R+1 depends on both Losers of R-1
           const prevR = sortedRounds[sortedRounds.indexOf(r) - 1];
           if (prevR !== undefined) {
-            if (groups.has(`LA_R${prevR}`)) deps.push(`LA_R${prevR}`);
-            if (groups.has(`LB_R${prevR}`)) deps.push(`LB_R${prevR}`);
+            if (groups.has(`LS_R${prevR}`)) deps.push(`LS_R${prevR}`);
+            if (groups.has(`LI_R${prevR}`)) deps.push(`LI_R${prevR}`);
           }
         }
       }
 
-      // Within same round: WB depends on WA, LA depends on WB, LB depends on LA
+      // Within same round: WA → WB → LS (Superiores) → LI (Inferiores)
       if (cat === 'WB' && groups.has(`WA_R${r}`)) deps.push(`WA_R${r}`);
-      if (cat === 'LA') {
+      if (cat === 'LS') {
         if (groups.has(`WB_R${r}`)) deps.push(`WB_R${r}`);
       }
-      if (cat === 'LB') {
-        if (groups.has(`LA_R${r}`)) deps.push(`LA_R${r}`);
+      if (cat === 'LI') {
+        if (groups.has(`LS_R${r}`)) deps.push(`LS_R${r}`);
       }
 
       const isCompleted = catMatches.every(m => m.status === 'completed');
@@ -145,7 +145,7 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
     const semiDeps: string[] = [];
     // Semis depend on all losers blocks of last round
     if (lastRound !== undefined) {
-      for (const cat of ['WA', 'WB', 'LA', 'LB'] as BlockCategory[]) {
+      for (const cat of ['WA', 'WB', 'LS', 'LI'] as BlockCategory[]) {
         const k = `${cat}_R${lastRound}`;
         if (groups.has(k)) semiDeps.push(k);
       }
@@ -233,8 +233,8 @@ export function validateMatchStart(matchId: string, matches: SchedulerMatch[]): 
 export function getSchedulerBlockColor(key: string): string {
   if (key.startsWith('WA')) return 'border-l-blue-500';
   if (key.startsWith('WB')) return 'border-l-sky-400';
-  if (key.startsWith('LA')) return 'border-l-orange-500';
-  if (key.startsWith('LB')) return 'border-l-amber-400';
+  if (key.startsWith('LS')) return 'border-l-orange-500';
+  if (key.startsWith('LI')) return 'border-l-amber-400';
   if (key === 'SEMI') return 'border-l-purple-500';
   if (key === 'FINAL') return 'border-l-yellow-500';
   return 'border-l-primary';
@@ -246,8 +246,8 @@ export function getSchedulerBlockColor(key: string): string {
 export function getSchedulerBadgeColor(key: string): string {
   if (key.startsWith('WA')) return 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30';
   if (key.startsWith('WB')) return 'bg-sky-400/20 text-sky-600 dark:text-sky-400 border-sky-400/30';
-  if (key.startsWith('LA')) return 'bg-orange-500/20 text-orange-600 dark:text-orange-400 border-orange-500/30';
-  if (key.startsWith('LB')) return 'bg-amber-400/20 text-amber-600 dark:text-amber-400 border-amber-400/30';
+  if (key.startsWith('LS')) return 'bg-orange-500/20 text-orange-600 dark:text-orange-400 border-orange-500/30';
+  if (key.startsWith('LI')) return 'bg-amber-400/20 text-amber-600 dark:text-amber-400 border-amber-400/30';
   if (key === 'SEMI') return 'bg-purple-500/20 text-purple-600 dark:text-purple-400 border-purple-500/30';
   if (key === 'FINAL') return 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border-yellow-500/30';
   return 'bg-primary/20 text-primary border-primary/30';

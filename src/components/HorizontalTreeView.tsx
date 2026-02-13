@@ -27,7 +27,11 @@ interface HorizontalTreeViewProps {
   matchNumberMap?: Map<string, number>;
 }
 
-/* ─── Horizontal Match Card ─── */
+/* ─── Card height constant for spacing calculations ─── */
+const CARD_H = 90; // approx card height in px
+const CARD_GAP = 12; // min gap between cards
+
+/* ─── Match Card ─── */
 const HTreeMatchCard = ({
   match,
   getName,
@@ -93,7 +97,6 @@ const HTreeMatchCard = ({
         </div>
       )}
 
-      {/* Team 1 */}
       <div className="space-y-0.5">
         <div className={`flex items-center justify-between px-2 py-1.5 ${t1Win ? "bg-success/10" : ""}`}>
           <span className={`truncate flex-1 ${t1Win ? "font-bold text-success" : isWaiting && !match.team1_id ? "text-muted-foreground/50 italic" : "team-name"}`}>
@@ -114,7 +117,6 @@ const HTreeMatchCard = ({
 
       <div className="border-t border-border/30" />
 
-      {/* Team 2 */}
       <div className="space-y-0.5">
         <div className={`flex items-center justify-between px-2 py-1.5 ${t2Win ? "bg-success/10" : ""}`}>
           <span className={`truncate flex-1 ${t2Win ? "font-bold text-success" : isWaiting && !match.team2_id ? "text-muted-foreground/50 italic" : "team-name"}`}>
@@ -157,14 +159,10 @@ const TreeConnectors = ({
     const containerRect = container.getBoundingClientRect();
     const newPaths: { d: string; completed: boolean }[] = [];
 
-    for (const m of matches) {
-      if (!m.next_win_match_id) continue;
-      const nextMatch = matches.find(n => n.id === m.next_win_match_id);
-      if (!nextMatch) continue;
-
-      const srcEl = container.querySelector(`[data-match-id="${m.id}"]`);
-      const dstEl = container.querySelector(`[data-match-id="${nextMatch.id}"]`);
-      if (!srcEl || !dstEl) continue;
+    const drawConnection = (srcId: string, dstId: string, completed: boolean) => {
+      const srcEl = container.querySelector(`[data-match-id="${srcId}"]`);
+      const dstEl = container.querySelector(`[data-match-id="${dstId}"]`);
+      if (!srcEl || !dstEl) return;
 
       const srcR = srcEl.getBoundingClientRect();
       const dstR = dstEl.getBoundingClientRect();
@@ -176,30 +174,18 @@ const TreeConnectors = ({
 
       const midX = (x1 + x2) / 2;
       const d = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
-      newPaths.push({ d, completed: m.status === "completed" });
-    }
+      newPaths.push({ d, completed });
+    };
 
-    // Also draw lose connections
     for (const m of matches) {
-      if (!m.next_lose_match_id) continue;
-      const nextMatch = matches.find(n => n.id === m.next_lose_match_id);
-      if (!nextMatch) continue;
-
-      const srcEl = container.querySelector(`[data-match-id="${m.id}"]`);
-      const dstEl = container.querySelector(`[data-match-id="${nextMatch.id}"]`);
-      if (!srcEl || !dstEl) continue;
-
-      const srcR = srcEl.getBoundingClientRect();
-      const dstR = dstEl.getBoundingClientRect();
-
-      const x1 = srcR.right - containerRect.left;
-      const y1 = srcR.top + srcR.height / 2 - containerRect.top;
-      const x2 = dstR.left - containerRect.left;
-      const y2 = dstR.top + dstR.height / 2 - containerRect.top;
-
-      const midX = (x1 + x2) / 2;
-      const d = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
-      newPaths.push({ d, completed: false });
+      if (m.next_win_match_id) {
+        const next = matches.find(n => n.id === m.next_win_match_id);
+        if (next) drawConnection(m.id, next.id, m.status === "completed");
+      }
+      if (m.next_lose_match_id) {
+        const next = matches.find(n => n.id === m.next_lose_match_id);
+        if (next) drawConnection(m.id, next.id, false);
+      }
     }
 
     setPaths(newPaths);
@@ -217,7 +203,7 @@ const TreeConnectors = ({
   if (paths.length === 0) return null;
 
   return (
-    <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 0 }}>
+    <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 0, overflow: "visible" }}>
       {paths.map((p, i) => (
         <path
           key={i}
@@ -232,20 +218,145 @@ const TreeConnectors = ({
   );
 };
 
-/* ─── Round Column Header Colors ─── */
-function getRoundHeaderStyle(bracketType: string | undefined, isLast: boolean, isSemiOrFinal: boolean): string {
-  if (isSemiOrFinal) return "bg-primary/15 text-primary";
-  if (bracketType === "losers") return "bg-destructive/10 text-destructive/80";
-  return "bg-muted/50 text-muted-foreground";
+/* ─── Build tree-layout positions with proportional spacing ─── */
+function buildTreeLayout(matches: Match[]) {
+  // Group by round
+  const roundGroups: Record<number, Match[]> = {};
+  matches.forEach(m => {
+    if (!roundGroups[m.round]) roundGroups[m.round] = [];
+    roundGroups[m.round].push(m);
+  });
+  Object.values(roundGroups).forEach(arr => arr.sort((a, b) => a.position - b.position));
+
+  const rounds = Object.keys(roundGroups).map(Number).sort((a, b) => a - b);
+  if (rounds.length === 0) return { rounds: [], roundGroups, positions: new Map<string, number>() };
+
+  // Calculate vertical position for each match
+  // First round gets evenly spaced positions
+  // Subsequent rounds center between their feeder matches
+  const positions = new Map<string, number>();
+  const firstRound = rounds[0];
+  const firstRoundMatches = roundGroups[firstRound];
+  const slotHeight = CARD_H + CARD_GAP;
+
+  // Position first round evenly
+  firstRoundMatches.forEach((m, i) => {
+    positions.set(m.id, i * slotHeight);
+  });
+
+  // For each subsequent round, position each match at the center of its feeders
+  for (let ri = 1; ri < rounds.length; ri++) {
+    const round = rounds[ri];
+    const roundMatches = roundGroups[round];
+
+    for (const match of roundMatches) {
+      // Find all matches that feed into this one (via next_win_match_id)
+      const feeders = matches.filter(m => m.next_win_match_id === match.id);
+      
+      if (feeders.length > 0) {
+        const feederPositions = feeders
+          .map(f => positions.get(f.id))
+          .filter((p): p is number => p !== undefined);
+        
+        if (feederPositions.length > 0) {
+          const avg = feederPositions.reduce((a, b) => a + b, 0) / feederPositions.length;
+          positions.set(match.id, avg);
+          continue;
+        }
+      }
+      
+      // Fallback: use position index relative to round
+      const idx = roundMatches.indexOf(match);
+      const totalHeight = (firstRoundMatches.length - 1) * slotHeight;
+      const spacing = roundMatches.length > 1 ? totalHeight / (roundMatches.length - 1) : 0;
+      positions.set(match.id, roundMatches.length === 1 ? totalHeight / 2 : idx * spacing);
+    }
+  }
+
+  return { rounds, roundGroups, positions };
 }
 
+/* ─── Render a section (winners/losers/etc) as horizontal tree ─── */
+const TreeSection = ({
+  label,
+  icon,
+  sectionMatches,
+  allMatches,
+  getName,
+  matchNumberMap,
+  colorClass,
+}: {
+  label: string;
+  icon: string;
+  sectionMatches: Match[];
+  allMatches: Match[];
+  getName: (id: string | null) => string;
+  matchNumberMap?: Map<string, number>;
+  colorClass: string;
+}) => {
+  if (sectionMatches.length === 0) return null;
+
+  const { rounds, roundGroups, positions } = buildTreeLayout(sectionMatches);
+  const maxY = Math.max(0, ...Array.from(positions.values()));
+  const totalHeight = maxY + CARD_H + 20;
+  const totalRounds = rounds.length;
+
+  const matchCountByRound: Record<number, number> = {};
+  sectionMatches.forEach(m => { matchCountByRound[m.round] = (matchCountByRound[m.round] || 0) + 1; });
+
+  return (
+    <div className={`rounded-xl border ${colorClass} p-3 space-y-2`}>
+      <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground flex items-center gap-1.5">
+        <span>{icon}</span>
+        <span>{label}</span>
+      </div>
+      <div className="flex gap-10" style={{ minHeight: totalHeight }}>
+        {rounds.map((round, ci) => {
+          const roundMatches = roundGroups[round];
+          const matchCount = roundMatches.length;
+          const isLast = ci === totalRounds - 1;
+          const isFinal = matchCount === 1 && isLast;
+          const isSemi = matchCount <= 2 && ci >= totalRounds - 2 && !isFinal;
+
+          return (
+            <div key={round} className="flex flex-col shrink-0 relative" style={{ minWidth: 180 }}>
+              <div className={`text-[9px] uppercase font-semibold mb-3 whitespace-nowrap rounded-full px-3 py-0.5 text-center ${
+                isFinal || isSemi ? "bg-primary/15 text-primary" : "bg-muted/50 text-muted-foreground"
+              }`}>
+                Rodada {round}
+              </div>
+              <div className="relative flex-1">
+                {roundMatches.map(match => {
+                  const top = positions.get(match.id) ?? 0;
+                  const scale = isFinal ? "final" : isSemi ? "semi" : matchCount <= 4 ? "normal" : "small";
+                  return (
+                    <div key={match.id} className="absolute left-0" style={{ top }}>
+                      <HTreeMatchCard
+                        match={match}
+                        getName={getName}
+                        scale={scale}
+                        allMatches={allMatches}
+                        matchNumber={matchNumberMap?.get(match.id)}
+                        matchNumberMap={matchNumberMap}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 /* ═══════════════════════════════════════════
-   MAIN COMPONENT: Horizontal Tree View
+   MAIN: Horizontal Tree View
    ═══════════════════════════════════════════ */
 const HorizontalTreeView = ({ matches, getName, matchNumberMap }: HorizontalTreeViewProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Separate matches by bracket section
   const sections = useMemo(() => {
     const winnersA = matches.filter(m => m.bracket_type === "winners" && m.bracket_half === "upper");
     const winnersB = matches.filter(m => m.bracket_type === "winners" && m.bracket_half === "lower");
@@ -253,109 +364,62 @@ const HorizontalTreeView = ({ matches, getName, matchNumberMap }: HorizontalTree
     const losersB = matches.filter(m => m.bracket_type === "losers" && m.bracket_half === "lower");
     const semiFinals = matches.filter(m => m.bracket_type === "semi_final");
     const finalMatches = matches.filter(m => m.bracket_type === "final");
-    // Normal knockout (no bracket_half)
-    const normalKnockout = matches.filter(m => m.round > 0 && !m.bracket_half && m.bracket_type !== "semi_final" && m.bracket_type !== "final");
-
     const isDE = winnersA.length > 0 || winnersB.length > 0 || semiFinals.length > 0;
-
-    return { winnersA, winnersB, losersA, losersB, semiFinals, finalMatches, normalKnockout, isDE };
+    return { winnersA, winnersB, losersA, losersB, semiFinals, finalMatches, isDE };
   }, [matches]);
 
-  // Build round columns for a set of matches
-  const buildRoundColumns = (sectionMatches: Match[]) => {
-    const roundGroups: Record<number, Match[]> = {};
-    sectionMatches.forEach(m => {
-      if (!roundGroups[m.round]) roundGroups[m.round] = [];
-      roundGroups[m.round].push(m);
-    });
-    const rounds = Object.keys(roundGroups).map(Number).sort((a, b) => a - b);
-    return rounds.map(r => ({
-      round: r,
-      matches: roundGroups[r].sort((a, b) => a.position - b.position),
-    }));
-  };
+  // For normal knockout: all elimination matches in one tree
+  const knockoutMatches = useMemo(() => matches.filter(m => m.round > 0), [matches]);
 
   const matchCountByRound = useMemo(() => {
     const counts: Record<number, number> = {};
-    matches.forEach(m => { counts[m.round] = (counts[m.round] || 0) + 1; });
+    knockoutMatches.forEach(m => { counts[m.round] = (counts[m.round] || 0) + 1; });
     return counts;
-  }, [matches]);
+  }, [knockoutMatches]);
 
-  const getScale = (round: number, totalRounds: number, roundIdx: number, matchCount: number): "small" | "normal" | "semi" | "final" => {
-    if (matchCount === 1 && roundIdx === totalRounds - 1) return "final";
-    if (matchCount <= 2 && roundIdx >= totalRounds - 2) return "semi";
-    if (matchCount <= 4) return "normal";
-    return "small";
-  };
-
-  // Render a bracket section as horizontal columns
-  const renderSection = (label: string, icon: string, sectionMatches: Match[], colorClass: string) => {
-    if (sectionMatches.length === 0) return null;
-    const columns = buildRoundColumns(sectionMatches);
-
-    return (
-      <div className={`rounded-xl border ${colorClass} p-3 space-y-2`}>
-        <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground flex items-center gap-1.5">
-          <span>{icon}</span>
-          <span>{label}</span>
-        </div>
-        <div className="flex gap-8">
-          {columns.map((col, ci) => (
-            <div key={col.round} className="flex flex-col items-center shrink-0" style={{ minWidth: 170 }}>
-              <div className={`text-[9px] uppercase font-semibold mb-2 whitespace-nowrap rounded-full px-3 py-0.5 ${getRoundHeaderStyle(sectionMatches[0]?.bracket_type, ci === columns.length - 1, false)}`}>
-                Rodada {col.round}
-              </div>
-              <div className="flex flex-col justify-around gap-4 flex-1">
-                {col.matches.map(match => (
-                  <HTreeMatchCard
-                    key={match.id}
-                    match={match}
-                    getName={getName}
-                    scale={getScale(col.round, columns.length, ci, col.matches.length)}
-                    allMatches={matches}
-                    matchNumber={matchNumberMap?.get(match.id)}
-                    matchNumberMap={matchNumberMap}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  // For normal knockout (non-DE), render all in one horizontal flow
+  // Normal knockout tree rendering
   const renderNormalKnockout = () => {
-    const knockoutMatches = matches.filter(m => m.round > 0);
     if (knockoutMatches.length === 0) return null;
-    const columns = buildRoundColumns(knockoutMatches);
+
+    const { rounds, roundGroups, positions } = buildTreeLayout(knockoutMatches);
+    const maxY = Math.max(0, ...Array.from(positions.values()));
+    const totalHeight = maxY + CARD_H + 20;
+    const totalRounds = rounds.length;
 
     return (
-      <div className="flex gap-8">
-        {columns.map((col, ci) => {
-          const isLast = ci === columns.length - 1;
-          const isSemi = col.matches.length === 2 && ci >= columns.length - 2;
-          const isFinal = col.matches.length === 1 && isLast;
-          const roundLabel = getEliminationRoundLabel(col.round, matchCountByRound[col.round] || 0);
+      <div className="flex gap-10" style={{ minHeight: totalHeight }}>
+        {rounds.map((round, ci) => {
+          const roundMatches = roundGroups[round];
+          const matchCount = roundMatches.length;
+          const isLast = ci === totalRounds - 1;
+          const isFinal = matchCount === 1 && isLast;
+          const isSemi = matchCount <= 2 && ci >= totalRounds - 2 && !isFinal;
+          const roundLabel = getEliminationRoundLabel(round, matchCountByRound[round] || 0);
 
           return (
-            <div key={col.round} className="flex flex-col items-center shrink-0" style={{ minWidth: 180 }}>
-              <div className={`text-[9px] uppercase font-semibold mb-3 whitespace-nowrap rounded-full px-3 py-0.5 ${isFinal || isSemi ? "bg-primary/15 text-primary" : "bg-muted/50 text-muted-foreground"}`}>
+            <div key={round} className="flex flex-col shrink-0 relative" style={{ minWidth: 180 }}>
+              <div className={`text-[9px] uppercase font-semibold mb-3 whitespace-nowrap rounded-full px-3 py-0.5 text-center ${
+                isFinal || isSemi ? "bg-primary/15 text-primary" : "bg-muted/50 text-muted-foreground"
+              }`}>
                 {roundLabel}
               </div>
-              <div className="flex flex-col justify-around gap-4 flex-1">
-                {col.matches.map(match => (
-                  <HTreeMatchCard
-                    key={match.id}
-                    match={match}
-                    getName={getName}
-                    scale={isFinal ? "final" : isSemi ? "semi" : "normal"}
-                    allMatches={matches}
-                    matchNumber={matchNumberMap?.get(match.id)}
-                    matchNumberMap={matchNumberMap}
-                  />
-                ))}
+              <div className="relative flex-1">
+                {roundMatches.map(match => {
+                  const top = positions.get(match.id) ?? 0;
+                  const scale = isFinal ? "final" : isSemi ? "semi" : "normal";
+                  return (
+                    <div key={match.id} className="absolute left-0" style={{ top }}>
+                      <HTreeMatchCard
+                        match={match}
+                        getName={getName}
+                        scale={scale}
+                        allMatches={matches}
+                        matchNumber={matchNumberMap?.get(match.id)}
+                        matchNumberMap={matchNumberMap}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );
@@ -364,7 +428,7 @@ const HorizontalTreeView = ({ matches, getName, matchNumberMap }: HorizontalTree
     );
   };
 
-  const allElimMatches = matches.filter(m => m.round > 0);
+  const allElimMatches = useMemo(() => matches.filter(m => m.round > 0), [matches]);
 
   return (
     <div ref={containerRef} className="relative overflow-x-auto pb-4" style={{ WebkitOverflowScrolling: "touch" }}>
@@ -372,19 +436,38 @@ const HorizontalTreeView = ({ matches, getName, matchNumberMap }: HorizontalTree
       <div className="relative space-y-4" style={{ zIndex: 1 }}>
         {sections.isDE ? (
           <>
-            {renderSection("Vencedores A", "🏆", sections.winnersA, "border-primary/20 bg-primary/[0.03]")}
-            {renderSection("Vencedores B", "🏆", sections.winnersB, "border-primary/15 bg-primary/[0.02]")}
-            {renderSection("Perdedores Superiores", "⬇", sections.losersA, "border-destructive/15 bg-destructive/[0.03]")}
-            {renderSection("Perdedores Inferiores", "⬇", sections.losersB, "border-destructive/10 bg-destructive/[0.02]")}
+            <TreeSection
+              label="Vencedores A" icon="🏆"
+              sectionMatches={sections.winnersA}
+              allMatches={matches} getName={getName} matchNumberMap={matchNumberMap}
+              colorClass="border-primary/20 bg-primary/[0.03]"
+            />
+            <TreeSection
+              label="Vencedores B" icon="🏆"
+              sectionMatches={sections.winnersB}
+              allMatches={matches} getName={getName} matchNumberMap={matchNumberMap}
+              colorClass="border-primary/15 bg-primary/[0.02]"
+            />
+            <TreeSection
+              label="Perdedores Superiores" icon="⬇"
+              sectionMatches={sections.losersA}
+              allMatches={matches} getName={getName} matchNumberMap={matchNumberMap}
+              colorClass="border-destructive/15 bg-destructive/[0.03]"
+            />
+            <TreeSection
+              label="Perdedores Inferiores" icon="⬇"
+              sectionMatches={sections.losersB}
+              allMatches={matches} getName={getName} matchNumberMap={matchNumberMap}
+              colorClass="border-destructive/10 bg-destructive/[0.02]"
+            />
 
-            {/* Semis + Final as horizontal columns */}
             {(sections.semiFinals.length > 0 || sections.finalMatches.length > 0) && (
               <div className="rounded-xl border border-primary/30 bg-primary/[0.04] p-3 space-y-2">
                 <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-primary/80 flex items-center gap-1.5">
                   <span>🏆</span>
                   <span>Fase Final</span>
                 </div>
-                <div className="flex gap-8 items-center">
+                <div className="flex gap-10 items-center">
                   {sections.semiFinals.length > 0 && (
                     <div className="flex flex-col items-center shrink-0" style={{ minWidth: 190 }}>
                       <div className="text-[9px] uppercase font-semibold mb-3 whitespace-nowrap rounded-full px-3 py-0.5 bg-primary/15 text-primary">
@@ -393,13 +476,8 @@ const HorizontalTreeView = ({ matches, getName, matchNumberMap }: HorizontalTree
                       <div className="flex flex-col justify-around gap-4 flex-1">
                         {sections.semiFinals.sort((a, b) => a.position - b.position).map(match => (
                           <HTreeMatchCard
-                            key={match.id}
-                            match={match}
-                            getName={getName}
-                            scale="semi"
-                            allMatches={matches}
-                            matchNumber={matchNumberMap?.get(match.id)}
-                            matchNumberMap={matchNumberMap}
+                            key={match.id} match={match} getName={getName} scale="semi"
+                            allMatches={matches} matchNumber={matchNumberMap?.get(match.id)} matchNumberMap={matchNumberMap}
                           />
                         ))}
                       </div>
@@ -413,13 +491,8 @@ const HorizontalTreeView = ({ matches, getName, matchNumberMap }: HorizontalTree
                       <div className="flex flex-col justify-around gap-4 flex-1">
                         {sections.finalMatches.map(match => (
                           <HTreeMatchCard
-                            key={match.id}
-                            match={match}
-                            getName={getName}
-                            scale="final"
-                            allMatches={matches}
-                            matchNumber={matchNumberMap?.get(match.id)}
-                            matchNumberMap={matchNumberMap}
+                            key={match.id} match={match} getName={getName} scale="final"
+                            allMatches={matches} matchNumber={matchNumberMap?.get(match.id)} matchNumberMap={matchNumberMap}
                           />
                         ))}
                       </div>

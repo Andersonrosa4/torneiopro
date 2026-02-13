@@ -359,8 +359,196 @@ const CenterColumn = ({
 };
 
 /* ────────────────────────────────────────────────────
-   Group Stage View — uses same MatchCard + BracketColumn style as DE
+   Group Stage + Knockout Preview — full bracket tree
    ──────────────────────────────────────────────────── */
+const GROUP_CARD_H = 76;
+const GROUP_CARD_GAP = 8;
+
+/** Placeholder card for knockout slots not yet generated */
+const PlaceholderMatchCard = ({
+  id,
+  label1,
+  label2,
+  scale = "normal",
+  roundLabel,
+}: {
+  id: string;
+  label1: string;
+  label2: string;
+  scale?: "normal" | "semi" | "final";
+  roundLabel?: string;
+}) => {
+  const sizeClasses = {
+    normal: "w-[160px] text-[11px]",
+    semi: "w-[175px] text-xs",
+    final: "w-[190px] text-xs",
+  };
+  const borderClasses = {
+    normal: "border-border/60",
+    semi: "border-primary/40 shadow-[0_0_10px_hsl(var(--primary)/0.15)]",
+    final: "border-primary/60 shadow-[0_0_16px_hsl(var(--primary)/0.3)] ring-1 ring-primary/20",
+  };
+
+  return (
+    <div
+      data-match-id={id}
+      className={`rounded-lg border bg-card/60 backdrop-blur-sm shrink-0 ${sizeClasses[scale]} ${borderClasses[scale]}`}
+    >
+      {scale === "final" && (
+        <div className="flex items-center justify-center gap-1 rounded-t-lg bg-gradient-primary px-2 py-0.5 text-[9px] font-bold text-primary-foreground tracking-wider">
+          <Trophy className="h-2.5 w-2.5" /> FINAL
+        </div>
+      )}
+      {scale === "semi" && (
+        <div className="flex items-center justify-center gap-1 rounded-t-lg bg-primary/15 px-2 py-0.5 text-[9px] font-semibold text-primary tracking-wider">
+          SEMIFINAL
+        </div>
+      )}
+      <div className="flex items-center justify-between px-2 py-1.5">
+        <span className="truncate flex-1 text-muted-foreground/60 italic">{label1}</span>
+      </div>
+      <div className="border-t border-border/30" />
+      <div className="flex items-center justify-between px-2 py-1.5">
+        <span className="truncate flex-1 text-muted-foreground/60 italic">{label2}</span>
+      </div>
+      <div className="flex justify-center border-t border-border/20 px-2 py-1">
+        <Badge variant="outline" className="text-muted-foreground text-[8px] px-1.5 py-0 leading-tight border-border/40">Aguardando</Badge>
+      </div>
+    </div>
+  );
+};
+
+/** SVG connectors for the full bracket tree (groups → knockout) */
+const FullBracketConnectors = ({
+  containerRef,
+  connections,
+}: {
+  containerRef: React.RefObject<HTMLDivElement>;
+  connections: { srcId: string; dstId: string }[];
+}) => {
+  const [paths, setPaths] = useState<string[]>([]);
+
+  const computePaths = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const containerRect = container.getBoundingClientRect();
+    const newPaths: string[] = [];
+
+    for (const { srcId, dstId } of connections) {
+      const srcEl = container.querySelector(`[data-match-id="${srcId}"]`);
+      const dstEl = container.querySelector(`[data-match-id="${dstId}"]`);
+      if (!srcEl || !dstEl) continue;
+
+      const srcR = srcEl.getBoundingClientRect();
+      const dstR = dstEl.getBoundingClientRect();
+
+      const x1 = srcR.right - containerRect.left;
+      const y1 = srcR.top + srcR.height / 2 - containerRect.top;
+      const x2 = dstR.left - containerRect.left;
+      const y2 = dstR.top + dstR.height / 2 - containerRect.top;
+
+      const midX = (x1 + x2) / 2;
+      newPaths.push(`M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`);
+    }
+
+    setPaths(newPaths);
+  }, [containerRef, connections]);
+
+  useEffect(() => {
+    const timer = setTimeout(computePaths, 350);
+    window.addEventListener("resize", computePaths);
+    return () => { clearTimeout(timer); window.removeEventListener("resize", computePaths); };
+  }, [computePaths]);
+
+  if (paths.length === 0) return null;
+
+  return (
+    <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 0, overflow: "visible" }}>
+      {paths.map((d, i) => (
+        <path key={i} d={d} fill="none" stroke="hsl(var(--primary) / 0.3)" strokeWidth="1.5" strokeDasharray="5 3" />
+      ))}
+    </svg>
+  );
+};
+
+/** Build knockout bracket structure from groups */
+function buildGroupKnockoutPreview(groupNumbers: number[]) {
+  const numGroups = groupNumbers.length;
+  // Standard: top 2 from each group advance
+  const advancingPerGroup = 2;
+  const totalAdvancing = numGroups * advancingPerGroup;
+
+  // Determine knockout rounds needed
+  const rounds: { label: string; matchCount: number; scale: "normal" | "semi" | "final" }[] = [];
+  let remaining = totalAdvancing;
+
+  while (remaining > 1) {
+    const matchCount = Math.floor(remaining / 2);
+    remaining = matchCount;
+    
+    if (remaining === 1) {
+      rounds.push({ label: "Final", matchCount, scale: "final" });
+    } else if (remaining === 1 || matchCount <= 2) {
+      rounds.push({ label: matchCount === 2 ? "Semifinais" : `Rodada`, matchCount, scale: matchCount <= 2 ? "semi" : "normal" });
+    } else {
+      const labels: Record<number, string> = { 4: "Quartas de Final", 8: "Oitavas", 2: "Semifinais" };
+      rounds.push({ label: labels[matchCount] || `Rodada (${matchCount} jogos)`, matchCount, scale: "normal" });
+    }
+  }
+
+  // Build placeholder matches with feeder labels
+  type PlaceholderMatch = { id: string; label1: string; label2: string; scale: "normal" | "semi" | "final" };
+  const knockoutRounds: PlaceholderMatch[][] = [];
+  const connections: { srcId: string; dstId: string }[] = [];
+
+  // First knockout round: fed by group standings
+  if (rounds.length > 0) {
+    const firstRound: PlaceholderMatch[] = [];
+    const firstRoundCount = rounds[0].matchCount;
+    
+    // Standard crossover seeding for groups
+    for (let i = 0; i < firstRoundCount; i++) {
+      const g1 = groupNumbers[i % numGroups];
+      const g2 = groupNumbers[(i + 1) % numGroups];
+      const seed1 = Math.floor(i / numGroups) + 1;
+      const seed2 = advancingPerGroup - seed1 + 1;
+      
+      firstRound.push({
+        id: `knockout-0-${i}`,
+        label1: `${seed1}º Grupo ${g1}`,
+        label2: `${seed2}º Grupo ${g2}`,
+        scale: rounds[0].scale,
+      });
+    }
+    knockoutRounds.push(firstRound);
+
+    // Subsequent rounds
+    for (let ri = 1; ri < rounds.length; ri++) {
+      const prevRound = knockoutRounds[ri - 1];
+      const currentRound: PlaceholderMatch[] = [];
+      const count = rounds[ri].matchCount;
+
+      for (let i = 0; i < count; i++) {
+        const id = `knockout-${ri}-${i}`;
+        const src1Idx = i * 2;
+        const src2Idx = i * 2 + 1;
+        
+        const label1 = src1Idx < prevRound.length ? `V Jogo ${src1Idx + 1}` : "A definir";
+        const label2 = src2Idx < prevRound.length ? `V Jogo ${src2Idx + 1}` : "A definir";
+
+        currentRound.push({ id, label1, label2, scale: rounds[ri].scale });
+
+        // Connect previous round to this
+        if (src1Idx < prevRound.length) connections.push({ srcId: prevRound[src1Idx].id, dstId: id });
+        if (src2Idx < prevRound.length) connections.push({ srcId: prevRound[src2Idx].id, dstId: id });
+      }
+      knockoutRounds.push(currentRound);
+    }
+  }
+
+  return { knockoutRounds, rounds, connections };
+}
+
 const GroupStageView = ({
   groupMatches,
   getName,
@@ -372,100 +560,136 @@ const GroupStageView = ({
   allMatches: Match[];
   matchNumberMap?: Map<string, number>;
 }) => {
-  const [showStandings, setShowStandings] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   const groupNumbers = Array.from(new Set(groupMatches.map((m) => m.bracket_number || 1))).sort();
+  
+  // Check if knockout matches already exist
+  const hasKnockout = allMatches.some(m => m.round > 0);
+  
+  // Build preview knockout structure
+  const { knockoutRounds, rounds: knockoutRoundLabels, connections: knockoutConnections } = useMemo(
+    () => hasKnockout ? { knockoutRounds: [], rounds: [], connections: [] } : buildGroupKnockoutPreview(groupNumbers),
+    [groupNumbers, hasKnockout]
+  );
 
-  const getGroupStandings = (groupNum: number) => {
-    const gMatches = groupMatches.filter((m) => (m.bracket_number || 1) === groupNum);
-    const teamIds = new Set<string>();
-    gMatches.forEach((m) => {
-      if (m.team1_id) teamIds.add(m.team1_id);
-      if (m.team2_id) teamIds.add(m.team2_id);
-    });
-    return Array.from(teamIds)
-      .map((tid) => {
-        const wins = gMatches.filter((m) => m.winner_team_id === tid).length;
-        const played = gMatches.filter(
-          (m) => (m.team1_id === tid || m.team2_id === tid) && m.status === "completed"
-        ).length;
-        return { id: tid, name: getName(tid), wins, played };
-      })
-      .sort((a, b) => b.wins - a.wins);
-  };
+  // Build connections from group summary cards to first knockout round
+  const groupSummaryConnections = useMemo(() => {
+    if (hasKnockout || knockoutRounds.length === 0) return [];
+    const conns: { srcId: string; dstId: string }[] = [];
+    // Each group summary connects to multiple first-round knockout matches
+    for (let i = 0; i < knockoutRounds[0].length; i++) {
+      // Connect from relevant group summaries
+      const g1 = groupNumbers[i % groupNumbers.length];
+      const g2 = groupNumbers[(i + 1) % groupNumbers.length];
+      conns.push({ srcId: `group-summary-${g1}`, dstId: knockoutRounds[0][i].id });
+      if (g2 !== g1) conns.push({ srcId: `group-summary-${g2}`, dstId: knockoutRounds[0][i].id });
+    }
+    // Deduplicate
+    const unique = new Map<string, { srcId: string; dstId: string }>();
+    conns.forEach(c => unique.set(`${c.srcId}-${c.dstId}`, c));
+    return Array.from(unique.values());
+  }, [groupNumbers, knockoutRounds, hasKnockout]);
+
+  const allConnections = [...groupSummaryConnections, ...knockoutConnections];
+
+  // Calculate vertical positions for knockout rounds (tree layout)
+  const slotH = GROUP_CARD_H + GROUP_CARD_GAP;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-bold text-primary flex items-center gap-2">
-          <Trophy className="h-5 w-5" /> Fase de Grupos
-        </h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-xs text-muted-foreground h-7"
-          onClick={() => setShowStandings(!showStandings)}
-        >
-          {showStandings ? "Ver Jogos" : "Ver Classificação"}
-        </Button>
-      </div>
+      <h3 className="text-lg font-bold text-primary flex items-center gap-2">
+        <Trophy className="h-5 w-5" /> Chaveamento
+      </h3>
 
-      {showStandings ? (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {groupNumbers.map((gNum) => {
-            const standings = getGroupStandings(gNum);
+      <div ref={containerRef} className="relative overflow-x-auto pb-4" style={{ WebkitOverflowScrolling: "touch" }}>
+        {allConnections.length > 0 && (
+          <FullBracketConnectors containerRef={containerRef} connections={allConnections} />
+        )}
+        <div className="flex gap-8 relative" style={{ zIndex: 1 }}>
+          {/* ── Groups Column ── */}
+          <div className="flex flex-col gap-4 shrink-0">
+            <div className="text-[9px] uppercase font-semibold text-muted-foreground/60 text-center rounded-full bg-muted/50 px-3 py-0.5">
+              Fase de Grupos
+            </div>
+            {groupNumbers.map((gNum) => {
+              const gMatches = groupMatches
+                .filter((m) => (m.bracket_number || 1) === gNum)
+                .sort((a, b) => a.position - b.position);
+
+              // Show compact group summary card for bracket view
+              const teamIds = new Set<string>();
+              gMatches.forEach(m => { if (m.team1_id) teamIds.add(m.team1_id); if (m.team2_id) teamIds.add(m.team2_id); });
+              const completedCount = gMatches.filter(m => m.status === "completed").length;
+              const totalCount = gMatches.length;
+
+              return (
+                <div
+                  key={gNum}
+                  data-match-id={`group-summary-${gNum}`}
+                  className="rounded-lg border border-primary/25 bg-card/90 backdrop-blur-sm w-[170px] shrink-0"
+                >
+                  <div className="px-2 pt-1.5 pb-1 text-[9px] font-bold text-primary uppercase tracking-wider text-center border-b border-border/30">
+                    Grupo {gNum}
+                  </div>
+                  <div className="px-2 py-1 space-y-0.5">
+                    {Array.from(teamIds).slice(0, 6).map(tid => {
+                      const wins = gMatches.filter(m => m.winner_team_id === tid).length;
+                      return (
+                        <div key={tid} className="flex items-center justify-between text-[9px]">
+                          <span className="truncate flex-1 team-name">{getName(tid)}</span>
+                          <span className="text-muted-foreground/70 font-mono ml-1">{wins}V</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="flex justify-center border-t border-border/20 px-2 py-1">
+                    <Badge
+                      className={`text-[8px] px-1.5 py-0 leading-tight border-0 ${
+                        completedCount === totalCount
+                          ? "bg-success/20 text-success"
+                          : completedCount > 0
+                          ? "bg-warning/20 text-warning"
+                          : "bg-muted/50 text-muted-foreground"
+                      }`}
+                    >
+                      {completedCount}/{totalCount} jogos
+                    </Badge>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── Knockout Preview Columns ── */}
+          {!hasKnockout && knockoutRounds.map((roundMatches, ri) => {
+            const roundLabel = knockoutRoundLabels[ri]?.label || `Rodada ${ri + 1}`;
+            const totalRoundHeight = groupNumbers.length * (slotH + 20);
+
             return (
-              <div key={gNum} className="rounded-xl border border-border bg-card p-4 shadow-card">
-                <h4 className="mb-3 text-sm font-bold text-primary uppercase tracking-wider">
-                  Grupo {gNum}
-                </h4>
-                <div className="space-y-1">
-                  {standings.map((s, i) => (
-                    <div key={s.id} className="flex items-center justify-between rounded-md bg-secondary/50 px-3 py-1.5 text-xs">
-                      <span className="flex items-center gap-2">
-                        <span className="font-bold text-muted-foreground">{i + 1}.</span>
-                        <span className="team-name">{s.name}</span>
-                      </span>
-                      <span className="font-bold text-primary">{s.wins}V / {s.played}J</span>
-                    </div>
+              <div key={ri} className="flex flex-col shrink-0" style={{ minWidth: 175 }}>
+                <div className={`text-[9px] uppercase font-semibold mb-3 whitespace-nowrap rounded-full px-3 py-0.5 text-center ${
+                  roundMatches[0]?.scale === "final" || roundMatches[0]?.scale === "semi"
+                    ? "bg-primary/15 text-primary"
+                    : "bg-muted/50 text-muted-foreground"
+                }`}>
+                  {roundLabel}
+                </div>
+                <div className="flex flex-col justify-around gap-4 flex-1" style={{ minHeight: totalRoundHeight }}>
+                  {roundMatches.map((pm) => (
+                    <PlaceholderMatchCard
+                      key={pm.id}
+                      id={pm.id}
+                      label1={pm.label1}
+                      label2={pm.label2}
+                      scale={pm.scale}
+                    />
                   ))}
                 </div>
               </div>
             );
           })}
         </div>
-      ) : (
-        /* ── Match cards view — same MatchCard as DE ── */
-        <div className="space-y-4">
-          {groupNumbers.map((gNum) => {
-            const gMatches = groupMatches
-              .filter((m) => (m.bracket_number || 1) === gNum)
-              .sort((a, b) => a.position - b.position);
-            return (
-              <div key={gNum} className="rounded-xl border border-primary/20 bg-primary/[0.03] p-3 space-y-2">
-                <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground flex items-center gap-1.5">
-                  <span>🏆</span>
-                  <span>Grupo {gNum}</span>
-                </div>
-                <div className="flex gap-6 overflow-x-auto pb-2">
-                  <div className="flex flex-col gap-3 shrink-0" style={{ minWidth: 160 }}>
-                    {gMatches.map((match) => (
-                      <MatchCard
-                        key={match.id}
-                        match={match}
-                        getName={getName}
-                        scale="normal"
-                        allMatches={allMatches}
-                        matchNumber={matchNumberMap?.get(match.id)}
-                        matchNumberMap={matchNumberMap}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      </div>
     </div>
   );
 };

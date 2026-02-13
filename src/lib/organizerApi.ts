@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface QueryOptions {
   table: string;
-  operation: "select" | "insert" | "update" | "delete";
+  operation: "select" | "insert" | "update" | "delete" | "undo_bracket" | "reset_results";
   data?: any;
   filters?: Record<string, any>;
   select?: string;

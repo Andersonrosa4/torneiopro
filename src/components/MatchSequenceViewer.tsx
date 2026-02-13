@@ -234,9 +234,10 @@ const MatchSequenceViewer = ({
   };
 
   const sequence = useMemo(() => generateSequence(matches, tournamentFormat), [matches, tournamentFormat]);
-  // REGRA: só exibir partidas onde AMBOS os times estão definidos
+  // RULE: Exibir TODAS as partidas (inclusive slots de espera/Chapéu com apenas um time)
+  // Chapéus serão renderizados como cards cinza com rótulo especial
   const displaySequence = useMemo(() => 
-    sequence.filter(m => m.team1_id && m.team2_id), 
+    sequence, // Mostrar todos (tanto matches reais quanto Chapéus)
     [sequence]
   );
 
@@ -489,6 +490,7 @@ const MatchCard = ({
   const team1Name = getTeamName(match.team1_id);
   const team2Name = getTeamName(match.team2_id);
   const hasTeams = match.team1_id && match.team2_id;
+  const hasOneTeam = (match.team1_id && !match.team2_id) || (!match.team1_id && match.team2_id); // Chapéu
   const canScore = isOwner && hasTeams && (!isCompleted || isEditing);
 
   const setsWon = useMemo(() => {
@@ -525,6 +527,7 @@ const MatchCard = ({
   };
 
   const getStatusBadge = () => {
+    if (hasOneTeam) return <Badge className="bg-muted text-muted-foreground border-border text-[10px]">Chapéu</Badge>;
     if (isCompleted) return <Badge className="bg-success/20 text-success border-0 text-[10px]">Finalizado</Badge>;
     if (hasTeams) return <Badge className="bg-warning/20 text-warning border-0 text-[10px]">Aguardando</Badge>;
     return <Badge variant="outline" className="text-muted-foreground text-[10px]">A definir</Badge>;
@@ -568,99 +571,106 @@ const MatchCard = ({
       </div>
 
       {/* Teams with inline declare winner buttons */}
-      <div className="flex flex-col gap-0.5">
-        {/* Team 1 */}
-        <div className="flex items-center gap-1.5 min-h-[24px]">
-          <span className={`text-xs flex-1 truncate ${isCompleted && !isEditing && match.winner_team_id === match.team1_id ? "text-success font-bold" : team1Name === "A definir" ? "text-muted-foreground" : "team-name"}`}>
-            {team1Name}
-          </span>
-          {isOwner && hasTeams && !isCompleted && match.team1_id && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-5 px-1.5 text-[10px] gap-0.5 text-primary hover:bg-primary/10 shrink-0"
-              onClick={() => handleDeclareTeamWinner(match.team1_id!)}
-            >
-              <Trophy className="h-3 w-3" /> Vencedor
-            </Button>
-          )}
-        </div>
-        <span className="text-[10px] text-muted-foreground pl-0.5">vs</span>
-        {/* Team 2 */}
-        <div className="flex items-center gap-1.5 min-h-[24px]">
-          <span className={`text-xs flex-1 truncate ${isCompleted && !isEditing && match.winner_team_id === match.team2_id ? "text-success font-bold" : team2Name === "A definir" ? "text-muted-foreground" : "team-name"}`}>
-            {team2Name}
-          </span>
-          {isOwner && hasTeams && !isCompleted && match.team2_id && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-5 px-1.5 text-[10px] gap-0.5 text-primary hover:bg-primary/10 shrink-0"
-              onClick={() => handleDeclareTeamWinner(match.team2_id!)}
-            >
-              <Trophy className="h-3 w-3" /> Vencedor
-            </Button>
-          )}
-        </div>
-      </div>
+       <div className="flex flex-col gap-0.5">
+         {/* Team 1 */}
+         <div className="flex items-center gap-1.5 min-h-[24px]">
+           <span className={`text-xs flex-1 truncate ${isCompleted && !isEditing && match.winner_team_id === match.team1_id ? "text-success font-bold" : match.team1_id === null ? "text-muted-foreground italic" : "team-name"}`}>
+             {match.team1_id ? team1Name : "Chapéu"}
+           </span>
+           {isOwner && hasTeams && !isCompleted && match.team1_id && (
+             <Button
+               size="sm"
+               variant="ghost"
+               className="h-5 px-1.5 text-[10px] gap-0.5 text-primary hover:bg-primary/10 shrink-0"
+               onClick={() => handleDeclareTeamWinner(match.team1_id!)}
+             >
+               <Trophy className="h-3 w-3" /> Vencedor
+             </Button>
+           )}
+         </div>
+         <span className="text-[10px] text-muted-foreground pl-0.5">vs</span>
+         {/* Team 2 */}
+         <div className="flex items-center gap-1.5 min-h-[24px]">
+           <span className={`text-xs flex-1 truncate ${isCompleted && !isEditing && match.winner_team_id === match.team2_id ? "text-success font-bold" : match.team2_id === null ? "text-muted-foreground italic" : "team-name"}`}>
+             {match.team2_id ? team2Name : "Chapéu"}
+           </span>
+           {isOwner && hasTeams && !isCompleted && match.team2_id && (
+             <Button
+               size="sm"
+               variant="ghost"
+               className="h-5 px-1.5 text-[10px] gap-0.5 text-primary hover:bg-primary/10 shrink-0"
+               onClick={() => handleDeclareTeamWinner(match.team2_id!)}
+             >
+               <Trophy className="h-3 w-3" /> Vencedor
+             </Button>
+           )}
+         </div>
+       </div>
 
-      {/* Score editing with sets */}
-      {hasTeams && canScore && (
-        <div className="space-y-1 mt-0.5">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {setScores.map((s, idx) => (
-              <div key={idx} className="flex items-center gap-0.5">
-                <span className="text-[9px] text-muted-foreground font-medium">S{idx + 1}</span>
-                <Input value={s.s1} onChange={(e) => updateSetScore(idx, "s1", e.target.value)} className="h-6 w-9 text-center text-[11px] p-0" />
-                <span className="text-[10px] text-muted-foreground">×</span>
-                <Input value={s.s2} onChange={(e) => updateSetScore(idx, "s2", e.target.value)} className="h-6 w-9 text-center text-[11px] p-0" />
-                {idx < setScores.length - 1 && <span className="text-muted-foreground mx-0.5">|</span>}
-              </div>
-            ))}
-          </div>
+      {/* Score editing with sets — ONLY for real matches (both teams present) */}
+       {hasTeams && canScore && (
+         <div className="space-y-1 mt-0.5">
+           <div className="flex items-center gap-1.5 flex-wrap">
+             {setScores.map((s, idx) => (
+               <div key={idx} className="flex items-center gap-0.5">
+                 <span className="text-[9px] text-muted-foreground font-medium">S{idx + 1}</span>
+                 <Input value={s.s1} onChange={(e) => updateSetScore(idx, "s1", e.target.value)} className="h-6 w-9 text-center text-[11px] p-0" />
+                 <span className="text-[10px] text-muted-foreground">×</span>
+                 <Input value={s.s2} onChange={(e) => updateSetScore(idx, "s2", e.target.value)} className="h-6 w-9 text-center text-[11px] p-0" />
+                 {idx < setScores.length - 1 && <span className="text-muted-foreground mx-0.5">|</span>}
+               </div>
+             ))}
+           </div>
 
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] text-muted-foreground">
-              {totalScore1}×{totalScore2} | Sets: {setsWon.t1}×{setsWon.t2}
-            </span>
-            {autoWinnerId && (
-              <Badge className="bg-success/20 text-success border-0 text-[10px] px-1.5 py-0">
-                Vencedor: {getTeamName(autoWinnerId).split(" / ")[0]}
-              </Badge>
-            )}
-          </div>
+           <div className="flex items-center gap-1.5 flex-wrap">
+             <span className="text-[10px] text-muted-foreground">
+               {totalScore1}×{totalScore2} | Sets: {setsWon.t1}×{setsWon.t2}
+             </span>
+             {autoWinnerId && (
+               <Badge className="bg-success/20 text-success border-0 text-[10px] px-1.5 py-0">
+                 Vencedor: {getTeamName(autoWinnerId).split(" / ")[0]}
+               </Badge>
+             )}
+           </div>
 
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <Button size="sm" variant="outline" className="h-5 px-2 text-[10px] gap-0.5" onClick={handleSaveScoreOnly}>
-              <Save className="h-3 w-3" /> Salvar
-            </Button>
-            {isEditing && (
-              <Button size="sm" variant="ghost" className="h-5 px-2 text-[10px]" onClick={() => setIsEditing(false)}>
-                Cancelar
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
+           <div className="flex items-center gap-1.5 flex-wrap">
+             <Button size="sm" variant="outline" className="h-5 px-2 text-[10px] gap-0.5" onClick={handleSaveScoreOnly}>
+               <Save className="h-3 w-3" /> Salvar
+             </Button>
+             {isEditing && (
+               <Button size="sm" variant="ghost" className="h-5 px-2 text-[10px]" onClick={() => setIsEditing(false)}>
+                 Cancelar
+               </Button>
+             )}
+           </div>
+         </div>
+       )}
 
-      {/* Completed / Read-only score display */}
-      {hasTeams && !canScore && (
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-xs font-mono font-bold">
-            {match.score1 ?? "-"} × {match.score2 ?? "-"}
-          </span>
-          {isCompleted && match.winner_team_id && (
-            <Badge className="bg-success/20 text-success border-0 text-[10px] px-1.5 py-0">
-              {getTeamName(match.winner_team_id)}
-            </Badge>
-          )}
-          {isOwner && isCompleted && (
-            <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px] gap-0.5" onClick={() => setIsEditing(true)}>
-              <Pencil className="h-3 w-3" /> Corrigir
-            </Button>
-          )}
-        </div>
-      )}
+       {/* Completed / Read-only score display */}
+       {hasTeams && !canScore && (
+         <div className="flex items-center gap-1.5 flex-wrap">
+           <span className="text-xs font-mono font-bold">
+             {match.score1 ?? "-"} × {match.score2 ?? "-"}
+           </span>
+           {isCompleted && match.winner_team_id && (
+             <Badge className="bg-success/20 text-success border-0 text-[10px] px-1.5 py-0">
+               {getTeamName(match.winner_team_id)}
+             </Badge>
+           )}
+           {isOwner && isCompleted && (
+             <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px] gap-0.5" onClick={() => setIsEditing(true)}>
+               <Pencil className="h-3 w-3" /> Corrigir
+             </Button>
+           )}
+         </div>
+       )}
+
+       {/* Chapéu slot — show waiting message */}
+       {hasOneTeam && (
+         <div className="flex items-center gap-1.5 flex-wrap px-0.5 py-1 rounded bg-muted/30">
+           <span className="text-xs text-muted-foreground italic">Aguardando adversário real...</span>
+         </div>
+       )}
     </div>
   );
 };

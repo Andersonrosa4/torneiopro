@@ -378,22 +378,30 @@ function buildLosersBracketWithFeeders(
       entry2.source[entry2.linkField] = targetMatch._temp_id;
     }
 
-    // ── PASSO 4: Competidor ímpar → bye (passa direto como survivor) ──
-    const newSurvivors: MatchData[] = [...roundMatches];
-    if (incoming.length % 2 === 1) {
-      const oddEntry = incoming[incoming.length - 1];
-      // O competidor ímpar precisa de um match de bye
-      const byeMatch = createMatch(
-        tournamentId, modalityId, losersRound, numMatches + 1,
-        'losers', half, bracketNumber,
-      );
-      // Linkar o source ao bye match
-      oddEntry.source[oddEntry.linkField] = byeMatch._temp_id;
-      // Marcar bye como já tendo vencedor (o próprio competidor avança)
-      byeMatch.status = 'pending';
-      allLosersMatches.push(byeMatch);
-      newSurvivors.push(byeMatch);
-    }
+    // ── PASSO 4: Competidor ímpar → Chapéu (slot de espera) ──
+     const newSurvivors: MatchData[] = [...roundMatches];
+     if (incoming.length % 2 === 1) {
+       const oddEntry = incoming[incoming.length - 1];
+       // O competidor ímpar precisa de um match de espera (Chapéu)
+       // Este é um slot vazio aguardando um adversário real
+       const chapeuMatch = createMatch(
+         tournamentId, modalityId, losersRound, numMatches + 1,
+         'losers', half, bracketNumber,
+       );
+       
+       // Linkar o source ao Chapéu
+       oddEntry.source[oddEntry.linkField] = chapeuMatch._temp_id;
+       
+       // Determinar qual slot recebe o time ímpar
+       // Usar position parity: odd position = team1, even = team2
+       const sourceMatch = oddEntry.source;
+       const slotField = sourceMatch.position % 2 === 1 ? 'team1_id' : 'team2_id';
+       chapeuMatch[slotField] = oddEntry.source.winner_team_id; // Will be set on winner declaration
+       
+       chapeuMatch.status = 'pending';
+       allLosersMatches.push(chapeuMatch);
+       newSurvivors.push(chapeuMatch);
+     }
 
     survivors = newSurvivors;
     losersRound++;
@@ -415,16 +423,20 @@ function buildLosersBracketWithFeeders(
       nextSurvivors.push(m);
     }
 
-    // Ímpar na redução → bye
-    if (survivors.length % 2 === 1) {
-      const byeMatch = createMatch(
-        tournamentId, modalityId, losersRound, numMatches + 1,
-        'losers', half, bracketNumber,
-      );
-      survivors[survivors.length - 1].next_win_match_id = byeMatch._temp_id;
-      allLosersMatches.push(byeMatch);
-      nextSurvivors.push(byeMatch);
-    }
+     // Ímpar na redução → Chapéu (slot de espera)
+     if (survivors.length % 2 === 1) {
+       const chapeuMatch = createMatch(
+         tournamentId, modalityId, losersRound, numMatches + 1,
+         'losers', half, bracketNumber,
+       );
+       survivors[survivors.length - 1].next_win_match_id = chapeuMatch._temp_id;
+       // Determine slot: odd position = team1, even = team2
+       const slotField = (numMatches + 1) % 2 === 1 ? 'team1_id' : 'team2_id';
+       chapeuMatch[slotField] = null; // Will receive team on winner advancement
+       chapeuMatch.status = 'pending';
+       allLosersMatches.push(chapeuMatch);
+       nextSurvivors.push(chapeuMatch);
+     }
 
     survivors = nextSurvivors;
     losersRound++;

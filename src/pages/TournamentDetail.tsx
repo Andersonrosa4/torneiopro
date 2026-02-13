@@ -22,7 +22,7 @@ import ModalityTabs from "@/components/ModalityTabs";
 import { useModalities } from "@/hooks/useModalities";
 import { generateDoubleEliminationBracket } from "@/lib/doubleEliminationLogic";
 import { processDoubleEliminationAdvance, handleResetFinal } from "@/lib/doubleEliminationAdvance";
-import { computeCascadeResets } from "@/lib/cascadeReset";
+import { computeAggressiveCascadeReset, computePartialCascadeResetSE } from "@/lib/aggressiveCascadeReset";
 
 // Lazy load heavy visualization components
 const BracketTreeView = lazy(() => import("@/components/BracketTreeView"));
@@ -658,50 +658,83 @@ const TournamentDetail = () => {
     const match = matches.find((m) => m.id === matchId);
     if (!match || !id) { declareWinnerMutex.current = false; return; }
 
-    // ── CASCADE RESET: If match was already completed, clear downstream first ──
-    const isReDeclaration = match.status === 'completed' && match.winner_team_id;
-    if (isReDeclaration) {
-      const modalityMatchesForCascade = match.modality_id
-        ? matches.filter(m => m.modality_id === match.modality_id)
-        : matches;
-      
-      // Fetch fresh data for cascade
-      const { data: freshForCascade } = await organizerQuery({
-        table: "matches",
-        operation: "select",
-        filters: { tournament_id: id },
-        order: [{ column: "round" }, { column: "position" }],
-      });
-      
-      if (freshForCascade) {
-        const cascadeMatches = match.modality_id
-          ? (freshForCascade as typeof matches).filter(m => m.modality_id === match.modality_id)
-          : (freshForCascade as typeof matches);
-        
-        const freshMatch = cascadeMatches.find(m => m.id === matchId) || match;
-        const oldWinner = freshMatch.winner_team_id;
-        const oldLoser = freshMatch.team1_id === oldWinner ? freshMatch.team2_id : freshMatch.team1_id;
-        
-        const cascadeResets = computeCascadeResets(freshMatch, cascadeMatches, oldWinner, oldLoser);
-        
-        if (cascadeResets.length > 0) {
-          console.log(`[CASCADE] Resetting ${cascadeResets.length} downstream matches`);
-          await Promise.all(
-            cascadeResets.map(async (reset) => {
-              const { error } = await organizerQuery({
-                table: "matches",
-                operation: "update",
-                data: reset.data,
-                filters: { id: reset.matchId },
-              });
-              if (error) console.error(`[CASCADE:Error] Match ${reset.matchId}:`, error);
-              else console.log(`[CASCADE:OK] Match ${reset.matchId} reset: ${JSON.stringify(reset.data)}`);
-            })
-          );
-          toast.info(`${cascadeResets.length} partida(s) dependente(s) resetada(s) para recálculo.`);
-        }
-      }
-    }
+    // ── AGGRESSIVE CASCADE RESET ──
+     // If match was already completed, reset ALL downstream matches before re-declaring
+     const isReDeclaration = match.status === 'completed' && match.winner_team_id;
+     if (isReDeclaration) {
+       // Determine if this is DE or SE
+       const modalityMatchesForCheck = match.modality_id
+         ? matches.filter(m => m.modality_id === match.modality_id)
+         : matches;
+       const isDE = modalityMatchesForCheck.some(m => m.bracket_type === 'losers' || m.bracket_type === 'final' || m.bracket_type === 'semi_final');
+       
+       // Fetch fresh data for cascade
+       const { data: freshForCascade } = await organizerQuery({
+         table: "matches",
+         operation: "select",
+         filters: { tournament_id: id },
+         order: [{ column: "round" }, { column: "position" }],
+       });
+       
+       if (freshForCascade) {
+         const cascadeMatches = match.modality_id
+           ? (freshForCascade as typeof matches).filter(m => m.modality_id === match.modality_id)
+           : (freshForCascade as typeof matches);
+         
+         const freshMatch = cascadeMatches.find(m => m.id === matchId) || match;
+         
+         // Apply appropriate cascade based on format
+         const cascadePlan = isDE
+           ? computeAggressiveCascadeReset(freshMatch, cascadeMatches)
+           : computePartialCascadeResetSE(freshMatch, cascadeMatches);
+         
+         // Log plan
+         cascadePlan.log.forEach(msg => console.log(msg));
+         
+         // Execute deletes and updates
+         if (cascadePlan.toDelete.length > 0) {
+           // Delete in batches to avoid foreign key issues
+           for (const matchIdToDel of cascadePlan.toDelete) {
+             await organizerQuery({
+               table: "matches",
+               operation: "update",
+               data: { next_win_match_id: null, next_lose_match_id: null },
+               filters: { id: matchIdToDel },
+             } as any);
+           }
+           // Now delete
+           await Promise.all(
+             cascadePlan.toDelete.map(mid =>
+               organizerQuery({
+                 table: "matches",
+                 operation: "delete",
+                 filters: { id: mid },
+               })
+             )
+           );
+         }
+         
+         // Execute updates
+         if (cascadePlan.toUpdate.length > 0) {
+           await Promise.all(
+             cascadePlan.toUpdate.map(async (reset) => {
+               const { error } = await organizerQuery({
+                 table: "matches",
+                 operation: "update",
+                 data: reset.data,
+                 filters: { id: reset.matchId },
+               });
+               if (error) console.error(`[CASCADE:Error] Match ${reset.matchId}:`, error);
+               else console.log(`[CASCADE:OK] Match ${reset.matchId} reset`);
+             })
+           );
+         }
+         
+         if (cascadePlan.toDelete.length > 0 || cascadePlan.toUpdate.length > 0) {
+           toast.info(`${cascadePlan.toDelete.length} partida(s) deletada(s), ${cascadePlan.toUpdate.length} resetada(s).`);
+         }
+       }
+     }
 
     // Validate round order for double elimination — use FRESH data from DB
     // IMPORTANT: Only check matches from the SAME modality to avoid cross-modality false positives

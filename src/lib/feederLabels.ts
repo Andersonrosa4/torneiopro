@@ -1,0 +1,97 @@
+/**
+ * Feeder Label Calculation for Double Elimination Bracket
+ * 
+ * Computes which match feeds each slot (V = winner, P = loser)
+ */
+
+interface Match {
+  id: string;
+  round: number;
+  position: number;
+  team1_id: string | null;
+  team2_id: string | null;
+  winner_team_id: string | null;
+  status: string;
+  bracket_type?: string;
+  bracket_half?: string | null;
+  next_win_match_id?: string | null;
+  next_lose_match_id?: string | null;
+}
+
+export interface FeederInfo {
+  label: string; // e.g. "V40", "P12"
+  type: 'winner' | 'loser' | 'seed';
+  matchNumber: string; // The source match ID (or position label)
+}
+
+/**
+ * Find all matches that feed INTO the given match
+ * Returns map of { team1: FeederInfo, team2: FeederInfo }
+ */
+export function getSlotFeeders(
+  targetMatch: Match,
+  allMatches: Match[]
+): { team1: FeederInfo | null; team2: FeederInfo | null } {
+  const feeders: { team1: FeederInfo | null; team2: FeederInfo | null } = {
+    team1: null,
+    team2: null,
+  };
+
+  // Find all matches that feed INTO this match
+  const feedingMatches = allMatches.filter(
+    (m) =>
+      m.next_win_match_id === targetMatch.id ||
+      m.next_lose_match_id === targetMatch.id
+  );
+
+  // Determine which feeder goes to which slot
+  // Typically: first feeder → team1, second feeder → team2 (by position order)
+  const sortedFeeders = feedingMatches.sort(
+    (a, b) => a.position - b.position
+  );
+
+  sortedFeeders.forEach((feeder, idx) => {
+    const isWinnerFeeder = feeder.next_win_match_id === targetMatch.id;
+    const type = isWinnerFeeder ? 'winner' : 'loser';
+    const prefix = isWinnerFeeder ? 'V' : 'P';
+    
+    // Use the match position as the display number
+    const feederLabel: FeederInfo = {
+      label: `${prefix}${feeder.position}`,
+      type,
+      matchNumber: feeder.id,
+    };
+
+    if (idx === 0) {
+      feeders.team1 = feederLabel;
+    } else if (idx === 1) {
+      feeders.team2 = feederLabel;
+    }
+  });
+
+  // If no feeders found, it's likely a seeded participant
+  if (feeders.team1 === null && feeders.team2 === null) {
+    // Try to infer from round number: round 1 = seeded, higher rounds = fed
+    if (targetMatch.round === 1) {
+      feeders.team1 = { label: 'Seed 1', type: 'seed', matchNumber: '' };
+      feeders.team2 = { label: 'Seed 2', type: 'seed', matchNumber: '' };
+    }
+  }
+
+  return feeders;
+}
+
+/**
+ * Compute feeder for the entire bracket
+ * Returns a map: matchId -> { team1, team2 }
+ */
+export function computeAllFeeders(allMatches: Match[]): Map<string, ReturnType<typeof getSlotFeeders>> {
+  const feederMap = new Map<string, ReturnType<typeof getSlotFeeders>>();
+
+  for (const match of allMatches) {
+    if (match.round === 0) continue; // Skip group stage
+    feederMap.set(match.id, getSlotFeeders(match, allMatches));
+  }
+
+  return feederMap;
+}

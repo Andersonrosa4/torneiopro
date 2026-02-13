@@ -9,13 +9,13 @@
  *   Winners Lower (B): 15 partidas
  *   Losers Upper (A): 14 partidas
  *   Losers Lower (B): 14 partidas
- *   Semifinais: 2 (Winner A vs Loser A, Winner B vs Loser B)
- *   Final: 1
- *   TOTAL = 62 ✓
+ *   Semi 1: Campeão Winners A vs Campeão Losers B (CRUZAMENTO OBRIGATÓRIO)
+ *   Semi 2: Campeão Winners B vs Campeão Losers A (CRUZAMENTO OBRIGATÓRIO)
  *
- * SEMIFINAIS (MODELO CUSTOM - SEM CRUZAMENTO):
- *   Semi 1: Campeão Winners A vs Campeão Losers A
- *   Semi 2: Campeão Winners B vs Campeão Losers B
+ * REGRA: Equipes com mesma originBracket NUNCA se enfrentam antes da FINAL.
+ *
+ *   Semi 1: Campeão Winners A vs Campeão Losers B
+ *   Semi 2: Campeão Winners B vs Campeão Losers A
  *
  * MIRROR CROSSING (APENAS na alimentação Winners→Losers):
  *   Winners A (upper) → Losers B (lower)
@@ -427,9 +427,10 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
   const totalLosersMatches = losersUpper.length + losersLower.length;
   console.log(`[DE:Losers] Upper=${losersUpper.length}, Lower=${losersLower.length}, Total=${totalLosersMatches}`);
 
-  // 3. SEMIFINAIS (MODELO CUSTOM — SEM CRUZAMENTO)
-  //    Semi 1: Campeão Winners A (upper) vs Campeão Losers A (upper)
-  //    Semi 2: Campeão Winners B (lower) vs Campeão Losers B (lower)
+  // 3. SEMIFINAIS (CRUZAMENTO OBRIGATÓRIO)
+  //    Semi 1: Campeão Winners A (upper) vs Campeão Losers B (lower)
+  //    Semi 2: Campeão Winners B (lower) vs Campeão Losers A (upper)
+  //    REGRA: Equipes com mesma originBracket NUNCA se enfrentam antes da FINAL.
   const winnersMaxRound = Math.max(...[...winnersUpper, ...winnersLower].map(m => m.round), 0);
   const losersMaxRound = Math.max(...[...losersUpper, ...losersLower].map(m => m.round), 0);
   const semiRound = Math.max(winnersMaxRound, losersMaxRound) + 1;
@@ -440,21 +441,21 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
   // 4. FINAL ÚNICA
   const finalMatch = createMatch(tournamentId, modalityId, semiRound + 1, 1, 'final', null, 6);
 
-  // 5. Linkagem Winners → Semifinais (mesmo lado)
-  //    Campeão Winners A → Semi 1
-  //    Campeão Winners B → Semi 2
+  // 5. Linkagem Winners → Semifinais (CRUZAMENTO)
+  //    Campeão Winners A (upper) → Semi 1 (team1)
+  //    Campeão Winners B (lower) → Semi 2 (team1)
   const winnersUpperFinal = getLastRoundMatch(winnersUpper);
   const winnersLowerFinal = getLastRoundMatch(winnersLower);
   if (winnersUpperFinal) winnersUpperFinal.next_win_match_id = semi1._temp_id;
   if (winnersLowerFinal) winnersLowerFinal.next_win_match_id = semi2._temp_id;
 
-  // 6. Linkagem Losers → Semifinais (mesmo lado)
-  //    Campeão Losers A (upper) → Semi 1
-  //    Campeão Losers B (lower) → Semi 2
-  const losersUpperFinal = getLastRoundMatch(losersUpper);
-  const losersLowerFinal = getLastRoundMatch(losersLower);
-  if (losersUpperFinal) losersUpperFinal.next_win_match_id = semi1._temp_id;
-  if (losersLowerFinal) losersLowerFinal.next_win_match_id = semi2._temp_id;
+  // 6. Linkagem Losers → Semifinais (CRUZAMENTO)
+  //    Campeão Losers B (lower) → Semi 1 (team2) — cruza com Winners A
+  //    Campeão Losers A (upper) → Semi 2 (team2) — cruza com Winners B
+  const losersUpperFinal = getLastRoundMatch(losersUpper);  // Losers A (upper)
+  const losersLowerFinal = getLastRoundMatch(losersLower);  // Losers B (lower)
+  if (losersLowerFinal) losersLowerFinal.next_win_match_id = semi1._temp_id;  // Losers B → Semi 1
+  if (losersUpperFinal) losersUpperFinal.next_win_match_id = semi2._temp_id;  // Losers A → Semi 2
 
   // 7. Semifinais → Final
   semi1.next_win_match_id = finalMatch._temp_id;
@@ -621,8 +622,8 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
 ║ Esperado (2N-3): ${expectedTotal} partidas                       
 ║ Status: ${allMatches.length === expectedTotal ? '✓ OK' : '⚠️ ALERTA'}                                 ║
 ║─────────────────────────────────────────────────────║
-║ Feeders Semifinal 1 (Winner A vs Loser A): 2     ║
-║ Feeders Semifinal 2 (Winner B vs Loser B): 2     ║
+║ Feeders Semifinal 1 (Winner A vs Loser B): 2     ║
+║ Feeders Semifinal 2 (Winner B vs Loser A): 2     ║
 ║ Feeders Final (Semi 1 vs Semi 2): 2              ║
 ╚════════════════════════════════════════════════════╝
   `);

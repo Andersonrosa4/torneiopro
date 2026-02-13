@@ -554,24 +554,25 @@ const TournamentDetail = () => {
       return;
     }
 
-    // Build cross-pairings: 1st of group A vs 2nd of group D, 2nd of A vs 1st of D, etc.
-    // Groups are paired from opposite ends: A↔D, B↔C
+    // Build cross-pairings: 1st of group A always vs 2nd of last group (Z)
+    //                       2nd of group A always vs 1st of last group (Z)
+    //                       Then 1st B vs 2nd (penultimate), etc.
     const numGroups = brackets.length;
     const pairings: { team1Id: string; team2Id: string }[] = [];
 
     for (let i = 0; i < Math.ceil(numGroups / 2); i++) {
-      const mirrorIdx = numGroups - 1 - i;
+      const rightIdx = numGroups - 1 - i;
       const groupI = groupRankings[String(brackets[i])];
-      const groupMirror = mirrorIdx !== i ? groupRankings[String(brackets[mirrorIdx])] : null;
+      const groupRight = rightIdx !== i ? groupRankings[String(brackets[rightIdx])] : null;
 
-      if (groupMirror) {
-        // 1st of group[i] vs 2nd of group[mirror]
-        if (groupI[0] && groupMirror[1]) {
-          pairings.push({ team1Id: groupI[0].teamId, team2Id: groupMirror[1].teamId });
+      if (groupRight) {
+        // 1st of group[i] vs 2nd of group[rightIdx]
+        if (groupI[0] && groupRight[1]) {
+          pairings.push({ team1Id: groupI[0].teamId, team2Id: groupRight[1].teamId });
         }
-        // 2nd of group[i] vs 1st of group[mirror]
-        if (groupI[1] && groupMirror[0]) {
-          pairings.push({ team1Id: groupI[1].teamId, team2Id: groupMirror[0].teamId });
+        // 2nd of group[i] vs 1st of group[rightIdx]
+        if (groupI[1] && groupRight[0]) {
+          pairings.push({ team1Id: groupI[1].teamId, team2Id: groupRight[0].teamId });
         }
       } else {
         // Odd number of groups: middle group plays within itself

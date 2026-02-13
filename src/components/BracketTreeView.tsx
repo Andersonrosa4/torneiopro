@@ -562,38 +562,53 @@ const GroupStageView = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const groupNumbers = Array.from(new Set(groupMatches.map((m) => m.bracket_number || 1))).sort();
-  
+
   // Check if knockout matches already exist
   const hasKnockout = allMatches.some(m => m.round > 0);
-  
+
   // Build preview knockout structure
   const { knockoutRounds, rounds: knockoutRoundLabels, connections: knockoutConnections } = useMemo(
     () => hasKnockout ? { knockoutRounds: [], rounds: [], connections: [] } : buildGroupKnockoutPreview(groupNumbers),
     [groupNumbers, hasKnockout]
   );
 
-  // Build connections from group summary cards to first knockout round
-  const groupSummaryConnections = useMemo(() => {
+  // Group matches by group, then find the "last" match per group to connect to knockout
+  const groupLastMatches = useMemo(() => {
+    const map: Record<number, Match[]> = {};
+    groupNumbers.forEach(gNum => {
+      const gMatches = groupMatches
+        .filter(m => (m.bracket_number || 1) === gNum)
+        .sort((a, b) => a.position - b.position);
+      map[gNum] = gMatches;
+    });
+    return map;
+  }, [groupMatches, groupNumbers]);
+
+  // Build connections: last match of each group → first knockout round slots
+  const groupToKnockoutConnections = useMemo(() => {
     if (hasKnockout || knockoutRounds.length === 0) return [];
     const conns: { srcId: string; dstId: string }[] = [];
-    // Each group summary connects to multiple first-round knockout matches
     for (let i = 0; i < knockoutRounds[0].length; i++) {
-      // Connect from relevant group summaries
       const g1 = groupNumbers[i % groupNumbers.length];
       const g2 = groupNumbers[(i + 1) % groupNumbers.length];
-      conns.push({ srcId: `group-summary-${g1}`, dstId: knockoutRounds[0][i].id });
-      if (g2 !== g1) conns.push({ srcId: `group-summary-${g2}`, dstId: knockoutRounds[0][i].id });
+      // Connect last match of each relevant group to knockout slot
+      const g1Matches = groupLastMatches[g1];
+      const g2Matches = groupLastMatches[g2];
+      if (g1Matches?.length) {
+        const lastMatch = g1Matches[g1Matches.length - 1];
+        conns.push({ srcId: lastMatch.id, dstId: knockoutRounds[0][i].id });
+      }
+      if (g2 !== g1 && g2Matches?.length) {
+        const lastMatch = g2Matches[g2Matches.length - 1];
+        conns.push({ srcId: lastMatch.id, dstId: knockoutRounds[0][i].id });
+      }
     }
-    // Deduplicate
     const unique = new Map<string, { srcId: string; dstId: string }>();
     conns.forEach(c => unique.set(`${c.srcId}-${c.dstId}`, c));
     return Array.from(unique.values());
-  }, [groupNumbers, knockoutRounds, hasKnockout]);
+  }, [groupNumbers, groupLastMatches, knockoutRounds, hasKnockout]);
 
-  const allConnections = [...groupSummaryConnections, ...knockoutConnections];
-
-  // Calculate vertical positions for knockout rounds (tree layout)
-  const slotH = GROUP_CARD_H + GROUP_CARD_GAP;
+  const allConnections = [...groupToKnockoutConnections, ...knockoutConnections];
 
   return (
     <div className="space-y-4">
@@ -606,67 +621,40 @@ const GroupStageView = ({
           <FullBracketConnectors containerRef={containerRef} connections={allConnections} />
         )}
         <div className="flex gap-8 relative" style={{ zIndex: 1 }}>
-          {/* ── Groups Column ── */}
-          <div className="flex flex-col gap-4 shrink-0">
-            <div className="text-[9px] uppercase font-semibold text-muted-foreground/60 text-center rounded-full bg-muted/50 px-3 py-0.5">
-              Fase de Grupos
-            </div>
-            {groupNumbers.map((gNum) => {
-              const gMatches = groupMatches
-                .filter((m) => (m.bracket_number || 1) === gNum)
-                .sort((a, b) => a.position - b.position);
-
-              // Show compact group summary card for bracket view
-              const teamIds = new Set<string>();
-              gMatches.forEach(m => { if (m.team1_id) teamIds.add(m.team1_id); if (m.team2_id) teamIds.add(m.team2_id); });
-              const completedCount = gMatches.filter(m => m.status === "completed").length;
-              const totalCount = gMatches.length;
-
-              return (
-                <div
-                  key={gNum}
-                  data-match-id={`group-summary-${gNum}`}
-                  className="rounded-lg border border-primary/25 bg-card/90 backdrop-blur-sm w-[170px] shrink-0"
-                >
-                  <div className="px-2 pt-1.5 pb-1 text-[9px] font-bold text-primary uppercase tracking-wider text-center border-b border-border/30">
-                    Grupo {gNum}
-                  </div>
-                  <div className="px-2 py-1 space-y-0.5">
-                    {Array.from(teamIds).slice(0, 6).map(tid => {
-                      const wins = gMatches.filter(m => m.winner_team_id === tid).length;
-                      return (
-                        <div key={tid} className="flex items-center justify-between text-[9px]">
-                          <span className="truncate flex-1 team-name">{getName(tid)}</span>
-                          <span className="text-muted-foreground/70 font-mono ml-1">{wins}V</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="flex justify-center border-t border-border/20 px-2 py-1">
-                    <Badge
-                      className={`text-[8px] px-1.5 py-0 leading-tight border-0 ${
-                        completedCount === totalCount
-                          ? "bg-success/20 text-success"
-                          : completedCount > 0
-                          ? "bg-warning/20 text-warning"
-                          : "bg-muted/50 text-muted-foreground"
-                      }`}
-                    >
-                      {completedCount}/{totalCount} jogos
-                    </Badge>
-                  </div>
+          {/* ── Groups Columns — each group is its own column with individual match cards ── */}
+          {groupNumbers.map((gNum) => {
+            const gMatches = (groupLastMatches[gNum] || []);
+            return (
+              <div key={gNum} className="flex flex-col shrink-0" style={{ minWidth: 175 }}>
+                <div className="text-[9px] uppercase font-semibold text-center rounded-full bg-primary/15 text-primary px-3 py-0.5 mb-3">
+                  Grupo {gNum}
                 </div>
-              );
-            })}
-          </div>
+                <div className="flex flex-col gap-3">
+                  {gMatches.map((match) => (
+                    <MatchCard
+                      key={match.id}
+                      match={match}
+                      getName={getName}
+                      scale="normal"
+                      allMatches={allMatches}
+                      matchNumber={matchNumberMap?.get(match.id)}
+                      matchNumberMap={matchNumberMap}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
 
           {/* ── Knockout Preview Columns ── */}
           {!hasKnockout && knockoutRounds.map((roundMatches, ri) => {
             const roundLabel = knockoutRoundLabels[ri]?.label || `Rodada ${ri + 1}`;
-            const totalRoundHeight = groupNumbers.length * (slotH + 20);
+            // Calculate total height to center knockout cards
+            const maxGroupMatchCount = Math.max(...groupNumbers.map(g => (groupLastMatches[g] || []).length));
+            const totalGroupHeight = maxGroupMatchCount * (KNOCKOUT_CARD_H + 12);
 
             return (
-              <div key={ri} className="flex flex-col shrink-0" style={{ minWidth: 175 }}>
+              <div key={`ko-${ri}`} className="flex flex-col shrink-0" style={{ minWidth: 175 }}>
                 <div className={`text-[9px] uppercase font-semibold mb-3 whitespace-nowrap rounded-full px-3 py-0.5 text-center ${
                   roundMatches[0]?.scale === "final" || roundMatches[0]?.scale === "semi"
                     ? "bg-primary/15 text-primary"
@@ -674,7 +662,7 @@ const GroupStageView = ({
                 }`}>
                   {roundLabel}
                 </div>
-                <div className="flex flex-col justify-around gap-4 flex-1" style={{ minHeight: totalRoundHeight }}>
+                <div className="flex flex-col justify-around gap-4 flex-1" style={{ minHeight: totalGroupHeight }}>
                   {roundMatches.map((pm) => (
                     <PlaceholderMatchCard
                       key={pm.id}

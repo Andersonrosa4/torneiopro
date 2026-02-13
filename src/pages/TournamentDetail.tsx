@@ -637,24 +637,81 @@ const TournamentDetail = () => {
       // Use new advancement logic
       const advancement = processDoubleEliminationAdvance(matches, match, winnerId, loserId);
       
+      // ── VALIDATION LOG ──
+      const modalityMatchesDE = selectedModality
+        ? matches.filter(m => m.modality_id === selectedModality.id && m.round > 0)
+        : matches.filter(m => m.round > 0);
+      
+      // Count teams (N) from unique team IDs in the bracket
+      const teamIdsDE = new Set<string>();
+      modalityMatchesDE.forEach(m => {
+        if (m.team1_id) teamIdsDE.add(m.team1_id);
+        if (m.team2_id) teamIdsDE.add(m.team2_id);
+      });
+      const N = teamIdsDE.size;
+      const expectedTotal = (2 * N) - 3;
+      const completedCount = modalityMatchesDE.filter(m => m.status === 'completed').length + 1; // +1 for current match
+      
+      console.log(`[DE:MatchComplete] MatchID=${matchId}, Round=${match.round}, Type=${match.bracket_type}`);
+      console.log(`[DE:MatchComplete] Winner=${winnerId}, Loser=${loserId}`);
+      console.log(`[DE:MatchComplete] WinnerTargets=${advancement.winnerUpdates.map(u => u.matchId).join(',')}`);
+      console.log(`[DE:MatchComplete] LoserTargets=${advancement.loserUpdates.map(u => u.matchId).join(',')}`);
+      console.log(`[DE:MatchComplete] CompletedMatches=${completedCount}/${expectedTotal} (2×${N}-3)`);
+
+      // ── FEEDER PROPAGATION WITH VALIDATION ──
+      let feederFailed = false;
+
       // Apply winner updates
       for (const update of advancement.winnerUpdates) {
-        await organizerQuery({
+        const { error } = await organizerQuery({
           table: "matches",
           operation: "update",
           data: update.data,
           filters: { id: update.matchId },
         });
+        if (error) {
+          console.error(`[DE:FeederFail] Winner injection failed for match ${update.matchId}:`, error);
+          feederFailed = true;
+        } else {
+          console.log(`[DE:FeederOK] Winner ${winnerId} → Match ${update.matchId} (${JSON.stringify(update.data)})`);
+        }
       }
 
       // Apply loser updates (mirror crossing)
       for (const update of advancement.loserUpdates) {
-        await organizerQuery({
+        const { error } = await organizerQuery({
           table: "matches",
           operation: "update",
           data: update.data,
           filters: { id: update.matchId },
         });
+        if (error) {
+          console.error(`[DE:FeederFail] Loser injection failed for match ${update.matchId}:`, error);
+          feederFailed = true;
+        } else {
+          console.log(`[DE:FeederOK] Loser ${loserId} → Match ${update.matchId} (${JSON.stringify(update.data)})`);
+        }
+      }
+
+      // ── HARD BLOCK IF FEEDER FAILS ──
+      if (feederFailed) {
+        toast.error("❌ Falha na propagação de feeders. Progressão bloqueada.");
+        fetchData();
+        return;
+      }
+
+      // ── VALIDATE: If match has outgoing feeders, they must have been injected ──
+      if (match.next_win_match_id && advancement.winnerUpdates.length === 0) {
+        console.error(`[DE:FeederMissing] Match ${matchId} has next_win_match_id=${match.next_win_match_id} but no winner update was generated`);
+        toast.error("❌ Falha na propagação de feeders. Vencedor não injetado no destino.");
+        fetchData();
+        return;
+      }
+      if (match.next_lose_match_id && loserId && advancement.loserUpdates.length === 0) {
+        console.error(`[DE:FeederMissing] Match ${matchId} has next_lose_match_id=${match.next_lose_match_id} but no loser update was generated`);
+        toast.error("❌ Falha na propagação de feeders. Perdedor não injetado no destino.");
+        fetchData();
+        return;
       }
 
       toast.success("Avanço automático realizado!");
@@ -679,14 +736,9 @@ const TournamentDetail = () => {
         const allRoundDone = roundMatches.every((m: any) => m.status === "completed");
 
         if (allRoundDone) {
-          // Collect all winners from completed round
           const winners = roundMatches
             .filter((m: any) => m.winner_team_id)
             .map((m: any) => m.winner_team_id as string);
-
-          // Check for chapéu (odd team from previous generation waiting)
-          // A chapéu team would exist if original team count was odd
-          // For now, we just pair the winners
 
           if (winners.length >= 2) {
             const nextRound = currentRound + 1;
@@ -709,14 +761,13 @@ const TournamentDetail = () => {
             await organizerQuery({ table: "matches", operation: "insert", data: nextMatches });
             toast.success(`Próxima fase gerada! ${nextMatches.length} partida(s) criada(s).`);
           } else if (winners.length === 1) {
-            // Single winner = tournament champion!
             toast.success("🏆 Torneio finalizado! Campeão definido!");
           }
         }
       }
     }
 
-    // Re-fetch matches from DB to get fresh state after update
+    // Re-fetch matches from DB to get fresh state after feeder propagation
     const { data: freshMatches } = await organizerQuery({
       table: "matches",
       operation: "select",
@@ -725,45 +776,63 @@ const TournamentDetail = () => {
     });
 
     if (freshMatches) {
-      const groupMatches = freshMatches.filter((m: any) => m.round === 0);
-      const knockoutExists = freshMatches.some((m: any) => m.round > 0);
-
-      // Calculate expected group matches using round-robin formula: n(n-1)/2 per group
-      const groupBrackets = new Map<number, any[]>();
-      groupMatches.forEach((m: any) => {
-        const bracket = m.bracket_number || 1;
-        if (!groupBrackets.has(bracket)) {
-          groupBrackets.set(bracket, []);
-        }
-        groupBrackets.get(bracket)!.push(m);
-      });
-
-      // Calculate total expected matches
-      let totalExpectedMatches = 0;
-      groupBrackets.forEach((matches) => {
-        const teamIds = new Set(matches.flatMap((m: any) => [m.team1_id, m.team2_id].filter(Boolean)));
-        const n = teamIds.size;
-        const expectedPerGroup = (n * (n - 1)) / 2;
-        totalExpectedMatches += expectedPerGroup;
-      });
-
-       // Count completed group matches
-       const completedGroupMatches = groupMatches.filter((m: any) => m.status === "completed").length;
-
-       // Only advance to knockout when ALL expected group matches are completed
-       const allGroupsDone = totalExpectedMatches > 0 && completedGroupMatches === totalExpectedMatches;
-
-       // REMOVED AUTO-GENERATION: User must explicitly click "Gerar Chaveamento" after groups complete
-
-       // Check if ALL tournament matches are completed (knockout included)
-      const allDone = freshMatches.every((m: any) => m.status === "completed");
-      if (allDone && freshMatches.some((m: any) => m.round > 0)) {
-        await organizerQuery({
-          table: "tournaments",
-          operation: "update",
-          data: { status: "completed" },
-          filters: { id },
+      // ── STRICT TOURNAMENT END RULE (Double Elimination) ──
+      const isDE_final = freshMatches.some((m: any) => m.bracket_type === 'final');
+      
+      if (isDE_final) {
+        // Double Elimination: Only complete when FINAL match is done + 2N-3 validation
+        const modalityFreshMatches = selectedModality
+          ? freshMatches.filter((m: any) => m.modality_id === selectedModality.id && m.round > 0)
+          : freshMatches.filter((m: any) => m.round > 0);
+        
+        const finalMatch = modalityFreshMatches.find((m: any) => m.bracket_type === 'final');
+        const isFinalCompleted = finalMatch?.status === 'completed';
+        
+        // Count teams for 2N-3 formula
+        const allTeamIds = new Set<string>();
+        modalityFreshMatches.forEach((m: any) => {
+          if (m.team1_id) allTeamIds.add(m.team1_id);
+          if (m.team2_id) allTeamIds.add(m.team2_id);
         });
+        const totalTeams = allTeamIds.size;
+        const expectedTotalMatches = (2 * totalTeams) - 3;
+        const completedMatches = modalityFreshMatches.filter((m: any) => m.status === 'completed').length;
+
+        console.log(`[DE:EndCheck] Final completed=${isFinalCompleted}, Completed=${completedMatches}/${expectedTotalMatches}`);
+
+        if (isFinalCompleted && completedMatches >= expectedTotalMatches) {
+          // All conditions met - tournament is complete
+          await organizerQuery({
+            table: "tournaments",
+            operation: "update",
+            data: { status: "completed" },
+            filters: { id },
+          });
+          toast.success("🏆 Torneio finalizado! Campeão definido na Grande Final!");
+        } else if (completedMatches < expectedTotalMatches) {
+          // NOT all matches done - do NOT finalize
+          console.log(`[DE:EndBlock] Finalization blocked: ${completedMatches}/${expectedTotalMatches} matches completed`);
+        }
+      } else {
+        // Non-DE: Original logic for groups + normal knockout
+        const groupMatches = freshMatches.filter((m: any) => m.round === 0);
+        
+        const groupBrackets = new Map<number, any[]>();
+        groupMatches.forEach((m: any) => {
+          const bracket = m.bracket_number || 1;
+          if (!groupBrackets.has(bracket)) groupBrackets.set(bracket, []);
+          groupBrackets.get(bracket)!.push(m);
+        });
+
+        const allDone = freshMatches.every((m: any) => m.status === "completed");
+        if (allDone && freshMatches.some((m: any) => m.round > 0)) {
+          await organizerQuery({
+            table: "tournaments",
+            operation: "update",
+            data: { status: "completed" },
+            filters: { id },
+          });
+        }
       }
     }
 

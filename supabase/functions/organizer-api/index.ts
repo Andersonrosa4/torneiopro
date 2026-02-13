@@ -72,6 +72,57 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Custom bulk operations
+    if (operation === "undo_bracket") {
+      const { tournament_id, modality_id } = body;
+      if (!tournament_id) {
+        return new Response(
+          JSON.stringify({ error: "tournament_id é obrigatório" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Step 1: Nullify FK refs
+      let updateQuery = supabase.from("matches").update({ next_win_match_id: null, next_lose_match_id: null }).eq("tournament_id", tournament_id);
+      if (modality_id) updateQuery = updateQuery.eq("modality_id", modality_id);
+      const { error: updateErr } = await updateQuery;
+      if (updateErr) {
+        return new Response(JSON.stringify({ error: updateErr.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // Step 2: Delete matches
+      let deleteQuery = supabase.from("matches").delete().eq("tournament_id", tournament_id);
+      if (modality_id) deleteQuery = deleteQuery.eq("modality_id", modality_id);
+      const { error: deleteErr } = await deleteQuery;
+      if (deleteErr) {
+        return new Response(JSON.stringify({ error: deleteErr.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      return new Response(JSON.stringify({ data: null }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Custom bulk reset results
+    if (operation === "reset_results") {
+      const { tournament_id, modality_id } = body;
+      if (!tournament_id) {
+        return new Response(
+          JSON.stringify({ error: "tournament_id é obrigatório" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      let resetQuery = supabase.from("matches").update({
+        score1: 0, score2: 0, winner_team_id: null, winner_id: null, status: "pending",
+      }).eq("tournament_id", tournament_id);
+      if (modality_id) resetQuery = resetQuery.eq("modality_id", modality_id);
+      const { error: resetErr } = await resetQuery;
+      if (resetErr) {
+        return new Response(JSON.stringify({ error: resetErr.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      return new Response(JSON.stringify({ data: null }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     let query: any;
 
     switch (operation) {

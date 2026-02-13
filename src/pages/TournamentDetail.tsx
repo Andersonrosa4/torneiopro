@@ -456,21 +456,16 @@ const TournamentDetail = () => {
 
   const undoBracket = async () => {
     if (!id) return;
-    // Nullify FK refs first, then delete matches
-    if (selectedModality) {
-      const modalityMatches = matches.filter(m => m.modality_id === selectedModality.id);
-      for (const m of modalityMatches) {
-        await organizerQuery({ table: "matches", operation: "update", data: { next_win_match_id: null, next_lose_match_id: null }, filters: { id: m.id } });
-      }
-      for (const m of modalityMatches) {
-        await organizerQuery({ table: "matches", operation: "delete", filters: { id: m.id } });
-      }
-    } else {
-      const tournamentMatches = matches.filter(m => m.tournament_id === id);
-      for (const m of tournamentMatches) {
-        await organizerQuery({ table: "matches", operation: "update", data: { next_win_match_id: null, next_lose_match_id: null }, filters: { id: m.id } });
-      }
-      await organizerQuery({ table: "matches", operation: "delete", filters: { tournament_id: id } });
+    const token = sessionStorage.getItem("organizer_token");
+    const organizerId = sessionStorage.getItem("organizer_id");
+    if (!token || !organizerId) { toast.error("Não autenticado"); return; }
+    const { data: result, error: invokeErr } = await supabase.functions.invoke("organizer-api", {
+      body: { token, organizerId, operation: "undo_bracket", tournament_id: id, modality_id: selectedModality?.id || null },
+    });
+    const error = invokeErr || (result?.error ? { message: result.error } : null);
+    if (error) {
+      toast.error("Erro ao desfazer chaveamento: " + error.message);
+      return;
     }
     toast.success("Chaveamento desfeito!");
     fetchData();
@@ -479,25 +474,16 @@ const TournamentDetail = () => {
   // Reset only match results (scores, winners, status) — keeps bracket structure intact
   const undoSequence = async () => {
     if (!id) return;
-    const targetMatches = selectedModality
-      ? matches.filter(m => m.modality_id === selectedModality.id)
-      : matches.filter(m => m.tournament_id === id);
-
-    for (const m of targetMatches) {
-      if (m.status === 'completed' || m.score1 || m.score2 || m.winner_team_id) {
-        await organizerQuery({
-          table: "matches",
-          operation: "update",
-          filters: { id: m.id },
-          data: {
-            score1: 0,
-            score2: 0,
-            winner_team_id: null,
-            winner_id: null,
-            status: 'pending',
-          },
-        });
-      }
+    const token = sessionStorage.getItem("organizer_token");
+    const organizerId = sessionStorage.getItem("organizer_id");
+    if (!token || !organizerId) { toast.error("Não autenticado"); return; }
+    const { data: result, error: invokeErr } = await supabase.functions.invoke("organizer-api", {
+      body: { token, organizerId, operation: "reset_results", tournament_id: id, modality_id: selectedModality?.id || null },
+    });
+    const error = invokeErr || (result?.error ? { message: result.error } : null);
+    if (error) {
+      toast.error("Erro ao resetar resultados: " + error.message);
+      return;
     }
     toast.success("Resultados das partidas resetados! Estrutura do chaveamento mantida.");
     fetchData();

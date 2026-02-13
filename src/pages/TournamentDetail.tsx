@@ -590,7 +590,11 @@ const TournamentDetail = () => {
     if (!match || !id) return;
 
     // Validate round order for double elimination — use FRESH data from DB
-    const isDE = matches.some(m => m.bracket_type === 'losers' || m.bracket_type === 'final' || m.bracket_type === 'semi_final');
+    // IMPORTANT: Only check matches from the SAME modality to avoid cross-modality false positives
+    const modalityMatches = match.modality_id
+      ? matches.filter(m => m.modality_id === match.modality_id)
+      : matches;
+    const isDE = modalityMatches.some(m => m.bracket_type === 'losers' || m.bracket_type === 'final' || m.bracket_type === 'semi_final');
     if (isDE) {
       // Fetch latest match statuses to avoid stale-state blocking
       const { data: freshMatches } = await supabase
@@ -1209,6 +1213,20 @@ const TournamentDetail = () => {
             <TabsContent value="sequence">
               {isOwner && filteredMatches.length > 0 && (
                 <div className="mb-4 flex justify-end gap-2">
+                  {/* Show "Generate Knockout" button when all groups are done but no knockout exists */}
+                  {(() => {
+                    const groupMatches = filteredMatches.filter((m: any) => m.round === 0);
+                    const knockoutMatches = filteredMatches.filter((m: any) => m.round > 0);
+                    const allGroupsDone = groupMatches.length > 0 && groupMatches.every((m: any) => m.status === "completed");
+                    if (allGroupsDone && knockoutMatches.length === 0) {
+                      return (
+                        <Button size="sm" className="gap-1 bg-gradient-primary text-primary-foreground" onClick={generateKnockoutFromGroups}>
+                          <Trophy className="h-4 w-4" /> Gerar Mata-Mata
+                        </Button>
+                      );
+                    }
+                    return null;
+                  })()}
                   <Button variant="outline" size="sm" className="gap-1" onClick={undoSequence}>
                     <Undo2 className="h-4 w-4" /> Resetar Resultados
                   </Button>

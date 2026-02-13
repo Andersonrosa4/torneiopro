@@ -41,16 +41,9 @@ const BracketView = ({ matches, participants, isOwner, onDeclareWinner, onUpdate
   };
 
   const getRoundLabel = (round: number) => {
-    // Group stage: sempre exibir "Fase de Grupos"
-    if (tournamentFormat === 'group_stage') {
-      return "Fase de Grupos";
-    }
-    
     if (round === rounds) return "Final";
     if (round === rounds - 1) return "Semifinal";
-    if (round === rounds - 2) return "Quartas de Final";
-    if (round === rounds - 3) return "Oitavas de Final";
-    return `Rodada ${round}`;
+    return "Fase de Grupos";
   };
 
   return (

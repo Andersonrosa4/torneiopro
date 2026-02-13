@@ -130,21 +130,12 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
   const maxRound = matches.length > 0 ? Math.max(...matches.map((m) => m.round)) : 0;
 
   const getRoundLabel = (round: number) => {
-    // Group stage: sempre exibir "Fase de Grupos"
-    if (tournamentFormat === 'group_stage') {
-      return "Fase de Grupos";
-    }
-    
-    // Knockout phases
-    if (round === 0) return "Grupo";
-    
+    if (round === 0) return "Fase de Grupos";
     const roundsFromEnd = maxRound - round;
     switch (roundsFromEnd) {
       case 0: return "Final";
       case 1: return "Semifinal";
-      case 2: return "Quartas de Final";
-      case 3: return "Oitavas de Final";
-      default: return `Fase de ${2 ** roundsFromEnd}`;
+      default: return "Fase de Grupos";
     }
   };
 

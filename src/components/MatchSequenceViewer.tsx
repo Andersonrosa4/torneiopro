@@ -252,15 +252,12 @@ function getMatchGroupId(match: Match): string {
 }
 
 function getRoundShortLabel(round: number, maxRound: number, tournamentFormat: string): string {
-  if (tournamentFormat === 'group_stage') return "Fase de Grupos";
-  if (round === 0) return "Grupo";
+  if (round === 0) return "Fase de Grupos";
   const roundsFromEnd = maxRound - round;
   switch (roundsFromEnd) {
     case 0: return "Final";
     case 1: return "Semi";
-    case 2: return "Quartas";
-    case 3: return "Oitavas";
-    default: return `R${round}`;
+    default: return `Fase de Grupos`;
   }
 }
 
@@ -294,15 +291,12 @@ const MatchSequenceViewer = ({
   const maxRound = matches.length > 0 ? Math.max(...matches.map((m) => m.round)) : 0;
 
   const getRoundLabel = (round: number) => {
-    if (tournamentFormat === 'group_stage') return "Fase de Grupos";
-    if (round === 0) return "Grupo";
+    if (round === 0) return "Fase de Grupos";
     const roundsFromEnd = maxRound - round;
     switch (roundsFromEnd) {
       case 0: return "Final";
       case 1: return "Semifinal";
-      case 2: return "Quartas de Final";
-      case 3: return "Oitavas de Final";
-      default: return `Fase de ${2 ** roundsFromEnd}`;
+      default: return "Fase de Grupos";
     }
   };
 

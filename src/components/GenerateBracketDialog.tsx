@@ -196,8 +196,7 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
               </button>
 
               <div className="rounded-lg border border-primary/30 bg-primary/10 p-3">
-                <p className="text-xs text-muted-foreground">Fase detectada automaticamente:</p>
-                <p className="text-sm font-bold text-primary">{getKnockoutPhase(teamCount)}</p>
+                <p className="text-sm font-bold text-primary">Fase de Grupos</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {teamCount} duplas inscritas
                 </p>
@@ -329,12 +328,9 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                         </div>
                       )}
 
-                      {/* Knockout phase detection */}
+              {/* Phase info */}
                       <div className="rounded-lg border border-primary/30 bg-primary/10 p-3">
-                        <p className="text-xs text-muted-foreground">Fase eliminatória detectada:</p>
-                        <p className="text-sm font-bold text-primary">
-                          {getKnockoutPhase(totalAdvancing)}
-                        </p>
+                        <p className="text-sm font-bold text-primary">Fase de Grupos</p>
                         <p className="text-xs text-muted-foreground mt-1">
                           {groups} grupo(s) × {advancing} avançando{byeTeamIds.length > 0 ? ` + ${byeTeamIds.length} BYE` : ""} = {totalAdvancing} duplas na eliminatória
                         </p>
@@ -347,10 +343,9 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
               {/* Phase info for non-group normal mode */}
               {bracketMode === "normal" && !useGroupStage && (
                 <div className="rounded-lg border border-border bg-secondary/50 p-3">
-                  <p className="text-sm text-muted-foreground">Fase detectada automaticamente:</p>
-                  <p className="text-lg font-bold text-primary">{getKnockoutPhase(teamCount)}</p>
+                  <p className="text-sm font-bold text-primary">Fase de Grupos</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {teamCount} duplas → {totalSlots} posições
+                    {teamCount} duplas inscritas
                   </p>
                 </div>
               )}

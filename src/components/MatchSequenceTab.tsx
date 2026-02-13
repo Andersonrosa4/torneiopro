@@ -121,6 +121,12 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
     return ordered;
   }, [matches, tournamentFormat]);
 
+  // Filter out "A definir vs A definir" — prohibited
+  const displaySequence = useMemo(() => 
+    sequence.filter(m => m.team1_id || m.team2_id),
+    [sequence]
+  );
+
   const maxRound = matches.length > 0 ? Math.max(...matches.map((m) => m.round)) : 0;
 
   const getRoundLabel = (round: number) => {
@@ -144,11 +150,11 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
 
   // Group into display rounds
   const groupedRounds = useMemo(() => {
-    if (sequence.length === 0) return [];
+    if (displaySequence.length === 0) return [];
 
     const groups: { label: string; items: { match: Match; idx: number }[] }[] = [];
-    const groupStage = sequence.filter((m) => m.round === 0);
-    const knockoutStage = sequence.filter((m) => m.round > 0);
+    const groupStage = displaySequence.filter((m) => m.round === 0);
+    const knockoutStage = displaySequence.filter((m) => m.round > 0);
 
     if (groupStage.length > 0) {
       const bracketCount = new Set(groupStage.map((m) => m.bracket_number || 1)).size;
@@ -178,9 +184,9 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
       }
     }
     return groups;
-  }, [sequence, maxRound]);
+  }, [displaySequence, maxRound]);
 
-  if (sequence.length === 0) {
+  if (displaySequence.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
         <p className="text-muted-foreground">Gere o chaveamento primeiro para ver a sequência de partidas.</p>

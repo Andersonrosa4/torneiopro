@@ -459,39 +459,52 @@ function getLastRoundMatch(matches: MatchData[]): MatchData | undefined {
  * - A feeder match pointing to it via next_win_match_id or next_lose_match_id
  */
 function validateBracketIntegrity(matches: MatchData[], totalTeams: number): void {
-  // Check R1 winners have real teams
+  const errors: string[] = [];
+
+  // Check R1 winners have real teams (both null = error; single null = chapéu OK)
   const r1Winners = matches.filter(m => m.bracket_type === 'winners' && m.round === 1);
   for (const match of r1Winners) {
-    if (!match.team1_id || !match.team2_id) {
-      // Only allow null if chapéu (odd team count)
-      const sameHalfR1 = r1Winners.filter(m => m.bracket_half === match.bracket_half);
-      const allHaveTeams = sameHalfR1.every(m => m.team1_id && m.team2_id);
-      if (!allHaveTeams) {
-        console.warn(`[Bracket Validation] R1 match ${match._temp_id} has null teams - may be chapéu`);
-      }
+    if (!match.team1_id && !match.team2_id) {
+      errors.push(`Partida R1 (pos ${match.position}, ${match.bracket_half}) sem nenhum time definido.`);
     }
   }
 
-  // Check non-R1 matches have feeders
+  // Check ALL non-R1 matches: must have real teams OR feeders pointing to them
   const nonR1Matches = matches.filter(
-    m => !(m.bracket_type === 'winners' && m.round === 1) && m.team1_id === null && m.team2_id === null
+    m => !(m.bracket_type === 'winners' && m.round === 1)
   );
 
   for (const match of nonR1Matches) {
-    const hasFeeder = matches.some(
+    const hasTeam1 = match.team1_id !== null;
+    const hasTeam2 = match.team2_id !== null;
+    if (hasTeam1 && hasTeam2) continue;
+
+    const feedersToThis = matches.filter(
       m => m.next_win_match_id === match._temp_id || m.next_lose_match_id === match._temp_id
     );
 
-    if (!hasFeeder && match.bracket_type !== 'final') {
-      console.warn(`[Bracket Validation] Match ${match._temp_id} has no feeder and no teams`);
+    const neededFeeders = (hasTeam1 ? 0 : 1) + (hasTeam2 ? 0 : 1);
+
+    if (feedersToThis.length < neededFeeders) {
+      if (match.bracket_type === 'final' && feedersToThis.length >= 2) continue;
+
+      errors.push(
+        `Partida sem origem válida: tipo=${match.bracket_type}, half=${match.bracket_half}, ` +
+        `rodada=${match.round}, pos=${match.position}. Feeders: ${feedersToThis.length}, necessários: ${neededFeeders}`
+      );
     }
   }
 
-  // Verify total match count is reasonable
-  // Double elimination: roughly 2N-1 matches for N teams
+  if (errors.length > 0) {
+    console.error('[Bracket Validation] Erros de integridade:', errors);
+    throw new Error(
+      `Validação do chaveamento falhou com ${errors.length} erro(s):\n` + errors.join('\n')
+    );
+  }
+
   const expectedMin = Math.floor(totalTeams * 1.5);
   if (matches.length < expectedMin) {
-    console.warn(`[Bracket Validation] Only ${matches.length} matches for ${totalTeams} teams. Expected at least ${expectedMin}`);
+    console.warn(`[Bracket Validation] Apenas ${matches.length} partidas para ${totalTeams} times. Esperado: ${expectedMin}`);
   }
 }
 

@@ -256,13 +256,21 @@ const TournamentDetail = () => {
         return;
       }
 
-      // Delete only matches for the current modality
+      // Delete only matches for the current modality (nullify FK refs first)
       if (selectedModality) {
         const modalityMatches = matches.filter(m => m.modality_id === selectedModality.id);
+        for (const m of modalityMatches) {
+          await organizerQuery({ table: "matches", operation: "update", data: { next_win_match_id: null, next_lose_match_id: null }, filters: { id: m.id } });
+        }
         for (const m of modalityMatches) {
           await organizerQuery({ table: "matches", operation: "delete", filters: { id: m.id } });
         }
       } else {
+        // Nullify all FK refs for tournament matches first
+        const tournamentMatches = matches.filter(m => m.tournament_id === id);
+        for (const m of tournamentMatches) {
+          await organizerQuery({ table: "matches", operation: "update", data: { next_win_match_id: null, next_lose_match_id: null }, filters: { id: m.id } });
+        }
         await organizerQuery({ table: "matches", operation: "delete", filters: { tournament_id: id } });
       }
 
@@ -448,13 +456,20 @@ const TournamentDetail = () => {
 
   const undoBracket = async () => {
     if (!id) return;
-    // Delete only matches for the current modality
+    // Nullify FK refs first, then delete matches
     if (selectedModality) {
       const modalityMatches = matches.filter(m => m.modality_id === selectedModality.id);
+      for (const m of modalityMatches) {
+        await organizerQuery({ table: "matches", operation: "update", data: { next_win_match_id: null, next_lose_match_id: null }, filters: { id: m.id } });
+      }
       for (const m of modalityMatches) {
         await organizerQuery({ table: "matches", operation: "delete", filters: { id: m.id } });
       }
     } else {
+      const tournamentMatches = matches.filter(m => m.tournament_id === id);
+      for (const m of tournamentMatches) {
+        await organizerQuery({ table: "matches", operation: "update", data: { next_win_match_id: null, next_lose_match_id: null }, filters: { id: m.id } });
+      }
       await organizerQuery({ table: "matches", operation: "delete", filters: { tournament_id: id } });
     }
     toast.success("Chaveamento desfeito!");
@@ -766,8 +781,12 @@ const TournamentDetail = () => {
 
   const deleteTournament = async () => {
     if (!id) return;
-    // Delete all related data in order
+    // Nullify FK refs first, then delete
     await organizerQuery({ table: "rankings", operation: "delete", filters: { tournament_id: id } });
+    const tournamentMatches = matches.filter(m => m.tournament_id === id);
+    for (const m of tournamentMatches) {
+      await organizerQuery({ table: "matches", operation: "update", data: { next_win_match_id: null, next_lose_match_id: null }, filters: { id: m.id } });
+    }
     await organizerQuery({ table: "matches", operation: "delete", filters: { tournament_id: id } });
     await organizerQuery({ table: "teams", operation: "delete", filters: { tournament_id: id } });
     await organizerQuery({ table: "tournaments", operation: "delete", filters: { id } });

@@ -1102,6 +1102,7 @@ const TournamentDetail = () => {
                     onDeclareWinner={() => {}}
                     onUpdateScore={() => {}}
                     structuralOnly
+                    tournamentFormat={selectedModality?.game_system || tournament?.format}
                   />
                 </section>
               ) : (
@@ -1139,7 +1140,7 @@ const TournamentDetail = () => {
                     eventDate={tournament?.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
                     onUpdateScore={updateScore}
                     onDeclareWinner={declareWinner}
-                    tournamentFormat={tournament?.format}
+                    tournamentFormat={selectedModality?.game_system || tournament?.format}
                     onAutoResult={handleAutoResult}
                   />
                 </section>

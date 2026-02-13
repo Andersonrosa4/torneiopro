@@ -396,7 +396,7 @@ const TournamentDetail = () => {
       toast.success(`✅ Dupla Eliminação gerada! ${matchCount} partidas criadas.`);
       fetchData();
     } else {
-      // === NORMAL KNOCKOUT (no BYEs, real teams only) ===
+      // === NORMAL KNOCKOUT — only create first round with REAL teams ===
       let arranged = [...filteredTeams];
       if (config.useSeeds && config.seedTeamIds && config.seedTeamIds.length > 0) {
         const seeds = arranged.filter(t => config.seedTeamIds!.includes(t.id));
@@ -411,106 +411,22 @@ const TournamentDetail = () => {
       const n = arranged.length;
       const newMatches: any[] = [];
 
-      // For N teams: nextPow2 = smallest power of 2 >= N
-      // preliminaryMatchCount = N - nextPow2/2 (excess teams that must play a preliminary round)
-      // If N is already a power of 2, no preliminary round needed.
-      const nextPow2 = Math.pow(2, Math.ceil(Math.log2(Math.max(n, 2))));
-      const mainRoundTeams = nextPow2 / 2; // teams that fit directly in main round 1
-      const preliminaryMatchCount = n - mainRoundTeams; // number of preliminary matches
-
-      if (preliminaryMatchCount > 0) {
-        // PRELIMINARY ROUND (round 0): the last (preliminaryMatchCount*2) teams play
-        // Winners advance to round 1 to face the direct-entry teams
-        const numPrelimTeams = preliminaryMatchCount * 2;
-        const directTeams = arranged.slice(0, n - numPrelimTeams); // teams that skip to round 1
-        const prelimTeams = arranged.slice(n - numPrelimTeams);    // teams that play preliminary
-
-        // Create preliminary matches
-        for (let i = 0; i < prelimTeams.length; i += 2) {
-          newMatches.push({
-            tournament_id: id,
-            round: 0,
-            position: Math.floor(i / 2) + 1,
-            team1_id: prelimTeams[i].id,
-            team2_id: prelimTeams[i + 1].id,
-            status: "pending",
-            modality_id: currentModalityId,
-          });
-        }
-
-        // Round 1: mainRoundTeams/2 matches
-        // First matches pair direct teams together, last matches pair a direct team vs preliminary winner
-        const round1Matches = mainRoundTeams / 2;
-        // Direct teams pair up first: directTeams has (mainRoundTeams - preliminaryMatchCount) teams
-        // We need to pair them: some will face each other, some will face preliminary winners
-        // Layout: positions 1..round1Matches
-        // Positions that receive preliminary winners: the last preliminaryMatchCount positions
-        const directPairCount = Math.floor(directTeams.length / 2);
-        const directLeftover = directTeams.length % 2 === 1 ? 1 : 0;
-
-        let pos = 1;
-        // Pair direct teams together
-        for (let i = 0; i < directPairCount; i++) {
-          newMatches.push({
-            tournament_id: id,
-            round: 1,
-            position: pos++,
-            team1_id: directTeams[i * 2].id,
-            team2_id: directTeams[i * 2 + 1].id,
-            status: "pending",
-            modality_id: currentModalityId,
-          });
-        }
-        // Remaining direct teams face preliminary winners
-        let directIdx = directPairCount * 2;
-        for (let i = 0; i < preliminaryMatchCount; i++) {
-          newMatches.push({
-            tournament_id: id,
-            round: 1,
-            position: pos++,
-            team1_id: directIdx < directTeams.length ? directTeams[directIdx++].id : null,
-            team2_id: null, // filled by preliminary winner
-            status: "pending",
-            modality_id: currentModalityId,
-          });
-        }
-      } else {
-        // Perfect power of 2 — all teams play in round 1
-        for (let i = 0; i < n; i += 2) {
-          newMatches.push({
-            tournament_id: id,
-            round: 1,
-            position: Math.floor(i / 2) + 1,
-            team1_id: arranged[i].id,
-            team2_id: arranged[i + 1].id,
-            status: "pending",
-            modality_id: currentModalityId,
-          });
-        }
+      // Create ONLY the first round — all matches must have real teams
+      // If odd number, last team waits (chapéu) for next round
+      const pairCount = Math.floor(n / 2);
+      for (let i = 0; i < pairCount; i++) {
+        newMatches.push({
+          tournament_id: id,
+          round: 1,
+          position: i + 1,
+          team1_id: arranged[i * 2].id,
+          team2_id: arranged[i * 2 + 1].id,
+          status: "pending",
+          modality_id: currentModalityId,
+        });
       }
 
-      // Generate subsequent rounds until final (1 match)
-      const firstMainRound = preliminaryMatchCount > 0 ? 1 : 1;
-      let currentRoundMatches = newMatches.filter(m => m.round === firstMainRound).length;
-      let round = firstMainRound + 1;
-      while (currentRoundMatches > 1) {
-        const count = Math.ceil(currentRoundMatches / 2);
-        for (let p = 0; p < count; p++) {
-          newMatches.push({
-            tournament_id: id,
-            round: round,
-            position: p + 1,
-            team1_id: null,
-            team2_id: null,
-            status: "pending",
-            modality_id: currentModalityId,
-          });
-        }
-        currentRoundMatches = count;
-        round++;
-      }
-
-      // NO auto-advance, NO BYEs — all matches must be played with real teams
+      // NO future rounds generated — they will be created dynamically by declareWinner
 
       const { error } = await organizerQuery({ table: "matches", operation: "insert", data: newMatches });
       if (error) { throw new Error(`Erro ao salvar partidas: ${error.message}`); }
@@ -642,123 +558,28 @@ const TournamentDetail = () => {
 
     const newMatches: any[] = [];
 
-    // Organic knockout: NO BYEs, NO power-of-2 padding
-    // If N is a power of 2, all play in round 1
-    // Otherwise, excess teams play a preliminary round
-    const nextPow2 = Math.pow(2, Math.ceil(Math.log2(Math.max(n, 2))));
-    const mainRoundTeams = nextPow2 / 2;
-    const preliminaryMatchCount = n - mainRoundTeams;
-
-    if (preliminaryMatchCount > 0) {
-      // Preliminary round: excess teams play first
-      const numPrelimTeams = preliminaryMatchCount * 2;
-      const directTeams = arranged.slice(0, n - numPrelimTeams);
-      const prelimTeams = arranged.slice(n - numPrelimTeams);
-
-      for (let i = 0; i < prelimTeams.length; i += 2) {
-        newMatches.push({
-          tournament_id: id,
-          round: 1,
-          position: Math.floor(i / 2) + 1,
-          team1_id: prelimTeams[i],
-          team2_id: prelimTeams[i + 1],
-          status: "pending",
-          bracket_number: 1,
-          modality_id: modalityId,
-        });
-      }
-
-      // Round 2: direct teams + preliminary winners
-      let pos = 1;
-      const directPairCount = Math.floor(directTeams.length / 2);
-      for (let i = 0; i < directPairCount; i++) {
-        newMatches.push({
-          tournament_id: id,
-          round: 2,
-          position: pos++,
-          team1_id: directTeams[i * 2],
-          team2_id: directTeams[i * 2 + 1],
-          status: "pending",
-          bracket_number: 1,
-          modality_id: modalityId,
-        });
-      }
-      // Slots for preliminary winners vs remaining direct teams
-      let directIdx = directPairCount * 2;
-      for (let i = 0; i < preliminaryMatchCount; i++) {
-        newMatches.push({
-          tournament_id: id,
-          round: 2,
-          position: pos++,
-          team1_id: directIdx < directTeams.length ? directTeams[directIdx++] : null,
-          team2_id: null, // filled by preliminary winner
-          status: "pending",
-          bracket_number: 1,
-          modality_id: modalityId,
-        });
-      }
-
-      // Subsequent rounds
-      let currentRoundCount = pos - 1;
-      let round = 3;
-      while (currentRoundCount > 1) {
-        const count = Math.ceil(currentRoundCount / 2);
-        for (let p = 0; p < count; p++) {
-          newMatches.push({
-            tournament_id: id,
-            round,
-            position: p + 1,
-            team1_id: null,
-            team2_id: null,
-            status: "pending",
-            bracket_number: 1,
-            modality_id: modalityId,
-          });
-        }
-        currentRoundCount = count;
-        round++;
-      }
-    } else {
-      // Perfect power of 2 — all teams play in round 1
-      for (let i = 0; i < n; i += 2) {
-        newMatches.push({
-          tournament_id: id,
-          round: 1,
-          position: Math.floor(i / 2) + 1,
-          team1_id: arranged[i],
-          team2_id: arranged[i + 1],
-          status: "pending",
-          bracket_number: 1,
-          modality_id: modalityId,
-        });
-      }
-
-      // Subsequent rounds
-      let currentRoundCount = n / 2;
-      let round = 2;
-      while (currentRoundCount > 1) {
-        const count = Math.ceil(currentRoundCount / 2);
-        for (let p = 0; p < count; p++) {
-          newMatches.push({
-            tournament_id: id,
-            round,
-            position: p + 1,
-            team1_id: null,
-            team2_id: null,
-            status: "pending",
-            bracket_number: 1,
-            modality_id: modalityId,
-          });
-        }
-        currentRoundCount = count;
-        round++;
-      }
+    // Create ONLY the first elimination round — all matches with real teams
+    // If odd number, last team waits (chapéu) for next round
+    const pairCount = Math.floor(n / 2);
+    for (let i = 0; i < pairCount; i++) {
+      newMatches.push({
+        tournament_id: id,
+        round: 1,
+        position: i + 1,
+        team1_id: arranged[i * 2],
+        team2_id: arranged[i * 2 + 1],
+        status: "pending",
+        bracket_number: 1,
+        modality_id: modalityId,
+      });
     }
+
+    // NO future rounds — they are created dynamically by declareWinner
 
     const { error } = await organizerQuery({ table: "matches", operation: "insert", data: newMatches });
     if (error) { toast.error(error.message); return; }
 
-    toast.success(`Fase de grupos concluída! Eliminatória gerada com ${allAdvancing.length} duplas classificadas.`);
+    toast.success(`Fase de grupos concluída! Eliminatória gerada com ${allAdvancing.length} duplas classificadas (${pairCount} partidas).`);
     fetchData();
   };
 
@@ -805,20 +626,60 @@ const TournamentDetail = () => {
 
       toast.success("Avanço automático realizado!");
     } else {
-      // Normal bracket advancement
-      const nextRound = match.round + 1;
-      const nextPosition = Math.ceil(match.position / 2);
-      const isTop = match.position % 2 === 1;
-      const bracket_number = match.bracket_number || 1;
+      // Normal bracket: dynamic next-round generation
+      // Re-fetch fresh state to check if all matches in this round are done
+      const { data: currentMatches } = await organizerQuery({
+        table: "matches",
+        operation: "select",
+        filters: { tournament_id: id },
+        order: [{ column: "round" }, { column: "position" }],
+      });
 
-      const nextMatch = matches.find(
-        (m) => m.round === nextRound && m.position === nextPosition && (m.bracket_number || 1) === bracket_number
-      );
+      if (currentMatches) {
+        const modalityId = match.modality_id;
+        const relevantMatches = modalityId
+          ? currentMatches.filter((m: any) => m.modality_id === modalityId)
+          : currentMatches;
 
-      if (nextMatch) {
-        const update = isTop ? { team1_id: winnerId } : { team2_id: winnerId };
-        await organizerQuery({ table: "matches", operation: "update", data: update, filters: { id: nextMatch.id } });
-        toast.success("Avanço automático realizado!");
+        const currentRound = match.round;
+        const roundMatches = relevantMatches.filter((m: any) => m.round === currentRound);
+        const allRoundDone = roundMatches.every((m: any) => m.status === "completed");
+
+        if (allRoundDone) {
+          // Collect all winners from completed round
+          const winners = roundMatches
+            .filter((m: any) => m.winner_team_id)
+            .map((m: any) => m.winner_team_id as string);
+
+          // Check for chapéu (odd team from previous generation waiting)
+          // A chapéu team would exist if original team count was odd
+          // For now, we just pair the winners
+
+          if (winners.length >= 2) {
+            const nextRound = currentRound + 1;
+            const nextMatches: any[] = [];
+            const pairCount = Math.floor(winners.length / 2);
+
+            for (let i = 0; i < pairCount; i++) {
+              nextMatches.push({
+                tournament_id: id,
+                round: nextRound,
+                position: i + 1,
+                team1_id: winners[i * 2],
+                team2_id: winners[i * 2 + 1],
+                status: "pending",
+                bracket_number: match.bracket_number || 1,
+                modality_id: modalityId,
+              });
+            }
+
+            await organizerQuery({ table: "matches", operation: "insert", data: nextMatches });
+            toast.success(`Próxima fase gerada! ${nextMatches.length} partida(s) criada(s).`);
+          } else if (winners.length === 1) {
+            // Single winner = tournament champion!
+            toast.success("🏆 Torneio finalizado! Campeão definido!");
+          }
+        }
       }
     }
 

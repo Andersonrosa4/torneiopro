@@ -46,6 +46,8 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
   const [numSets, setNumSets] = useState("3");
   const [gamesPerSet, setGamesPerSet] = useState("6");
   const [selectedSeedIds, setSelectedSeedIds] = useState<string[]>([]);
+  const [sideATeamIds, setSideATeamIds] = useState<string[]>([]);
+  const [sideBTeamIds, setSideBTeamIds] = useState<string[]>([]);
   const [useGroupStage, setUseGroupStage] = useState(true);
   const [numGroups, setNumGroups] = useState("2");
   const [teamsPerGroupAdvancing, setTeamsPerGroupAdvancing] = useState("2");
@@ -106,7 +108,11 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
       byeTeamIds,
       useIndex: supportsIndex && useIndex,
       numIndexTeams: supportsIndex && useIndex ? Number(numIndexTeams) : 0,
-    });
+      ...(bracketMode === "double_elimination" && useSeeds === "true" ? {
+        sideATeamIds,
+        sideBTeamIds,
+      } : {}),
+    } as any);
     setOpen(false);
     setStep("mode");
   };
@@ -425,7 +431,7 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                 </Select>
               </div>
 
-              {useSeeds === "true" && (
+              {useSeeds === "true" && bracketMode !== "double_elimination" && (
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold">Selecione as duplas cabeça de chave:</Label>
                   <div className="max-h-40 overflow-y-auto space-y-1 rounded-lg border border-border p-2 bg-card/50">
@@ -444,6 +450,58 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {selectedSeedIds.length} cabeça(s) de chave selecionada(s)
+                  </p>
+                </div>
+              )}
+
+              {useSeeds === "true" && bracketMode === "double_elimination" && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Duplas no Lado A (Vencedores Superior):</Label>
+                    <div className="max-h-36 overflow-y-auto space-y-1 rounded-lg border border-blue-500/30 p-2 bg-blue-500/5">
+                      {teams.filter(t => !sideBTeamIds.includes(t.id)).map((t) => (
+                        <label
+                          key={t.id}
+                          className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-secondary/50 cursor-pointer text-sm"
+                        >
+                          <Checkbox
+                            checked={sideATeamIds.includes(t.id)}
+                            onCheckedChange={() => {
+                              setSideATeamIds(prev =>
+                                prev.includes(t.id) ? prev.filter(id => id !== t.id) : [...prev, t.id]
+                              );
+                            }}
+                          />
+                          <span className="text-foreground">{t.player1_name} / {t.player2_name}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <p className="text-xs text-blue-400">{sideATeamIds.length} dupla(s) no Lado A</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Duplas no Lado B (Vencedores Inferior):</Label>
+                    <div className="max-h-36 overflow-y-auto space-y-1 rounded-lg border border-cyan-500/30 p-2 bg-cyan-500/5">
+                      {teams.filter(t => !sideATeamIds.includes(t.id)).map((t) => (
+                        <label
+                          key={t.id}
+                          className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-secondary/50 cursor-pointer text-sm"
+                        >
+                          <Checkbox
+                            checked={sideBTeamIds.includes(t.id)}
+                            onCheckedChange={() => {
+                              setSideBTeamIds(prev =>
+                                prev.includes(t.id) ? prev.filter(id => id !== t.id) : [...prev, t.id]
+                              );
+                            }}
+                          />
+                          <span className="text-foreground">{t.player1_name} / {t.player2_name}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <p className="text-xs text-cyan-400">{sideBTeamIds.length} dupla(s) no Lado B</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Duplas não atribuídas serão distribuídas aleatoriamente nos espaços restantes.
                   </p>
                 </div>
               )}

@@ -6,6 +6,7 @@ import { Trophy, Save, Download, FileText, Sheet, Pencil } from "lucide-react";
 import { motion } from "framer-motion";
 import { exportMatchSequence } from "@/lib/exportUtils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { getEliminationRoundLabel, getEliminationRoundShortLabel } from "@/lib/roundLabels";
 
 interface Match {
   id: string;
@@ -251,14 +252,8 @@ function getMatchGroupId(match: Match): string {
   return `Chave ${match.bracket_number || 1}`;
 }
 
-function getRoundShortLabel(round: number, maxRound: number, tournamentFormat: string): string {
-  if (round === 0) return "Fase de Grupos";
-  const roundsFromEnd = maxRound - round;
-  switch (roundsFromEnd) {
-    case 0: return "Final";
-    case 1: return "Semi";
-    default: return `Fase de Grupos`;
-  }
+function getRoundShortLabel(round: number, matchCountInRound: number): string {
+  return getEliminationRoundShortLabel(round, matchCountInRound);
 }
 
 // ─── Main Component ──────────────────────────────────────────
@@ -288,16 +283,15 @@ const MatchSequenceViewer = ({
     sequence.filter(m => m.team1_id || m.team2_id), 
     [sequence]
   );
-  const maxRound = matches.length > 0 ? Math.max(...matches.map((m) => m.round)) : 0;
+
+  const matchCountByRound = useMemo(() => {
+    const counts: Record<number, number> = {};
+    matches.forEach(m => { counts[m.round] = (counts[m.round] || 0) + 1; });
+    return counts;
+  }, [matches]);
 
   const getRoundLabel = (round: number) => {
-    if (round === 0) return "Fase de Grupos";
-    const roundsFromEnd = maxRound - round;
-    switch (roundsFromEnd) {
-      case 0: return "Final";
-      case 1: return "Semifinal";
-      default: return "Fase de Grupos";
-    }
+    return getEliminationRoundLabel(round, matchCountByRound[round] || 0);
   };
 
   // Group by bracket blocks for double elimination, or by round for others
@@ -366,7 +360,7 @@ const MatchSequenceViewer = ({
       }
     }
     return groups;
-  }, [displaySequence, maxRound, tournamentFormat]);
+  }, [displaySequence, matchCountByRound, tournamentFormat]);
 
   if (displaySequence.length === 0) {
     return (
@@ -436,7 +430,7 @@ const MatchSequenceViewer = ({
                 match={match}
                 index={globalIndex}
                 getTeamName={getTeamName}
-                getRoundLabel={(r) => getRoundShortLabel(r, maxRound, tournamentFormat)}
+                getRoundLabel={(r) => getRoundShortLabel(r, matchCountByRound[r] || 0)}
                 isOwner={isOwner}
                 numSets={numSets}
                 onDeclareWinner={onDeclareWinner}

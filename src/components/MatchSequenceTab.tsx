@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Trophy } from "lucide-react";
+import { getEliminationRoundLabel } from "@/lib/roundLabels";
 
 interface Match {
   id: string;
@@ -127,16 +128,14 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
     [sequence]
   );
 
-  const maxRound = matches.length > 0 ? Math.max(...matches.map((m) => m.round)) : 0;
+  const matchCountByRound = useMemo(() => {
+    const counts: Record<number, number> = {};
+    matches.forEach(m => { counts[m.round] = (counts[m.round] || 0) + 1; });
+    return counts;
+  }, [matches]);
 
   const getRoundLabel = (round: number) => {
-    if (round === 0) return "Fase de Grupos";
-    const roundsFromEnd = maxRound - round;
-    switch (roundsFromEnd) {
-      case 0: return "Final";
-      case 1: return "Semifinal";
-      default: return "Fase de Grupos";
-    }
+    return getEliminationRoundLabel(round, matchCountByRound[round] || 0);
   };
 
   // Group into display rounds
@@ -175,7 +174,7 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
       }
     }
     return groups;
-  }, [displaySequence, maxRound]);
+  }, [displaySequence, matchCountByRound]);
 
   if (displaySequence.length === 0) {
     return (

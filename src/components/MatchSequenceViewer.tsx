@@ -625,7 +625,7 @@ const MatchCard = ({
             </span>
             {autoWinnerId && (
               <Badge className="bg-success/20 text-success border-0 text-[10px] px-1.5 py-0">
-                Auto: {getTeamName(autoWinnerId).split(" / ")[0]}
+                Vencedor: {getTeamName(autoWinnerId).split(" / ")[0]}
               </Badge>
             )}
           </div>
@@ -664,7 +664,5 @@ const MatchCard = ({
     </div>
   );
 };
-
-const MemoizedMatchCard = memo(MatchCard);
 
 export default MatchSequenceViewer;

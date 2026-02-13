@@ -52,7 +52,7 @@ export function getSlotFeeders(
   sortedFeeders.forEach((feeder, idx) => {
     const isWinnerFeeder = feeder.next_win_match_id === targetMatch.id;
     const type = isWinnerFeeder ? 'winner' : 'loser';
-    const prefix = isWinnerFeeder ? 'V' : 'P';
+    const prefix = isWinnerFeeder ? 'Venc.' : 'Perd.';
     
     // Use matchNumberMap for the real sequence number
     const num = matchNumberMap?.get(feeder.id) ?? feeder.position;

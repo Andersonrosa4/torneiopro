@@ -629,8 +629,11 @@ const TournamentDetail = () => {
       filters: { id: matchId },
     });
 
-    // Determine if this is a double elimination bracket
-    const isDoubleElimination = matches.some(m => m.bracket_type === 'losers' || m.bracket_type === 'final' || m.bracket_type === 'semi_final');
+    // Determine if this is a double elimination bracket — filter by SAME modality
+    const modalityMatchesForDE = match.modality_id
+      ? matches.filter(m => m.modality_id === match.modality_id)
+      : matches;
+    const isDoubleElimination = modalityMatchesForDE.some(m => m.bracket_type === 'losers' || m.bracket_type === 'final' || m.bracket_type === 'semi_final');
 
     if (isDoubleElimination) {
       // Use new advancement logic

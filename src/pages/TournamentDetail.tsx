@@ -853,17 +853,15 @@ const TournamentDetail = () => {
         totalExpectedMatches += expectedPerGroup;
       });
 
-      // Count completed group matches
-      const completedGroupMatches = groupMatches.filter((m: any) => m.status === "completed").length;
+       // Count completed group matches
+       const completedGroupMatches = groupMatches.filter((m: any) => m.status === "completed").length;
 
-      // Only advance to knockout when ALL expected group matches are completed
-      const allGroupsDone = totalExpectedMatches > 0 && completedGroupMatches === totalExpectedMatches;
+       // Only advance to knockout when ALL expected group matches are completed
+       const allGroupsDone = totalExpectedMatches > 0 && completedGroupMatches === totalExpectedMatches;
 
-      if (allGroupsDone && !knockoutExists && match.round === 0) {
-        await generateKnockoutFromGroups();
-      }
+       // REMOVED AUTO-GENERATION: User must explicitly click "Gerar Chaveamento" after groups complete
 
-      // Check if ALL tournament matches are completed (knockout included)
+       // Check if ALL tournament matches are completed (knockout included)
       const allDone = freshMatches.every((m: any) => m.status === "completed");
       if (allDone && freshMatches.some((m: any) => m.round > 0)) {
         await organizerQuery({

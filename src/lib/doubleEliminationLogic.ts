@@ -217,110 +217,124 @@ function buildLosersBracketWithFeeders(
   if (winnersRounds.length === 0) return [];
 
   const allMatches: MatchData[] = [];
-  let survivors: MatchData[] = [];
+
+  // Queue simulation: track "slots" that feed into losers matches
+  // Each slot is either a match whose winner continues, or a winners match whose loser drops
+  // We use abstract "feeder" tracking: survivors = matches whose winners stay in queue
+  let queueSurvivors: MatchData[] = []; // matches whose WINNER stays in losers queue
   let losersRound = 1;
 
   for (let ri = 0; ri < winnersRounds.length; ri++) {
     const wRound = winnersRounds[ri];
     const winnersInRound = byRound.get(wRound)!.sort((a, b) => a.position - b.position);
-    const droppersCount = winnersInRound.length;
+    const newDropperCount = winnersInRound.length;
 
-    if (ri === 0) {
-      // ── FIRST ROUND: pair losers from Winners R1 ──
-      const pairCount = Math.floor(droppersCount / 2);
-      const r1Matches: MatchData[] = [];
+    if (queueSurvivors.length === 0 && ri === 0) {
+      // ── FIRST INTAKE: pair droppers from Winners R1 among themselves ──
+      // (no existing survivors yet, so we must pair droppers)
+      const pairCount = Math.floor(newDropperCount / 2);
+      const roundMatches: MatchData[] = [];
+
       for (let p = 0; p < pairCount; p++) {
         const m = createMatch(tournamentId, modalityId, losersRound, p + 1, 'losers', half, bracketNumber);
-        r1Matches.push(m);
+        // Link both winners matches' losers to this losers match
+        winnersInRound[p * 2].next_lose_match_id = m._temp_id;
+        winnersInRound[p * 2 + 1].next_lose_match_id = m._temp_id;
+        roundMatches.push(m);
         allMatches.push(m);
       }
 
-      // Link: every 2 winners losers → 1 losers match
-      for (let i = 0; i < winnersInRound.length; i++) {
-        const idx = Math.floor(i / 2);
-        if (idx < r1Matches.length) {
-          winnersInRound[i].next_lose_match_id = r1Matches[idx]._temp_id;
-        }
+      // Odd dropper → chapéu: link to a placeholder that carries forward
+      if (newDropperCount % 2 === 1) {
+        // Last dropper has no pair — create a "pass-through" match
+        // Actually, we just leave it as a survivor feeder for next round
+        // We need a match to hold it. Create a match that will get its second team later.
+        const m = createMatch(tournamentId, modalityId, losersRound, pairCount + 1, 'losers', half, bracketNumber);
+        winnersInRound[newDropperCount - 1].next_lose_match_id = m._temp_id;
+        // This match only has 1 source for now — it will be a chapéu
+        roundMatches.push(m);
+        allMatches.push(m);
       }
 
-      survivors = [...r1Matches];
+      queueSurvivors = roundMatches;
       losersRound++;
-    } else {
-      // ── MINOR ROUND: reduce survivors to match dropper count ──
-      while (survivors.length > droppersCount && survivors.length > 1) {
-        const minor: MatchData[] = [];
-        const pairCount = Math.floor(survivors.length / 2);
-        for (let p = 0; p < pairCount; p++) {
-          const m = createMatch(tournamentId, modalityId, losersRound, p + 1, 'losers', half, bracketNumber);
-          survivors[p * 2].next_win_match_id = m._temp_id;
-          survivors[p * 2 + 1].next_win_match_id = m._temp_id;
-          minor.push(m);
-          allMatches.push(m);
-        }
-        // Odd survivor carries forward
-        if (survivors.length % 2 === 1) {
-          minor.push(survivors[survivors.length - 1]);
-        }
-        survivors = minor;
-        losersRound++;
-      }
-
-      // ── MAJOR ROUND: pair survivors with new droppers ──
-      if (droppersCount > 0) {
-        const major: MatchData[] = [];
-        const directPairs = Math.min(survivors.length, droppersCount);
-
-        // Each survivor pairs with one dropper
-        for (let p = 0; p < directPairs; p++) {
-          const m = createMatch(tournamentId, modalityId, losersRound, major.length + 1, 'losers', half, bracketNumber);
-          survivors[p].next_win_match_id = m._temp_id;
-          winnersInRound[p].next_lose_match_id = m._temp_id;
-          major.push(m);
-          allMatches.push(m);
-        }
-
-        // Extra survivors carry forward
-        for (let p = directPairs; p < survivors.length; p++) {
-          major.push(survivors[p]);
-        }
-
-        // Extra droppers: pair among themselves
-        let dp = directPairs;
-        while (dp + 1 < droppersCount) {
-          const m = createMatch(tournamentId, modalityId, losersRound, major.length + 1, 'losers', half, bracketNumber);
-          winnersInRound[dp].next_lose_match_id = m._temp_id;
-          winnersInRound[dp + 1].next_lose_match_id = m._temp_id;
-          major.push(m);
-          allMatches.push(m);
-          dp += 2;
-        }
-
-        // Remaining odd dropper → attach to last major match
-        if (dp < droppersCount && major.length > 0) {
-          winnersInRound[dp].next_lose_match_id = major[major.length - 1]._temp_id;
-        }
-
-        survivors = major;
-        losersRound++;
-      }
+      continue;
     }
+
+    // ── SUBSEQUENT INTAKES: prioritize survivors vs new droppers ──
+    // Priority: pair each SURVIVOR (existing losers queue) with a NEW DROPPER
+    // This ensures we never pair two fresh droppers when survivors exist.
+
+    const roundMatches: MatchData[] = [];
+    let survivorIdx = 0;
+    let dropperIdx = 0;
+
+    // Phase 1: Pair survivors with droppers (priority pairing)
+    while (survivorIdx < queueSurvivors.length && dropperIdx < newDropperCount) {
+      const m = createMatch(tournamentId, modalityId, losersRound, roundMatches.length + 1, 'losers', half, bracketNumber);
+      queueSurvivors[survivorIdx].next_win_match_id = m._temp_id;
+      winnersInRound[dropperIdx].next_lose_match_id = m._temp_id;
+      roundMatches.push(m);
+      allMatches.push(m);
+      survivorIdx++;
+      dropperIdx++;
+    }
+
+    // Phase 2: Remaining survivors pair among themselves
+    while (survivorIdx + 1 < queueSurvivors.length) {
+      const m = createMatch(tournamentId, modalityId, losersRound, roundMatches.length + 1, 'losers', half, bracketNumber);
+      queueSurvivors[survivorIdx].next_win_match_id = m._temp_id;
+      queueSurvivors[survivorIdx + 1].next_win_match_id = m._temp_id;
+      roundMatches.push(m);
+      allMatches.push(m);
+      survivorIdx += 2;
+    }
+
+    // Phase 3: Remaining droppers pair among themselves (only if no survivors left)
+    while (dropperIdx + 1 < newDropperCount) {
+      const m = createMatch(tournamentId, modalityId, losersRound, roundMatches.length + 1, 'losers', half, bracketNumber);
+      winnersInRound[dropperIdx].next_lose_match_id = m._temp_id;
+      winnersInRound[dropperIdx + 1].next_lose_match_id = m._temp_id;
+      roundMatches.push(m);
+      allMatches.push(m);
+      dropperIdx += 2;
+    }
+
+    // Chapéu: one leftover survivor or dropper
+    if (survivorIdx < queueSurvivors.length) {
+      // Odd survivor carries forward — create a pass-through
+      const m = createMatch(tournamentId, modalityId, losersRound, roundMatches.length + 1, 'losers', half, bracketNumber);
+      queueSurvivors[survivorIdx].next_win_match_id = m._temp_id;
+      roundMatches.push(m);
+      allMatches.push(m);
+    } else if (dropperIdx < newDropperCount) {
+      // Odd dropper — attach to last match or create chapéu match
+      const m = createMatch(tournamentId, modalityId, losersRound, roundMatches.length + 1, 'losers', half, bracketNumber);
+      winnersInRound[dropperIdx].next_lose_match_id = m._temp_id;
+      roundMatches.push(m);
+      allMatches.push(m);
+    }
+
+    queueSurvivors = roundMatches;
+    losersRound++;
   }
 
-  // ── FINAL REDUCTION: pair remaining survivors until champion ──
-  while (survivors.length > 1) {
+  // ── FINAL REDUCTION: keep pairing survivors until 1 champion remains ──
+  while (queueSurvivors.length > 1) {
     const next: MatchData[] = [];
-    const pairCount = Math.floor(survivors.length / 2);
-    for (let p = 0; p < pairCount; p++) {
-      const m = createMatch(tournamentId, modalityId, losersRound, p + 1, 'losers', half, bracketNumber);
-      survivors[p * 2].next_win_match_id = m._temp_id;
-      survivors[p * 2 + 1].next_win_match_id = m._temp_id;
+    let i = 0;
+    for (; i + 1 < queueSurvivors.length; i += 2) {
+      const m = createMatch(tournamentId, modalityId, losersRound, next.length + 1, 'losers', half, bracketNumber);
+      queueSurvivors[i].next_win_match_id = m._temp_id;
+      queueSurvivors[i + 1].next_win_match_id = m._temp_id;
       next.push(m);
       allMatches.push(m);
     }
-    if (survivors.length % 2 === 1) {
-      next.push(survivors[survivors.length - 1]);
+    // Odd survivor → chapéu (carries forward)
+    if (i < queueSurvivors.length) {
+      next.push(queueSurvivors[i]);
     }
-    survivors = next;
+    queueSurvivors = next;
     losersRound++;
   }
 

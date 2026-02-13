@@ -665,8 +665,19 @@ const TournamentDetail = () => {
     const isDoubleElimination = modalityMatchesForDE.some(m => m.bracket_type === 'losers' || m.bracket_type === 'final' || m.bracket_type === 'semi_final');
 
     if (isDoubleElimination) {
-      // Use new advancement logic
-      const advancement = processDoubleEliminationAdvance(matches, match, winnerId, loserId);
+      // CRITICAL: Fetch fresh matches from DB to avoid stale state issues
+      // (e.g., when multiple matches in same round are completed quickly)
+      const { data: freshMatches } = await organizerQuery({
+        table: "matches",
+        operation: "select",
+        filters: { tournament_id: id },
+        order: [{ column: "round" }, { column: "position" }],
+      });
+      const freshMatchList = (freshMatches || matches) as typeof matches;
+      const freshMatch = freshMatchList.find(m => m.id === matchId) || match;
+      
+      // Use new advancement logic with fresh data
+      const advancement = processDoubleEliminationAdvance(freshMatchList, freshMatch, winnerId, loserId);
       
       // ── VALIDATION LOG ──
       const modalityMatchesDE = selectedModality

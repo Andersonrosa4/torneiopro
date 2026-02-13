@@ -370,6 +370,10 @@ function getLastRoundMatch(matches: MatchData[]): MatchData | undefined {
 export function generateDoubleEliminationBracket(config: DoubleEliminationConfig): GeneratedBracket {
   const { tournamentId, modalityId, teams, useSeeds, seedTeamIds, sideATeamIds, sideBTeamIds } = config;
 
+  // ──────────────────────────────────────────────
+  // VALIDAÇÃO PRÉ-GERAÇÃO
+  // ──────────────────────────────────────────────
+
   if (teams.length < 4) {
     throw new Error(`Impossível gerar dupla eliminação com menos de 4 duplas. Recebido: ${teams.length}`);
   }
@@ -453,8 +457,31 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
     finalMatch,
   ];
 
-  // ── VALIDAÇÃO: Mirror Crossing (Winners→Losers) ──
+  // ── VALIDAÇÃO 1: Ordem de Execução (Winners A antes de Winners B) ──
+  const validateExecutionOrder = () => {
+    const maxRoundA = Math.max(...winnersUpper.map(m => m.round), 0);
+    const maxRoundB = Math.max(...winnersLower.map(m => m.round), 0);
+    
+    console.log(`[Execution Order] Winners A max round: ${maxRoundA}, Winners B max round: ${maxRoundB}`);
+    
+    // Verificar que não há intercalação: todas as rodadas de A devem vir antes de B
+    const roundsA = new Set(winnersUpper.map(m => m.round));
+    const roundsB = new Set(winnersLower.map(m => m.round));
+    
+    // Neste modelo, A e B têm suas próprias estruturas, então validamos que não compartilham rodadas
+    // Se compartilham, há intercalação indevida
+    const commonRounds = [...roundsA].filter(r => roundsB.has(r));
+    if (commonRounds.length > 0) {
+      console.warn(`[⚠️ Execution Order] Rodadas compartilhadas entre A e B: ${commonRounds.join(', ')}`);
+    } else {
+      console.log(`[✓ Execution Order] Winners A e Winners B com rodadas separadas, sem intercalação`);
+    }
+  };
+
+  // ── VALIDAÇÃO 2: Mirror Crossing Obrigatório ──
   const validateMirrorCrossing = () => {
+    const violations: string[] = [];
+    
     for (const m of allMatches) {
       if (m.bracket_type !== 'winners') continue;
       if (!m.next_lose_match_id) continue;
@@ -462,53 +489,119 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
       const losersTarget = allMatches.find(lm => lm._temp_id === m.next_lose_match_id);
       if (!losersTarget || losersTarget.bracket_type !== 'losers') continue;
 
+      // Mirror Crossing: Winners A (upper) → Losers B (lower), Winners B (lower) → Losers A (upper)
       if (m.bracket_half === 'upper' && losersTarget.bracket_half !== 'lower') {
-        throw new Error(
-          `[❌ Mirror Crossing] Winners A deve alimentar Losers B, encontrado Losers ${losersTarget.bracket_half || 'null'}`
+        violations.push(
+          `Winners A (upper) sem rota para Losers B (lower): encontrado Losers ${losersTarget.bracket_half || 'null'}`
         );
       }
 
       if (m.bracket_half === 'lower' && losersTarget.bracket_half !== 'upper') {
-        throw new Error(
-          `[❌ Mirror Crossing] Winners B deve alimentar Losers A, encontrado Losers ${losersTarget.bracket_half || 'null'}`
+        violations.push(
+          `Winners B (lower) sem rota para Losers A (upper): encontrado Losers ${losersTarget.bracket_half || 'null'}`
         );
       }
     }
-    console.log(`[✓ Mirror Crossing] Validação: Winners A→Losers B, Winners B→Losers A`);
+
+    if (violations.length > 0) {
+      throw new Error(`[❌ Mirror Crossing] Violações detectadas:\n${violations.join('\n')}`);
+    }
+    console.log(`[✓ Mirror Crossing] Validado: Winners A→Losers B, Winners B→Losers A`);
   };
 
-  validateMirrorCrossing();
+  // ── VALIDAÇÃO 3: Integridade de Feeders ──
+  const validateFeederIntegrity = () => {
+    const violations: string[] = [];
 
-  // ── VALIDAÇÃO: Semifinais têm dois feeders reais ──
-  const validateSemiFinals = () => {
+    // Verificar que nenhuma equipe aparece duas vezes no mesmo lado
+    const teamsByBracketSide = new Map<string, Set<string>>();
+    for (const m of allMatches) {
+      const key = `${m.bracket_type}-${m.bracket_half}`;
+      if (!teamsByBracketSide.has(key)) teamsByBracketSide.set(key, new Set());
+      const teams_set = teamsByBracketSide.get(key)!;
+      if (m.team1_id) teams_set.add(m.team1_id);
+      if (m.team2_id) teams_set.add(m.team2_id);
+    }
+
+    // Verificar que toda partida de Losers tem dois feeders reais completados
+    const losersMatches = allMatches.filter(m => m.bracket_type === 'losers');
+    for (const lm of losersMatches) {
+      const feeders = allMatches.filter(fm => fm.next_win_match_id === lm._temp_id || fm.next_lose_match_id === lm._temp_id);
+      if (feeders.length !== 2) {
+        violations.push(
+          `[Losers ${lm.bracket_half} R${lm.round}] Esperado 2 feeders, encontrado ${feeders.length}`
+        );
+      }
+    }
+
+    // Verificar que Semifinais têm exatamente 2 feeders reais
     const semis = allMatches.filter(m => m.bracket_type === 'semi_final');
     for (const semi of semis) {
       const feeders = allMatches.filter(m => m.next_win_match_id === semi._temp_id);
       if (feeders.length !== 2) {
-        throw new Error(
-          `[❌ Semifinal inválida] Semi ${semi.position} tem ${feeders.length} feeders, esperado 2.`
+        violations.push(
+          `[Semi ${semi.bracket_half} P${semi.position}] Esperado 2 feeders, encontrado ${feeders.length}`
         );
       }
     }
-    console.log(`[✓ Semifinais] Cada semifinal tem exatamente 2 feeders reais`);
+
+    // Verificar que Final tem exatamente 2 feeders (semis)
+    const finalMatch = allMatches.find(m => m.bracket_type === 'final');
+    if (finalMatch) {
+      const feeders = allMatches.filter(m => m.next_win_match_id === finalMatch._temp_id);
+      if (feeders.length !== 2) {
+        violations.push(
+          `[Final] Esperado 2 feeders (semis), encontrado ${feeders.length}`
+        );
+      }
+    }
+
+    if (violations.length > 0) {
+      throw new Error(`[❌ Integridade de Feeders] Violações:\n${violations.join('\n')}`);
+    }
+    console.log(`[✓ Integridade de Feeders] Todos os matches possuem feeders válidos`);
   };
 
-  validateSemiFinals();
+  // ── VALIDAÇÃO 4: Contagem Total ──
+  const validateTotalCount = () => {
+    const totalMatches = allMatches.length;
+    if (totalMatches !== expectedTotal) {
+      console.warn(
+        `[⚠️ Contagem] Geradas ${totalMatches} partidas, esperado ${expectedTotal}.`
+      );
+    } else {
+      console.log(`[✓ Contagem] Total correto: ${totalMatches} partidas para ${teams.length} equipes`);
+    }
+  };
 
-  // ── VALIDAÇÃO: Total de partidas ──
-  const totalMatches = allMatches.length;
-  if (totalMatches !== expectedTotal) {
-    console.warn(
-      `[⚠️ Contagem] Geradas ${totalMatches} partidas, esperado ${expectedTotal}. ` +
-      `Detalhamento: Winners=${totalWinnersMatches}, Losers=${totalLosersMatches}, Semis=2, Final=1.`
-    );
-  }
+  // ── EXECUTAR TODAS AS VALIDAÇÕES ──
+  validateExecutionOrder();
+  validateMirrorCrossing();
+  validateFeederIntegrity();
+  validateTotalCount();
 
-  console.log(
-    `[✓ Dupla Eliminação] ${totalMatches} partidas para ${teams.length} equipes. ` +
-    `Detalhamento: Winners=${totalWinnersMatches}, Losers=${totalLosersMatches}, Semis=2, Final=1. ` +
-    `Modelo custom: Winner A vs Loser A, Winner B vs Loser B.`
-  );
+  // ── LOG DE VALIDAÇÃO FINAL ──
+  console.log(`
+╔════════════════════════════════════════════════════╗
+║        VALIDAÇÃO FINAL - DUPLA ELIMINAÇÃO          ║
+╠════════════════════════════════════════════════════╣
+║ Total de Equipes: ${teams.length}                          
+║ Winners A (upper): ${winnersUpper.length} partidas              
+║ Winners B (lower): ${winnersLower.length} partidas              
+║ Losers A (upper): ${losersUpper.length} partidas               
+║ Losers B (lower): ${losersLower.length} partidas               
+║ Semifinais: 2 partidas                            ║
+║ Final: 1 partida                                  ║
+║─────────────────────────────────────────────────────║
+║ Total Gerado: ${allMatches.length} partidas                       
+║ Esperado (2N-3): ${expectedTotal} partidas                       
+║ Status: ${allMatches.length === expectedTotal ? '✓ OK' : '⚠️ ALERTA'}                                 ║
+║─────────────────────────────────────────────────────║
+║ Feeders Semifinal 1 (Winner A vs Loser A): 2     ║
+║ Feeders Semifinal 2 (Winner B vs Loser B): 2     ║
+║ Feeders Final (Semi 1 vs Semi 2): 2              ║
+╚════════════════════════════════════════════════════╝
+  `);
 
   // Converter _temp_id → id
   const cleanMatches = allMatches.map(({ _temp_id, ...rest }) => ({

@@ -4,6 +4,11 @@ import { Trophy, Lock } from "lucide-react";
 import { getEliminationRoundLabel } from "@/lib/roundLabels";
 import { buildSchedulerBlocks, getSchedulerBlockColor } from "@/lib/roundScheduler";
 
+/* Helper: Convert number to letter (1→A, 2→B, etc) */
+const numberToLetter = (num: number): string => {
+  return String.fromCharCode(64 + num);
+};
+
 interface Match {
   id: string;
   round: number;
@@ -37,7 +42,7 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
   };
 
   const getGroupId = (match: Match & { bracket_type?: string; bracket_half?: string | null }) => {
-    if (match.round === 0) return `Grupo ${match.bracket_number || 1}`;
+    if (match.round === 0) return `Grupo ${numberToLetter(match.bracket_number || 1)}`;
     if ((match as any).bracket_type === 'winners' && (match as any).bracket_half) return `Chave dos Vencedores - ${(match as any).bracket_half === 'upper' ? 'Superior' : 'Inferior'}`;
     if ((match as any).bracket_type === 'winners' && !(match as any).bracket_half) return 'Final dos Vencedores';
     if ((match as any).bracket_type === 'losers') return `Perdedores (${(match as any).bracket_half === 'upper' ? 'Superior' : 'Inferior'})`;

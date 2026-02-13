@@ -9,6 +9,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { getEliminationRoundLabel, getEliminationRoundShortLabel } from "@/lib/roundLabels";
 import { buildSchedulerBlocks, getSchedulerBlockColor, getSchedulerBadgeColor, type SchedulerBlock } from "@/lib/roundScheduler";
 
+/* Helper: Convert number to letter (1→A, 2→B, etc) */
+const numberToLetter = (num: number): string => {
+  return String.fromCharCode(64 + num);
+};
+
 interface Match {
   id: string;
   round: number;
@@ -193,7 +198,7 @@ function getBracketBlockColor(blockLabel: string): string {
 }
 
 function getMatchGroupId(match: Match): string {
-  if (match.round === 0) return `Grupo ${match.bracket_number || 1}`;
+  if (match.round === 0) return `Grupo ${numberToLetter(match.bracket_number || 1)}`;
   if (match.bracket_type === 'winners' && match.bracket_half) return `Chave dos Vencedores - ${match.bracket_half === 'upper' ? 'Superior' : 'Inferior'}`;
   if (match.bracket_type === 'winners' && !match.bracket_half) return 'Final dos Vencedores';
   if (match.bracket_type === 'losers') return `Perdedores (${match.bracket_half === 'upper' ? 'Superior' : 'Inferior'})`;

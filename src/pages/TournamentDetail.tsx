@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -98,6 +98,7 @@ const TournamentDetail = () => {
   const [editP1, setEditP1] = useState("");
   const [editP2, setEditP2] = useState("");
   const [fictitiousCount, setFictitiousCount] = useState("4");
+  const declareWinnerMutex = useRef(false);
   const [fictitiousDialogOpen, setFictitiousDialogOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState("");
@@ -517,6 +518,13 @@ const TournamentDetail = () => {
       return;
     }
 
+    // GUARD: Check if knockout matches already exist (prevent duplicate generation)
+    const existingKnockout = relevantMatches.filter((m: any) => m.round >= 1);
+    if (existingKnockout.length > 0) {
+      console.log(`[generateKnockoutFromGroups] Knockout already exists (${existingKnockout.length} matches), skipping.`);
+      return;
+    }
+
     const brackets = Array.from(new Set<number>(groupMatches.map((m: any) => (m.bracket_number || 1) as number))).sort((a, b) => a - b);
 
     // Get tournament config for index
@@ -615,8 +623,16 @@ const TournamentDetail = () => {
   };
 
   const declareWinner = async (matchId: string, winnerId: string) => {
+    // MUTEX: Prevent concurrent executions that cause duplicate rounds
+    if (declareWinnerMutex.current) {
+      toast.info("Aguarde a operação anterior ser concluída...");
+      return;
+    }
+    declareWinnerMutex.current = true;
+    
+    try {
     const match = matches.find((m) => m.id === matchId);
-    if (!match || !id) return;
+    if (!match || !id) { declareWinnerMutex.current = false; return; }
 
     // Validate round order for double elimination — use FRESH data from DB
     // IMPORTANT: Only check matches from the SAME modality to avoid cross-modality false positives
@@ -969,6 +985,9 @@ const TournamentDetail = () => {
     }
 
     fetchData();
+    } finally {
+      declareWinnerMutex.current = false;
+    }
   };
 
   // Combined handler: save score + declare winner in one action

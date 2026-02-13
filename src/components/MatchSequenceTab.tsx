@@ -143,7 +143,12 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
     if (displaySequence.length === 0) return [];
 
     const groups: { label: string; items: { match: Match; idx: number }[] }[] = [];
-    const groupStage = displaySequence.filter((m) => m.round === 0);
+
+    // DOUBLE_ELIMINATION: never has round 0 (no group stage)
+    // GROUPS_PLUS_ELIMINATION: round 0 = group stage
+    const groupStage = tournamentFormat !== 'double_elimination'
+      ? displaySequence.filter((m) => m.round === 0)
+      : [];
     const knockoutStage = displaySequence.filter((m) => m.round > 0);
 
     if (groupStage.length > 0) {
@@ -158,12 +163,61 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
     }
 
     if (knockoutStage.length > 0) {
-      const rounds = [...new Set(knockoutStage.map((m) => m.round))].sort((a, b) => a - b);
-      for (const r of rounds) {
-        groups.push({
-          label: getRoundLabel(r),
-          items: knockoutStage.filter((m) => m.round === r).map((m) => ({ match: m, idx: 0 })),
-        });
+      if (tournamentFormat === 'double_elimination') {
+        // Group by bracket_type + bracket_half + round
+        const bracketOrder: Record<string, number> = {
+          'winners_upper': 1, 'winners_lower': 2,
+          'losers_upper': 3, 'losers_lower': 4,
+          'cross_semi_upper': 5, 'cross_semi_lower': 6,
+          'final_null': 7,
+        };
+        const getBracketLabel = (m: Match): string => {
+          const bt = (m as any).bracket_type || 'winners';
+          const bh = (m as any).bracket_half;
+          if (bt === 'winners' && bh === 'upper') return 'Vencedores A';
+          if (bt === 'winners' && bh === 'lower') return 'Vencedores B';
+          if (bt === 'losers' && bh === 'upper') return 'Perdedores A';
+          if (bt === 'losers' && bh === 'lower') return 'Perdedores B';
+          if (bt === 'cross_semi') return 'Semifinal Cruzada';
+          if (bt === 'final') return 'Final';
+          return 'Jogos';
+        };
+        const getBracketKey = (m: Match): string => {
+          const bt = (m as any).bracket_type || 'winners';
+          const bh = (m as any).bracket_half || 'null';
+          return `${bt}_${bh}`;
+        };
+
+        // Group matches by bracket section
+        const sections = new Map<string, Match[]>();
+        for (const m of knockoutStage) {
+          const key = getBracketKey(m);
+          if (!sections.has(key)) sections.set(key, []);
+          sections.get(key)!.push(m);
+        }
+        const sortedKeys = [...sections.keys()].sort(
+          (a, b) => (bracketOrder[a] ?? 10) - (bracketOrder[b] ?? 10)
+        );
+        for (const key of sortedKeys) {
+          const sectionMatches = sections.get(key)!;
+          const label = getBracketLabel(sectionMatches[0]);
+          const rounds = [...new Set(sectionMatches.map(m => m.round))].sort((a, b) => a - b);
+          for (const r of rounds) {
+            const roundMatches = sectionMatches.filter(m => m.round === r);
+            groups.push({
+              label: `${label} — Rodada ${r}`,
+              items: roundMatches.map((m) => ({ match: m, idx: 0 })),
+            });
+          }
+        }
+      } else {
+        const rounds = [...new Set(knockoutStage.map((m) => m.round))].sort((a, b) => a - b);
+        for (const r of rounds) {
+          groups.push({
+            label: getRoundLabel(r),
+            items: knockoutStage.filter((m) => m.round === r).map((m) => ({ match: m, idx: 0 })),
+          });
+        }
       }
     }
 
@@ -174,7 +228,7 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
       }
     }
     return groups;
-  }, [displaySequence, matchCountByRound]);
+  }, [displaySequence, matchCountByRound, tournamentFormat]);
 
   if (displaySequence.length === 0) {
     return (

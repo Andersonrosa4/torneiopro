@@ -488,6 +488,7 @@ const TournamentDetail = () => {
     fetchData();
   };
 
+  // ONLY for GROUPS_PLUS_ELIMINATION mode — never called in DOUBLE_ELIMINATION
   const generateKnockoutFromGroups = async () => {
     if (!id) return;
 

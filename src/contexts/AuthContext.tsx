@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode, useMemo, useCallback } from "react";
 
 interface User {
   id: string;
@@ -42,42 +42,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
   const [loading] = useState(false);
 
-  const login = (newToken: string, newOrganizerId: string, role?: string) => {
+  const login = useCallback((newToken: string, newOrganizerId: string, role?: string) => {
     sessionStorage.setItem("organizer_token", newToken);
     sessionStorage.setItem("organizer_id", newOrganizerId);
     if (role) sessionStorage.setItem("organizer_role", role);
     setOrganizerId(newOrganizerId);
     setUserRole(role || null);
     setUser({ id: newOrganizerId });
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     sessionStorage.removeItem("organizer_token");
     sessionStorage.removeItem("organizer_id");
     sessionStorage.removeItem("organizer_role");
     setOrganizerId(null);
     setUserRole(null);
     setUser(null);
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     logout();
-  };
+  }, [logout]);
+
+  const value = useMemo(() => ({
+    user,
+    organizerId,
+    userRole,
+    isAuthenticated: !!storedToken && !!organizerId,
+    isAdmin: userRole === "admin",
+    loading,
+    login,
+    logout,
+    signOut,
+  }), [user, organizerId, userRole, storedToken, loading, login, logout, signOut]);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        organizerId,
-        userRole,
-        isAuthenticated: !!storedToken && !!organizerId,
-        isAdmin: userRole === "admin",
-        loading,
-        login,
-        logout,
-        signOut,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

@@ -234,20 +234,24 @@ const HorizontalBracket = ({
       <div ref={containerRef} className="relative overflow-x-auto">
         <ConnectorLines containerRef={containerRef} matches={bracketMatches} roundNumbers={rounds} reversed={reversed} />
         <div className="flex gap-8 relative" style={{ zIndex: 1 }}>
-          {displayRounds.map((round) => (
-            <div key={round} className="flex flex-col items-center shrink-0" style={{ minWidth: 170 }}>
-              <div className="text-[9px] uppercase font-semibold text-muted-foreground/70 mb-2 whitespace-nowrap">
-                R{round}
-              </div>
-              <div className="flex flex-col justify-around gap-3 flex-1">
-                {roundGroups[round]
-                  .sort((a, b) => a.position - b.position)
-                  .map((match) => (
+          {displayRounds.map((round) => {
+            const roundMatchesSorted = roundGroups[round].sort((a, b) => a.position - b.position);
+            // REGRA: só exibir rodada se TODOS os jogos possuem ambos os times
+            const allDefined = roundMatchesSorted.every(m => m.team1_id && m.team2_id);
+            if (!allDefined) return null;
+            return (
+              <div key={round} className="flex flex-col items-center shrink-0" style={{ minWidth: 170 }}>
+                <div className="text-[9px] uppercase font-semibold text-muted-foreground/70 mb-2 whitespace-nowrap">
+                  R{round}
+                </div>
+                <div className="flex flex-col justify-around gap-3 flex-1">
+                  {roundMatchesSorted.map((match) => (
                     <MatchCard key={match.id} match={match} getName={getName} />
                   ))}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

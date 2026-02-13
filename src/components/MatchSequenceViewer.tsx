@@ -278,9 +278,9 @@ const MatchSequenceViewer = ({
   };
 
   const sequence = useMemo(() => generateSequence(matches, tournamentFormat), [matches, tournamentFormat]);
-  // Filter out matches with no teams (A definir vs A definir is prohibited)
+  // REGRA: só exibir partidas onde AMBOS os times estão definidos
   const displaySequence = useMemo(() => 
-    sequence.filter(m => m.team1_id || m.team2_id), 
+    sequence.filter(m => m.team1_id && m.team2_id), 
     [sequence]
   );
 

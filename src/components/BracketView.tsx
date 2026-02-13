@@ -56,6 +56,9 @@ const BracketView = ({ matches, participants, isOwner, onDeclareWinner, onUpdate
       <div className="flex gap-8 min-w-max">
         {roundNumbers.map((round) => {
           const roundMatches = matches.filter((m) => m.round === round).sort((a, b) => a.position - b.position);
+          // REGRA: só exibir fase se TODOS os jogos possuem team1_id E team2_id
+          const allDefined = roundMatches.every(m => m.team1_id && m.team2_id);
+          if (!allDefined) return null;
           return (
             <div key={round} className="flex flex-col">
               <h3 className="mb-3 text-center text-sm font-semibold text-primary">

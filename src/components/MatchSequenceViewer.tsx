@@ -61,8 +61,8 @@ function generateDoubleEliminationSequence(matches: Match[]): Match[] {
     'winners_lower': 3,
     'losers_lower': 4,
     'winners_null': 5,
-    'cross_semi_upper': 6,
-    'cross_semi_lower': 7,
+    'semi_final_upper': 6,
+    'semi_final_lower': 7,
     'third_place': 8,
     'final': 9,
     'other': 10,
@@ -226,7 +226,7 @@ function getBracketBlockLabel(match: Match): string {
   if (bt === 'winners' && !bh) return 'Final dos Vencedores';
   if (bt === 'losers' && bh === 'upper') return 'Perdedores – Chave A';
   if (bt === 'losers' && bh === 'lower') return 'Perdedores – Chave B';
-  if (bt === 'cross_semi') return 'Semifinais';
+  if (bt === 'semi_final') return 'Semifinais';
   if (bt === 'final') return 'Final';
   if (bt === 'third_place') return 'Disputa 3º Lugar';
   return 'Outros';
@@ -246,7 +246,7 @@ function getMatchGroupId(match: Match): string {
   if (match.bracket_type === 'winners' && match.bracket_half) return `Chave dos Vencedores - ${match.bracket_half === 'upper' ? 'Superior' : 'Inferior'}`;
   if (match.bracket_type === 'winners' && !match.bracket_half) return 'Final dos Vencedores';
   if (match.bracket_type === 'losers') return `Perdedores (${match.bracket_half === 'upper' ? 'Superior' : 'Inferior'})`;
-  if (match.bracket_type === 'cross_semi') return `Semifinal Cruzada ${match.bracket_half === 'upper' ? '1' : '2'}`;
+  if (match.bracket_type === 'semi_final') return `Semifinal ${match.bracket_half === 'upper' ? '1' : '2'}`;
   if (match.bracket_type === 'final') return 'Final';
   if (match.bracket_type === 'third_place') return 'Disputa 3º Lugar';
   return `Chave ${match.bracket_number || 1}`;

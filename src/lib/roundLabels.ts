@@ -1,14 +1,14 @@
 /**
  * Retorna o rótulo correto da fase eliminatória baseado na quantidade
- * de partidas na rodada (ou número de equipes competindo).
+ * EXATA de partidas na rodada.
  *
  * Regras:
  * - round === 0 → "Fase de Grupos"
- * - 1 partida → "Final"
- * - 2 partidas → "Semifinal"
- * - 3-4 partidas → "Quartas de Final"
- * - 5-8 partidas → "Oitavas de Final"
- * - 9-16 partidas → "16 avos de Final"
+ * - 1 jogo  → "Final"
+ * - 2 jogos → "Semifinal"
+ * - 3-4 jogos → "Quartas de Final"
+ * - 5-8 jogos → "Oitavas de Final"
+ * - 9-16 jogos → "16 avos de Final"
  * - Acima → "Rodada Eliminatória"
  */
 export function getEliminationRoundLabel(
@@ -16,11 +16,11 @@ export function getEliminationRoundLabel(
   matchCountInRound: number,
 ): string {
   if (round === 0) return "Fase de Grupos";
-  if (matchCountInRound <= 1) return "Final";
+  if (matchCountInRound === 1) return "Final";
   if (matchCountInRound === 2) return "Semifinal";
-  if (matchCountInRound <= 4) return "Quartas de Final";
-  if (matchCountInRound <= 8) return "Oitavas de Final";
-  if (matchCountInRound <= 16) return "16 avos de Final";
+  if (matchCountInRound >= 3 && matchCountInRound <= 4) return "Quartas de Final";
+  if (matchCountInRound >= 5 && matchCountInRound <= 8) return "Oitavas de Final";
+  if (matchCountInRound >= 9 && matchCountInRound <= 16) return "16 avos de Final";
   return "Rodada Eliminatória";
 }
 
@@ -32,10 +32,10 @@ export function getEliminationRoundShortLabel(
   matchCountInRound: number,
 ): string {
   if (round === 0) return "Grupos";
-  if (matchCountInRound <= 1) return "Final";
+  if (matchCountInRound === 1) return "Final";
   if (matchCountInRound === 2) return "Semi";
-  if (matchCountInRound <= 4) return "Quartas";
-  if (matchCountInRound <= 8) return "Oitavas";
-  if (matchCountInRound <= 16) return "16 avos";
+  if (matchCountInRound >= 3 && matchCountInRound <= 4) return "Quartas";
+  if (matchCountInRound >= 5 && matchCountInRound <= 8) return "Oitavas";
+  if (matchCountInRound >= 9 && matchCountInRound <= 16) return "16 avos";
   return "Elim.";
 }

@@ -19,7 +19,7 @@
  *
  * Every Winners match has next_lose_match_id pointing to a Losers match.
  * Every Losers match has exactly 2 source feeders.
- * Validation: total matches >= (2 × teams − 5).
+ * Validation: total matches >= (2 × teams − 1).
  */
 
 interface Team {
@@ -480,10 +480,10 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
 
   // ── VALIDATION ──
   const totalMatches = allMatches.length;
-  const minExpected = (2 * teams.length) - 5;
+  const minExpected = (2 * teams.length) - 1;
   if (totalMatches < minExpected) {
     throw new Error(
-      `Estrutura incompleta: gerou ${totalMatches} partidas, mas dupla eliminação com ${teams.length} duplas exige no mínimo ${minExpected}. Abortando.`
+      `Estrutura incompleta: gerou ${totalMatches} partidas, mas dupla eliminação com ${teams.length} duplas exige no mínimo ${minExpected} (2×${teams.length}−1). Abortando.`
     );
   }
 
@@ -512,7 +512,7 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
     id: _temp_id,
   }));
 
-  console.log(`[Double Elimination] Generated ${cleanMatches.length} matches for ${teams.length} teams (min expected: ${minExpected})`);
+  console.log(`[Double Elimination] Generated ${cleanMatches.length} matches for ${teams.length} teams (min expected: ${minExpected}, formula: 2×${teams.length}−1)`);
 
   return { matches: cleanMatches };
 }

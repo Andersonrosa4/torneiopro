@@ -72,9 +72,18 @@ function generateDoubleEliminationSequence(matches: Match[]): Match[] {
     }
   }
   
-  // Use round scheduler for elimination matches
-  const blocks = buildSchedulerBlocks(elimination as any);
-  return [...groupInterleaved, ...blocks.flatMap(b => b.matches as Match[])];
+  // Check if elimination matches have bracket_half (true double elimination structure)
+  const hasDoubleElimStructure = elimination.some(m => m.bracket_half);
+  
+  if (hasDoubleElimStructure) {
+    // Use round scheduler for strict ordering
+    const blocks = buildSchedulerBlocks(elimination as any);
+    return [...groupInterleaved, ...blocks.flatMap(b => b.matches as Match[])];
+  } else {
+    // Fallback: interleave by round/bracket (e.g. group stage → single elim knockout)
+    const interleavedElim = generateInterleavedSequence(elimination);
+    return [...groupInterleaved, ...interleavedElim];
+  }
 }
 
 function resolveByeConflicts(sequence: Match[]): Match[] {
@@ -263,20 +272,39 @@ const MatchSequenceViewer = ({
         }
       }
 
-      // Elimination matches via scheduler
+      // Elimination matches
       const eliminationMatches = matches.filter(m => m.round > 0);
-      const schedulerBlocks = buildSchedulerBlocks(eliminationMatches);
-      for (const sb of schedulerBlocks) {
-        const blockMatches = sb.matches.filter(m => m.team1_id && m.team2_id);
-        if (blockMatches.length === 0) continue;
-        const entries = blockMatches.map(m => ({ match: m as Match, globalIndex: idx++ }));
-        blocks.push({ 
-          label: sb.label, 
-          matches: entries, 
-          blockKey: sb.key, 
-          isUnlocked: sb.isUnlocked, 
-          isCompleted: sb.isCompleted 
-        });
+      const hasDoubleElimStructure = eliminationMatches.some(m => m.bracket_half);
+      
+      if (hasDoubleElimStructure) {
+        // Use round scheduler for true double elimination
+        const schedulerBlocks = buildSchedulerBlocks(eliminationMatches);
+        for (const sb of schedulerBlocks) {
+          const blockMatches = sb.matches.filter(m => m.team1_id && m.team2_id);
+          if (blockMatches.length === 0) continue;
+          const entries = blockMatches.map(m => ({ match: m as Match, globalIndex: idx++ }));
+          blocks.push({ 
+            label: sb.label, 
+            matches: entries, 
+            blockKey: sb.key, 
+            isUnlocked: sb.isUnlocked, 
+            isCompleted: sb.isCompleted 
+          });
+        }
+      } else {
+        // Fallback: group knockout by round (group stage → single elim)
+        const knockoutDisplay = displaySequence.filter(m => m.round > 0);
+        const knockoutRounds = [...new Set(knockoutDisplay.map(m => m.round))].sort((a, b) => a - b);
+        for (const r of knockoutRounds) {
+          const roundMatches = knockoutDisplay.filter(m => m.round === r);
+          blocks.push({
+            label: getEliminationRoundLabel(r, matchCountByRound[r] || 0),
+            matches: roundMatches.map(m => ({ match: m, globalIndex: idx++ })),
+            blockKey: `KO_R${r}`,
+            isUnlocked: true,
+            isCompleted: roundMatches.every(m => m.status === 'completed'),
+          });
+        }
       }
       return blocks;
     }

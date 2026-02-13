@@ -76,12 +76,35 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
         }
       }
       
-      const schedulerBlocks = buildSchedulerBlocks(elimination as any);
-      const result: Match[] = [...groupInterleaved];
-      for (const block of schedulerBlocks) {
-        result.push(...(block.matches as Match[]));
+      const hasDoubleElimStructure = elimination.some(m => (m as any).bracket_half);
+      
+      if (hasDoubleElimStructure) {
+        const schedulerBlocks = buildSchedulerBlocks(elimination as any);
+        const result: Match[] = [...groupInterleaved];
+        for (const block of schedulerBlocks) {
+          result.push(...(block.matches as Match[]));
+        }
+        return result;
+      } else {
+        // Fallback: interleave knockout by round/bracket
+        const rounds = [...new Set(elimination.map(m => m.round))].sort((a, b) => a - b);
+        const brackets = [...new Set(elimination.map(m => m.bracket_number || 1))].sort((a, b) => a - b);
+        const ordered: Match[] = [...groupInterleaved];
+        for (const round of rounds) {
+          const roundMatches = elimination.filter(m => m.round === round);
+          const byBracket: Record<number, Match[]> = {};
+          for (const b of brackets) {
+            byBracket[b] = roundMatches.filter(m => (m.bracket_number || 1) === b).sort((a, b2) => a.position - b2.position);
+          }
+          const maxLen = Math.max(...Object.values(byBracket).map(a => a.length));
+          for (let i = 0; i < maxLen; i++) {
+            for (const b of brackets) {
+              if (byBracket[b][i]) ordered.push(byBracket[b][i]);
+            }
+          }
+        }
+        return ordered;
       }
-      return result;
     }
 
     // OUTROS FORMATOS: Interleaving entre chaves
@@ -141,9 +164,11 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
     }
 
     if (knockoutStage.length > 0) {
-      if (tournamentFormat === 'double_elimination') {
-        // Use round scheduler blocks
-        const schedulerBlocks = buildSchedulerBlocks(matches as any);
+      const hasDoubleElimStructure = matches.some(m => m.round > 0 && (m as any).bracket_half);
+      if (tournamentFormat === 'double_elimination' && hasDoubleElimStructure) {
+        // Use round scheduler blocks for true double elimination
+        const eliminationOnly = matches.filter(m => m.round > 0);
+        const schedulerBlocks = buildSchedulerBlocks(eliminationOnly as any);
         for (const sb of schedulerBlocks) {
           const blockMatches = (sb.matches as Match[]).filter(m => m.team1_id && m.team2_id);
           if (blockMatches.length === 0) continue;

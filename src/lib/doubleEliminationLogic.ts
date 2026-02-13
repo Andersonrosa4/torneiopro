@@ -150,7 +150,7 @@ function generateWinnersHalf(
       bracket_number: bracketNumber,
       next_win_match_id: null,
       next_lose_match_id: null,
-      _temp_id: `w_${half}_r1_p${i + 1}`,
+      _temp_id: crypto.randomUUID(),
     });
   }
 
@@ -171,7 +171,7 @@ function generateWinnersHalf(
         bracket_number: bracketNumber,
         next_win_match_id: null,
         next_lose_match_id: null,
-        _temp_id: `w_${half}_r${r}_p${p + 1}`,
+        _temp_id: crypto.randomUUID(),
       });
     }
   }
@@ -236,7 +236,7 @@ function generateLosersHalf(
         bracket_number: bracketNumber,
         next_win_match_id: null,
         next_lose_match_id: null,
-        _temp_id: `l_${half}_r${r}_p${p + 1}`,
+        _temp_id: crypto.randomUUID(),
       });
     }
   }
@@ -308,7 +308,7 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
     bracket_number: 5,
     next_win_match_id: null,
     next_lose_match_id: null,
-    _temp_id: 'cross_semi_1',
+    _temp_id: crypto.randomUUID(),
   };
 
   const crossSemi2: MatchData = {
@@ -324,7 +324,7 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
     bracket_number: 5,
     next_win_match_id: null,
     next_lose_match_id: null,
-    _temp_id: 'cross_semi_2',
+    _temp_id: crypto.randomUUID(),
   };
 
   // 4. Final
@@ -341,7 +341,7 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
     bracket_number: 6,
     next_win_match_id: null,
     next_lose_match_id: null,
-    _temp_id: 'final',
+    _temp_id: crypto.randomUUID(),
   };
 
   const allMatches: MatchData[] = [
@@ -409,20 +409,13 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
   // ─── VALIDATION ───
   validateBracketIntegrity(allMatches, teams.length);
 
-  // Clean temp IDs from output
+  // Convert _temp_id to actual id field so DB uses our pre-generated UUIDs
   const cleanMatches = allMatches.map(({ _temp_id, ...rest }) => ({
     ...rest,
-    // Convert temp_id references in next_win/lose to keep them for DB insertion
-    next_win_match_id: rest.next_win_match_id,
-    next_lose_match_id: rest.next_lose_match_id,
+    id: _temp_id,
   }));
 
-  // We need to keep _temp_id for the caller to resolve references
-  // Return with _temp_id metadata for resolution
-  return {
-    matches: cleanMatches,
-    _matchesWithTempIds: allMatches,
-  } as any;
+  return { matches: cleanMatches };
 }
 
 /**

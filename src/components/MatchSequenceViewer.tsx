@@ -203,9 +203,9 @@ const MatchSequenceViewer = ({
     if (match.round === 0) return `Grupo ${match.bracket_number || 1}`;
     if (match.bracket_type === 'winners' && match.bracket_half) return `Chave dos Vencedores - ${match.bracket_half === 'upper' ? 'Superior' : 'Inferior'}`;
     if (match.bracket_type === 'winners' && !match.bracket_half) return 'Final dos Vencedores';
-    if (match.bracket_type === 'losers') return `Chave dos Perdedores - ${match.bracket_half === 'upper' ? 'Inferior ↓' : 'Superior ↑'}`;
-    if (match.bracket_type === 'final') return 'Grande Final';
-    if (match.bracket_type === 'reset_final') return 'Final Extra (Reset)';
+    if (match.bracket_type === 'losers') return `Perdedores (${match.bracket_half === 'upper' ? 'Superior' : 'Inferior'})`;
+    if (match.bracket_type === 'cross_semi') return `Semifinal Cruzada ${match.bracket_half === 'upper' ? '1' : '2'}`;
+    if (match.bracket_type === 'final') return 'Final';
     if (match.bracket_type === 'third_place') return 'Disputa 3º Lugar';
     return `Chave ${match.bracket_number || 1}`;
   };
@@ -311,8 +311,8 @@ const MatchCard = ({
   const getBracketColor = (match: Match & { bracket_type?: string }) => {
     if (match.bracket_type === 'winners') return 'bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-500/30';
     if (match.bracket_type === 'losers') return 'bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-500/30';
-    if (match.bracket_type === 'final') return 'bg-purple-500/20 text-purple-700 dark:text-purple-400 border-purple-500/30';
-    if (match.bracket_type === 'reset_final') return 'bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30';
+    if (match.bracket_type === 'cross_semi') return 'bg-purple-500/20 text-purple-700 dark:text-purple-400 border-purple-500/30';
+    if (match.bracket_type === 'final') return 'bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30';
     return 'bg-primary/20 text-primary border-primary/30';
   };
 

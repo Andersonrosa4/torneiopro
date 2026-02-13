@@ -652,7 +652,7 @@ const TournamentDetail = () => {
     });
 
     // Determine if this is a double elimination bracket
-    const isDoubleElimination = matches.some(m => m.bracket_type === 'losers' || m.bracket_type === 'final');
+    const isDoubleElimination = matches.some(m => m.bracket_type === 'losers' || m.bracket_type === 'final' || m.bracket_type === 'cross_semi');
 
     if (isDoubleElimination) {
       // Use new advancement logic
@@ -676,23 +676,6 @@ const TournamentDetail = () => {
           data: update.data,
           filters: { id: update.matchId },
         });
-      }
-
-      // Check if reset final is needed
-      if (match.bracket_type === 'final') {
-        const { needsReset, resetMatchToCreate } = handleResetFinal(matches, match);
-        if (needsReset && resetMatchToCreate) {
-          await organizerQuery({
-            table: "matches",
-            operation: "insert",
-            data: [{
-              tournament_id: id,
-              modality_id: match.modality_id,
-              ...resetMatchToCreate,
-            }],
-          });
-          toast.success("🔄 Final Extra gerada! Campeão dos Perdedores venceu a Grande Final.");
-        }
       }
 
       toast.success("Avanço automático realizado!");

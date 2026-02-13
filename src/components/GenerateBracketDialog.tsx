@@ -176,13 +176,14 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                   <div className="flex-1">
                     <h3 className="text-lg font-bold text-foreground">Dupla Eliminação</h3>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Uma equipe só é eliminada após duas derrotas. Inclui chave dos Vencedores,
-                      chave dos Perdedores e Grande Final com possível reset.
+                      Duplas divididas em metade superior e inferior. Perdedores vão para o lado
+                      oposto. Semifinais cruzadas e final única.
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <span className="text-xs rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Chave dos Vencedores</span>
-                      <span className="text-xs rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Chave dos Perdedores</span>
-                      <span className="text-xs rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Grande Final</span>
+                      <span className="text-xs rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Vencedores (Sup/Inf)</span>
+                      <span className="text-xs rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Perdedores (Sup/Inf)</span>
+                      <span className="text-xs rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Semifinais Cruzadas</span>
+                      <span className="text-xs rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Final</span>
                     </div>
                   </div>
                 </div>
@@ -355,18 +356,22 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                   <div className="space-y-2 text-sm text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full bg-primary shrink-0" />
-                      <span><strong className="text-foreground">Chave dos Vencedores:</strong> {getKnockoutPhase(teamCount)} → Final dos Vencedores</span>
+                      <span><strong className="text-foreground">Vencedores (Superior + Inferior):</strong> Duplas jogam apenas dentro de sua metade</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full bg-destructive shrink-0" />
-                      <span><strong className="text-foreground">Chave dos Perdedores:</strong> Perdedores disputam entre si</span>
+                      <span><strong className="text-foreground">Perdedores (Superior + Inferior):</strong> Recebem perdedores do lado oposto (cruzamento invertido)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-accent shrink-0" />
+                      <span><strong className="text-foreground">Semifinais Cruzadas:</strong> Campeão Perdedores vs Campeão Vencedores do lado oposto</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full bg-warning shrink-0" />
-                      <span><strong className="text-foreground">Grande Final:</strong> Campeão dos Vencedores vs Campeão dos Perdedores</span>
+                      <span><strong className="text-foreground">Final:</strong> Vencedores das semifinais cruzadas</span>
                     </div>
                     <p className="text-xs mt-2 border-t border-border pt-2">
-                      Uma equipe só é eliminada após duas derrotas. Se o campeão dos Perdedores vencer a Grande Final, uma Final Extra (reset) é disputada.
+                      Qualquer derrota na Chave dos Perdedores elimina definitivamente. Nunca há mistura de metades antes das semifinais.
                     </p>
                   </div>
                   <div className="rounded-lg border border-primary/30 bg-primary/10 p-3">

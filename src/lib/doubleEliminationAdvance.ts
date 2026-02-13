@@ -60,35 +60,43 @@ function determineSlotInNextMatch(
   nextMatch: Match,
   isWinner: boolean,
 ): 'team1_id' | 'team2_id' {
+  let preferredSlot: 'team1_id' | 'team2_id';
+
   // For winners advancing within same bracket type
   if (isWinner && currentMatch.bracket_type === nextMatch.bracket_type) {
-    return currentMatch.position % 2 === 1 ? 'team1_id' : 'team2_id';
+    preferredSlot = currentMatch.position % 2 === 1 ? 'team1_id' : 'team2_id';
   }
-
   // For losers dropping to losers bracket
-  if (!isWinner && currentMatch.bracket_type === 'winners' && nextMatch.bracket_type === 'losers') {
-    // Sequential: positions 1,2 → match 1 (team1, team2); 3,4 → match 2
-    return (currentMatch.position - 1) % 2 === 0 ? 'team1_id' : 'team2_id';
+  else if (!isWinner && currentMatch.bracket_type === 'winners' && nextMatch.bracket_type === 'losers') {
+    preferredSlot = (currentMatch.position - 1) % 2 === 0 ? 'team1_id' : 'team2_id';
   }
-
   // Winners final → semi_final (mesmo lado)
-  if (isWinner && currentMatch.bracket_type === 'winners' && nextMatch.bracket_type === 'semi_final') {
-    return 'team1_id'; // Campeão Winners entra como team1 na semifinal
+  else if (isWinner && currentMatch.bracket_type === 'winners' && nextMatch.bracket_type === 'semi_final') {
+    preferredSlot = 'team1_id';
   }
-
   // Losers final → semi_final (mesmo lado)
-  if (isWinner && currentMatch.bracket_type === 'losers' && nextMatch.bracket_type === 'semi_final') {
-    return 'team2_id'; // Campeão Losers entra como team2 na semifinal
+  else if (isWinner && currentMatch.bracket_type === 'losers' && nextMatch.bracket_type === 'semi_final') {
+    preferredSlot = 'team2_id';
   }
-
   // Semi → final
-  if (isWinner && currentMatch.bracket_type === 'semi_final' && nextMatch.bracket_type === 'final') {
-    return currentMatch.position === 1 ? 'team1_id' : 'team2_id';
+  else if (isWinner && currentMatch.bracket_type === 'semi_final' && nextMatch.bracket_type === 'final') {
+    preferredSlot = currentMatch.position === 1 ? 'team1_id' : 'team2_id';
+  }
+  // Fallback
+  else {
+    preferredSlot = !nextMatch.team1_id ? 'team1_id' : 'team2_id';
   }
 
-  // Fallback: first empty slot
-  if (!nextMatch.team1_id) return 'team1_id';
-  return 'team2_id';
+  // CRITICAL: If preferred slot is already occupied, use the other slot
+  if (nextMatch[preferredSlot]) {
+    const otherSlot = preferredSlot === 'team1_id' ? 'team2_id' : 'team1_id';
+    if (!nextMatch[otherSlot]) {
+      console.log(`[SlotCollision] Preferred ${preferredSlot} occupied in match ${nextMatch.id}, using ${otherSlot}`);
+      return otherSlot;
+    }
+  }
+
+  return preferredSlot;
 }
 
 /**

@@ -554,22 +554,50 @@ const TournamentDetail = () => {
       return;
     }
 
-    // Shuffle advancing teams
-    const arranged = [...allAdvancing].sort(() => Math.random() - 0.5);
-    const n = arranged.length;
+    // Build cross-pairings: 1st of group A vs 2nd of group D, 2nd of A vs 1st of D, etc.
+    // Groups are paired from opposite ends: A↔D, B↔C
+    const numGroups = brackets.length;
+    const pairings: { team1Id: string; team2Id: string }[] = [];
+
+    for (let i = 0; i < Math.ceil(numGroups / 2); i++) {
+      const mirrorIdx = numGroups - 1 - i;
+      const groupI = groupRankings[String(brackets[i])];
+      const groupMirror = mirrorIdx !== i ? groupRankings[String(brackets[mirrorIdx])] : null;
+
+      if (groupMirror) {
+        // 1st of group[i] vs 2nd of group[mirror]
+        if (groupI[0] && groupMirror[1]) {
+          pairings.push({ team1Id: groupI[0].teamId, team2Id: groupMirror[1].teamId });
+        }
+        // 2nd of group[i] vs 1st of group[mirror]
+        if (groupI[1] && groupMirror[0]) {
+          pairings.push({ team1Id: groupI[1].teamId, team2Id: groupMirror[0].teamId });
+        }
+      } else {
+        // Odd number of groups: middle group plays within itself
+        if (groupI[0] && groupI[1]) {
+          pairings.push({ team1Id: groupI[0].teamId, team2Id: groupI[1].teamId });
+        }
+      }
+    }
+
+    // Add any index teams as extra pairings if needed
+    if (indexTeamIds.length > 0) {
+      // Index teams fill remaining spots — pair them sequentially
+      for (let i = 0; i < indexTeamIds.length - 1; i += 2) {
+        pairings.push({ team1Id: indexTeamIds[i], team2Id: indexTeamIds[i + 1] });
+      }
+    }
 
     const newMatches: any[] = [];
 
-    // Create ONLY the first elimination round — all matches with real teams
-    // If odd number, last team waits (chapéu) for next round
-    const pairCount = Math.floor(n / 2);
-    for (let i = 0; i < pairCount; i++) {
+    for (let i = 0; i < pairings.length; i++) {
       newMatches.push({
         tournament_id: id,
         round: 1,
         position: i + 1,
-        team1_id: arranged[i * 2],
-        team2_id: arranged[i * 2 + 1],
+        team1_id: pairings[i].team1Id,
+        team2_id: pairings[i].team2Id,
         status: "pending",
         bracket_number: 1,
         modality_id: modalityId,
@@ -581,7 +609,7 @@ const TournamentDetail = () => {
     const { error } = await organizerQuery({ table: "matches", operation: "insert", data: newMatches });
     if (error) { toast.error(error.message); return; }
 
-    toast.success(`Fase de grupos concluída! Eliminatória gerada com ${allAdvancing.length} duplas classificadas (${pairCount} partidas).`);
+    toast.success(`Fase de grupos concluída! Eliminatória gerada com ${allAdvancing.length} duplas classificadas (${pairings.length} partidas).`);
     fetchData();
   };
 

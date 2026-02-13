@@ -509,23 +509,45 @@ function buildGroupKnockoutPreview(groupNumbers: number[]) {
   const connections: { srcId: string; dstId: string }[] = [];
 
   // First knockout round: fed by group standings
+  // Cross-pairing: 1st of group pairs with 2nd of mirror group (A↔D, B↔C, etc.)
   if (rounds.length > 0) {
     const firstRound: PlaceholderMatch[] = [];
     const firstRoundCount = rounds[0].matchCount;
     
-    // Standard crossover seeding for groups
+    // Build cross-pairings: group[i] mirrors group[numGroups - 1 - i]
+    const pairings: { g1: number; seed1: number; g2: number; seed2: number }[] = [];
+    for (let i = 0; i < numGroups; i++) {
+      const mirrorIdx = numGroups - 1 - i;
+      if (mirrorIdx <= i) break; // avoid duplicates
+      // 1st of group i vs 2nd of mirror group
+      pairings.push({ g1: groupNumbers[i], seed1: 1, g2: groupNumbers[mirrorIdx], seed2: 2 });
+      // 2nd of group i vs 1st of mirror group
+      pairings.push({ g1: groupNumbers[i], seed1: 2, g2: groupNumbers[mirrorIdx], seed2: 1 });
+    }
+    // If odd number of groups, handle middle group pairing with itself or neighbors
+    if (numGroups % 2 === 1) {
+      const midIdx = Math.floor(numGroups / 2);
+      pairings.push({ g1: groupNumbers[midIdx], seed1: 1, g2: groupNumbers[midIdx], seed2: 2 });
+    }
+
+    // Fill first round from pairings (up to firstRoundCount)
     for (let i = 0; i < firstRoundCount; i++) {
-      const g1 = groupNumbers[i % numGroups];
-      const g2 = groupNumbers[(i + 1) % numGroups];
-      const seed1 = Math.floor(i / numGroups) + 1;
-      const seed2 = advancingPerGroup - seed1 + 1;
-      
-      firstRound.push({
-        id: `knockout-0-${i}`,
-        label1: `${seed1}º Grupo ${numberToLetter(g1)}`,
-        label2: `${seed2}º Grupo ${numberToLetter(g2)}`,
-        scale: rounds[0].scale,
-      });
+      if (i < pairings.length) {
+        const p = pairings[i];
+        firstRound.push({
+          id: `knockout-0-${i}`,
+          label1: `${p.seed1}º Grupo ${numberToLetter(p.g1)}`,
+          label2: `${p.seed2}º Grupo ${numberToLetter(p.g2)}`,
+          scale: rounds[0].scale,
+        });
+      } else {
+        firstRound.push({
+          id: `knockout-0-${i}`,
+          label1: "A definir",
+          label2: "A definir",
+          scale: rounds[0].scale,
+        });
+      }
     }
     knockoutRounds.push(firstRound);
 

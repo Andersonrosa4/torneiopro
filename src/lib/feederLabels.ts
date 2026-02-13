@@ -2,6 +2,7 @@
  * Feeder Label Calculation for Double Elimination Bracket
  * 
  * Computes which match feeds each slot (V = winner, P = loser)
+ * Labels use the global match sequence number (matchNumber), NOT position/index.
  */
 
 interface Match {
@@ -21,31 +22,29 @@ interface Match {
 export interface FeederInfo {
   label: string; // e.g. "V40", "P12"
   type: 'winner' | 'loser' | 'seed';
-  matchNumber: string; // The source match ID (or position label)
+  matchNumber: string;
 }
 
 /**
- * Find all matches that feed INTO the given match
- * Returns map of { team1: FeederInfo, team2: FeederInfo }
+ * Find all matches that feed INTO the given match.
+ * matchNumberMap maps match.id → global sequential number (from scheduler).
  */
 export function getSlotFeeders(
   targetMatch: Match,
-  allMatches: Match[]
+  allMatches: Match[],
+  matchNumberMap?: Map<string, number>
 ): { team1: FeederInfo | null; team2: FeederInfo | null } {
   const feeders: { team1: FeederInfo | null; team2: FeederInfo | null } = {
     team1: null,
     team2: null,
   };
 
-  // Find all matches that feed INTO this match
   const feedingMatches = allMatches.filter(
     (m) =>
       m.next_win_match_id === targetMatch.id ||
       m.next_lose_match_id === targetMatch.id
   );
 
-  // Determine which feeder goes to which slot
-  // Typically: first feeder → team1, second feeder → team2 (by position order)
   const sortedFeeders = feedingMatches.sort(
     (a, b) => a.position - b.position
   );
@@ -55,9 +54,11 @@ export function getSlotFeeders(
     const type = isWinnerFeeder ? 'winner' : 'loser';
     const prefix = isWinnerFeeder ? 'V' : 'P';
     
-    // Use the match position as the display number
+    // Use matchNumberMap for the real sequence number
+    const num = matchNumberMap?.get(feeder.id) ?? feeder.position;
+    
     const feederLabel: FeederInfo = {
-      label: `${prefix}${feeder.position}`,
+      label: `${prefix}${num}`,
       type,
       matchNumber: feeder.id,
     };
@@ -69,9 +70,7 @@ export function getSlotFeeders(
     }
   });
 
-  // If no feeders found, it's likely a seeded participant
   if (feeders.team1 === null && feeders.team2 === null) {
-    // Try to infer from round number: round 1 = seeded, higher rounds = fed
     if (targetMatch.round === 1) {
       feeders.team1 = { label: 'Seed 1', type: 'seed', matchNumber: '' };
       feeders.team2 = { label: 'Seed 2', type: 'seed', matchNumber: '' };
@@ -82,15 +81,17 @@ export function getSlotFeeders(
 }
 
 /**
- * Compute feeder for the entire bracket
- * Returns a map: matchId -> { team1, team2 }
+ * Compute feeders for the entire bracket.
  */
-export function computeAllFeeders(allMatches: Match[]): Map<string, ReturnType<typeof getSlotFeeders>> {
+export function computeAllFeeders(
+  allMatches: Match[],
+  matchNumberMap?: Map<string, number>
+): Map<string, ReturnType<typeof getSlotFeeders>> {
   const feederMap = new Map<string, ReturnType<typeof getSlotFeeders>>();
 
   for (const match of allMatches) {
-    if (match.round === 0) continue; // Skip group stage
-    feederMap.set(match.id, getSlotFeeders(match, allMatches));
+    if (match.round === 0) continue;
+    feederMap.set(match.id, getSlotFeeders(match, allMatches, matchNumberMap));
   }
 
   return feederMap;

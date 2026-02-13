@@ -47,12 +47,14 @@ const MatchCard = ({
   scale = "normal",
   allMatches,
   matchNumber,
+  matchNumberMap,
 }: {
   match: Match;
   getName: (id: string | null) => string;
   scale?: "small" | "normal" | "semi" | "final";
   allMatches?: Match[];
   matchNumber?: number;
+  matchNumberMap?: Map<string, number>;
 }) => {
   const isCompleted = match.status === "completed";
   const t1Win = match.winner_team_id === match.team1_id && isCompleted;
@@ -60,8 +62,8 @@ const MatchCard = ({
   const hasBothTeams = match.team1_id && match.team2_id;
   const isWaiting = !hasBothTeams;
 
-  // Compute feeders from actual feeder mapping
-  const feeders = allMatches ? getSlotFeeders(match, allMatches) : { team1: null, team2: null };
+  // Compute feeders from actual feeder mapping with real match numbers
+  const feeders = allMatches ? getSlotFeeders(match, allMatches, matchNumberMap) : { team1: null, team2: null };
 
   const sizeClasses = {
     small: "w-[140px] text-[10px]",
@@ -288,7 +290,7 @@ const BracketColumn = ({
                 </div>
                 <div className="flex flex-col justify-around gap-3 flex-1">
                    {roundMatches.map((match) => (
-                     <MatchCard key={match.id} match={match} getName={getName} scale={getScale(round)} allMatches={allMatches} matchNumber={matchNumberMap?.get(match.id)} />
+                     <MatchCard key={match.id} match={match} getName={getName} scale={getScale(round)} allMatches={allMatches} matchNumber={matchNumberMap?.get(match.id)} matchNumberMap={matchNumberMap} />
                    ))}
                  </div>
               </div>
@@ -333,7 +335,7 @@ const CenterColumn = ({
                 <div className="text-[9px] text-center text-muted-foreground/60 font-medium">
                   Semi {i + 1}
                 </div>
-                <MatchCard match={m} getName={getName} scale="semi" allMatches={allMatches} matchNumber={matchNumberMap?.get(m.id)} />
+                <MatchCard match={m} getName={getName} scale="semi" allMatches={allMatches} matchNumber={matchNumberMap?.get(m.id)} matchNumberMap={matchNumberMap} />
               </div>
             ))}
         </div>
@@ -346,7 +348,7 @@ const CenterColumn = ({
 
       {/* Final */}
       {finalMatches.map((m) => (
-        <MatchCard key={m.id} match={m} getName={getName} scale="final" allMatches={allMatches} matchNumber={matchNumberMap?.get(m.id)} />
+        <MatchCard key={m.id} match={m} getName={getName} scale="final" allMatches={allMatches} matchNumber={matchNumberMap?.get(m.id)} matchNumberMap={matchNumberMap} />
       ))}
     </div>
   );
@@ -457,7 +459,7 @@ const NormalKnockout = ({
                 </div>
                 <div className="flex flex-col justify-around gap-3 flex-1">
                    {roundMatches.map((match) => (
-                     <MatchCard key={match.id} match={match} getName={getName} scale={scale as any} allMatches={matches} matchNumber={matchNumberMap?.get(match.id)} />
+                     <MatchCard key={match.id} match={match} getName={getName} scale={scale as any} allMatches={matches} matchNumber={matchNumberMap?.get(match.id)} matchNumberMap={matchNumberMap} />
                    ))}
                  </div>
               </div>

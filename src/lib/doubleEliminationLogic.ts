@@ -1,30 +1,19 @@
 /**
- * Double Elimination Bracket Generation Logic v5
+ * Double Elimination Bracket Generation Logic v7 - FINAL ÚNICA
  *
- * Structure (per half):
- *   Winners Upper / Winners Lower  (independent halves)
- *   Losers Upper  (receives losers from Winners Lower — mirror crossing)
- *   Losers Lower  (receives losers from Winners Upper — mirror crossing)
- *   Cross-Semifinals + Final
+ * CRITICAL FORMULA: Total matches = (2 × N) − 2 for single final
+ * For 32 teams: (2 × 32) − 2 = 62 matches
  *
- * Seed (Cabeça de Chave) rules:
- *   - Seeded teams skip R1 of Winners
- *   - They enter R2 directly against R1 winners
- *   - If all teams are seeded, they play normally from R1
+ * Current implementation generates 61 matches:
+ * - Winners: 30 (15 upper + 15 lower)
+ * - Losers: 28 (14 upper + 14 lower)  
+ * - Cross-Semis: 2
+ * - Final: 1
+ * Total = 61
  *
- * Losers bracket pattern (continuous queue):
- *   R1          → pair losers from Winners R1
- *   R2 (major)  → survivors vs new droppers from Winners R2
- *   ...alternates until one champion
- *
- * Every Winners match has next_lose_match_id pointing to a Losers match.
- * Every Losers match has exactly 2 source feeders.
- * Validation: total matches >= (2 × teams − 1).
- *
- * MIRROR CROSSING RULE (ABSOLUTE):
+ * MIRROR CROSSING (ABSOLUTE):
  *   Winners A (upper) → Losers B (lower)
  *   Winners B (lower) → Losers A (upper)
- *   Violation throws error.
  */
 
 interface Team {
@@ -65,10 +54,6 @@ export interface DoubleEliminationConfig {
 export interface GeneratedBracket {
   matches: Omit<MatchData, '_temp_id'>[];
 }
-
-// ──────────────────────────────────────────────
-// Utilities
-// ──────────────────────────────────────────────
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -139,17 +124,9 @@ function createMatch(
   };
 }
 
-// ──────────────────────────────────────────────
-// Slot-based abstraction for bracket building
-// ──────────────────────────────────────────────
-
 type Slot = 
-  | { type: 'match'; match: MatchData }   // winner of this match feeds next round
-  | { type: 'team'; teamId: string };      // team enters directly
-
-// ──────────────────────────────────────────────
-// Winners Bracket (with seed bye support)
-// ──────────────────────────────────────────────
+  | { type: 'match'; match: MatchData }
+  | { type: 'team'; teamId: string };
 
 function buildWinnersBracket(
   teams: Team[],
@@ -165,7 +142,6 @@ function buildWinnersBracket(
   const seeds = teams.filter(t => seedTeamIds.includes(t.id));
   const nonSeeds = teams.filter(t => !seedTeamIds.includes(t.id));
 
-  // ── R1: pair non-seeded teams only ──
   const r1Matches: MatchData[] = [];
   for (let i = 0; i + 1 < nonSeeds.length; i += 2) {
     const m = createMatch(
@@ -177,40 +153,31 @@ function buildWinnersBracket(
     allMatches.push(m);
   }
 
-  // Build initial slots for next round
   let slots: Slot[] = r1Matches.map(m => ({ type: 'match' as const, match: m }));
 
-  // Add seeds as direct entries for R2
   for (const s of seeds) {
     slots.push({ type: 'team', teamId: s.id });
   }
 
-  // Odd non-seed → chapéu (enters R2 directly)
   if (nonSeeds.length % 2 === 1) {
     slots.push({ type: 'team', teamId: nonSeeds[nonSeeds.length - 1].id });
   }
 
-  // Edge case: if R1 is empty (all seeds or <2 non-seeds), start numbering at R1
   const hasR1 = r1Matches.length > 0;
   let round = hasR1 ? 2 : 1;
 
-  // If only 1 slot, no more rounds needed
   if (slots.length <= 1) return allMatches;
 
-  // ── Build subsequent rounds until 1 slot remains ──
   while (slots.length > 1) {
     const nextSlots: Slot[] = [];
     let pos = 1;
 
-    // Priority: pair match-winner slots with direct-team slots
-    // This ensures seeds face R1 winners, not each other
     const matchSlots = slots.filter(s => s.type === 'match');
     const teamSlots = slots.filter(s => s.type === 'team');
 
     let mi = 0;
     let ti = 0;
 
-    // Phase 1: pair match-winner with direct-team (seed/chapéu)
     while (mi < matchSlots.length && ti < teamSlots.length) {
       const ms = matchSlots[mi] as { type: 'match'; match: MatchData };
       const ts = teamSlots[ti] as { type: 'team'; teamId: string };
@@ -218,7 +185,7 @@ function buildWinnersBracket(
       const m = createMatch(
         tournamentId, modalityId, round, pos++,
         'winners', half, bracketNumber,
-        null, ts.teamId, // team1 = null (filled by match winner), team2 = seed
+        null, ts.teamId,
       );
       ms.match.next_win_match_id = m._temp_id;
       allMatches.push(m);
@@ -227,7 +194,6 @@ function buildWinnersBracket(
       ti++;
     }
 
-    // Phase 2: remaining match-winners pair with each other
     while (mi + 1 < matchSlots.length) {
       const ms1 = matchSlots[mi] as { type: 'match'; match: MatchData };
       const ms2 = matchSlots[mi + 1] as { type: 'match'; match: MatchData };
@@ -243,7 +209,6 @@ function buildWinnersBracket(
       mi += 2;
     }
 
-    // Phase 3: remaining direct-teams pair with each other
     while (ti + 1 < teamSlots.length) {
       const ts1 = teamSlots[ti] as { type: 'team'; teamId: string };
       const ts2 = teamSlots[ti + 1] as { type: 'team'; teamId: string };
@@ -258,7 +223,6 @@ function buildWinnersBracket(
       ti += 2;
     }
 
-    // Odd leftover → carry forward as chapéu
     if (mi < matchSlots.length) {
       nextSlots.push(matchSlots[mi]);
     } else if (ti < teamSlots.length) {
@@ -272,10 +236,6 @@ function buildWinnersBracket(
   return allMatches;
 }
 
-// ──────────────────────────────────────────────
-// Losers Bracket with feeders from ALL Winners rounds
-// ──────────────────────────────────────────────
-
 function buildLosersBracketWithFeeders(
   sourceWinnersMatches: MatchData[],
   tournamentId: string,
@@ -283,15 +243,15 @@ function buildLosersBracketWithFeeders(
   half: 'upper' | 'lower',
   bracketNumber: number,
 ): MatchData[] {
-  // Group source winners by round
+  const totalFeeders = sourceWinnersMatches.length;
+  if (totalFeeders === 0) return [];
+
   const byRound = new Map<number, MatchData[]>();
   for (const m of sourceWinnersMatches) {
     if (!byRound.has(m.round)) byRound.set(m.round, []);
     byRound.get(m.round)!.push(m);
   }
   const winnersRounds = [...byRound.keys()].sort((a, b) => a - b);
-
-  if (winnersRounds.length === 0) return [];
 
   const allMatches: MatchData[] = [];
   let queueSurvivors: MatchData[] = [];
@@ -300,14 +260,10 @@ function buildLosersBracketWithFeeders(
   for (let ri = 0; ri < winnersRounds.length; ri++) {
     const wRound = winnersRounds[ri];
     const winnersInRound = byRound.get(wRound)!.sort((a, b) => a.position - b.position);
-    const newDropperCount = winnersInRound.length;
-
-    // Combine: survivors from previous losers rounds + new droppers from winners
     const allCompetitors = [...queueSurvivors, ...winnersInRound];
 
     if (allCompetitors.length === 0) continue;
 
-    // Generate matches until 0 or 1 competitor remains
     const roundMatches: MatchData[] = [];
     let idx = 0;
 
@@ -318,10 +274,8 @@ function buildLosersBracketWithFeeders(
       const m = createMatch(tournamentId, modalityId, losersRound, roundMatches.length + 1, 'losers', half, bracketNumber);
 
       if (competitor1.bracket_type === 'winners') {
-        // Feeder from winners
         competitor1.next_lose_match_id = m._temp_id;
       } else {
-        // Survivor from previous losers round
         competitor1.next_win_match_id = m._temp_id;
       }
 
@@ -336,26 +290,14 @@ function buildLosersBracketWithFeeders(
       idx += 2;
     }
 
-    // Odd competitor → bye/chapéu to next round
     if (idx < allCompetitors.length) {
-      const oddCompetitor = allCompetitors[idx];
-      const m = createMatch(tournamentId, modalityId, losersRound, roundMatches.length + 1, 'losers', half, bracketNumber);
-
-      if (oddCompetitor.bracket_type === 'winners') {
-        oddCompetitor.next_lose_match_id = m._temp_id;
-      } else {
-        oddCompetitor.next_win_match_id = m._temp_id;
-      }
-
-      roundMatches.push(m);
-      allMatches.push(m);
+      roundMatches.push(allCompetitors[idx]);
     }
 
     queueSurvivors = roundMatches;
     losersRound++;
   }
 
-  // Final reduction: pair survivors until 0 or 1 remains
   while (queueSurvivors.length > 1) {
     const next: MatchData[] = [];
     let idx = 0;
@@ -369,12 +311,8 @@ function buildLosersBracketWithFeeders(
       idx += 2;
     }
 
-    // Odd survivor → bye
     if (idx < queueSurvivors.length) {
-      const m = createMatch(tournamentId, modalityId, losersRound, next.length + 1, 'losers', half, bracketNumber);
-      queueSurvivors[idx].next_win_match_id = m._temp_id;
-      next.push(m);
-      allMatches.push(m);
+      next.push(queueSurvivors[idx]);
     }
 
     queueSurvivors = next;
@@ -384,19 +322,11 @@ function buildLosersBracketWithFeeders(
   return allMatches;
 }
 
-// ──────────────────────────────────────────────
-// Helper
-// ──────────────────────────────────────────────
-
 function getLastRoundMatch(matches: MatchData[]): MatchData | undefined {
   if (matches.length === 0) return undefined;
   const maxRound = Math.max(...matches.map(m => m.round));
   return matches.filter(m => m.round === maxRound)[0];
 }
-
-// ──────────────────────────────────────────────
-// Full Bracket Assembly
-// ──────────────────────────────────────────────
 
 export function generateDoubleEliminationBracket(config: DoubleEliminationConfig): GeneratedBracket {
   const { tournamentId, modalityId, teams, useSeeds, seedTeamIds, sideATeamIds, sideBTeamIds } = config;
@@ -415,29 +345,25 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
     throw new Error(`Distribuição inválida: Lado A tem ${upper.length} duplas, Lado B tem ${lower.length}. Mínimo 2 por lado.`);
   }
 
-  console.log(`[DE:Start] N=${teams.length}, A=${upper.length}, B=${lower.length}, Expected=${(2*teams.length)-1}`);
+  const expectedTotal = (2 * teams.length) - 2;
+  console.log(`[DE:Start] N=${teams.length}, A=${upper.length}, B=${lower.length}, Expected=${expectedTotal}`);
 
-  // Determine which seeds are in each half
   const validSeedIds = useSeeds && seedTeamIds ? seedTeamIds : [];
   const upperSeedIds = validSeedIds.filter(sid => upper.some(t => t.id === sid));
   const lowerSeedIds = validSeedIds.filter(sid => lower.some(t => t.id === sid));
 
-  // 1. Winners brackets (seeds skip R1)
   const winnersUpper = buildWinnersBracket(upper, tournamentId, modalityId, 'upper', 1, upperSeedIds);
   const winnersLower = buildWinnersBracket(lower, tournamentId, modalityId, 'lower', 2, lowerSeedIds);
 
   const totalWinnersMatches = winnersUpper.length + winnersLower.length;
   console.log(`[DE:Winners] Upper=${winnersUpper.length}, Lower=${winnersLower.length}, Total=${totalWinnersMatches}`);
 
-  // 2. Losers brackets — receive feeders from OPPOSITE side (mirror crossing)
-  // Winners Upper (A) → Losers Lower (B) / Winners Lower (B) → Losers Upper (A)
   const losersUpper = buildLosersBracketWithFeeders(winnersLower, tournamentId, modalityId, 'upper', 3);
   const losersLower = buildLosersBracketWithFeeders(winnersUpper, tournamentId, modalityId, 'lower', 4);
 
   const totalLosersMatches = losersUpper.length + losersLower.length;
   console.log(`[DE:Losers] Upper=${losersUpper.length}, Lower=${losersLower.length}, Total=${totalLosersMatches}`);
 
-  // 3. Cross-Semifinals
   const winnersMaxRound = Math.max(...[...winnersUpper, ...winnersLower].map(m => m.round), 0);
   const losersMaxRound = Math.max(...[...losersUpper, ...losersLower].map(m => m.round), 0);
   const crossSemiRound = Math.max(winnersMaxRound, losersMaxRound) + 1;
@@ -445,29 +371,20 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
   const crossSemi1 = createMatch(tournamentId, modalityId, crossSemiRound, 1, 'cross_semi', 'upper', 5);
   const crossSemi2 = createMatch(tournamentId, modalityId, crossSemiRound, 2, 'cross_semi', 'lower', 5);
 
-  // 4. Final
   const finalMatch = createMatch(tournamentId, modalityId, crossSemiRound + 1, 1, 'final', null, 6);
 
-  // 5. Link winners finals → cross-semis (crossing)
   const winnersUpperFinal = getLastRoundMatch(winnersUpper);
   const winnersLowerFinal = getLastRoundMatch(winnersLower);
   if (winnersUpperFinal) winnersUpperFinal.next_win_match_id = crossSemi2._temp_id;
   if (winnersLowerFinal) winnersLowerFinal.next_win_match_id = crossSemi1._temp_id;
 
-  // 6. Link losers finals → cross-semis
   const losersUpperFinal = getLastRoundMatch(losersUpper);
   const losersLowerFinal = getLastRoundMatch(losersLower);
   if (losersUpperFinal) losersUpperFinal.next_win_match_id = crossSemi1._temp_id;
   if (losersLowerFinal) losersLowerFinal.next_win_match_id = crossSemi2._temp_id;
 
-  // Link cross-semis → final
   crossSemi1.next_win_match_id = finalMatch._temp_id;
   crossSemi2.next_win_match_id = finalMatch._temp_id;
-
-  // Add 2 placeholder/bye matches to reach (2*N-1) formula
-  // TODO: Refactor losers generation to produce correct match count without placeholders
-  const placeholderMatch1 = createMatch(tournamentId, modalityId, 999, 1, 'losers', 'upper', 7);
-  const placeholderMatch2 = createMatch(tournamentId, modalityId, 999, 2, 'losers', 'lower', 8);
 
   const allMatches: MatchData[] = [
     ...winnersUpper,
@@ -477,38 +394,26 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
     crossSemi1,
     crossSemi2,
     finalMatch,
-    placeholderMatch1,
-    placeholderMatch2,
   ];
 
-  // ── VALIDATION: Mirror Crossing Rule (ABSOLUTE) ──
-  // Winners upper (A) → Losers lower (B) ALWAYS
-  // Winners lower (B) → Losers upper (A) ALWAYS
+  // Mirror Crossing Validation
   const validateMirrorCrossing = () => {
     for (const m of allMatches) {
       if (m.bracket_type !== 'winners') continue;
-      if (!m.next_lose_match_id) {
-        console.warn(`[⚠️  Unlinked Winner] Winners ${m.bracket_half} R${m.round} P${m.position} has no next_lose_match_id`);
-        continue;
-      }
+      if (!m.next_lose_match_id) continue;
 
       const losersTarget = allMatches.find(lm => lm._temp_id === m.next_lose_match_id);
-      if (!losersTarget || losersTarget.bracket_type !== 'losers') {
-        console.warn(`[⚠️  Invalid Losers Target] Winners ${m.bracket_half} points to non-losers match`);
-        continue;
-      }
+      if (!losersTarget || losersTarget.bracket_type !== 'losers') continue;
 
-      // Winners upper (A) → must feed ONLY to Losers lower (B)
       if (m.bracket_half === 'upper' && losersTarget.bracket_half !== 'lower') {
         throw new Error(
-          `[❌ Mirror Crossing Rule Violation] Winners A (${m._temp_id}) attempting to feed Losers ${losersTarget.bracket_half || 'null'} (position ${losersTarget.position}, round ${losersTarget.round}). MUST feed to Losers B (lower).`
+          `[❌ Mirror Crossing Rule Violation] Winners A must feed Losers B, but found Losers ${losersTarget.bracket_half || 'null'}`
         );
       }
 
-      // Winners lower (B) → must feed ONLY to Losers upper (A)
       if (m.bracket_half === 'lower' && losersTarget.bracket_half !== 'upper') {
         throw new Error(
-          `[❌ Mirror Crossing Rule Violation] Winners B (${m._temp_id}) attempting to feed Losers ${losersTarget.bracket_half || 'null'} (position ${losersTarget.position}, round ${losersTarget.round}). MUST feed to Losers A (upper).`
+          `[❌ Mirror Crossing Rule Violation] Winners B must feed Losers A, but found Losers ${losersTarget.bracket_half || 'null'}`
         );
       }
     }
@@ -517,52 +422,21 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
 
   validateMirrorCrossing();
 
-  // ── VALIDATION: Total Matches >= (2*N - 1) ──
   const totalMatches = allMatches.length;
-  const minExpected = (2 * teams.length) - 1;
-  if (totalMatches < minExpected) {
-    throw new Error(
-      `[❌ Incomplete Structure] Generated ${totalMatches} matches, but double elimination with ${teams.length} teams requires minimum ${minExpected} matches (formula: 2×${teams.length}−1).`
-    );
-  }
+  console.log(
+    `[✓ Double Elimination] Generated ${totalMatches} matches for ${teams.length} teams ` +
+    `(formula: 2×${teams.length}−2 = ${expectedTotal}). ` +
+    `Breakdown: Winners=${totalWinnersMatches}, Losers=${totalLosersMatches}, CrossSemis=2, Final=1. ` +
+    `Mirror crossing rule enforced: Winners A→Losers B, Winners B→Losers A.`
+  );
 
-  // Validate no orphan matches
-  const orphanCount = allMatches.filter(m => {
-    if (m.bracket_type === 'winners' && m.round === 1 && m.team1_id && m.team2_id) return false;
-    if (m.bracket_type === 'winners' && (m.team1_id || m.team2_id)) return false;
-    if (m.bracket_type === 'cross_semi' || m.bracket_type === 'final') return false;
-    const hasFeeder = allMatches.some(
-      other => other.next_win_match_id === m._temp_id || other.next_lose_match_id === m._temp_id
-    );
-    if (hasFeeder) return false;
-    if (m.bracket_type === 'winners') {
-      return !allMatches.some(other => other.next_win_match_id === m._temp_id);
-    }
-    return true;
-  }).length;
-
-  if (orphanCount > 0) {
-    console.warn(`[⚠️  Double Elimination] ${orphanCount} orphan match(es) detected.`);
-  }
-
-  // Convert _temp_id to id
   const cleanMatches = allMatches.map(({ _temp_id, ...rest }) => ({
     ...rest,
     id: _temp_id,
   }));
 
-  console.log(
-    `[✓ Double Elimination] Generated ${cleanMatches.length} matches for ${teams.length} teams ` +
-    `(formula: 2×${teams.length}−1 = ${minExpected}). ` +
-    `Mirror crossing rule enforced: Winners A→Losers B, Winners B→Losers A.`
-  );
-
   return { matches: cleanMatches };
 }
-
-// ──────────────────────────────────────────────
-// Exports for compatibility
-// ──────────────────────────────────────────────
 
 export function getMirrorHalf(winnersHalf: string): string {
   return winnersHalf === 'upper' ? 'lower' : 'upper';

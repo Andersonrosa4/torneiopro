@@ -236,9 +236,7 @@ const HorizontalBracket = ({
         <div className="flex gap-8 relative" style={{ zIndex: 1 }}>
           {displayRounds.map((round) => {
             const roundMatchesSorted = roundGroups[round].sort((a, b) => a.position - b.position);
-            // REGRA: só exibir rodada se TODOS os jogos possuem ambos os times
-            const allDefined = roundMatchesSorted.every(m => m.team1_id && m.team2_id);
-            if (!allDefined) return null;
+            // Rule 29: Bracket mostra todas as partidas futuras (incluindo "A definir")
             return (
               <div key={round} className="flex flex-col items-center shrink-0" style={{ minWidth: 170 }}>
                 <div className="text-[9px] uppercase font-semibold text-muted-foreground/70 mb-2 whitespace-nowrap">

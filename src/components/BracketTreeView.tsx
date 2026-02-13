@@ -3,8 +3,8 @@ import { Trophy, LayoutGrid, List } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { schedulerSequence } from "@/lib/roundScheduler";
+import { getEliminationRoundLabel } from "@/lib/roundLabels";
 import { useIsMobile } from "@/hooks/use-mobile";
-import HorizontalTreeView from "@/components/HorizontalTreeView";
 
 interface Participant {
   id: string;
@@ -39,6 +39,123 @@ interface BracketTreeViewProps {
   structuralOnly?: boolean;
   tournamentFormat?: string;
 }
+
+/* ────────────────────────────────────────────────────
+   Match Card — compact card for bracket column view
+   ──────────────────────────────────────────────────── */
+const MatchCard = ({
+  match,
+  getName,
+  isFinal,
+  matchNumber,
+}: {
+  match: Match;
+  getName: (id: string | null) => string;
+  isFinal?: boolean;
+  matchNumber?: number;
+}) => {
+  const p1Name = getName(match.team1_id);
+  const p2Name = getName(match.team2_id);
+  const isCompleted = match.status === "completed";
+  const t1Win = match.winner_team_id === match.team1_id && isCompleted;
+  const t2Win = match.winner_team_id === match.team2_id && isCompleted;
+
+  return (
+    <div className={`w-56 rounded-lg border bg-card shadow-card ${isFinal ? "border-primary/40 shadow-glow" : isCompleted ? "border-success/30" : "border-border"} ${isCompleted ? "opacity-90" : ""}`}>
+      {isFinal && (
+        <div className="flex items-center justify-center gap-1 rounded-t-lg bg-gradient-primary px-2 py-1 text-xs font-bold text-primary-foreground">
+          <Trophy className="h-3 w-3" /> FINAL
+        </div>
+      )}
+      {matchNumber != null && (
+        <div className="px-2 pt-1 text-[9px] font-semibold text-muted-foreground/70">
+          Jogo {matchNumber}
+        </div>
+      )}
+      <div className={`flex items-center gap-2 border-b border-border px-3 py-2 ${t1Win ? "bg-success/10" : ""}`}>
+        <span className={`flex-1 text-sm truncate ${t1Win ? "text-success font-bold" : p1Name === "A definir" ? "text-muted-foreground" : "team-name"}`}>
+          {p1Name}
+        </span>
+        <span className="text-sm font-bold tabular-nums">{match.score1 ?? "-"}</span>
+        {isCompleted && t1Win && <Trophy className="h-3.5 w-3.5 text-success shrink-0" />}
+      </div>
+      <div className={`flex items-center gap-2 px-3 py-2 ${t2Win ? "bg-success/10" : ""}`}>
+        <span className={`flex-1 text-sm truncate ${t2Win ? "text-success font-bold" : p2Name === "A definir" ? "text-muted-foreground" : "team-name"}`}>
+          {p2Name}
+        </span>
+        <span className="text-sm font-bold tabular-nums">{match.score2 ?? "-"}</span>
+        {isCompleted && t2Win && <Trophy className="h-3.5 w-3.5 text-success shrink-0" />}
+      </div>
+    </div>
+  );
+};
+
+/* ────────────────────────────────────────────────────
+   Column Bracket — renders rounds as side-by-side columns
+   ──────────────────────────────────────────────────── */
+const ColumnBracket = ({
+  sectionMatches,
+  getName,
+  matchNumberMap,
+  label,
+  icon,
+  colorClass,
+}: {
+  sectionMatches: Match[];
+  getName: (id: string | null) => string;
+  matchNumberMap?: Map<string, number>;
+  label?: string;
+  icon?: string;
+  colorClass?: string;
+}) => {
+  if (sectionMatches.length === 0) return null;
+
+  const rounds = [...new Set(sectionMatches.map(m => m.round))].sort((a, b) => a - b);
+  const matchCountByRound: Record<number, number> = {};
+  sectionMatches.forEach(m => { matchCountByRound[m.round] = (matchCountByRound[m.round] || 0) + 1; });
+
+  const maxRound = rounds[rounds.length - 1];
+
+  return (
+    <div className={`rounded-xl border p-3 space-y-2 ${colorClass || "border-border/50 bg-card/30"}`}>
+      {label && (
+        <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          {icon && <span>{icon}</span>}
+          <span>{label}</span>
+        </div>
+      )}
+      <div className="overflow-x-auto">
+        <div className="flex gap-8 min-w-max">
+          {rounds.map(round => {
+            const roundMatches = sectionMatches.filter(m => m.round === round).sort((a, b) => a.position - b.position);
+            const matchCount = matchCountByRound[round] || 0;
+            const roundLabel = getEliminationRoundLabel(round, matchCount);
+            const isFinalRound = round === maxRound && matchCount === 1;
+
+            return (
+              <div key={round} className="flex flex-col">
+                <h3 className="mb-3 text-center text-sm font-semibold text-primary">
+                  {roundLabel}
+                </h3>
+                <div className="flex flex-1 flex-col justify-around gap-4">
+                  {roundMatches.map(match => (
+                    <MatchCard
+                      key={match.id}
+                      match={match}
+                      getName={getName}
+                      isFinal={isFinalRound}
+                      matchNumber={matchNumberMap?.get(match.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 /* ────────────────────────────────────────────────────
    Group Stage View
@@ -102,9 +219,8 @@ const GroupStageView = ({
   );
 };
 
-
 /* ────────────────────────────────────────────────────
-   Mobile List View — partidas em lista vertical agrupadas por rodada
+   Mobile List View
    ──────────────────────────────────────────────────── */
 const MobileListView = ({
   matches,
@@ -118,10 +234,6 @@ const MobileListView = ({
   const eliminationMatches = matches.filter(m => m.round > 0);
   if (eliminationMatches.length === 0) return null;
 
-  const matchCountByRound: Record<number, number> = {};
-  eliminationMatches.forEach(m => { matchCountByRound[m.round] = (matchCountByRound[m.round] || 0) + 1; });
-
-  // Group by bracket_type + round for better organization
   const blocks: { label: string; matches: Match[] }[] = [];
   const bracketTypes = ['winners', 'losers', 'semi_final', 'final'];
   
@@ -222,33 +334,20 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
       return 'bracket';
     } catch { return 'bracket'; }
   });
-  const zoomContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try { localStorage.setItem('bracket-view-mode', viewMode); } catch {}
   }, [viewMode]);
-
-  // Auto-scroll to center on mobile bracket mode
-  useEffect(() => {
-    if (isMobile && viewMode === 'bracket' && zoomContainerRef.current) {
-      const el = zoomContainerRef.current;
-      requestAnimationFrame(() => {
-        el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
-      });
-    }
-  }, [isMobile, viewMode, matches.length]);
 
   const getName = (id: string | null) => {
     if (!id) return "A definir";
     return participants.find((p) => p.id === id)?.name || "A definir";
   };
 
-  // Build global match numbering from scheduler sequence
   const matchNumberMap = useMemo(() => {
     const seq = schedulerSequence(matches);
     const map = new Map<string, number>();
     seq.forEach((m, i) => map.set(m.id, i + 1));
-    // Also number group stage matches not in scheduler
     let next = map.size + 1;
     for (const m of matches) {
       if (!map.has(m.id)) map.set(m.id, next++);
@@ -260,6 +359,25 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
   const hasGroupStage = groupMatches.length > 0;
   const hasElimination = useMemo(() => matches.some((m) => m.round > 0), [matches]);
 
+  // Detect double elimination
+  const isDE = useMemo(() => {
+    return matches.some(m => m.bracket_type === 'losers' || m.bracket_type === 'final' || m.bracket_type === 'semi_final');
+  }, [matches]);
+
+  // DE sections
+  const deSections = useMemo(() => {
+    if (!isDE) return null;
+    const winnersA = matches.filter(m => m.round > 0 && m.bracket_type === "winners" && m.bracket_half === "upper");
+    const winnersB = matches.filter(m => m.round > 0 && m.bracket_type === "winners" && m.bracket_half === "lower");
+    const losersA = matches.filter(m => m.round > 0 && m.bracket_type === "losers" && m.bracket_half === "upper");
+    const losersB = matches.filter(m => m.round > 0 && m.bracket_type === "losers" && m.bracket_half === "lower");
+    const semiFinals = matches.filter(m => m.bracket_type === "semi_final");
+    const finalMatches = matches.filter(m => m.bracket_type === "final");
+    return { winnersA, winnersB, losersA, losersB, semiFinals, finalMatches };
+  }, [matches, isDE]);
+
+  // Normal knockout matches
+  const knockoutMatches = useMemo(() => matches.filter(m => m.round > 0), [matches]);
 
   if (!hasGroupStage && !hasElimination) {
     return (
@@ -269,11 +387,9 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
     );
   }
 
-  const mobileZoom = 0.7;
-
   return (
     <div className="w-full space-y-4">
-      {/* View mode toggle */}
+      {/* View mode toggle — mobile only */}
       {hasElimination && isMobile && (
         <div className="flex items-center justify-center gap-1 bg-muted/50 rounded-lg p-1">
           <Button
@@ -303,16 +419,61 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
         <MobileListView matches={matches} getName={getName} matchNumberMap={matchNumberMap} />
       )}
 
-      {/* Bracket Mode — unified view using HorizontalTreeView for both DE and Normal */}
+      {/* Bracket Column Mode */}
       {viewMode === 'bracket' && hasElimination && (
-        <div
-          ref={zoomContainerRef}
-          className="overflow-x-auto overflow-y-hidden pb-4"
-          style={{ touchAction: "pan-x pinch-zoom", WebkitOverflowScrolling: "touch" }}
-        >
-          <div style={isMobile ? { transform: `scale(${mobileZoom})`, transformOrigin: 'top left', width: `${100 / mobileZoom}%` } : undefined}>
-            <HorizontalTreeView matches={matches} getName={getName} matchNumberMap={matchNumberMap} />
-          </div>
+        <div className="overflow-x-auto pb-4" style={{ WebkitOverflowScrolling: "touch" }}>
+          {isDE && deSections ? (
+            <div className="space-y-4">
+              <ColumnBracket
+                sectionMatches={deSections.winnersA}
+                getName={getName}
+                matchNumberMap={matchNumberMap}
+                label="Vencedores A"
+                icon="🏆"
+                colorClass="border-primary/20 bg-primary/[0.03]"
+              />
+              <ColumnBracket
+                sectionMatches={deSections.winnersB}
+                getName={getName}
+                matchNumberMap={matchNumberMap}
+                label="Vencedores B"
+                icon="🏆"
+                colorClass="border-primary/15 bg-primary/[0.02]"
+              />
+              <ColumnBracket
+                sectionMatches={deSections.losersA}
+                getName={getName}
+                matchNumberMap={matchNumberMap}
+                label="Perdedores Superiores"
+                icon="⬇"
+                colorClass="border-destructive/15 bg-destructive/[0.03]"
+              />
+              <ColumnBracket
+                sectionMatches={deSections.losersB}
+                getName={getName}
+                matchNumberMap={matchNumberMap}
+                label="Perdedores Inferiores"
+                icon="⬇"
+                colorClass="border-destructive/10 bg-destructive/[0.02]"
+              />
+              {(deSections.semiFinals.length > 0 || deSections.finalMatches.length > 0) && (
+                <ColumnBracket
+                  sectionMatches={[...deSections.semiFinals, ...deSections.finalMatches]}
+                  getName={getName}
+                  matchNumberMap={matchNumberMap}
+                  label="Fase Final"
+                  icon="🏆"
+                  colorClass="border-primary/30 bg-primary/[0.04]"
+                />
+              )}
+            </div>
+          ) : (
+            <ColumnBracket
+              sectionMatches={knockoutMatches}
+              getName={getName}
+              matchNumberMap={matchNumberMap}
+            />
+          )}
         </div>
       )}
     </div>

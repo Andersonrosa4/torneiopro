@@ -1137,8 +1137,9 @@ const TournamentDetail = () => {
                     tournamentName={tournament?.name || ""}
                     sport={sportLabels[tournament?.sport] || tournament?.sport || ""}
                     eventDate={tournament?.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
-                    onDeclareWinner={declareWinner}
                     onUpdateScore={updateScore}
+                    onDeclareWinner={declareWinner}
+                    tournamentFormat={tournament?.format}
                     onAutoResult={handleAutoResult}
                   />
                 </section>

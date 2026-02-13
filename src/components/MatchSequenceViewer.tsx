@@ -36,6 +36,7 @@ interface MatchSequenceViewerProps {
   tournamentName?: string;
   sport?: string;
   eventDate?: string;
+  tournamentFormat?: string; // 'single_elimination' | 'double_elimination' | 'group_stage'
   onDeclareWinner: (matchId: string, winnerId: string) => void;
   onUpdateScore: (matchId: string, score1: number, score2: number) => void;
   onAutoResult?: (matchId: string, score1: number, score2: number, winnerId: string) => void;
@@ -118,6 +119,7 @@ const MatchSequenceViewer = ({
   tournamentName = "",
   sport = "",
   eventDate,
+  tournamentFormat = 'single_elimination',
   onDeclareWinner,
   onUpdateScore,
   onAutoResult,
@@ -134,6 +136,11 @@ const MatchSequenceViewer = ({
   const maxRound = matches.length > 0 ? Math.max(...matches.map((m) => m.round)) : 0;
 
   const getRoundLabel = (round: number) => {
+    // Group stage: sempre exibir "Fase de Grupos"
+    if (tournamentFormat === 'group_stage') {
+      return "Fase de Grupos";
+    }
+    
     if (round === 0) return "Grupo";
     
     // Knockout phase labeling based on distance from final

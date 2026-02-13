@@ -173,6 +173,7 @@ const TournamentPublicView = () => {
                     isOwner={false}
                     onDeclareWinner={() => {}}
                     onUpdateScore={() => {}}
+                    tournamentFormat={tournament?.format}
                   />
                 </section>
               ) : (
@@ -191,6 +192,7 @@ const TournamentPublicView = () => {
                 tournamentName={tournament?.name || ""}
                 sport={tournament?.sport || ""}
                 eventDate={tournament?.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
+                tournamentFormat={tournament?.format}
                 onDeclareWinner={() => {}}
                 onUpdateScore={() => {}}
               />

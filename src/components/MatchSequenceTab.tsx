@@ -24,9 +24,10 @@ interface Team {
 interface MatchSequenceTabProps {
   matches: Match[];
   teams: Team[];
+  tournamentFormat?: string; // 'single_elimination' | 'double_elimination' | 'group_stage'
 }
 
-const MatchSequenceTab = ({ matches, teams }: MatchSequenceTabProps) => {
+const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_elimination' }: MatchSequenceTabProps) => {
   const getTeamName = (teamId: string | null) => {
     if (!teamId) return "A definir";
     const team = teams.find((t) => t.id === teamId);
@@ -80,9 +81,14 @@ const MatchSequenceTab = ({ matches, teams }: MatchSequenceTabProps) => {
   const maxRound = matches.length > 0 ? Math.max(...matches.map((m) => m.round)) : 0;
 
   const getRoundLabel = (round: number) => {
+    // Group stage: sempre exibir "Fase de Grupos"
+    if (tournamentFormat === 'group_stage') {
+      return "Fase de Grupos";
+    }
+    
+    // Knockout phases
     if (round === 0) return "Grupo";
     
-    // Knockout phase labeling based on distance from final
     const roundsFromEnd = maxRound - round;
     switch (roundsFromEnd) {
       case 0: return "Final";

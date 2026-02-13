@@ -661,8 +661,7 @@ const TournamentDetail = () => {
       }
     }
 
-    const phaseLabel = allAdvancing.length <= 2 ? "Final" : allAdvancing.length <= 4 ? "Semifinais" : allAdvancing.length <= 8 ? "Quartas de Final" : "Oitavas de Final";
-    toast.success(`Fase de grupos concluída! ${phaseLabel} gerada automaticamente com ${allAdvancing.length} duplas.`);
+    toast.success(`Fase de grupos concluída! Eliminatória gerada automaticamente com ${allAdvancing.length} duplas.`);
     fetchData();
   };
 

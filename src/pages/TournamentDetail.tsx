@@ -500,6 +500,33 @@ const TournamentDetail = () => {
     fetchData();
   };
 
+  // Reset only match results (scores, winners, status) — keeps bracket structure intact
+  const undoSequence = async () => {
+    if (!id) return;
+    const targetMatches = selectedModality
+      ? matches.filter(m => m.modality_id === selectedModality.id)
+      : matches.filter(m => m.tournament_id === id);
+
+    for (const m of targetMatches) {
+      if (m.status === 'completed' || m.score1 || m.score2 || m.winner_team_id) {
+        await organizerQuery({
+          table: "matches",
+          operation: "update",
+          filters: { id: m.id },
+          data: {
+            score1: 0,
+            score2: 0,
+            winner_team_id: null,
+            winner_id: null,
+            status: 'pending',
+          },
+        });
+      }
+    }
+    toast.success("Resultados das partidas resetados! Estrutura do chaveamento mantida.");
+    fetchData();
+  };
+
   const generateKnockoutFromGroups = async () => {
     if (!id) return;
 
@@ -1119,9 +1146,9 @@ const TournamentDetail = () => {
             {/* Sequência Tab - Match sequence with group identification */}
             <TabsContent value="sequence">
               {isOwner && filteredMatches.length > 0 && (
-                <div className="mb-4 flex justify-end">
-                  <Button variant="destructive" size="sm" className="gap-1" onClick={undoBracket}>
-                    <Undo2 className="h-4 w-4" /> Desfazer Sequência
+                <div className="mb-4 flex justify-end gap-2">
+                  <Button variant="outline" size="sm" className="gap-1" onClick={undoSequence}>
+                    <Undo2 className="h-4 w-4" /> Resetar Resultados
                   </Button>
                 </div>
               )}

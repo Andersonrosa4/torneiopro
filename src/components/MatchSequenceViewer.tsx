@@ -426,7 +426,7 @@ const MatchSequenceViewer = ({
           </div>
           <div className="p-2 space-y-2">
             {block.matches.map(({ match, globalIndex }) => (
-              <MemoizedMatchCard
+              <MatchCard
                 key={match.id}
                 match={match}
                 index={globalIndex}

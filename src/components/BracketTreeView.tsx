@@ -30,7 +30,7 @@ interface BracketTreeViewProps {
   onDeclareWinner: (matchId: string, winnerId: string) => void;
   onUpdateScore: (matchId: string, score1: number, score2: number) => void;
   structuralOnly?: boolean;
-  tournamentFormat?: string; // 'single_elimination' | 'double_elimination' | 'group_stage'
+  tournamentFormat?: string;
 }
 
 /* ── Compact Match Card ── */
@@ -94,10 +94,12 @@ const ConnectorLines = ({
   containerRef,
   matches,
   roundNumbers,
+  reversed,
 }: {
   containerRef: React.RefObject<HTMLDivElement>;
   matches: Match[];
   roundNumbers: number[];
+  reversed?: boolean;
 }) => {
   const [lines, setLines] = useState<Array<{ x1: number; y1: number; x2: number; y2: number }>>([]);
 
@@ -109,9 +111,12 @@ const ConnectorLines = ({
       const containerRect = container.getBoundingClientRect();
       const newLines: typeof lines = [];
 
-      for (let i = 0; i < roundNumbers.length - 1; i++) {
-        const currentRound = roundNumbers[i];
-        const nextRound = roundNumbers[i + 1];
+      // For reversed (losers), rounds are displayed R-to-L, so visual order is reversed
+      const orderedRounds = reversed ? [...roundNumbers].reverse() : roundNumbers;
+
+      for (let i = 0; i < orderedRounds.length - 1; i++) {
+        const currentRound = orderedRounds[i];
+        const nextRound = orderedRounds[i + 1];
 
         const currentMatches = matches
           .filter((m) => m.round === currentRound)
@@ -120,34 +125,46 @@ const ConnectorLines = ({
         for (let j = 0; j < currentMatches.length; j += 2) {
           const m1 = currentMatches[j];
           const m2 = currentMatches[j + 1];
-
           const nextPos = Math.ceil((j / 2) + 1);
           const nextMatch = matches.find(
             (m) => m.round === nextRound && m.position === nextPos
           );
-
           if (!nextMatch) continue;
 
           const el1 = container.querySelector(`[data-match-id="${m1.id}"]`);
           const el2 = m2 ? container.querySelector(`[data-match-id="${m2.id}"]`) : null;
           const elNext = container.querySelector(`[data-match-id="${nextMatch.id}"]`);
-
           if (!el1 || !elNext) continue;
 
           const r1 = el1.getBoundingClientRect();
           const rNext = elNext.getBoundingClientRect();
 
-          const x1 = r1.right - containerRect.left;
-          const y1 = r1.top + r1.height / 2 - containerRect.top;
-          const x2 = rNext.left - containerRect.left;
-          const yNext = rNext.top + rNext.height / 2 - containerRect.top;
+          if (reversed) {
+            // Losers: lines go from LEFT of source to RIGHT of target (R-to-L flow)
+            const x1 = r1.left - containerRect.left;
+            const y1 = r1.top + r1.height / 2 - containerRect.top;
+            const x2 = rNext.right - containerRect.left;
+            const yNext = rNext.top + rNext.height / 2 - containerRect.top;
+            newLines.push({ x1, y1, x2, y2: yNext });
 
-          newLines.push({ x1, y1, x2, y2: yNext });
+            if (el2) {
+              const r2 = el2.getBoundingClientRect();
+              const y2 = r2.top + r2.height / 2 - containerRect.top;
+              newLines.push({ x1: r2.left - containerRect.left, y1: y2, x2, y2: yNext });
+            }
+          } else {
+            // Winners: lines go from RIGHT of source to LEFT of target (L-to-R flow)
+            const x1 = r1.right - containerRect.left;
+            const y1 = r1.top + r1.height / 2 - containerRect.top;
+            const x2 = rNext.left - containerRect.left;
+            const yNext = rNext.top + rNext.height / 2 - containerRect.top;
+            newLines.push({ x1, y1, x2, y2: yNext });
 
-          if (el2) {
-            const r2 = el2.getBoundingClientRect();
-            const y2 = r2.top + r2.height / 2 - containerRect.top;
-            newLines.push({ x1: r2.right - containerRect.left, y1: y2, x2, y2: yNext });
+            if (el2) {
+              const r2 = el2.getBoundingClientRect();
+              const y2 = r2.top + r2.height / 2 - containerRect.top;
+              newLines.push({ x1: r2.right - containerRect.left, y1: y2, x2, y2: yNext });
+            }
           }
         }
       }
@@ -156,7 +173,7 @@ const ConnectorLines = ({
     }, 200);
 
     return () => clearTimeout(timer);
-  }, [containerRef, matches, roundNumbers]);
+  }, [containerRef, matches, roundNumbers, reversed]);
 
   if (lines.length === 0) return null;
 
@@ -179,19 +196,21 @@ const ConnectorLines = ({
   );
 };
 
-/* ── Horizontal Bracket Section ── */
+/* ── Horizontal Bracket Section (supports reversed direction) ── */
 const HorizontalBracket = ({
   bracketMatches,
   getName,
   label,
   colorClass,
   maxRoundGlobal,
+  reversed,
 }: {
   bracketMatches: Match[];
   getName: (id: string | null) => string;
   label: string;
   colorClass: string;
   maxRoundGlobal: number;
+  reversed?: boolean;
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -202,6 +221,9 @@ const HorizontalBracket = ({
   });
   const rounds = Object.keys(roundGroups).map(Number).sort((a, b) => a - b);
 
+  // For losers bracket: reverse the visual order (highest round first = rightmost, lowest round last = leftmost)
+  const displayRounds = reversed ? [...rounds].reverse() : rounds;
+
   if (bracketMatches.length === 0) return null;
 
   return (
@@ -210,9 +232,9 @@ const HorizontalBracket = ({
         {label}
       </div>
       <div ref={containerRef} className="relative overflow-x-auto">
-        <ConnectorLines containerRef={containerRef} matches={bracketMatches} roundNumbers={rounds} />
+        <ConnectorLines containerRef={containerRef} matches={bracketMatches} roundNumbers={rounds} reversed={reversed} />
         <div className="flex gap-8 relative" style={{ zIndex: 1 }}>
-          {rounds.map((round) => (
+          {displayRounds.map((round) => (
             <div key={round} className="flex flex-col items-center shrink-0" style={{ minWidth: 170 }}>
               <div className="text-[9px] uppercase font-semibold text-muted-foreground/70 mb-2 whitespace-nowrap">
                 R{round}
@@ -234,8 +256,6 @@ const HorizontalBracket = ({
 
 /* ── Main Component ── */
 const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-
   const getName = (id: string | null) => {
     if (!id) return "A definir";
     return participants.find((p) => p.id === id)?.name || "A definir";
@@ -264,8 +284,8 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
     return standings.sort((a, b) => b.wins - a.wins);
   };
 
-  /* ── Build full horizontal tree ── */
-  const renderHorizontalTree = () => {
+  /* ── Build mirrored horizontal tree ── */
+  const renderMirroredTree = () => {
     const winnersA = matches.filter((m) => m.bracket_type === "winners" && m.bracket_half === "upper");
     const winnersB = matches.filter((m) => m.bracket_type === "winners" && m.bracket_half === "lower");
     const losersA = matches.filter((m) => m.bracket_type === "losers" && m.bracket_half === "lower");
@@ -298,68 +318,83 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
       0
     );
 
-    // Combine cross-semis and final into a unified horizontal flow
     const centralMatches = [...crossSemis, ...finalMatches];
 
     return (
-      <div className="space-y-6">
-        {/* Winners A */}
-        <HorizontalBracket
-          bracketMatches={winnersA}
-          getName={getName}
-          label="🏆 Vencedores — Lado A"
-          colorClass="bg-blue-950/20"
-          maxRoundGlobal={maxRound}
-        />
+      <div className="space-y-4">
+        {/* ── MIRRORED LAYOUT: Winners (left, L→R)  |  Losers (right, R→L) ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* LEFT SIDE: All Winners brackets (L → R) */}
+          <div className="space-y-4">
+            <div className="text-xs font-bold uppercase tracking-widest text-center text-muted-foreground border-b border-border pb-1">
+              ← Chave dos Vencedores →
+            </div>
+            <HorizontalBracket
+              bracketMatches={winnersA}
+              getName={getName}
+              label="🏆 Vencedores — Lado A"
+              colorClass="bg-blue-950/20"
+              maxRoundGlobal={maxRound}
+              reversed={false}
+            />
+            <HorizontalBracket
+              bracketMatches={winnersB}
+              getName={getName}
+              label="🏆 Vencedores — Lado B"
+              colorClass="bg-cyan-950/20"
+              maxRoundGlobal={maxRound}
+              reversed={false}
+            />
+          </div>
 
-        {/* Winners B */}
-        <HorizontalBracket
-          bracketMatches={winnersB}
-          getName={getName}
-          label="🏆 Vencedores — Lado B"
-          colorClass="bg-cyan-950/20"
-          maxRoundGlobal={maxRound}
-        />
+          {/* RIGHT SIDE: All Losers brackets (R → L) */}
+          <div className="space-y-4">
+            <div className="text-xs font-bold uppercase tracking-widest text-center text-muted-foreground border-b border-border pb-1">
+              ← Chave dos Perdedores →
+            </div>
+            {losersA.length > 0 && (
+              <HorizontalBracket
+                bracketMatches={losersA}
+                getName={getName}
+                label="⬇ Perdedores — Lado A"
+                colorClass="bg-orange-950/20"
+                maxRoundGlobal={maxRound}
+                reversed={true}
+              />
+            )}
+            {losersB.length > 0 && (
+              <HorizontalBracket
+                bracketMatches={losersB}
+                getName={getName}
+                label="⬇ Perdedores — Lado B"
+                colorClass="bg-red-950/20"
+                maxRoundGlobal={maxRound}
+                reversed={true}
+              />
+            )}
+          </div>
+        </div>
 
-        {/* Losers A */}
-        {losersA.length > 0 && (
-          <HorizontalBracket
-            bracketMatches={losersA}
-            getName={getName}
-            label="⬇ Perdedores — Lado A"
-            colorClass="bg-orange-950/20"
-            maxRoundGlobal={maxRound}
-          />
-        )}
-
-        {/* Losers B */}
-        {losersB.length > 0 && (
-          <HorizontalBracket
-            bracketMatches={losersB}
-            getName={getName}
-            label="⬇ Perdedores — Lado B"
-            colorClass="bg-red-950/20"
-            maxRoundGlobal={maxRound}
-          />
-        )}
-
-        {/* Cross-Semis + Final as horizontal flow */}
+        {/* CENTER: Cross-Semis + Final */}
         {centralMatches.length > 0 && (
-          <HorizontalBracket
-            bracketMatches={centralMatches}
-            getName={getName}
-            label="🏆 Semifinais Cruzadas → Final"
-            colorClass="bg-primary/5"
-            maxRoundGlobal={maxRound}
-          />
+          <div className="max-w-2xl mx-auto">
+            <HorizontalBracket
+              bracketMatches={centralMatches}
+              getName={getName}
+              label="🏆 Semifinais Cruzadas → Final"
+              colorClass="bg-primary/5"
+              maxRoundGlobal={maxRound}
+              reversed={false}
+            />
+          </div>
         )}
 
         {/* Legend */}
         <div className="rounded-lg bg-muted/30 border border-border p-3 text-[10px] space-y-1">
-          <div className="font-semibold text-muted-foreground mb-1">📍 Regras de Cruzamento:</div>
-          <div className="text-muted-foreground">→ Perdedor Vencedores A → Perdedores A (lado oposto invertido)</div>
-          <div className="text-muted-foreground">← Perdedor Vencedores B → Perdedores B (lado oposto invertido)</div>
-          <div className="text-muted-foreground mt-1">🏆 Semifinais: Campeão Perdedores × Campeão Vencedores do lado oposto</div>
+          <div className="font-semibold text-muted-foreground mb-1">📍 Layout:</div>
+          <div className="text-muted-foreground">← Vencedores crescem da esquerda para o centro</div>
+          <div className="text-muted-foreground">→ Perdedores crescem da direita para o centro</div>
+          <div className="text-muted-foreground mt-1">🏆 Semifinais e Final convergem no centro</div>
           <div className="text-muted-foreground">⚠️ Derrota na Chave dos Perdedores = Eliminação definitiva</div>
         </div>
       </div>
@@ -413,8 +448,8 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
         </div>
       )}
 
-      {/* Elimination — Horizontal Tree */}
-      {hasElimination && renderHorizontalTree()}
+      {/* Elimination — Mirrored Tree */}
+      {hasElimination && renderMirroredTree()}
     </div>
   );
 };

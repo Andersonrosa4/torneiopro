@@ -1,0 +1,1 @@
+ALTER TABLE public.organizers ADD COLUMN last_online_at timestamp with time zone DEFAULT NULL;

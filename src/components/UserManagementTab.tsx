@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
   Plus, Trash2, Pencil, Check, X, Users, Eye, EyeOff,
-  ShieldCheck, UserCog, Mail, User,
+  ShieldCheck, UserCog, Mail, User, Clock,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
@@ -27,6 +27,41 @@ interface OrganizerUser {
   display_name: string | null;
   role: string;
   created_at: string;
+  last_online_at: string | null;
+}
+
+function formatLastOnline(lastOnline: string | null): string {
+  if (!lastOnline) return "Nunca acessou";
+
+  const date = new Date(lastOnline);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+
+  if (diffMin < 5) return "Online agora";
+
+  const isToday =
+    date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear();
+
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday =
+    date.getDate() === yesterday.getDate() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getFullYear() === yesterday.getFullYear();
+
+  const time = date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+  if (isToday) return `Hoje às ${time}`;
+  if (isYesterday) return `Ontem às ${time}`;
+
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }) + ` ${time}`;
 }
 
 const UserManagementTab = () => {
@@ -55,7 +90,7 @@ const UserManagementTab = () => {
     const { data, error } = await organizerQuery({
       table: "organizers",
       operation: "select",
-      select: "id, username, email, display_name, role, created_at",
+      select: "id, username, email, display_name, role, created_at, last_online_at",
       order: [
         { column: "role", ascending: true },
         { column: "created_at", ascending: false },
@@ -294,6 +329,12 @@ const UserManagementTab = () => {
                     <User className="h-3 w-3" /> @{u.username}
                   </span>
                 )}
+              </p>
+              <p className="text-[11px] text-muted-foreground/70 flex items-center gap-1 mt-0.5">
+                <Clock className="h-3 w-3" />
+                <span className={formatLastOnline(u.last_online_at) === "Online agora" ? "text-green-500 font-medium" : ""}>
+                  {formatLastOnline(u.last_online_at)}
+                </span>
               </p>
             </div>
             <div className="flex items-center gap-1 shrink-0">

@@ -196,6 +196,7 @@ export type Database = {
           display_name: string | null
           email: string | null
           id: string
+          last_online_at: string | null
           password_hash: string
           role: string
           updated_at: string
@@ -207,6 +208,7 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           id?: string
+          last_online_at?: string | null
           password_hash: string
           role?: string
           updated_at?: string
@@ -218,6 +220,7 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           id?: string
+          last_online_at?: string | null
           password_hash?: string
           role?: string
           updated_at?: string

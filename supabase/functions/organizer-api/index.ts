@@ -56,6 +56,13 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Update last_online_at asynchronously (fire-and-forget, non-blocking)
+    supabase
+      .from("organizers")
+      .update({ last_online_at: new Date().toISOString() })
+      .eq("id", organizerId)
+      .then(() => {});
+
     // Allowed tables
     const allowedTables = ["tournaments", "teams", "matches", "participants", "rankings", "organizers", "user_roles", "modalities"];
     if (!allowedTables.includes(table)) {

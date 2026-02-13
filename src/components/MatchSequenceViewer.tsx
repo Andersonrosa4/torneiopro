@@ -2,13 +2,10 @@ import { useState, useMemo, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Check, Save, Download, FileText, Sheet, Pencil, Zap } from "lucide-react";
+import { Trophy, Save, Download, FileText, Sheet, Pencil } from "lucide-react";
 import { motion } from "framer-motion";
 import { exportMatchSequence } from "@/lib/exportUtils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
 
 interface Match {
   id: string;
@@ -460,59 +457,6 @@ const MatchSequenceViewer = ({
   );
 };
 
-// ─── Quick Winner Selection Modal ────────────────────────────
-
-interface QuickFinalizeModalProps {
-  open: boolean;
-  onClose: () => void;
-  team1Name: string;
-  team2Name: string;
-  team1Id: string;
-  team2Id: string;
-  onSelectWinner: (winnerId: string) => void;
-}
-
-const QuickFinalizeModal = ({ open, onClose, team1Name, team2Name, team1Id, team2Id, onSelectWinner }: QuickFinalizeModalProps) => {
-  const [selected, setSelected] = useState<string>("");
-
-  const handleConfirm = () => {
-    if (selected) {
-      onSelectWinner(selected);
-      onClose();
-    }
-  };
-
-  useEffect(() => {
-    if (!open) setSelected("");
-  }, [open]);
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Selecione a dupla vencedora</DialogTitle>
-        </DialogHeader>
-        <RadioGroup value={selected} onValueChange={setSelected} className="space-y-3 py-4">
-          <div className="flex items-center space-x-3 rounded-lg border border-border p-3 hover:bg-muted/50 cursor-pointer" onClick={() => setSelected(team1Id)}>
-            <RadioGroupItem value={team1Id} id="team1" />
-            <Label htmlFor="team1" className="cursor-pointer font-medium flex-1">{team1Name}</Label>
-          </div>
-          <div className="flex items-center space-x-3 rounded-lg border border-border p-3 hover:bg-muted/50 cursor-pointer" onClick={() => setSelected(team2Id)}>
-            <RadioGroupItem value={team2Id} id="team2" />
-            <Label htmlFor="team2" className="cursor-pointer font-medium flex-1">{team2Name}</Label>
-          </div>
-        </RadioGroup>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleConfirm} disabled={!selected} className="gap-1">
-            <Check className="h-4 w-4" /> Confirmar Vencedor
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
 // ─── Match Card ──────────────────────────────────────────────
 
 interface MatchCardProps {
@@ -546,7 +490,7 @@ const MatchCard = ({
 
   const [setScores, setSetScores] = useState(initSets);
   const [isEditing, setIsEditing] = useState(false);
-  const [quickFinalizeOpen, setQuickFinalizeOpen] = useState(false);
+  
 
   useEffect(() => {
     setSetScores(initSets());
@@ -579,28 +523,8 @@ const MatchCard = ({
     return null;
   }, [setsWon, numSets, match.team1_id, match.team2_id]);
 
-  const handleSaveAndFinalize = () => {
-    if (!autoWinnerId) return;
-    if (onAutoResult) {
-      onAutoResult(match.id, totalScore1, totalScore2, autoWinnerId);
-    } else {
-      onUpdateScore(match.id, totalScore1, totalScore2);
-      onDeclareWinner(match.id, autoWinnerId);
-    }
-    setIsEditing(false);
-  };
-
   const handleSaveScoreOnly = () => {
     onUpdateScore(match.id, totalScore1, totalScore2);
-  };
-
-  const handleQuickFinalize = (winnerId: string) => {
-    if (onAutoResult) {
-      onAutoResult(match.id, 0, 0, winnerId);
-    } else {
-      onUpdateScore(match.id, 0, 0);
-      onDeclareWinner(match.id, winnerId);
-    }
   };
 
   const updateSetScore = (setIdx: number, field: "s1" | "s2", value: string) => {
@@ -617,147 +541,141 @@ const MatchCard = ({
     return <Badge variant="outline" className="text-muted-foreground text-[10px]">A definir</Badge>;
   };
 
-  return (
-    <>
-      <motion.div
-        initial={{ opacity: 0, x: -10 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: Math.min(index * 0.015, 0.8) }}
-        className={`flex flex-col gap-2 rounded-lg border bg-card px-4 py-3 transition-all ${
-          isCompleted ? "border-success/30 opacity-80" : hasTeams ? "border-primary/20" : "border-border"
-        }`}
-      >
-        {/* Header row */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-[11px] font-bold text-muted-foreground shrink-0">
-            {index}
-          </span>
-          <Badge variant="outline" className="text-[10px] shrink-0 font-semibold">
-            {getRoundLabel(match.round)}
-          </Badge>
-          {getStatusBadge()}
-          {isCompleted && !isEditing && <Trophy className="h-4 w-4 text-success ml-auto shrink-0" />}
-        </div>
+  const handleDeclareTeamWinner = (winnerId: string) => {
+    if (totalScore1 > 0 || totalScore2 > 0) {
+      if (onAutoResult) {
+        onAutoResult(match.id, totalScore1, totalScore2, winnerId);
+      } else {
+        onUpdateScore(match.id, totalScore1, totalScore2);
+        onDeclareWinner(match.id, winnerId);
+      }
+    } else {
+      if (onAutoResult) {
+        onAutoResult(match.id, 0, 0, winnerId);
+      } else {
+        onUpdateScore(match.id, 0, 0);
+        onDeclareWinner(match.id, winnerId);
+      }
+    }
+    setIsEditing(false);
+  };
 
-        {/* Teams */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className={`text-sm font-medium ${isCompleted && !isEditing && match.winner_team_id === match.team1_id ? "text-success font-bold" : ""}`}>
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: Math.min(index * 0.015, 0.8) }}
+      className={`flex flex-col gap-1 rounded-lg border bg-card px-3 py-1.5 transition-all ${
+        isCompleted ? "border-success/30 opacity-80" : hasTeams ? "border-primary/20" : "border-border"
+      }`}
+    >
+      {/* Header row */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground shrink-0">
+          {index}
+        </span>
+        <Badge variant="outline" className="text-[9px] shrink-0 font-semibold px-1.5 py-0">
+          {getRoundLabel(match.round)}
+        </Badge>
+        {getStatusBadge()}
+        {isCompleted && !isEditing && <Trophy className="h-3.5 w-3.5 text-success ml-auto shrink-0" />}
+      </div>
+
+      {/* Teams with inline declare winner buttons */}
+      <div className="flex flex-col gap-0.5">
+        {/* Team 1 */}
+        <div className="flex items-center gap-1.5 min-h-[24px]">
+          <span className={`text-xs font-medium flex-1 truncate ${isCompleted && !isEditing && match.winner_team_id === match.team1_id ? "text-success font-bold" : ""}`}>
             {team1Name}
           </span>
-          <span className="text-xs text-muted-foreground">vs</span>
-          <span className={`text-sm font-medium ${isCompleted && !isEditing && match.winner_team_id === match.team2_id ? "text-success font-bold" : ""}`}>
+          {isOwner && hasTeams && !isCompleted && match.team1_id && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-5 px-1.5 text-[10px] gap-0.5 text-primary hover:bg-primary/10 shrink-0"
+              onClick={() => handleDeclareTeamWinner(match.team1_id!)}
+            >
+              <Trophy className="h-3 w-3" /> Vencedor
+            </Button>
+          )}
+        </div>
+        <span className="text-[10px] text-muted-foreground pl-0.5">vs</span>
+        {/* Team 2 */}
+        <div className="flex items-center gap-1.5 min-h-[24px]">
+          <span className={`text-xs font-medium flex-1 truncate ${isCompleted && !isEditing && match.winner_team_id === match.team2_id ? "text-success font-bold" : ""}`}>
             {team2Name}
           </span>
+          {isOwner && hasTeams && !isCompleted && match.team2_id && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-5 px-1.5 text-[10px] gap-0.5 text-primary hover:bg-primary/10 shrink-0"
+              onClick={() => handleDeclareTeamWinner(match.team2_id!)}
+            >
+              <Trophy className="h-3 w-3" /> Vencedor
+            </Button>
+          )}
         </div>
+      </div>
 
-        {/* Score editing with sets */}
-        {hasTeams && canScore && (
-          <div className="space-y-2 mt-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              {setScores.map((s, idx) => (
-                <div key={idx} className="flex items-center gap-1">
-                  <span className="text-[10px] text-muted-foreground font-medium">S{idx + 1}</span>
-                  <Input value={s.s1} onChange={(e) => updateSetScore(idx, "s1", e.target.value)} className="h-7 w-10 text-center text-xs p-0" />
-                  <span className="text-xs text-muted-foreground">×</span>
-                  <Input value={s.s2} onChange={(e) => updateSetScore(idx, "s2", e.target.value)} className="h-7 w-10 text-center text-xs p-0" />
-                  {idx < setScores.length - 1 && <span className="text-muted-foreground mx-1">|</span>}
-                </div>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-muted-foreground">
-                Total: {totalScore1} × {totalScore2} | Sets: {setsWon.t1} × {setsWon.t2}
-              </span>
-              {autoWinnerId ? (
-                <Badge className="bg-success/20 text-success border-0 text-xs">
-                  Vencedor: {getTeamName(autoWinnerId).split(" / ")[0]}...
-                </Badge>
-              ) : (
-                <Badge className="bg-warning/20 text-warning border-0 text-xs">
-                  Sem vencedor definido
-                </Badge>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button size="sm" variant="outline" className="h-6 px-2 text-xs gap-1" onClick={handleSaveScoreOnly}>
-                <Save className="h-3 w-3" /> Salvar Placar
-              </Button>
-              <Button
-                size="sm"
-                className="h-6 px-2 text-xs gap-1 bg-success/90 hover:bg-success text-success-foreground"
-                onClick={handleSaveAndFinalize}
-                disabled={!autoWinnerId}
-              >
-                <Check className="h-3 w-3" /> Finalizar Partida
-              </Button>
-              {/* Quick finalize button — always available when scoring */}
-              <Button
-                size="sm"
-                variant="secondary"
-                className="h-6 px-2 text-xs gap-1"
-                onClick={() => setQuickFinalizeOpen(true)}
-              >
-                <Zap className="h-3 w-3" /> Finalizar Rápido
-              </Button>
-              {isEditing && (
-                <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setIsEditing(false)}>
-                  Cancelar
-                </Button>
-              )}
-            </div>
+      {/* Score editing with sets */}
+      {hasTeams && canScore && (
+        <div className="space-y-1 mt-0.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {setScores.map((s, idx) => (
+              <div key={idx} className="flex items-center gap-0.5">
+                <span className="text-[9px] text-muted-foreground font-medium">S{idx + 1}</span>
+                <Input value={s.s1} onChange={(e) => updateSetScore(idx, "s1", e.target.value)} className="h-6 w-9 text-center text-[11px] p-0" />
+                <span className="text-[10px] text-muted-foreground">×</span>
+                <Input value={s.s2} onChange={(e) => updateSetScore(idx, "s2", e.target.value)} className="h-6 w-9 text-center text-[11px] p-0" />
+                {idx < setScores.length - 1 && <span className="text-muted-foreground mx-0.5">|</span>}
+              </div>
+            ))}
           </div>
-        )}
 
-        {/* Completed / Read-only score display */}
-        {hasTeams && !canScore && (
-          <div className="flex items-center gap-2 flex-wrap mt-2">
-            <span className="text-sm font-mono font-bold">
-              {match.score1 ?? "-"} × {match.score2 ?? "-"}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] text-muted-foreground">
+              {totalScore1}×{totalScore2} | Sets: {setsWon.t1}×{setsWon.t2}
             </span>
-            {isCompleted && match.winner_team_id && (
-              <Badge className="bg-success/20 text-success border-0 text-xs">
-                Vencedor: {getTeamName(match.winner_team_id)}
+            {autoWinnerId && (
+              <Badge className="bg-success/20 text-success border-0 text-[10px] px-1.5 py-0">
+                Auto: {getTeamName(autoWinnerId).split(" / ")[0]}
               </Badge>
             )}
-            {!isCompleted && (
-              <Badge className="bg-warning/20 text-warning border-0 text-xs">Pendente</Badge>
-            )}
-            {isOwner && isCompleted && (
-              <Button size="sm" variant="ghost" className="h-6 px-2 text-xs gap-1" onClick={() => setIsEditing(true)}>
-                <Pencil className="h-3 w-3" /> Corrigir
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Button size="sm" variant="outline" className="h-5 px-2 text-[10px] gap-0.5" onClick={handleSaveScoreOnly}>
+              <Save className="h-3 w-3" /> Salvar
+            </Button>
+            {isEditing && (
+              <Button size="sm" variant="ghost" className="h-5 px-2 text-[10px]" onClick={() => setIsEditing(false)}>
+                Cancelar
               </Button>
             )}
           </div>
-        )}
-
-        {/* Quick finalize for matches without any score input visible (owner, has teams, not completed, not editing) */}
-        {isOwner && hasTeams && !isCompleted && !canScore && (
-          <Button
-            size="sm"
-            variant="secondary"
-            className="h-6 px-2 text-xs gap-1 w-fit mt-1"
-            onClick={() => setQuickFinalizeOpen(true)}
-          >
-            <Zap className="h-3 w-3" /> Finalizar Rápido
-          </Button>
-        )}
-      </motion.div>
-
-      {/* Quick finalize modal */}
-      {match.team1_id && match.team2_id && (
-        <QuickFinalizeModal
-          open={quickFinalizeOpen}
-          onClose={() => setQuickFinalizeOpen(false)}
-          team1Name={team1Name}
-          team2Name={team2Name}
-          team1Id={match.team1_id}
-          team2Id={match.team2_id}
-          onSelectWinner={handleQuickFinalize}
-        />
+        </div>
       )}
-    </>
+
+      {/* Completed / Read-only score display */}
+      {hasTeams && !canScore && (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs font-mono font-bold">
+            {match.score1 ?? "-"} × {match.score2 ?? "-"}
+          </span>
+          {isCompleted && match.winner_team_id && (
+            <Badge className="bg-success/20 text-success border-0 text-[10px] px-1.5 py-0">
+              {getTeamName(match.winner_team_id)}
+            </Badge>
+          )}
+          {isOwner && isCompleted && (
+            <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px] gap-0.5" onClick={() => setIsEditing(true)}>
+              <Pencil className="h-3 w-3" /> Corrigir
+            </Button>
+          )}
+        </div>
+      )}
+    </motion.div>
   );
 };
 

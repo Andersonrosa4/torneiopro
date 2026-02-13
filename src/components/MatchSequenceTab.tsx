@@ -60,9 +60,24 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
     if (matches.length === 0) return [];
 
     if (tournamentFormat === 'double_elimination') {
-      // Use round scheduler for strict W-A R1 → W-B R1 → L-A R1 → L-B R1 → ... ordering
-      const schedulerBlocks = buildSchedulerBlocks(matches as any);
-      const result: Match[] = [];
+      // Group stage first (round 0), then elimination via scheduler
+      const groupStage = matches.filter(m => m.round === 0);
+      const elimination = matches.filter(m => m.round > 0);
+      
+      const groupInterleaved: Match[] = [];
+      if (groupStage.length > 0) {
+        const brackets = [...new Set(groupStage.map(m => m.bracket_number || 1))].sort((a, b) => a - b);
+        const positions = [...new Set(groupStage.map(m => m.position))].sort((a, b) => a - b);
+        for (const pos of positions) {
+          for (const b of brackets) {
+            const match = groupStage.find(m => (m.bracket_number || 1) === b && m.position === pos);
+            if (match) groupInterleaved.push(match);
+          }
+        }
+      }
+      
+      const schedulerBlocks = buildSchedulerBlocks(elimination as any);
+      const result: Match[] = [...groupInterleaved];
       for (const block of schedulerBlocks) {
         result.push(...(block.matches as Match[]));
       }
@@ -111,9 +126,7 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
 
     const groups: { label: string; items: { match: Match; idx: number }[]; blockKey?: string; isUnlocked?: boolean; isCompleted?: boolean }[] = [];
 
-    const groupStage = tournamentFormat !== 'double_elimination'
-      ? displaySequence.filter((m) => m.round === 0)
-      : [];
+    const groupStage = displaySequence.filter((m) => m.round === 0);
     const knockoutStage = displaySequence.filter((m) => m.round > 0);
 
     if (groupStage.length > 0) {

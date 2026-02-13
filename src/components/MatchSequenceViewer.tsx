@@ -55,9 +55,26 @@ function generateSequence(matches: Match[], tournamentFormat: string): Match[] {
 }
 
 function generateDoubleEliminationSequence(matches: Match[]): Match[] {
-  // Use round scheduler for strict ordering
-  const blocks = buildSchedulerBlocks(matches as any);
-  return blocks.flatMap(b => b.matches as Match[]);
+  // Group stage matches (round 0) come first, interleaved by bracket
+  const groupStage = matches.filter(m => m.round === 0);
+  const elimination = matches.filter(m => m.round > 0);
+  
+  // Interleave group stage by bracket_number
+  const groupInterleaved: Match[] = [];
+  if (groupStage.length > 0) {
+    const brackets = [...new Set(groupStage.map(m => m.bracket_number || 1))].sort((a, b) => a - b);
+    const positions = [...new Set(groupStage.map(m => m.position))].sort((a, b) => a - b);
+    for (const pos of positions) {
+      for (const b of brackets) {
+        const match = groupStage.find(m => (m.bracket_number || 1) === b && m.position === pos);
+        if (match) groupInterleaved.push(match);
+      }
+    }
+  }
+  
+  // Use round scheduler for elimination matches
+  const blocks = buildSchedulerBlocks(elimination as any);
+  return [...groupInterleaved, ...blocks.flatMap(b => b.matches as Match[])];
 }
 
 function resolveByeConflicts(sequence: Match[]): Match[] {
@@ -224,11 +241,31 @@ const MatchSequenceViewer = ({
     if (displaySequence.length === 0) return [];
 
     if (tournamentFormat === 'double_elimination') {
-      // Use round scheduler for strict block ordering
-      const schedulerBlocks = buildSchedulerBlocks(matches);
       const blocks: { label: string; matches: { match: Match; globalIndex: number }[]; blockKey: string; isUnlocked: boolean; isCompleted: boolean }[] = [];
-      
       let idx = 1;
+
+      // Group stage matches (round 0) first
+      const groupStage = displaySequence.filter(m => m.round === 0);
+      if (groupStage.length > 0) {
+        const bracketCount = new Set(groupStage.map(m => m.bracket_number || 1)).size;
+        const matchesPerRound = Math.max(bracketCount, 1);
+        let roundNum = 1;
+        for (let i = 0; i < groupStage.length; i += matchesPerRound) {
+          const chunk = groupStage.slice(i, i + matchesPerRound);
+          blocks.push({
+            label: `Fase de Grupos — Rodada ${roundNum}`,
+            matches: chunk.map(m => ({ match: m, globalIndex: idx++ })),
+            blockKey: `GS_R${roundNum}`,
+            isUnlocked: true,
+            isCompleted: chunk.every(m => m.status === 'completed'),
+          });
+          roundNum++;
+        }
+      }
+
+      // Elimination matches via scheduler
+      const eliminationMatches = matches.filter(m => m.round > 0);
+      const schedulerBlocks = buildSchedulerBlocks(eliminationMatches);
       for (const sb of schedulerBlocks) {
         const blockMatches = sb.matches.filter(m => m.team1_id && m.team2_id);
         if (blockMatches.length === 0) continue;

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, memo, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -426,7 +426,7 @@ const MatchSequenceViewer = ({
           </div>
           <div className="p-2 space-y-2">
             {block.matches.map(({ match, globalIndex }) => (
-              <MatchCard
+              <MemoizedMatchCard
                 key={match.id}
                 match={match}
                 index={globalIndex}
@@ -550,11 +550,8 @@ const MatchCard = ({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: Math.min(index * 0.015, 0.8) }}
-      className={`flex flex-col gap-1 rounded-lg border bg-card px-3 py-1.5 transition-all ${
+    <div
+      className={`flex flex-col gap-1 rounded-lg border bg-card px-3 py-1.5 transition-colors ${
         isCompleted ? "border-success/30 opacity-80" : hasTeams ? "border-primary/20" : "border-border"
       }`}
     >
@@ -664,8 +661,10 @@ const MatchCard = ({
           )}
         </div>
       )}
-    </motion.div>
+    </div>
   );
 };
+
+const MemoizedMatchCard = memo(MatchCard);
 
 export default MatchSequenceViewer;

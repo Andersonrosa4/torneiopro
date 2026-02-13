@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, lazy, Suspense } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,11 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import AppHeader from "@/components/AppHeader";
 import ThemedBackground from "@/components/ThemedBackground";
-import BracketTreeView from "@/components/BracketTreeView";
-import MatchSequenceViewer from "@/components/MatchSequenceViewer";
-import ClassificationTab from "@/components/ClassificationTab";
 import { GenerateBracketDialog } from "@/components/GenerateBracketDialog";
-import RankingsTab from "@/components/RankingsTab";
 import { rankTeamsInGroup, selectIndexTeams } from "@/lib/tiebreakLogic";
 import { organizerQuery } from "@/lib/organizerApi";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
@@ -26,6 +22,12 @@ import ModalityTabs from "@/components/ModalityTabs";
 import { useModalities } from "@/hooks/useModalities";
 import { generateDoubleEliminationBracket } from "@/lib/doubleEliminationLogic";
 import { processDoubleEliminationAdvance, handleResetFinal } from "@/lib/doubleEliminationAdvance";
+
+// Lazy load heavy visualization components
+const BracketTreeView = lazy(() => import("@/components/BracketTreeView"));
+const MatchSequenceViewer = lazy(() => import("@/components/MatchSequenceViewer"));
+const ClassificationTab = lazy(() => import("@/components/ClassificationTab"));
+const RankingsTab = lazy(() => import("@/components/RankingsTab"));
 
 const sportLabels: Record<string, string> = {
   beach_volleyball: "🏐 Vôlei de Praia",
@@ -107,13 +109,15 @@ const TournamentDetail = () => {
 
   const isOwner = tournament?.created_by === organizerId || isAdmin;
 
-  // Filtered data by selected modality — STRICT isolation, no fallback
-  const filteredTeams = selectedModality
-    ? teams.filter(t => t.modality_id === selectedModality.id)
-    : teams;
-  const filteredMatches = selectedModality
-    ? matches.filter(m => m.modality_id === selectedModality.id)
-    : matches;
+  // Filtered data by selected modality — STRICT isolation, no fallback (MEMOIZED)
+  const filteredTeams = useMemo(() => 
+    selectedModality ? teams.filter(t => t.modality_id === selectedModality.id) : teams,
+    [teams, selectedModality]
+  );
+  const filteredMatches = useMemo(() => 
+    selectedModality ? matches.filter(m => m.modality_id === selectedModality.id) : matches,
+    [matches, selectedModality]
+  );
 
   // Reads use direct supabase (SELECT policies are true)
   const fetchData = useCallback(async () => {
@@ -134,18 +138,26 @@ const TournamentDetail = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Real-time subscriptions
+  // Real-time subscriptions with debounce to avoid excessive re-fetches
   useEffect(() => {
     if (!id) return;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedFetch = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => fetchData(), 300);
+    };
     const channel = supabase
       .channel(`tournament-rt-${id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `tournament_id=eq.${id}` }, () => fetchData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "teams", filter: `tournament_id=eq.${id}` }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `tournament_id=eq.${id}` }, debouncedFetch)
+      .on("postgres_changes", { event: "*", schema: "public", table: "teams", filter: `tournament_id=eq.${id}` }, debouncedFetch)
       .on("postgres_changes", { event: "*", schema: "public", table: "tournaments" }, (payload) => {
-        if ((payload.new as any)?.id === id) fetchData();
+        if ((payload.new as any)?.id === id) debouncedFetch();
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { 
+      if (debounceTimer) clearTimeout(debounceTimer);
+      supabase.removeChannel(channel); 
+    };
   }, [id, fetchData]);
 
   // All writes go through organizerQuery
@@ -224,14 +236,17 @@ const TournamentDetail = () => {
   const shuffleTeams = async () => {
     if (!id) return;
     const shuffled = [...filteredTeams].sort(() => Math.random() - 0.5);
-    for (let i = 0; i < shuffled.length; i++) {
-      await organizerQuery({
-        table: "teams",
-        operation: "update",
-        data: { seed: i + 1 },
-        filters: { id: shuffled[i].id },
-      });
-    }
+    // Batch all updates in parallel for speed
+    await Promise.all(
+      shuffled.map((team, i) =>
+        organizerQuery({
+          table: "teams",
+          operation: "update",
+          data: { seed: i + 1 },
+          filters: { id: team.id },
+        })
+      )
+    );
     toast.success("Duplas embaralhadas!");
     fetchData();
   };
@@ -257,21 +272,29 @@ const TournamentDetail = () => {
         return;
       }
 
-      // Delete only matches for the current modality (nullify FK refs first)
+      // Delete only matches for the current modality — use bulk API
       if (selectedModality) {
-        const modalityMatches = matches.filter(m => m.modality_id === selectedModality.id);
-        for (const m of modalityMatches) {
-          await organizerQuery({ table: "matches", operation: "update", data: { next_win_match_id: null, next_lose_match_id: null }, filters: { id: m.id } });
-        }
-        for (const m of modalityMatches) {
-          await organizerQuery({ table: "matches", operation: "delete", filters: { id: m.id } });
+        await organizerQuery({
+          table: "matches",
+          operation: "update",
+          data: { next_win_match_id: null, next_lose_match_id: null },
+          filters: { tournament_id: id, modality_id: selectedModality.id },
+        } as any);
+        // Then delete via edge function bulk op
+        const token = sessionStorage.getItem("organizer_token");
+        const orgId = sessionStorage.getItem("organizer_id");
+        if (token && orgId) {
+          await supabase.functions.invoke("organizer-api", {
+            body: { token, organizerId: orgId, operation: "undo_bracket", tournament_id: id, modality_id: selectedModality.id },
+          });
         }
       } else {
-        // Nullify all FK refs for tournament matches first
-        const tournamentMatches = matches.filter(m => m.tournament_id === id);
-        for (const m of tournamentMatches) {
-          await organizerQuery({ table: "matches", operation: "update", data: { next_win_match_id: null, next_lose_match_id: null }, filters: { id: m.id } });
-        }
+        await organizerQuery({
+          table: "matches",
+          operation: "update",
+          data: { next_win_match_id: null, next_lose_match_id: null },
+          filters: { tournament_id: id },
+        } as any);
         await organizerQuery({ table: "matches", operation: "delete", filters: { tournament_id: id } });
       }
 
@@ -716,40 +739,31 @@ const TournamentDetail = () => {
       console.log(`[DE:MatchComplete] LoserTargets=${advancement.loserUpdates.map(u => u.matchId).join(',')}`);
       console.log(`[DE:MatchComplete] CompletedMatches=${completedCount}/${expectedTotal} (2×${N}-3)`);
 
-      // ── FEEDER PROPAGATION WITH VALIDATION ──
+      // ── FEEDER PROPAGATION WITH VALIDATION (PARALLEL) ──
       let feederFailed = false;
 
-      // Apply winner updates
-      for (const update of advancement.winnerUpdates) {
-        const { error } = await organizerQuery({
-          table: "matches",
-          operation: "update",
-          data: update.data,
-          filters: { id: update.matchId },
-        });
-        if (error) {
-          console.error(`[DE:FeederFail] Winner injection failed for match ${update.matchId}:`, error);
-          feederFailed = true;
-        } else {
-          console.log(`[DE:FeederOK] Winner ${winnerId} → Match ${update.matchId} (${JSON.stringify(update.data)})`);
-        }
-      }
+      const allUpdates = [
+        ...advancement.winnerUpdates.map(u => ({ ...u, type: 'winner' as const })),
+        ...advancement.loserUpdates.map(u => ({ ...u, type: 'loser' as const })),
+      ];
 
-      // Apply loser updates (mirror crossing)
-      for (const update of advancement.loserUpdates) {
-        const { error } = await organizerQuery({
-          table: "matches",
-          operation: "update",
-          data: update.data,
-          filters: { id: update.matchId },
-        });
-        if (error) {
-          console.error(`[DE:FeederFail] Loser injection failed for match ${update.matchId}:`, error);
-          feederFailed = true;
-        } else {
-          console.log(`[DE:FeederOK] Loser ${loserId} → Match ${update.matchId} (${JSON.stringify(update.data)})`);
-        }
-      }
+      const results = await Promise.all(
+        allUpdates.map(async (update) => {
+          const { error } = await organizerQuery({
+            table: "matches",
+            operation: "update",
+            data: update.data,
+            filters: { id: update.matchId },
+          });
+          if (error) {
+            console.error(`[DE:FeederFail] ${update.type} injection failed for match ${update.matchId}:`, error);
+            return false;
+          }
+          console.log(`[DE:FeederOK] ${update.type === 'winner' ? 'Winner' : 'Loser'} ${update.type === 'winner' ? winnerId : loserId} → Match ${update.matchId} (${JSON.stringify(update.data)})`);
+          return true;
+        })
+      );
+      feederFailed = results.some(r => !r);
 
       // ── HARD BLOCK IF FEEDER FAILS ──
       if (feederFailed) {
@@ -1012,13 +1026,15 @@ const TournamentDetail = () => {
 
   const deleteTournament = async () => {
     if (!id) return;
-    // Nullify FK refs first, then delete
+    // Use bulk operations for speed
+    const token = sessionStorage.getItem("organizer_token");
+    const orgId = sessionStorage.getItem("organizer_id");
     await organizerQuery({ table: "rankings", operation: "delete", filters: { tournament_id: id } });
-    const tournamentMatches = matches.filter(m => m.tournament_id === id);
-    for (const m of tournamentMatches) {
-      await organizerQuery({ table: "matches", operation: "update", data: { next_win_match_id: null, next_lose_match_id: null }, filters: { id: m.id } });
+    if (token && orgId) {
+      await supabase.functions.invoke("organizer-api", {
+        body: { token, organizerId: orgId, operation: "undo_bracket", tournament_id: id },
+      });
     }
-    await organizerQuery({ table: "matches", operation: "delete", filters: { tournament_id: id } });
     await organizerQuery({ table: "teams", operation: "delete", filters: { tournament_id: id } });
     await organizerQuery({ table: "tournaments", operation: "delete", filters: { id } });
     toast.success("Torneio excluído com sucesso!");
@@ -1031,6 +1047,12 @@ const TournamentDetail = () => {
       toast.success("Código copiado!");
     }
   };
+
+  const participants = useMemo(() => filteredTeams.map((t) => ({
+    id: t.id,
+    name: `${t.player1_name} / ${t.player2_name}`,
+    seed: t.seed,
+  })), [filteredTeams]);
 
   if (loading) {
     return (
@@ -1054,12 +1076,6 @@ const TournamentDetail = () => {
       </ThemedBackground>
     );
   }
-
-  const participants = filteredTeams.map((t) => ({
-    id: t.id,
-    name: `${t.player1_name} / ${t.player2_name}`,
-    seed: t.seed,
-  }));
 
   return (
     <ThemedBackground>
@@ -1347,15 +1363,17 @@ const TournamentDetail = () => {
                   <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
                     <Trophy className="h-5 w-5" /> Chaveamento
                   </h2>
-                  <BracketTreeView
-                    matches={filteredMatches}
-                    participants={participants}
-                    isOwner={false}
-                    onDeclareWinner={() => {}}
-                    onUpdateScore={() => {}}
-                    structuralOnly
-                    tournamentFormat={selectedModality?.game_system || tournament?.format}
-                  />
+                  <Suspense fallback={<div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
+                    <BracketTreeView
+                      matches={filteredMatches}
+                      participants={participants}
+                      isOwner={false}
+                      onDeclareWinner={() => {}}
+                      onUpdateScore={() => {}}
+                      structuralOnly
+                      tournamentFormat={selectedModality?.game_system || tournament?.format}
+                    />
+                  </Suspense>
                 </section>
               ) : (
                 <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
@@ -1396,19 +1414,21 @@ const TournamentDetail = () => {
                   <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
                     <Trophy className="h-5 w-5" /> Sequência de Partidas
                   </h2>
-                  <MatchSequenceViewer
-                    matches={filteredMatches}
-                    teams={filteredTeams}
-                    isOwner={isOwner}
-                    numSets={tournament?.num_sets || 3}
-                    tournamentName={tournament?.name || ""}
-                    sport={sportLabels[tournament?.sport] || tournament?.sport || ""}
-                    eventDate={tournament?.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
-                    onUpdateScore={updateScore}
-                    onDeclareWinner={declareWinner}
-                    tournamentFormat={selectedModality?.game_system || tournament?.format}
-                    onAutoResult={handleAutoResult}
-                  />
+                  <Suspense fallback={<div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
+                    <MatchSequenceViewer
+                      matches={filteredMatches}
+                      teams={filteredTeams}
+                      isOwner={isOwner}
+                      numSets={tournament?.num_sets || 3}
+                      tournamentName={tournament?.name || ""}
+                      sport={sportLabels[tournament?.sport] || tournament?.sport || ""}
+                      eventDate={tournament?.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
+                      onUpdateScore={updateScore}
+                      onDeclareWinner={declareWinner}
+                      tournamentFormat={selectedModality?.game_system || tournament?.format}
+                      onAutoResult={handleAutoResult}
+                    />
+                  </Suspense>
                 </section>
               ) : (
                 <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
@@ -1424,7 +1444,9 @@ const TournamentDetail = () => {
                   <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
                     <Trophy className="h-5 w-5" /> Classificação
                   </h2>
-                  <ClassificationTab matches={filteredMatches} teams={filteredTeams} />
+                  <Suspense fallback={<div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
+                    <ClassificationTab matches={filteredMatches} teams={filteredTeams} />
+                  </Suspense>
                 </section>
               ) : (
                 <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
@@ -1435,14 +1457,16 @@ const TournamentDetail = () => {
 
             {/* Ranking Tab */}
             <TabsContent value="rankings">
-              <RankingsTab
-                tournamentId={id || ""}
-                isOwner={isOwner}
-                sport={tournament.sport}
-                tournamentName={tournament.name}
-                eventDate={tournament.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
-                modalityId={selectedModality?.id || null}
-              />
+              <Suspense fallback={<div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
+                <RankingsTab
+                  tournamentId={id || ""}
+                  isOwner={isOwner}
+                  sport={tournament.sport}
+                  tournamentName={tournament.name}
+                  eventDate={tournament.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
+                  modalityId={selectedModality?.id || null}
+                />
+              </Suspense>
             </TabsContent>
           </Tabs>
           <FlowAppsBranding variant="tournament-cta" />

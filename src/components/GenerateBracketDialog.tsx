@@ -68,12 +68,11 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
     if (count <= 4) return "Semifinal";
     if (count <= 8) return "Quartas de Final";
     if (count <= 16) return "Oitavas de Final";
-    return `Fase eliminatória (${count} times)`;
+    return `Fase eliminatória`;
   };
 
-  // Auto-detect for non-group stage
-  const totalSlots = Math.pow(2, Math.ceil(Math.log2(Math.max(teamCount, 2))));
-  const maxRounds = Math.ceil(Math.log2(totalSlots));
+  // No power-of-2 calculations needed
+  const maxRounds = Math.ceil(Math.log2(Math.max(teamCount, 2)));
   const getAutoStartRound = () => {
     if (teamCount <= 2) return maxRounds;
     if (teamCount <= 4) return maxRounds - 1;
@@ -269,7 +268,7 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                         </div>
                       </div>
 
-                      {/* BYE removido — todas as duplas devem jogar */}
+                      {/* Todas as duplas devem jogar */}
 
                       {/* Index advancement (Volleyball/Futevolei only) */}
                       {supportsIndex && (
@@ -357,7 +356,7 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                   <div className="rounded-lg border border-primary/30 bg-primary/10 p-3">
                     <p className="text-xs text-muted-foreground">Fase inicial detectada:</p>
                     <p className="text-sm font-bold text-primary">{getKnockoutPhase(teamCount)}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{teamCount} duplas → {totalSlots} posições (BYEs automáticos)</p>
+                    <p className="text-xs text-muted-foreground mt-1">{teamCount} duplas cadastradas</p>
                   </div>
                 </div>
               )}

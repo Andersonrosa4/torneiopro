@@ -168,8 +168,8 @@ const MatchCard = ({
 };
 
 /* ────────────────────────────────────────────────────
-   SVG Connectors between rounds
-   ──────────────────────────────────────────────────── */
+    SVG Connectors between rounds
+    ──────────────────────────────────────────────────── */
 const BracketConnectors = ({
   containerRef,
   matches,
@@ -215,8 +215,8 @@ const BracketConnectors = ({
         y2 = dstR.top + dstR.height / 2 - containerRect.top;
       }
 
-      const midX = (x1 + x2) / 2;
-      newPaths.push(`M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`);
+      // Simple straight line from source to destination
+      newPaths.push(`M ${x1} ${y1} L ${x2} ${y2}`);
     }
 
     setPaths(newPaths);
@@ -236,7 +236,7 @@ const BracketConnectors = ({
   return (
     <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 0 }}>
       {paths.map((d, i) => (
-        <path key={i} d={d} fill="none" stroke="hsl(var(--primary) / 0.35)" strokeWidth="1.5" strokeDasharray="4 3" />
+        <path key={i} d={d} fill="none" stroke="hsl(var(--primary) / 0.35)" strokeWidth="1.5" />
       ))}
     </svg>
   );
@@ -454,8 +454,8 @@ const FullBracketConnectors = ({
       const x2 = dstR.left - containerRect.left;
       const y2 = dstR.top + dstR.height / 2 - containerRect.top;
 
-      const midX = (x1 + x2) / 2;
-      newPaths.push(`M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`);
+      // Simple straight line from source to destination
+      newPaths.push(`M ${x1} ${y1} L ${x2} ${y2}`);
     }
 
     setPaths(newPaths);
@@ -472,7 +472,7 @@ const FullBracketConnectors = ({
   return (
     <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 0, overflow: "visible" }}>
       {paths.map((d, i) => (
-        <path key={i} d={d} fill="none" stroke="hsl(var(--primary) / 0.3)" strokeWidth="1.5" strokeDasharray="5 3" />
+        <path key={i} d={d} fill="none" stroke="hsl(var(--primary) / 0.3)" strokeWidth="1.5" />
       ))}
     </svg>
   );

@@ -172,8 +172,8 @@ const TreeConnectors = ({
       const x2 = dstR.left - containerRect.left;
       const y2 = dstR.top + dstR.height / 2 - containerRect.top;
 
-      const midX = (x1 + x2) / 2;
-      const d = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
+      // Simple straight line from source to destination
+      const d = `M ${x1} ${y1} L ${x2} ${y2}`;
       newPaths.push({ d, completed });
     };
 
@@ -211,7 +211,6 @@ const TreeConnectors = ({
           fill="none"
           stroke={p.completed ? "hsl(var(--success) / 0.4)" : "hsl(var(--primary) / 0.3)"}
           strokeWidth="1.5"
-          strokeDasharray={p.completed ? "none" : "4 3"}
         />
       ))}
     </svg>

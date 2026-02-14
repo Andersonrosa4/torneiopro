@@ -552,9 +552,8 @@ const MatchSequenceViewer = ({
       const hasDoubleElimStructure = eliminationMatches.some(m => m.bracket_half) || tournamentFormat === 'double_elimination';
       if (hasDoubleElimStructure) {
         const schedulerBlocks = buildSchedulerBlocks(eliminationMatches);
-        // Merge all non-semi/final blocks into a single "Jogos" block
-        const jogosMatches: { match: Match; globalIndex: number }[] = [];
-        let jogosAllCompleted = true;
+        // Group by round + bracket type: "Xª Rodada — Vencedores" / "Xª Rodada — Perdedores"
+        const mergedGroups: { key: string; label: string; matches: { match: Match; globalIndex: number }[]; isCompleted: boolean; isUnlocked: boolean }[] = [];
         
         for (const sb of schedulerBlocks) {
           const blockMatches = sb.matches.filter(m => m.team1_id && m.team2_id);
@@ -564,32 +563,31 @@ const MatchSequenceViewer = ({
             .sort((a, b) => a.globalIndex - b.globalIndex);
 
           if (sb.key === 'SEMI' || sb.key === 'FINAL') {
-            blocks.push({
-              label: sb.label,
-              matches: mappedMatches,
-              blockKey: sb.key,
-              isUnlocked: sb.isUnlocked,
-              isCompleted: sb.isCompleted,
-            });
+            mergedGroups.push({ key: sb.key, label: sb.label, matches: mappedMatches, isCompleted: sb.isCompleted, isUnlocked: sb.isUnlocked });
+            continue;
+          }
+
+          const isWinners = sb.key.startsWith('WA') || sb.key.startsWith('WB');
+          const isLosers = sb.key.startsWith('LS') || sb.key.startsWith('LI');
+          const mergeKey = isWinners ? `W_R${sb.round}` : isLosers ? `L_R${sb.round}` : sb.key;
+          const mergeLabel = isWinners
+            ? `${sb.round}ª Rodada — Vencedores`
+            : isLosers
+            ? `${sb.round}ª Rodada — Perdedores`
+            : sb.label;
+
+          const existing = mergedGroups.find(g => g.key === mergeKey);
+          if (existing) {
+            existing.matches.push(...mappedMatches);
+            existing.matches.sort((a, b) => a.globalIndex - b.globalIndex);
+            if (!sb.isCompleted) existing.isCompleted = false;
           } else {
-            jogosMatches.push(...mappedMatches);
-            if (!sb.isCompleted) jogosAllCompleted = false;
+            mergedGroups.push({ key: mergeKey, label: mergeLabel, matches: [...mappedMatches], isCompleted: sb.isCompleted, isUnlocked: sb.isUnlocked });
           }
         }
         
-        if (jogosMatches.length > 0) {
-          jogosMatches.sort((a, b) => a.globalIndex - b.globalIndex);
-          // Insert "Jogos" block before Semi/Final
-          const semiIdx = blocks.findIndex(b => (b as any).blockKey === 'SEMI' || (b as any).blockKey === 'FINAL');
-          const jogosEntry = {
-            label: 'Jogos',
-            matches: jogosMatches,
-            blockKey: 'JOGOS',
-            isUnlocked: true,
-            isCompleted: jogosAllCompleted,
-          };
-          if (semiIdx >= 0) blocks.splice(semiIdx, 0, jogosEntry);
-          else blocks.push(jogosEntry);
+        for (const mg of mergedGroups) {
+          blocks.push({ label: mg.label, matches: mg.matches, blockKey: mg.key, isUnlocked: mg.isUnlocked, isCompleted: mg.isCompleted });
         }
       } else {
         const knockoutDisplay = displaySequence.filter(m => m.round > 0);
@@ -760,12 +758,12 @@ const MatchSequenceViewer = ({
                   index={globalIndex}
                   getTeamName={getTeamName}
                   getRoundLabel={(r) => {
-                    // For DE: show "Jogos" on all cards except semi_final and final
                     if (isDoubleElim) {
                       const m = match;
                       if (m.bracket_type === 'semi_final') return 'Semifinal';
                       if (m.bracket_type === 'final') return 'Final';
-                      return 'Jogos';
+                      if (m.bracket_type === 'losers') return 'Perdedores';
+                      return 'Vencedores';
                     }
                     return getRoundShortLabel(r, matchCountByRound[r] || 0);
                   }}

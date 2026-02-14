@@ -92,6 +92,16 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: deleteErr.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
+      // Also clean up groups and classificacao_grupos for this tournament
+      const { error: classDelErr } = await supabase.from("classificacao_grupos").delete().eq("tournament_id", tournament_id);
+      if (classDelErr) {
+        return new Response(JSON.stringify({ error: classDelErr.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const { error: groupDelErr } = await supabase.from("groups").delete().eq("tournament_id", tournament_id);
+      if (groupDelErr) {
+        return new Response(JSON.stringify({ error: groupDelErr.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       return new Response(JSON.stringify({ data: null }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 

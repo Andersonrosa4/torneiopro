@@ -64,6 +64,67 @@ function blockLabel(cat: BlockCategory, round: number): string {
 /**
  * Build the global scheduler blocks in strict round-interleaved order.
  */
+/**
+ * REST OPTIMIZATION — REGRA DE DESCANSO
+ * 
+ * Reordena matches DENTRO de cada bloco para evitar que uma dupla jogue
+ * dois jogos consecutivos (ex: perde no jogo 44 e já joga o 45).
+ * 
+ * Algoritmo: Para cada bloco, identifica quais matches recebem feeders
+ * de matches "tardios" no bloco anterior. Empurra esses matches para
+ * o final do bloco, maximizando a distância de descanso.
+ * 
+ * SEGURANÇA: Não altera positions nem linkagens — apenas a ORDEM DE DISPLAY
+ * dentro de cada bloco do scheduler.
+ */
+function optimizeBlocksForRest(blocks: SchedulerBlock[], allMatches: SchedulerMatch[]): void {
+  // Build feeder map: targetMatchId → list of source match IDs that feed into it
+  const feedersOf = new Map<string, string[]>();
+  for (const m of allMatches) {
+    if (m.next_lose_match_id) {
+      if (!feedersOf.has(m.next_lose_match_id)) feedersOf.set(m.next_lose_match_id, []);
+      feedersOf.get(m.next_lose_match_id)!.push(m.id);
+    }
+    if (m.next_win_match_id) {
+      if (!feedersOf.has(m.next_win_match_id)) feedersOf.set(m.next_win_match_id, []);
+      feedersOf.get(m.next_win_match_id)!.push(m.id);
+    }
+  }
+
+  // Build global position map from current block order (before optimization)
+  const globalPos = new Map<string, number>();
+  let gPos = 0;
+  for (const block of blocks) {
+    for (const m of block.matches) {
+      globalPos.set(m.id, gPos++);
+    }
+  }
+
+  for (let bi = 1; bi < blocks.length; bi++) {
+    const block = blocks[bi];
+    if (block.matches.length <= 1) continue;
+
+    // For each match in this block, compute the "latest feeder position"
+    // = the highest global position among all matches that feed into it
+    const latestFeederPos = (matchId: string): number => {
+      const feeders = feedersOf.get(matchId) || [];
+      if (feeders.length === 0) return -1;
+      return Math.max(...feeders.map(fId => globalPos.get(fId) ?? -1));
+    };
+
+    // Sort: matches fed by EARLY feeders play FIRST, matches fed by LATE feeders play LAST
+    // This ensures maximum rest between a feeder match and its target
+    block.matches.sort((a, b) => {
+      const aLatest = latestFeederPos(a.id);
+      const bLatest = latestFeederPos(b.id);
+      // Primary: latest feeder position ascending (early feeders first)
+      if (aLatest !== bLatest) return aLatest - bLatest;
+      // Secondary: original position ascending (stable sort)
+      return a.position - b.position;
+    });
+  }
+}
+
 export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[] {
   // Group matches by category + round
   const groups = new Map<string, SchedulerMatch[]>();
@@ -180,6 +241,12 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
       dependencies: semiMatches.length > 0 ? ['SEMI'] : [],
     });
   }
+
+  // ── REST OPTIMIZATION: reorder matches within blocks to avoid back-to-back ──
+  // Rule: A team that loses/wins in game N should NOT play game N+1.
+  // Strategy: within each block, push matches fed by late matches in the previous block
+  // to the END of the current block, maximizing rest distance.
+  optimizeBlocksForRest(blocks, matches);
 
   // Compute unlock status — based SOLELY on match status
   const blockMap = new Map(blocks.map(b => [b.key, b]));

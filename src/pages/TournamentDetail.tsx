@@ -1397,13 +1397,13 @@ const TournamentDetail = () => {
   return (
     <ThemedBackground>
       <AppHeader />
-      <main className="container py-8">
-        <Button variant="ghost" onClick={() => navigate("/dashboard")} className="mb-4 gap-2">
-          <ArrowLeft className="h-4 w-4" /> Voltar
+      <main className="container py-4 sm:py-8 px-3 sm:px-6">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")} className="mb-3 sm:mb-4 gap-2">
+          <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Voltar</span>
         </Button>
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
           {/* Header */}
-           <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+           <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:flex-wrap sm:items-start sm:justify-between gap-3 sm:gap-4">
             <div>
               <div className="flex items-center gap-3">
                 {editingName ? (
@@ -1454,7 +1454,7 @@ const TournamentDetail = () => {
                   </div>
                 ) : (
                   <>
-                    <h1 className="text-3xl font-bold tracking-tight">{tournament.name}</h1>
+                    <h1 className="text-xl sm:text-3xl font-bold tracking-tight break-words">{tournament.name}</h1>
                     {isOwner && (
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setNewName(tournament.name); setEditingName(true); }}>
                         <Pencil className="h-4 w-4 text-muted-foreground" />
@@ -1478,7 +1478,7 @@ const TournamentDetail = () => {
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-2 self-start">
               {isOwner && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
@@ -1525,19 +1525,19 @@ const TournamentDetail = () => {
 
           {/* All tabs always visible */}
           <Tabs defaultValue="teams" className="w-full">
-            <TabsList className="flex flex-wrap gap-2 mb-5 h-auto bg-transparent p-0 w-full">
-              <TabsTrigger value="teams" className="flex-1 min-w-[80px] text-center text-sm font-medium h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Duplas</TabsTrigger>
-              <TabsTrigger value="bracket" className="flex-1 min-w-[80px] text-center text-sm font-medium h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Chaveamento</TabsTrigger>
-              <TabsTrigger value="sequence" className="flex-1 min-w-[80px] text-center text-sm font-medium h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Sequência</TabsTrigger>
-              <TabsTrigger value="classification" className="flex-1 min-w-[80px] text-center text-sm font-medium h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Classificação</TabsTrigger>
-              <TabsTrigger value="rankings" className="flex-1 min-w-[80px] text-center text-sm font-medium h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Ranking</TabsTrigger>
+            <TabsList className="flex flex-wrap gap-1.5 sm:gap-2 mb-4 sm:mb-5 h-auto bg-transparent p-0 w-full">
+              <TabsTrigger value="teams" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Duplas</TabsTrigger>
+              <TabsTrigger value="bracket" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Chave</TabsTrigger>
+              <TabsTrigger value="sequence" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Sequência</TabsTrigger>
+              <TabsTrigger value="classification" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Class.</TabsTrigger>
+              <TabsTrigger value="rankings" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Ranking</TabsTrigger>
             </TabsList>
 
             {/* Duplas Tab */}
             <TabsContent value="teams">
               {isOwner && (
-                <section className="rounded-xl border border-border bg-card p-6 shadow-card">
-                  <h2 className="mb-4 text-xl font-semibold">Cadastrar Dupla</h2>
+                <section className="rounded-xl border border-border bg-card p-3 sm:p-6 shadow-card">
+                  <h2 className="mb-3 sm:mb-4 text-lg sm:text-xl font-semibold">Cadastrar Dupla</h2>
                   <div className="mb-4 flex flex-col gap-2 sm:flex-row">
                     <Input
                       value={player1}

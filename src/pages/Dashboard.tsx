@@ -116,17 +116,17 @@ const Dashboard = () => {
   return (
     <ThemedBackground>
       <AppHeader />
-      <main className="container py-8">
-        <Button variant="ghost" onClick={() => navigate("/")} className="mb-4 gap-2">
-          <ArrowLeft className="h-4 w-4" /> Voltar
+      <main className="container py-4 sm:py-8 px-3 sm:px-6">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="mb-3 sm:mb-4 gap-2">
+          <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Voltar</span>
         </Button>
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-5 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Painel</h1>
-            <p className="mt-1 text-muted-foreground">Gerencie seus torneios</p>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Painel</h1>
+            <p className="mt-0.5 sm:mt-1 text-sm text-muted-foreground">Gerencie seus torneios</p>
           </div>
           <Link to="/tournaments/new">
-            <Button className="gap-2 bg-gradient-primary text-primary-foreground hover:opacity-90">
+            <Button className="gap-2 bg-gradient-primary text-primary-foreground hover:opacity-90 w-full sm:w-auto">
               <Plus className="h-4 w-4" />
               Novo Torneio
             </Button>
@@ -167,7 +167,7 @@ const Dashboard = () => {
                 <p className="text-muted-foreground">Você ainda não criou nenhum torneio.</p>
               </div>
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 {tournaments.map((t, i) => (
                   <motion.div key={t.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
                     <Link to={`/tournaments/${t.id}`} className="block">

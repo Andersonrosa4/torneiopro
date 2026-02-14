@@ -116,32 +116,32 @@ const TournamentPublicView = () => {
 
   return (
     <ThemedBackground>
-      <div className="container py-8">
-        <Button variant="ghost" onClick={() => navigate("/")} className="mb-4 gap-2">
-          <ArrowLeft className="h-4 w-4" /> Voltar
+      <div className="container py-4 sm:py-8 px-3 sm:px-6">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="mb-3 sm:mb-4 gap-2">
+          <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Voltar</span>
         </Button>
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-bold tracking-tight">{tournament.name}</h1>
-                <Badge variant="outline">{statusLabels[tournament.status] || tournament.status}</Badge>
+          <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:flex-wrap sm:items-start sm:justify-between gap-3 sm:gap-4">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                <h1 className="text-xl sm:text-3xl font-bold tracking-tight break-words">{tournament.name}</h1>
+                <Badge variant="outline" className="shrink-0">{statusLabels[tournament.status] || tournament.status}</Badge>
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+              <div className="mt-1.5 sm:mt-2 flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                 <span>{sportLabels[tournament.sport] || tournament.sport}</span>
                 {tournament.category && <span>• {tournament.category}</span>}
                 {tournament.location && (
-                  <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{tournament.location}</span>
+                  <span className="flex items-center gap-1"><MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5" />{tournament.location}</span>
                 )}
                 {tournament.event_date && (
-                  <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{new Date(tournament.event_date).toLocaleDateString("pt-BR")}</span>
+                  <span className="flex items-center gap-1"><Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5" />{new Date(tournament.event_date).toLocaleDateString("pt-BR")}</span>
                 )}
               </div>
             </div>
             {tournament.tournament_code && (
-              <div className="rounded-lg bg-card border border-border px-4 py-2 text-center">
-                <p className="text-xs text-muted-foreground">Código</p>
-                <p className="text-2xl font-mono font-bold tracking-[0.3em] text-primary">{tournament.tournament_code}</p>
+              <div className="rounded-lg bg-card border border-border px-3 sm:px-4 py-1.5 sm:py-2 text-center self-start">
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Código</p>
+                <p className="text-lg sm:text-2xl font-mono font-bold tracking-[0.3em] text-primary">{tournament.tournament_code}</p>
               </div>
             )}
           </div>
@@ -157,16 +157,16 @@ const TournamentPublicView = () => {
 
           {/* All tabs — identical structure to organizer */}
           <Tabs defaultValue="teams" className="w-full">
-            <TabsList className="mb-4 flex-wrap">
-              <TabsTrigger value="teams">Duplas</TabsTrigger>
-              <TabsTrigger value="bracket">Chaveamento</TabsTrigger>
-              <TabsTrigger value="sequence">Sequência</TabsTrigger>
-              <TabsTrigger value="classification">Classificação</TabsTrigger>
-              <TabsTrigger value="rankings">Ranking</TabsTrigger>
+            <TabsList className="flex flex-wrap gap-1.5 sm:gap-2 mb-4 sm:mb-5 h-auto bg-transparent p-0 w-full">
+              <TabsTrigger value="teams" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm">Duplas</TabsTrigger>
+              <TabsTrigger value="bracket" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm">Chave</TabsTrigger>
+              <TabsTrigger value="sequence" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm">Sequência</TabsTrigger>
+              <TabsTrigger value="classification" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm">Class.</TabsTrigger>
+              <TabsTrigger value="rankings" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm">Ranking</TabsTrigger>
             </TabsList>
 
             <TabsContent value="teams">
-              <section className="rounded-xl border border-border bg-card p-6 shadow-card">
+              <section className="rounded-xl border border-border bg-card p-3 sm:p-6 shadow-card">
                 <h2 className="mb-3 text-xl font-semibold flex items-center gap-2">
                   <Users className="h-5 w-5" /> Duplas ({filteredTeams.length})
                 </h2>

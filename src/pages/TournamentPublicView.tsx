@@ -201,7 +201,7 @@ const TournamentPublicView = () => {
                       isOwner={false}
                       onDeclareWinner={() => {}}
                       onUpdateScore={() => {}}
-                      tournamentFormat={selectedModality?.game_system || tournament?.format}
+                      tournamentFormat={tournament?.format === 'double_elimination' ? 'double_elimination' : (selectedModality?.game_system || tournament?.format)}
                     />
                   </Suspense>
                 </section>
@@ -228,7 +228,7 @@ const TournamentPublicView = () => {
                       tournamentName={tournament?.name || ""}
                       sport={tournament?.sport || ""}
                       eventDate={tournament?.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
-                      tournamentFormat={selectedModality?.game_system || tournament?.format}
+                      tournamentFormat={tournament?.format === 'double_elimination' ? 'double_elimination' : (selectedModality?.game_system || tournament?.format)}
                       onDeclareWinner={() => {}}
                       onUpdateScore={() => {}}
                     />

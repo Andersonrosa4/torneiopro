@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Trophy, Users, MapPin, Calendar, ArrowLeft } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import BracketTreeView from "@/components/BracketTreeView";
 import MatchSequenceViewer from "@/components/MatchSequenceViewer";
 import ClassificationTab from "@/components/ClassificationTab";
@@ -37,6 +38,7 @@ const TournamentPublicView = () => {
   const [teams, setTeams] = useState<any[]>([]);
   const [matches, setMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [bracketViewMode, setBracketViewMode] = useState<"atual" | "arvore">("arvore");
 
   const fetchData = useCallback(async () => {
     if (!id) return;
@@ -165,17 +167,58 @@ const TournamentPublicView = () => {
             <TabsContent value="bracket">
               {matches.length > 0 ? (
                 <section>
-                  <h2 className="mb-3 text-xl font-semibold flex items-center gap-2">
-                    <Trophy className="h-5 w-5" /> Chaveamento
-                  </h2>
-                  <BracketTreeView
-                    matches={matches}
-                    participants={participants}
-                    isOwner={false}
-                    onDeclareWinner={() => {}}
-                    onUpdateScore={() => {}}
-                    tournamentFormat={tournament?.format}
-                  />
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-semibold flex items-center gap-2">
+                      <Trophy className="h-5 w-5" /> Chaveamento
+                    </h2>
+                    <ToggleGroup 
+                      type="single" 
+                      value={bracketViewMode}
+                      onValueChange={(value) => {
+                        if (value) setBracketViewMode(value as "atual" | "arvore");
+                      }}
+                      className="bg-muted rounded-lg p-1"
+                    >
+                      <ToggleGroupItem 
+                        value="atual" 
+                        className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground rounded-md"
+                      >
+                        Modo Atual
+                      </ToggleGroupItem>
+                      <ToggleGroupItem 
+                        value="arvore"
+                        className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground rounded-md"
+                      >
+                        Modo Árvore
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </div>
+
+                  {bracketViewMode === "arvore" && (
+                    <BracketTreeView
+                      matches={matches}
+                      participants={participants}
+                      isOwner={false}
+                      onDeclareWinner={() => {}}
+                      onUpdateScore={() => {}}
+                      tournamentFormat={tournament?.format}
+                    />
+                  )}
+
+                  {bracketViewMode === "atual" && (
+                    <MatchSequenceViewer
+                      matches={matches}
+                      teams={teams}
+                      isOwner={false}
+                      numSets={tournament?.num_sets || 3}
+                      tournamentName={tournament?.name || ""}
+                      sport={tournament?.sport || ""}
+                      eventDate={tournament?.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
+                      tournamentFormat={tournament?.format}
+                      onDeclareWinner={() => {}}
+                      onUpdateScore={() => {}}
+                    />
+                  )}
                 </section>
               ) : (
                 <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">

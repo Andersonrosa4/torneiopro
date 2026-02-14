@@ -87,64 +87,78 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
   const blocks: SchedulerBlock[] = [];
   let order = 0;
 
-  // For each round: WA → WB → LA → LB
-  for (const r of sortedRounds) {
-    const roundCats: BlockCategory[] = ['WA', 'WB', 'LS', 'LI'];
-    for (const cat of roundCats) {
-      const key = `${cat}_R${r}`;
-      const catMatches = groups.get(key) || [];
-      if (catMatches.length === 0) continue;
+  // Helper to create a block with dependency calculation
+  function createBlock(cat: BlockCategory, r: number) {
+    const key = `${cat}_R${r}`;
+    const catMatches = groups.get(key) || [];
+    if (catMatches.length === 0) return;
 
-      const deps: string[] = [];
+    const deps: string[] = [];
 
-      if (cat === 'LS' || cat === 'LI') {
-        // Losers R depends on Winners A R+1 + Winners B R+1 (next round of winners must be complete)
-        const nextRoundIdx = sortedRounds.indexOf(r) + 1;
-        if (nextRoundIdx < sortedRounds.length) {
-          const nextR = sortedRounds[nextRoundIdx];
-          if (groups.has(`WA_R${nextR}`)) deps.push(`WA_R${nextR}`);
-          if (groups.has(`WB_R${nextR}`)) deps.push(`WB_R${nextR}`);
-        }
+    if (cat === 'LS' || cat === 'LI') {
+      // Losers R depends on Winners A R+1 + Winners B R+1 (next round of winners must be complete)
+      const nextRoundIdx = sortedRounds.indexOf(r) + 1;
+      if (nextRoundIdx < sortedRounds.length) {
+        const nextR = sortedRounds[nextRoundIdx];
+        if (groups.has(`WA_R${nextR}`)) deps.push(`WA_R${nextR}`);
+        if (groups.has(`WB_R${nextR}`)) deps.push(`WB_R${nextR}`);
       }
+    }
 
-      if (cat === 'WA' || cat === 'WB') {
-        if (r > sortedRounds[0]) {
-          // Winners R depends on previous Winners round (within-round sequencing)
-          const prevR = sortedRounds[sortedRounds.indexOf(r) - 1];
-          if (prevR !== undefined) {
-            if (cat === 'WA' && groups.has(`WA_R${prevR}`)) deps.push(`WA_R${prevR}`);
-            if (cat === 'WB' && (groups.has(`WA_R${r}`) || groups.has(`WB_R${prevR}`))) {
-              // WB depends on WA of same round, or WB of previous round
-              if (groups.has(`WA_R${r}`)) deps.push(`WA_R${r}`);
-              else if (groups.has(`WB_R${prevR}`)) deps.push(`WB_R${prevR}`);
-            }
+    if (cat === 'WA' || cat === 'WB') {
+      if (r > sortedRounds[0]) {
+        const prevR = sortedRounds[sortedRounds.indexOf(r) - 1];
+        if (prevR !== undefined) {
+          // Winners R depends on Losers of previous round (if they exist)
+          if (groups.has(`LS_R${prevR}`)) deps.push(`LS_R${prevR}`);
+          if (groups.has(`LI_R${prevR}`)) deps.push(`LI_R${prevR}`);
+          // If no losers existed for prevR, depend on previous winners
+          if (!groups.has(`LS_R${prevR}`) && !groups.has(`LI_R${prevR}`)) {
+            if (groups.has(`WA_R${prevR}`)) deps.push(`WA_R${prevR}`);
+            if (groups.has(`WB_R${prevR}`)) deps.push(`WB_R${prevR}`);
           }
         }
       }
-
-      // Within same round: WA → WB (for Winners only)
-      // Losers blocks removed from within-round sequencing since they now execute after next Winners round
-      if (cat === 'WB' && groups.has(`WA_R${r}`)) deps.push(`WA_R${r}`);
-      
-      // Within Losers of a future round: LS → LI
-      if (cat === 'LI') {
-        // Find which round these Losers belong to, and if LS exists for same round
-        if (groups.has(`LS_R${r}`)) deps.push(`LS_R${r}`);
-      }
-
-      const isCompleted = catMatches.every(m => m.status === 'completed');
-
-      blocks.push({
-        key,
-        label: blockLabel(cat, r),
-        round: r,
-        blockOrder: order++,
-        matches: catMatches.sort((a, b) => a.position - b.position),
-        isCompleted,
-        isUnlocked: false, // computed below
-        dependencies: [...new Set(deps)],
-      });
     }
+
+    // Within same category pair: WB depends on WA, LI depends on LS
+    if (cat === 'WB' && groups.has(`WA_R${r}`)) deps.push(`WA_R${r}`);
+    if (cat === 'LI' && groups.has(`LS_R${r}`)) deps.push(`LS_R${r}`);
+
+    const isCompleted = catMatches.every(m => m.status === 'completed');
+
+    blocks.push({
+      key,
+      label: blockLabel(cat, r),
+      round: r,
+      blockOrder: order++,
+      matches: catMatches.sort((a, b) => a.position - b.position),
+      isCompleted,
+      isUnlocked: false,
+      dependencies: [...new Set(deps)],
+    });
+  }
+
+  // Emit blocks in correct execution order:
+  // WA R1, WB R1, WA R2, WB R2, LS R1, LI R1, WA R3, WB R3, LS R2, LI R2, ...
+  // Pattern: For each winners round R, emit WA R + WB R, then LS (R-1) + LI (R-1)
+  for (let i = 0; i < sortedRounds.length; i++) {
+    const r = sortedRounds[i];
+    // Emit Winners for this round
+    createBlock('WA', r);
+    createBlock('WB', r);
+    // Emit Losers for PREVIOUS round (losers R-1 execute after winners R)
+    if (i > 0) {
+      const prevR = sortedRounds[i - 1];
+      createBlock('LS', prevR);
+      createBlock('LI', prevR);
+    }
+  }
+  // Emit Losers for the LAST winners round (if any)
+  if (sortedRounds.length > 0) {
+    const lastR = sortedRounds[sortedRounds.length - 1];
+    createBlock('LS', lastR);
+    createBlock('LI', lastR);
   }
 
   // Semifinals

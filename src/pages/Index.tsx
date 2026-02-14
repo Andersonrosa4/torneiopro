@@ -67,11 +67,31 @@ const Index = () => {
             <Trophy className="h-10 w-10 text-primary-foreground" />
           </div>
           <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-white font-display">
-            Gestão Pro
+            Controle total do seu torneio, do grupo à grande final.
           </h1>
-          <p className="mt-3 text-lg text-[hsl(35_30%_80%)]">
-            Sistema profissional de gestão de torneios
+          <p className="mt-4 text-lg text-[hsl(35_30%_80%)]">
+            Fase de grupos, chaveamento profissional e dupla eliminação em um único sistema.
           </p>
+          
+          {/* Diferenciais */}
+          <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center text-sm">
+            <div className="flex items-center gap-2 text-[hsl(35_30%_80%)]">
+              <div className="w-2 h-2 rounded-full bg-primary" />
+              Fase de grupos automática
+            </div>
+            <div className="flex items-center gap-2 text-[hsl(35_30%_80%)]">
+              <div className="w-2 h-2 rounded-full bg-primary" />
+              Chaveamento profissional
+            </div>
+            <div className="flex items-center gap-2 text-[hsl(35_30%_80%)]">
+              <div className="w-2 h-2 rounded-full bg-primary" />
+              Dupla eliminação real
+            </div>
+            <div className="flex items-center gap-2 text-[hsl(35_30%_80%)]">
+              <div className="w-2 h-2 rounded-full bg-primary" />
+              Atualização em tempo real
+            </div>
+          </div>
         </motion.div>
 
         <div className="grid w-full gap-6 sm:grid-cols-3">
@@ -102,28 +122,43 @@ const Index = () => {
               {/* Text overlay */}
               <div className="absolute bottom-0 left-0 right-0 p-5">
                 <h2 className="text-2xl font-bold text-white font-display drop-shadow-lg">
-                  {sport.name}
+                  Criar torneio de {sport.name}
                 </h2>
                 <p className="mt-1 text-sm text-[hsl(0_0%_100%/0.85)]">
-                  {sport.description}
+                  Criar agora
                 </p>
               </div>
             </motion.button>
           ))}
         </div>
 
+        {/* Botões principais */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.55 }}
+          className="mt-12 flex flex-col sm:flex-row gap-4 justify-center items-center w-full"
+        >
+          <button
+            onClick={() => navigate("/auth", { state: { sport: null } })}
+            className="px-8 py-3 bg-gradient-primary text-primary-foreground font-semibold rounded-lg hover:shadow-glow transition-all duration-300 transform hover:scale-105"
+          >
+            Criar meu torneio
+          </button>
+          <button
+            onClick={() => navigate("/athlete-login")}
+            className="px-8 py-3 rounded-lg border border-[hsl(0_0%_100%/0.15)] bg-[hsl(0_0%_100%/0.06)] text-[hsl(35_30%_85%)] hover:bg-[hsl(0_0%_100%/0.12)] hover:text-white transition-all backdrop-blur-sm font-semibold"
+          >
+            Sou atleta → Entrar com código
+          </button>
+        </motion.div>
+
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.7 }}
-          className="mt-10 text-center"
+          className="mt-10 text-center hidden"
         >
-          <button
-            onClick={() => navigate("/athlete-login")}
-            className="rounded-full border border-[hsl(0_0%_100%/0.15)] bg-[hsl(0_0%_100%/0.06)] px-6 py-2.5 text-sm text-[hsl(35_30%_85%)] hover:bg-[hsl(0_0%_100%/0.12)] hover:text-white transition-all backdrop-blur-sm"
-          >
-            Sou atleta → Entrar com código do torneio
-          </button>
         </motion.div>
 
         <FlowAppsBranding variant="home-footer" />

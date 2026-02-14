@@ -14,6 +14,102 @@ export type Database = {
   }
   public: {
     Tables: {
+      classificacao_grupos: {
+        Row: {
+          created_at: string
+          derrotas: number
+          group_id: string
+          id: string
+          jogos: number
+          pontos: number
+          saldo_sets: number
+          sets_contra: number
+          sets_pro: number
+          team_id: string
+          tournament_id: string
+          vitorias: number
+        }
+        Insert: {
+          created_at?: string
+          derrotas?: number
+          group_id: string
+          id?: string
+          jogos?: number
+          pontos?: number
+          saldo_sets?: number
+          sets_contra?: number
+          sets_pro?: number
+          team_id: string
+          tournament_id: string
+          vitorias?: number
+        }
+        Update: {
+          created_at?: string
+          derrotas?: number
+          group_id?: string
+          id?: string
+          jogos?: number
+          pontos?: number
+          saldo_sets?: number
+          sets_contra?: number
+          sets_pro?: number
+          team_id?: string
+          tournament_id?: string
+          vitorias?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classificacao_grupos_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classificacao_grupos_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classificacao_grupos_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      groups: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          tournament_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          tournament_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          tournament_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "groups_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       matches: {
         Row: {
           bracket_half: string | null
@@ -21,6 +117,7 @@ export type Database = {
           bracket_type: string | null
           created_at: string
           id: string
+          is_chapeu: boolean | null
           modality_id: string | null
           next_lose_match_id: string | null
           next_win_match_id: string | null
@@ -43,6 +140,7 @@ export type Database = {
           bracket_type?: string | null
           created_at?: string
           id?: string
+          is_chapeu?: boolean | null
           modality_id?: string | null
           next_lose_match_id?: string | null
           next_win_match_id?: string | null
@@ -65,6 +163,7 @@ export type Database = {
           bracket_type?: string | null
           created_at?: string
           id?: string
+          is_chapeu?: boolean | null
           modality_id?: string | null
           next_lose_match_id?: string | null
           next_win_match_id?: string | null

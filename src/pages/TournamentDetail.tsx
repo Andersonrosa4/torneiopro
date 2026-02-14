@@ -1323,6 +1323,8 @@ const TournamentDetail = () => {
 
   // Combined handler: save score + declare winner in one action
   const handleAutoResult = async (matchId: string, score1: number, score2: number, winnerId: string) => {
+    // Update local state BEFORE calling declareWinner so it reads the correct scores
+    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, score1, score2 } : m));
     await organizerQuery({
       table: "matches",
       operation: "update",

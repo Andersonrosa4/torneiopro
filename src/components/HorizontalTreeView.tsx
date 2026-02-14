@@ -284,6 +284,7 @@ const TreeSection = ({
   getName,
   matchNumberMap,
   colorClass,
+  reversed = false,
 }: {
   label: string;
   icon: string;
@@ -292,12 +293,14 @@ const TreeSection = ({
   getName: (id: string | null) => string;
   matchNumberMap?: Map<string, number>;
   colorClass: string;
+  reversed?: boolean;
 }) => {
   if (sectionMatches.length === 0) return null;
 
   const { rounds, roundGroups, positions } = buildTreeLayout(sectionMatches);
   const maxY = Math.max(0, ...Array.from(positions.values()));
   const totalHeight = maxY + CARD_H + 20;
+  const displayRounds = reversed ? [...rounds].reverse() : rounds;
   const totalRounds = rounds.length;
 
   const matchCountByRound: Record<number, number> = {};
@@ -310,12 +313,13 @@ const TreeSection = ({
         <span>{label}</span>
       </div>
       <div className="flex gap-10" style={{ minHeight: totalHeight }}>
-        {rounds.map((round, ci) => {
+        {displayRounds.map((round, ci) => {
           const roundMatches = roundGroups[round];
           const matchCount = roundMatches.length;
-          const isLast = ci === totalRounds - 1;
+          const origIdx = rounds.indexOf(round);
+          const isLast = origIdx === totalRounds - 1;
           const isFinal = matchCount === 1 && isLast;
-          const isSemi = matchCount <= 2 && ci >= totalRounds - 2 && !isFinal;
+          const isSemi = matchCount <= 2 && origIdx >= totalRounds - 2 && !isFinal;
 
           return (
             <div key={round} className="flex flex-col shrink-0 relative" style={{ minWidth: 180 }}>
@@ -329,7 +333,7 @@ const TreeSection = ({
                   const top = positions.get(match.id) ?? 0;
                   const scale = isFinal ? "final" : isSemi ? "semi" : matchCount <= 4 ? "normal" : "small";
                   return (
-                    <div key={match.id} className="absolute left-0" style={{ top }}>
+                    <div key={match.id} className={`absolute ${reversed ? 'right-0' : 'left-0'}`} style={{ top }}>
                       <HTreeMatchCard
                         match={match}
                         getName={getName}
@@ -448,6 +452,7 @@ const HorizontalTreeView = ({ matches, getName, matchNumberMap }: HorizontalTree
                 sectionMatches={sections.losersA}
                 allMatches={matches} getName={getName} matchNumberMap={matchNumberMap}
                 colorClass="border-destructive/15 bg-destructive/[0.03]"
+                reversed={true}
               />
             </div>
             <div className="grid grid-cols-[1fr_1fr] gap-4">
@@ -462,6 +467,7 @@ const HorizontalTreeView = ({ matches, getName, matchNumberMap }: HorizontalTree
                 sectionMatches={sections.losersB}
                 allMatches={matches} getName={getName} matchNumberMap={matchNumberMap}
                 colorClass="border-destructive/10 bg-destructive/[0.02]"
+                reversed={true}
               />
             </div>
 

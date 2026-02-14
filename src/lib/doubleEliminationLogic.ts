@@ -312,8 +312,11 @@ function buildLosersBracketWithFeeders(
     const incoming: { source: MatchData; linkField: 'next_win_match_id' | 'next_lose_match_id' }[] = [];
 
     if (ri === 0 && survivors.length === 0) {
-      // ── Rodada 1: Espelhamento reverso ──
+      // ── Rodada 1: Espelhamento reverso com anti-consecutivo ──
       // Parear primeiro com último, segundo com penúltimo, etc.
+      // REGRA 12: O último jogo dos Winners (maior posição) NUNCA pode
+      // alimentar o primeiro jogo dos Losers (posição 1), pois isso
+      // criaria uma situação de back-to-back na sequência.
       const sources = winnersInRound.map(m => ({
         source: m,
         linkField: 'next_lose_match_id' as const,
@@ -331,6 +334,20 @@ function buildLosersBracketWithFeeders(
       // Se ímpar, o do meio fica sozinho
       if (left === right) {
         incoming.push(sources[left]);
+      }
+
+      // ── Anti-consecutivo: mover o último source (maior posição) para fora do primeiro par ──
+      // O último source por posição está no incoming[1] (segundo do primeiro par).
+      // Trocá-lo com o elemento incoming[3] (segundo do segundo par), se existir.
+      if (incoming.length >= 4) {
+        const lastSourcePos = Math.max(...sources.map(s => s.source.position));
+        if (incoming[1].source.position === lastSourcePos) {
+          // Swap with incoming[3] to move it to the second losers match
+          [incoming[1], incoming[3]] = [incoming[3], incoming[1]];
+        } else if (incoming[0].source.position === lastSourcePos) {
+          // Edge case: if it ended up at index 0
+          [incoming[0], incoming[2]] = [incoming[2], incoming[0]];
+        }
       }
     } else {
       // ── Rodadas subsequentes: intercalar survivors com novos perdedores ──

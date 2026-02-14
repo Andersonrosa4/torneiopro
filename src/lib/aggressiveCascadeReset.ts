@@ -36,11 +36,16 @@ export interface CascadeResetPlan {
 /**
  * Compute aggressive cascade reset for double elimination.
  * 
+ * GRANULAR POLICY: 
+ * - Winners edits → cascade within Winners AND to opposite-side Losers (mirror crossing)
+ * - Losers edits → cascade ONLY within Losers, NEVER affect Winners
+ * 
  * When match at round R is edited:
  * 1. Find all matches in SAME bracket_type + bracket_half with round >= R
- * 2. For DE: also find corresponding matches in Losers bracket (mirror crossing)
- * 3. Delete ALL downstream matches
- * 4. Reset scores/teams on partially-impacted matches
+ * 2. For DE: Winners edits cascade to opposite Losers (mirror crossing)
+ * 3. Losers edits are isolated (no cascade to Winners)
+ * 4. Delete ALL downstream matches in affected bracket
+ * 5. Reset scores/teams on partially-impacted matches
  */
 export function computeAggressiveCascadeReset(
   editedMatch: Match,
@@ -51,7 +56,7 @@ export function computeAggressiveCascadeReset(
   const toUpdate: Map<string, Record<string, any>> = new Map();
 
   // ── STEP 1: Identify matches to purge based on bracket type and round ──
-  
+
   // Same bracket type (winners/losers) + same half + same round or later
   const sameBracketMatches = allMatches.filter(m => 
     m.bracket_type === editedMatch.bracket_type &&
@@ -61,6 +66,7 @@ export function computeAggressiveCascadeReset(
   );
 
   // For edited Winners matches, also cascade to opposite Losers (mirror crossing)
+  // CRITICAL: Losers edits MUST NOT cascade to Winners (granular isolation)
   let mirrorLosersMatches: Match[] = [];
   if (editedMatch.bracket_type === 'winners' && editedMatch.bracket_half) {
     const oppositeSide = editedMatch.bracket_half === 'upper' ? 'lower' : 'upper';
@@ -70,6 +76,8 @@ export function computeAggressiveCascadeReset(
       m.round >= editedMatch.round
     );
     log.push(`[Mirror] Winners ${editedMatch.bracket_half} R${editedMatch.round} cascades to Losers ${oppositeSide} R${editedMatch.round}+`);
+  } else if (editedMatch.bracket_type === 'losers') {
+    log.push(`[Isolation] Losers ${editedMatch.bracket_half} R${editedMatch.round} edit isolated - NO cascade to Winners`);
   }
 
   // Collect all matches to DELETE

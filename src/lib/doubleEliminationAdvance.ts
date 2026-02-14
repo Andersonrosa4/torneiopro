@@ -60,46 +60,61 @@ function determineSlotInNextMatch(
   nextMatch: Match,
   isWinner: boolean,
 ): 'team1_id' | 'team2_id' {
+  /**
+   * IRON RULE — SLOT CONVENTION (never change):
+   *   • Losers bracket survivor advancing within losers  → ALWAYS team1_id
+   *   • Winners bracket loser dropping INTO losers        → ALWAYS team2_id
+   * This guarantees zero collisions between the two flows.
+   */
+
   let preferredSlot: 'team1_id' | 'team2_id';
 
-  // For winners advancing within same bracket type
-  if (isWinner && currentMatch.bracket_type === nextMatch.bracket_type) {
-    // Within losers bracket: survivor always goes to team1_id
-    if (currentMatch.bracket_type === 'losers') {
-      preferredSlot = 'team1_id';
-    } else {
-      preferredSlot = currentMatch.position % 2 === 1 ? 'team1_id' : 'team2_id';
-    }
+  // ─── RULE 1: Losers survivor → team1_id (IMMUTABLE) ───
+  if (isWinner && currentMatch.bracket_type === 'losers' && nextMatch.bracket_type === 'losers') {
+    preferredSlot = 'team1_id';
   }
-  // For losers dropping from winners to losers bracket: always team2_id
-  // This prevents collision with losers bracket survivors who go to team1_id
+  // ─── RULE 2: Winners loser dropping to losers → team2_id (IMMUTABLE) ───
   else if (!isWinner && currentMatch.bracket_type === 'winners' && nextMatch.bracket_type === 'losers') {
     preferredSlot = 'team2_id';
   }
-  // Winners final → semi_final (mesmo lado)
+  // ─── Winners advancing within winners ───
+  else if (isWinner && currentMatch.bracket_type === 'winners' && nextMatch.bracket_type === 'winners') {
+    preferredSlot = currentMatch.position % 2 === 1 ? 'team1_id' : 'team2_id';
+  }
+  // ─── Winners final → semi_final ───
   else if (isWinner && currentMatch.bracket_type === 'winners' && nextMatch.bracket_type === 'semi_final') {
     preferredSlot = 'team1_id';
   }
-  // Losers final → semi_final (mesmo lado)
+  // ─── Losers final → semi_final ───
   else if (isWinner && currentMatch.bracket_type === 'losers' && nextMatch.bracket_type === 'semi_final') {
     preferredSlot = 'team2_id';
   }
-  // Semi → final
+  // ─── Semi → final ───
   else if (isWinner && currentMatch.bracket_type === 'semi_final' && nextMatch.bracket_type === 'final') {
     preferredSlot = currentMatch.position === 1 ? 'team1_id' : 'team2_id';
   }
-  // Fallback
+  // ─── Fallback ───
   else {
     preferredSlot = !nextMatch.team1_id ? 'team1_id' : 'team2_id';
   }
 
-  // CRITICAL: If preferred slot is already occupied, use the other slot
+  // SAFETY NET: If preferred slot is already occupied, use the other slot
+  // But WARN loudly — this should never happen if rules above are correct
   if (nextMatch[preferredSlot]) {
     const otherSlot = preferredSlot === 'team1_id' ? 'team2_id' : 'team1_id';
     if (!nextMatch[otherSlot]) {
-      console.log(`[SlotCollision] Preferred ${preferredSlot} occupied in match ${nextMatch.id}, using ${otherSlot}`);
+      console.error(
+        `[🚨 SLOT COLLISION] Match ${nextMatch.id} (${nextMatch.bracket_type} R${nextMatch.round}P${nextMatch.position}): ` +
+        `preferred ${preferredSlot} already occupied. Falling back to ${otherSlot}. ` +
+        `Source: ${currentMatch.bracket_type} R${currentMatch.round}P${currentMatch.position} isWinner=${isWinner}`
+      );
       return otherSlot;
     }
+    // Both slots occupied — critical error
+    console.error(
+      `[💀 BOTH SLOTS FULL] Match ${nextMatch.id}: CANNOT place team. ` +
+      `Source: ${currentMatch.bracket_type} R${currentMatch.round}P${currentMatch.position}`
+    );
   }
 
   return preferredSlot;
@@ -287,12 +302,12 @@ function processLegacyAdvancement(
     }
 
     // Loser → mirror losers bracket (STRICT: oppositeSide)
+    // IRON RULE: Winners losers ALWAYS go to team2_id in losers bracket
     if (loserId && bh) {
       const mirrorHalf = oppositeSide(bh);
-      const mirrorBN = bh === 'upper' ? 4 : 3; // upper→4(losers lower), lower→3(losers upper)
+      const mirrorBN = bh === 'upper' ? 4 : 3;
       const losersInMirror = matches.filter(m => m.bracket_type === 'losers' && m.bracket_number === mirrorBN);
       
-      // Validate mirror routing
       if (losersInMirror.length > 0 && losersInMirror[0].bracket_half !== mirrorHalf) {
         console.error(`[❌ Legacy Mirror] Expected losers half=${mirrorHalf}, found=${losersInMirror[0].bracket_half}`);
       }
@@ -301,11 +316,10 @@ function processLegacyAdvancement(
       const targetMatches = losersInMirror.filter(m => m.round === targetRound).sort((a, b) => a.position - b.position);
 
       const targetIdx = Math.floor((currentMatch.position - 1) / 2);
-      const isFirst = (currentMatch.position - 1) % 2 === 0;
 
       if (targetIdx < targetMatches.length) {
-        const field = isFirst ? 'team1_id' : 'team2_id';
-        result.loserUpdates.push({ matchId: targetMatches[targetIdx].id, data: { [field]: loserId } });
+        // ALWAYS team2_id for winners bracket losers dropping down
+        result.loserUpdates.push({ matchId: targetMatches[targetIdx].id, data: { team2_id: loserId } });
       }
     }
   }
@@ -313,8 +327,8 @@ function processLegacyAdvancement(
   if (bt === 'losers' && bh) {
     const nextMatch = findNextInSameBracket();
     if (nextMatch) {
-      const field = currentMatch.position % 2 === 1 ? 'team1_id' : 'team2_id';
-      result.winnerUpdates.push({ matchId: nextMatch.id, data: { [field]: winnerId } });
+      // IRON RULE: Losers survivors ALWAYS go to team1_id
+      result.winnerUpdates.push({ matchId: nextMatch.id, data: { team1_id: winnerId } });
     } else if (isFinalOfHalf()) {
       // Campeão Losers → semifinal CRUZADA (lado oposto)
       // Losers A (upper) → Semi 2 (lower), Losers B (lower) → Semi 1 (upper)

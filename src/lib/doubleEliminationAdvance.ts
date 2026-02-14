@@ -328,8 +328,9 @@ function processLegacyAdvancement(
       const targetIdx = Math.floor((currentMatch.position - 1) / 2);
 
       if (targetIdx < targetMatches.length) {
-        // ALWAYS team2_id for winners bracket losers dropping down
-        result.loserUpdates.push({ matchId: targetMatches[targetIdx].id, data: { team2_id: loserId } });
+        // Position-based slot: odd → team1_id, even → team2_id (matches primary logic)
+        const dropSlot = currentMatch.position % 2 === 1 ? 'team1_id' : 'team2_id';
+        result.loserUpdates.push({ matchId: targetMatches[targetIdx].id, data: { [dropSlot]: loserId } });
       }
     }
   }

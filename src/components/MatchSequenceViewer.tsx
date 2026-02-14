@@ -188,6 +188,22 @@ function getRoundShortLabel(round: number, matchCountInRound: number): string {
   return getEliminationRoundShortLabel(round, matchCountInRound);
 }
 
+/** For DE tournaments, return a bracket-aware label instead of count-based "Quartas/Oitavas" */
+function getDERoundBadgeLabel(match: Match): string {
+  if (match.round === 0) return 'Fase de Grupos';
+  if (match.bracket_type === 'final') return 'Grande Final';
+  if (match.bracket_type === 'semi_final') return 'Semifinal';
+  if (match.bracket_type === 'winners') {
+    const half = match.bracket_half === 'upper' ? 'A' : 'B';
+    return `Venc. ${half} — R${match.round}`;
+  }
+  if (match.bracket_type === 'losers') {
+    const half = match.bracket_half === 'upper' ? 'Sup.' : 'Inf.';
+    return `Perd. ${half} — R${match.round}`;
+  }
+  return `R${match.round}`;
+}
+
 /* ═══════════════════════════════════════════
    Progress Summary
    ═══════════════════════════════════════════ */
@@ -227,6 +243,7 @@ interface MatchCardProps {
   getRoundLabel: (round: number) => string;
   isOwner: boolean;
   numSets: number;
+  tournamentFormat: string;
   onDeclareWinner: (matchId: string, winnerId: string) => void;
   onUpdateScore: (matchId: string, score1: number, score2: number) => void;
   onAutoResult?: (matchId: string, score1: number, score2: number, winnerId: string) => void;
@@ -239,6 +256,7 @@ const MatchCard = ({
   getRoundLabel,
   isOwner,
   numSets,
+  tournamentFormat,
   onDeclareWinner,
   onUpdateScore,
   onAutoResult,
@@ -340,7 +358,7 @@ const MatchCard = ({
         {/* Header: round badge + status */}
         <div className="flex items-center gap-1.5 flex-wrap">
           <Badge variant="outline" className="text-[9px] shrink-0 font-semibold px-1.5 py-0 border-border/50">
-            {getRoundLabel(match.round)}
+            {tournamentFormat === 'double_elimination' ? getDERoundBadgeLabel(match) : getRoundLabel(match.round)}
           </Badge>
           {hasOneTeam && <Badge className="bg-muted text-muted-foreground border-border text-[9px] px-1.5 py-0">Chapéu</Badge>}
           {isCompleted && !isEditing && <Trophy className="h-3 w-3 text-success ml-auto shrink-0" />}
@@ -780,6 +798,7 @@ const MatchSequenceViewer = ({
                   }}
                   isOwner={isOwner}
                   numSets={numSets}
+                  tournamentFormat={tournamentFormat}
                   onDeclareWinner={onDeclareWinner}
                   onUpdateScore={onUpdateScore}
                   onAutoResult={onAutoResult}

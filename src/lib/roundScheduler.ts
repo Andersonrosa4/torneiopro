@@ -98,28 +98,37 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
       const deps: string[] = [];
 
       if (cat === 'LS' || cat === 'LI') {
-        // Losers R depends on Winners A R + Winners B R
-        if (groups.has(`WA_R${r}`)) deps.push(`WA_R${r}`);
-        if (groups.has(`WB_R${r}`)) deps.push(`WB_R${r}`);
+        // Losers R depends on Winners A R+1 + Winners B R+1 (next round of winners must be complete)
+        const nextRoundIdx = sortedRounds.indexOf(r) + 1;
+        if (nextRoundIdx < sortedRounds.length) {
+          const nextR = sortedRounds[nextRoundIdx];
+          if (groups.has(`WA_R${nextR}`)) deps.push(`WA_R${nextR}`);
+          if (groups.has(`WB_R${nextR}`)) deps.push(`WB_R${nextR}`);
+        }
       }
 
       if (cat === 'WA' || cat === 'WB') {
         if (r > sortedRounds[0]) {
-          // Winners R+1 depends on both Losers of R-1
+          // Winners R depends on previous Winners round (within-round sequencing)
           const prevR = sortedRounds[sortedRounds.indexOf(r) - 1];
           if (prevR !== undefined) {
-            if (groups.has(`LS_R${prevR}`)) deps.push(`LS_R${prevR}`);
-            if (groups.has(`LI_R${prevR}`)) deps.push(`LI_R${prevR}`);
+            if (cat === 'WA' && groups.has(`WA_R${prevR}`)) deps.push(`WA_R${prevR}`);
+            if (cat === 'WB' && (groups.has(`WA_R${r}`) || groups.has(`WB_R${prevR}`))) {
+              // WB depends on WA of same round, or WB of previous round
+              if (groups.has(`WA_R${r}`)) deps.push(`WA_R${r}`);
+              else if (groups.has(`WB_R${prevR}`)) deps.push(`WB_R${prevR}`);
+            }
           }
         }
       }
 
-      // Within same round: WA → WB → LS (Superiores) → LI (Inferiores)
+      // Within same round: WA → WB (for Winners only)
+      // Losers blocks removed from within-round sequencing since they now execute after next Winners round
       if (cat === 'WB' && groups.has(`WA_R${r}`)) deps.push(`WA_R${r}`);
-      if (cat === 'LS') {
-        if (groups.has(`WB_R${r}`)) deps.push(`WB_R${r}`);
-      }
+      
+      // Within Losers of a future round: LS → LI
       if (cat === 'LI') {
+        // Find which round these Losers belong to, and if LS exists for same round
         if (groups.has(`LS_R${r}`)) deps.push(`LS_R${r}`);
       }
 

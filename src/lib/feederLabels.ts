@@ -76,7 +76,8 @@ export function getSlotFeeders(
       if (isWinnerFeeder && feeder.bracket_type === 'losers' && targetMatch.bracket_type === 'losers') {
         slot = 'team1'; // losers survivor → always team1
       } else if (!isWinnerFeeder && feeder.bracket_type === 'winners' && targetMatch.bracket_type === 'losers') {
-        slot = 'team2'; // winners loser dropping → always team2
+        // MUST match doubleEliminationAdvance.ts: position-based slot for droppers
+        slot = feeder.position % 2 === 1 ? 'team1' : 'team2';
       } else if (isWinnerFeeder && feeder.bracket_type === 'winners' && targetMatch.bracket_type === 'winners') {
         slot = feeder.position % 2 === 1 ? 'team1' : 'team2';
       } else {

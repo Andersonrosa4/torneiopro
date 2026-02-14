@@ -234,14 +234,15 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
               <Badge className="bg-success/20 text-success border-0 text-[10px] mt-3">✓ Concluído</Badge>
             )}
           </div>
-          {group.items.map(({ match, idx }) => {
-            const isCompleted = match.status === "completed";
-            const team1Name = getTeamName(match.team1_id);
-            const team2Name = getTeamName(match.team2_id);
-            const hasTeams = match.team1_id && match.team2_id;
+           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
+             {group.items.map(({ match, idx }) => {
+             const isCompleted = match.status === "completed";
+             const team1Name = getTeamName(match.team1_id);
+             const team2Name = getTeamName(match.team2_id);
+             const hasTeams = match.team1_id && match.team2_id;
 
-            return (
-              <div
+             return (
+               <div
                 key={match.id}
                 className={`flex items-center gap-4 rounded-lg border bg-card px-4 py-3 shadow-card transition-all ${
                   isCompleted ? "border-success/30 opacity-80" : hasTeams ? "border-primary/30" : "border-border"
@@ -279,12 +280,13 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
                     <Badge variant="outline" className="text-muted-foreground">Aguardando</Badge>
                   )}
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )})}
-    </section>
+               </div>
+             );
+           })}
+           </div>
+         </div>
+       )})}
+     </section>
   );
 };
 

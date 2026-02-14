@@ -425,7 +425,7 @@ const MatchSequenceViewer = ({
               {block.matches.length} {block.matches.length === 1 ? 'partida' : 'partidas'}
             </span>
           </div>
-          <div className="p-2 space-y-2">
+          <div className="p-2 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
             {block.matches.map(({ match, globalIndex }) => (
               <MatchCard
                 key={match.id}

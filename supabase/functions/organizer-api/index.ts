@@ -14,54 +14,59 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { token, organizerId, table, operation, data, filters, select, order, single, maybeSingle } = body;
 
-    // Validate auth
-    if (!token || !organizerId) {
-      return new Response(
-        JSON.stringify({ error: "Autenticação necessária" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Validate token format
-    try {
-      const decoded = atob(token);
-      const [tokenOrgId] = decoded.split(":");
-      if (tokenOrgId !== organizerId) {
-        throw new Error("Token inválido");
-      }
-    } catch {
-      return new Response(
-        JSON.stringify({ error: "Token inválido" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Verify organizer exists
-    const { data: organizer, error: orgError } = await supabase
-      .from("organizers")
-      .select("id")
-      .eq("id", organizerId)
-      .single();
+    // Public SELECT: no auth required
+    const isPublicSelect = operation === "select" && !token && !organizerId;
 
-    if (orgError || !organizer) {
-      return new Response(
-        JSON.stringify({ error: "Organizador não encontrado" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (!isPublicSelect) {
+      // Validate auth for all non-public operations
+      if (!token || !organizerId) {
+        return new Response(
+          JSON.stringify({ error: "Autenticação necessária" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Validate token format
+      try {
+        const decoded = atob(token);
+        const [tokenOrgId] = decoded.split(":");
+        if (tokenOrgId !== organizerId) {
+          throw new Error("Token inválido");
+        }
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Token inválido" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Verify organizer exists
+      const { data: organizer, error: orgError } = await supabase
+        .from("organizers")
+        .select("id")
+        .eq("id", organizerId)
+        .single();
+
+      if (orgError || !organizer) {
+        return new Response(
+          JSON.stringify({ error: "Organizador não encontrado" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Update last_online_at asynchronously (fire-and-forget, non-blocking)
+      supabase
+        .from("organizers")
+        .update({ last_online_at: new Date().toISOString() })
+        .eq("id", organizerId)
+        .then(() => {});
     }
-
-    // Update last_online_at asynchronously (fire-and-forget, non-blocking)
-    supabase
-      .from("organizers")
-      .update({ last_online_at: new Date().toISOString() })
-      .eq("id", organizerId)
-      .then(() => {});
 
     // Custom bulk operations (checked BEFORE table validation)
     if (operation === "undo_bracket") {

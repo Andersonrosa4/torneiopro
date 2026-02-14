@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { publicQuery } from "@/lib/organizerApi";
 import { useSportTheme } from "@/contexts/SportContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,9 +41,9 @@ const TournamentPublicView = () => {
   const fetchData = useCallback(async () => {
     if (!id) return;
     const [tRes, teamsRes, mRes] = await Promise.all([
-      supabase.from("tournaments").select("*").eq("id", id).single(),
-      supabase.from("teams").select("*").eq("tournament_id", id).order("seed"),
-      supabase.from("matches").select("*").eq("tournament_id", id).order("round").order("position"),
+      publicQuery({ table: "tournaments", filters: { id }, single: true }),
+      publicQuery({ table: "teams", filters: { tournament_id: id }, order: { column: "seed", ascending: true } }),
+      publicQuery({ table: "matches", filters: { tournament_id: id }, order: [{ column: "round", ascending: true }, { column: "position", ascending: true }] }),
     ]);
     if (tRes.data) {
       setTournament(tRes.data);

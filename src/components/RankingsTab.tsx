@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { organizerQuery, publicQuery } from "@/lib/organizerApi";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,11 +48,11 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
   const [editPoints, setEditPoints] = useState("");
 
   const fetchRankings = async () => {
-    const { data, error } = await supabase
-      .from("rankings")
-      .select("*")
-      .eq("tournament_id", tournamentId)
-      .order("points", { ascending: false });
+    const { data, error } = await publicQuery<RankingEntry[]>({
+      table: "rankings",
+      filters: { tournament_id: tournamentId },
+      order: { column: "points", ascending: false },
+    });
 
     if (error) {
       toast.error("Erro ao carregar rankings");
@@ -62,15 +63,15 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
   };
 
   const fetchTeams = async () => {
-    let query = supabase
-      .from("teams")
-      .select("*")
-      .eq("tournament_id", tournamentId)
-      .order("seed");
+    const filters: Record<string, any> = { tournament_id: tournamentId };
     if (modalityId) {
-      query = query.eq("modality_id", modalityId);
+      filters.modality_id = modalityId;
     }
-    const { data } = await query;
+    const { data } = await publicQuery<Team[]>({
+      table: "teams",
+      filters,
+      order: { column: "seed", ascending: true },
+    });
     if (data) setTeams(data);
   };
 
@@ -121,12 +122,16 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       return;
     }
 
-    const { error } = await supabase.from("rankings").insert({
-      athlete_name: selectedAthlete,
-      points: Number(points),
-      sport: sport as "beach_volleyball" | "futevolei" | "beach_tennis",
-      tournament_id: tournamentId,
-      created_by: createdBy,
+    const { error } = await organizerQuery({
+      table: "rankings",
+      operation: "insert",
+      data: {
+        athlete_name: selectedAthlete,
+        points: Number(points),
+        sport: sport as "beach_volleyball" | "futevolei" | "beach_tennis",
+        tournament_id: tournamentId,
+        created_by: createdBy,
+      },
     });
 
     if (error) {
@@ -146,7 +151,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       return;
     }
 
-    const { error } = await supabase.from("rankings").update({ points: newPoints }).eq("id", id);
+    const { error } = await organizerQuery({ table: "rankings", operation: "update", data: { points: newPoints }, filters: { id } });
 
     if (error) {
       toast.error("Erro ao atualizar pontos");
@@ -157,7 +162,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
   };
 
   const deleteRanking = async (id: string) => {
-    const { error } = await supabase.from("rankings").delete().eq("id", id);
+    const { error } = await organizerQuery({ table: "rankings", operation: "delete", filters: { id } });
 
     if (error) {
       toast.error("Erro ao remover ranking");

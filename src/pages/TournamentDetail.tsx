@@ -16,7 +16,7 @@ import AppHeader from "@/components/AppHeader";
 import ThemedBackground from "@/components/ThemedBackground";
 import { GenerateBracketDialog } from "@/components/GenerateBracketDialog";
 import { rankTeamsInGroup, selectIndexTeams } from "@/lib/tiebreakLogic";
-import { organizerQuery } from "@/lib/organizerApi";
+import { organizerQuery, publicQuery } from "@/lib/organizerApi";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
 import ModalityTabs from "@/components/ModalityTabs";
 import { useModalities } from "@/hooks/useModalities";
@@ -125,9 +125,9 @@ const TournamentDetail = () => {
   const fetchData = useCallback(async () => {
     if (!id) return;
     const [tRes, teamsRes, mRes] = await Promise.all([
-      supabase.from("tournaments").select("*").eq("id", id).single(),
-      supabase.from("teams").select("*").eq("tournament_id", id).order("seed"),
-      supabase.from("matches").select("*").eq("tournament_id", id).order("round").order("position"),
+      publicQuery({ table: "tournaments", filters: { id }, single: true }),
+      publicQuery({ table: "teams", filters: { tournament_id: id }, order: { column: "seed", ascending: true } }),
+      publicQuery({ table: "matches", filters: { tournament_id: id }, order: [{ column: "round", ascending: true }, { column: "position", ascending: true }] }),
     ]);
     if (tRes.data) {
       setTournament(tRes.data);

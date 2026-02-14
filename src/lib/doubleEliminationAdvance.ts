@@ -61,21 +61,31 @@ function determineSlotInNextMatch(
   isWinner: boolean,
 ): 'team1_id' | 'team2_id' {
   /**
-   * IRON RULE — SLOT CONVENTION (never change):
-   *   • Losers bracket survivor advancing within losers  → ALWAYS team1_id
-   *   • Winners bracket loser dropping INTO losers        → ALWAYS team2_id
-   * This guarantees zero collisions between the two flows.
+   * ╔══════════════════════════════════════════════════════════════════╗
+   * ║  IRON RULE — SLOT CONVENTION (BLINDADA)                         ║
+   * ║                                                                  ║
+   * ║  Losers R2+: survivor (Venc.) → team1_id, dropper → team2_id   ║
+   * ║  Losers R1: AMBOS são droppers da Winners, então usamos         ║
+   * ║  posição do jogo de origem: ímpar → team1, par → team2.         ║
+   * ║                                                                  ║
+   * ║  ⛔ NUNCA usar team2_id fixo quando dois droppers alimentam     ║
+   * ║     a mesma partida — isso causa race condition e perda de      ║
+   * ║     dados (bug histórico: perdedores não caiam na Losers).      ║
+   * ╚══════════════════════════════════════════════════════════════════╝
    */
 
   let preferredSlot: 'team1_id' | 'team2_id';
 
-  // ─── RULE 1: Losers survivor → team1_id (IMMUTABLE) ───
+  // ─── Losers survivor advancing within losers → ALWAYS team1_id ───
   if (isWinner && currentMatch.bracket_type === 'losers' && nextMatch.bracket_type === 'losers') {
     preferredSlot = 'team1_id';
   }
-  // ─── RULE 2: Winners loser dropping to losers → team2_id (IMMUTABLE) ───
+  // ─── Winners loser dropping INTO losers ───
+  // Two winners matches may feed the SAME losers match (sequential pairing).
+  // Use POSITION to differentiate: odd position → team1_id, even → team2_id.
+  // This guarantees zero collisions even with stale frontend data.
   else if (!isWinner && currentMatch.bracket_type === 'winners' && nextMatch.bracket_type === 'losers') {
-    preferredSlot = 'team2_id';
+    preferredSlot = currentMatch.position % 2 === 1 ? 'team1_id' : 'team2_id';
   }
   // ─── Winners advancing within winners ───
   else if (isWinner && currentMatch.bracket_type === 'winners' && nextMatch.bracket_type === 'winners') {

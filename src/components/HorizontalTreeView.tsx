@@ -435,30 +435,35 @@ const HorizontalTreeView = ({ matches, getName, matchNumberMap }: HorizontalTree
       <div className="relative space-y-4" style={{ zIndex: 1 }}>
         {sections.isDE ? (
           <>
-            <TreeSection
-              label="Vencedores A" icon="🏆"
-              sectionMatches={sections.winnersA}
-              allMatches={matches} getName={getName} matchNumberMap={matchNumberMap}
-              colorClass="border-primary/20 bg-primary/[0.03]"
-            />
-            <TreeSection
-              label="Vencedores B" icon="🏆"
-              sectionMatches={sections.winnersB}
-              allMatches={matches} getName={getName} matchNumberMap={matchNumberMap}
-              colorClass="border-primary/15 bg-primary/[0.02]"
-            />
-            <TreeSection
-              label="Perdedores Superiores" icon="⬇"
-              sectionMatches={sections.losersA}
-              allMatches={matches} getName={getName} matchNumberMap={matchNumberMap}
-              colorClass="border-destructive/15 bg-destructive/[0.03]"
-            />
-            <TreeSection
-              label="Perdedores Inferiores" icon="⬇"
-              sectionMatches={sections.losersB}
-              allMatches={matches} getName={getName} matchNumberMap={matchNumberMap}
-              colorClass="border-destructive/10 bg-destructive/[0.02]"
-            />
+            {/* Paired layout: Winners side-by-side with Losers */}
+            <div className="grid grid-cols-[1fr_1fr] gap-4">
+              <TreeSection
+                label="Vencedores A" icon="🏆"
+                sectionMatches={sections.winnersA}
+                allMatches={matches} getName={getName} matchNumberMap={matchNumberMap}
+                colorClass="border-primary/20 bg-primary/[0.03]"
+              />
+              <TreeSection
+                label="Perdedores Superiores" icon="⬇"
+                sectionMatches={sections.losersA}
+                allMatches={matches} getName={getName} matchNumberMap={matchNumberMap}
+                colorClass="border-destructive/15 bg-destructive/[0.03]"
+              />
+            </div>
+            <div className="grid grid-cols-[1fr_1fr] gap-4">
+              <TreeSection
+                label="Vencedores B" icon="🏆"
+                sectionMatches={sections.winnersB}
+                allMatches={matches} getName={getName} matchNumberMap={matchNumberMap}
+                colorClass="border-primary/15 bg-primary/[0.02]"
+              />
+              <TreeSection
+                label="Perdedores Inferiores" icon="⬇"
+                sectionMatches={sections.losersB}
+                allMatches={matches} getName={getName} matchNumberMap={matchNumberMap}
+                colorClass="border-destructive/10 bg-destructive/[0.02]"
+              />
+            </div>
 
             {(sections.semiFinals.length > 0 || sections.finalMatches.length > 0) && (
               <div className="rounded-xl border border-primary/30 bg-primary/[0.04] p-3 space-y-2">

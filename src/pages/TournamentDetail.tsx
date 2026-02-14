@@ -23,6 +23,7 @@ import { useModalities } from "@/hooks/useModalities";
 import { generateDoubleEliminationBracket } from "@/lib/doubleEliminationLogic";
 import { processDoubleEliminationAdvance, handleResetFinal } from "@/lib/doubleEliminationAdvance";
 import { computeAggressiveCascadeReset, computePartialCascadeResetSE } from "@/lib/aggressiveCascadeReset";
+import { distributeChapeus, getChapeuTeams, getRealTeams } from "@/lib/chapeuDistribution";
 
 // Lazy load heavy visualization components
 const BracketTreeView = lazy(() => import("@/components/BracketTreeView"));
@@ -586,11 +587,16 @@ const TournamentDetail = () => {
       return;
     }
 
+    // === DISTRIBUTE CHAPÉUS ===
+    const chapeuDistribution = distributeChapeus(allAdvancing, groupRankings);
+    const chapeuTeams = getChapeuTeams(chapeuDistribution);
+    const realTeams = getRealTeams(chapeuDistribution);
+
     // Build cross-pairings: 1st of group A always vs 2nd of last group (Z)
     //                       2nd of group A always vs 1st of last group (Z)
     //                       Then 1st B vs 2nd (penultimate), etc.
     const numGroups = brackets.length;
-    const pairings: { team1Id: string; team2Id: string }[] = [];
+    const pairings: { team1Id: string; team2Id: string | null }[] = [];
 
     for (let i = 0; i < Math.ceil(numGroups / 2); i++) {
       const rightIdx = numGroups - 1 - i;
@@ -600,16 +606,28 @@ const TournamentDetail = () => {
       if (groupRight) {
         // 1st of group[i] vs 2nd of group[rightIdx]
         if (groupI[0] && groupRight[1]) {
-          pairings.push({ team1Id: groupI[0].teamId, team2Id: groupRight[1].teamId });
+          const team1 = groupI[0].teamId;
+          const team2 = groupRight[1].teamId;
+          // If team1 is in Chapéu, pair with null (waiting); otherwise pair with real opponent
+          const finalTeam2 = chapeuTeams.includes(team1) ? null : team2;
+          pairings.push({ team1Id: team1, team2Id: finalTeam2 });
         }
         // 2nd of group[i] vs 1st of group[rightIdx]
         if (groupI[1] && groupRight[0]) {
-          pairings.push({ team1Id: groupI[1].teamId, team2Id: groupRight[0].teamId });
+          const team1 = groupI[1].teamId;
+          const team2 = groupRight[0].teamId;
+          // If team1 is in Chapéu, pair with null (waiting); otherwise pair with real opponent
+          const finalTeam2 = chapeuTeams.includes(team1) ? null : team2;
+          pairings.push({ team1Id: team1, team2Id: finalTeam2 });
         }
       } else {
         // Odd number of groups: middle group plays within itself
         if (groupI[0] && groupI[1]) {
-          pairings.push({ team1Id: groupI[0].teamId, team2Id: groupI[1].teamId });
+          const team1 = groupI[0].teamId;
+          const team2 = groupI[1].teamId;
+          // If team1 is in Chapéu, pair with null (waiting); otherwise pair with real opponent
+          const finalTeam2 = chapeuTeams.includes(team1) ? null : team2;
+          pairings.push({ team1Id: team1, team2Id: finalTeam2 });
         }
       }
     }
@@ -618,7 +636,15 @@ const TournamentDetail = () => {
     if (indexTeamIds.length > 0) {
       // Index teams fill remaining spots — pair them sequentially
       for (let i = 0; i < indexTeamIds.length - 1; i += 2) {
-        pairings.push({ team1Id: indexTeamIds[i], team2Id: indexTeamIds[i + 1] });
+        const team1 = indexTeamIds[i];
+        const team2 = indexTeamIds[i + 1];
+        // If team1 is in Chapéu, pair with null (waiting); otherwise pair with real opponent
+        const finalTeam2 = chapeuTeams.includes(team1) ? null : team2;
+        pairings.push({ team1Id: team1, team2Id: finalTeam2 });
+      }
+      // Handle odd index team
+      if (indexTeamIds.length % 2 === 1) {
+        pairings.push({ team1Id: indexTeamIds[indexTeamIds.length - 1], team2Id: null });
       }
     }
 

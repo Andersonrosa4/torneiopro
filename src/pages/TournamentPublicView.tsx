@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo, lazy, Suspense } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { publicQuery } from "@/lib/organizerApi";
@@ -8,13 +8,16 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Trophy, Users, MapPin, Calendar, ArrowLeft } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import BracketTreeView from "@/components/BracketTreeView";
-import MatchSequenceViewer from "@/components/MatchSequenceViewer";
-import ClassificationTab from "@/components/ClassificationTab";
-import RankingsTab from "@/components/RankingsTab";
 import ThemedBackground from "@/components/ThemedBackground";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
+import ModalityTabs from "@/components/ModalityTabs";
+import { useModalities } from "@/hooks/useModalities";
+
+// Lazy load heavy components — same as organizer
+const BracketTreeView = lazy(() => import("@/components/BracketTreeView"));
+const MatchSequenceViewer = lazy(() => import("@/components/MatchSequenceViewer"));
+const ClassificationTab = lazy(() => import("@/components/ClassificationTab"));
+const RankingsTab = lazy(() => import("@/components/RankingsTab"));
 
 const sportLabels: Record<string, string> = {
   beach_volleyball: "Vôlei de Praia",
@@ -38,7 +41,18 @@ const TournamentPublicView = () => {
   const [teams, setTeams] = useState<any[]>([]);
   const [matches, setMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [bracketViewMode, setBracketViewMode] = useState<"atual" | "arvore">("arvore");
+
+  const { modalities, selectedModality, setSelectedModality } = useModalities(id);
+
+  // Filtered data by selected modality — same as organizer
+  const filteredTeams = useMemo(() =>
+    selectedModality ? teams.filter(t => t.modality_id === selectedModality.id) : teams,
+    [teams, selectedModality]
+  );
+  const filteredMatches = useMemo(() =>
+    selectedModality ? matches.filter(m => m.modality_id === selectedModality.id) : matches,
+    [matches, selectedModality]
+  );
 
   const fetchData = useCallback(async () => {
     if (!id) return;
@@ -58,7 +72,7 @@ const TournamentPublicView = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Real-time updates for athlete view
+  // Real-time updates
   useEffect(() => {
     if (!id) return;
     const channel = supabase
@@ -94,7 +108,7 @@ const TournamentPublicView = () => {
     );
   }
 
-  const participants = teams.map((t) => ({
+  const participants = filteredTeams.map((t) => ({
     id: t.id,
     name: `${t.player1_name} / ${t.player2_name}`,
     seed: t.seed,
@@ -132,7 +146,16 @@ const TournamentPublicView = () => {
             )}
           </div>
 
-          {/* All tabs visible for athlete */}
+          {/* Modality tabs — same as organizer */}
+          {modalities.length > 0 && (
+            <ModalityTabs
+              modalities={modalities}
+              selectedModality={selectedModality}
+              onSelect={setSelectedModality}
+            />
+          )}
+
+          {/* All tabs — identical structure to organizer */}
           <Tabs defaultValue="teams" className="w-full">
             <TabsList className="mb-4 flex-wrap">
               <TabsTrigger value="teams">Duplas</TabsTrigger>
@@ -145,13 +168,13 @@ const TournamentPublicView = () => {
             <TabsContent value="teams">
               <section className="rounded-xl border border-border bg-card p-6 shadow-card">
                 <h2 className="mb-3 text-xl font-semibold flex items-center gap-2">
-                  <Users className="h-5 w-5" /> Duplas ({teams.length})
+                  <Users className="h-5 w-5" /> Duplas ({filteredTeams.length})
                 </h2>
-                {teams.length === 0 ? (
+                {filteredTeams.length === 0 ? (
                   <p className="text-muted-foreground text-sm">Nenhuma dupla inscrita ainda.</p>
                 ) : (
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    {teams.map((t, i) => (
+                    {filteredTeams.map((t, i) => (
                       <div key={t.id} className="flex items-center gap-3 rounded-lg border border-border bg-secondary/50 px-4 py-3">
                         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
                           {i + 1}
@@ -164,61 +187,23 @@ const TournamentPublicView = () => {
               </section>
             </TabsContent>
 
+            {/* Chaveamento — identical to organizer bracket tab */}
             <TabsContent value="bracket">
-              {matches.length > 0 ? (
+              {filteredMatches.length > 0 ? (
                 <section>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold flex items-center gap-2">
-                      <Trophy className="h-5 w-5" /> Chaveamento
-                    </h2>
-                    <ToggleGroup 
-                      type="single" 
-                      value={bracketViewMode}
-                      onValueChange={(value) => {
-                        if (value) setBracketViewMode(value as "atual" | "arvore");
-                      }}
-                      className="bg-muted rounded-lg p-1"
-                    >
-                      <ToggleGroupItem 
-                        value="atual" 
-                        className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground rounded-md"
-                      >
-                        Modo Atual
-                      </ToggleGroupItem>
-                      <ToggleGroupItem 
-                        value="arvore"
-                        className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground rounded-md"
-                      >
-                        Modo Árvore
-                      </ToggleGroupItem>
-                    </ToggleGroup>
-                  </div>
-
-                  {bracketViewMode === "arvore" && (
+                  <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
+                    <Trophy className="h-5 w-5" /> Chaveamento
+                  </h2>
+                  <Suspense fallback={<div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
                     <BracketTreeView
-                      matches={matches}
+                      matches={filteredMatches}
                       participants={participants}
                       isOwner={false}
                       onDeclareWinner={() => {}}
                       onUpdateScore={() => {}}
-                      tournamentFormat={tournament?.format}
+                      tournamentFormat={selectedModality?.game_system || tournament?.format}
                     />
-                  )}
-
-                  {bracketViewMode === "atual" && (
-                    <MatchSequenceViewer
-                      matches={matches}
-                      teams={teams}
-                      isOwner={false}
-                      numSets={tournament?.num_sets || 3}
-                      tournamentName={tournament?.name || ""}
-                      sport={tournament?.sport || ""}
-                      eventDate={tournament?.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
-                      tournamentFormat={tournament?.format}
-                      onDeclareWinner={() => {}}
-                      onUpdateScore={() => {}}
-                    />
-                  )}
+                  </Suspense>
                 </section>
               ) : (
                 <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
@@ -227,28 +212,44 @@ const TournamentPublicView = () => {
               )}
             </TabsContent>
 
+            {/* Sequência — identical to organizer sequence tab */}
             <TabsContent value="sequence">
-              <MatchSequenceViewer
-                matches={matches}
-                teams={teams}
-                isOwner={false}
-                numSets={tournament?.num_sets || 3}
-                tournamentName={tournament?.name || ""}
-                sport={tournament?.sport || ""}
-                eventDate={tournament?.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
-                tournamentFormat={tournament?.format}
-                onDeclareWinner={() => {}}
-                onUpdateScore={() => {}}
-              />
+              {filteredMatches.length > 0 ? (
+                <section>
+                  <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
+                    <Trophy className="h-5 w-5" /> Sequência de Partidas
+                  </h2>
+                  <Suspense fallback={<div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
+                    <MatchSequenceViewer
+                      matches={filteredMatches}
+                      teams={filteredTeams}
+                      isOwner={false}
+                      numSets={tournament?.num_sets || 3}
+                      tournamentName={tournament?.name || ""}
+                      sport={tournament?.sport || ""}
+                      eventDate={tournament?.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
+                      tournamentFormat={selectedModality?.game_system || tournament?.format}
+                      onDeclareWinner={() => {}}
+                      onUpdateScore={() => {}}
+                    />
+                  </Suspense>
+                </section>
+              ) : (
+                <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
+                  <p className="text-muted-foreground">Sequência disponível após gerar o chaveamento.</p>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="classification">
-              {matches.length > 0 ? (
+              {filteredMatches.length > 0 ? (
                 <section>
                   <h2 className="mb-3 text-xl font-semibold flex items-center gap-2">
                     <Trophy className="h-5 w-5" /> Classificação
                   </h2>
-                  <ClassificationTab matches={matches} teams={teams} />
+                  <Suspense fallback={<div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
+                    <ClassificationTab matches={filteredMatches} teams={filteredTeams} />
+                  </Suspense>
                 </section>
               ) : (
                 <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
@@ -258,13 +259,15 @@ const TournamentPublicView = () => {
             </TabsContent>
 
             <TabsContent value="rankings">
-              <RankingsTab
-                tournamentId={id || ""}
-                isOwner={false}
-                sport={tournament.sport}
-                tournamentName={tournament.name}
-                eventDate={tournament.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
-              />
+              <Suspense fallback={<div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
+                <RankingsTab
+                  tournamentId={id || ""}
+                  isOwner={false}
+                  sport={tournament.sport}
+                  tournamentName={tournament.name}
+                  eventDate={tournament.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
+                />
+              </Suspense>
             </TabsContent>
           </Tabs>
           <FlowAppsBranding variant="tournament-cta" />

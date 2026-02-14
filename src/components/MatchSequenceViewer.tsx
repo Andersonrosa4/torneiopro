@@ -653,10 +653,11 @@ const MatchSequenceViewer = ({
 
       {/* Blocks */}
       {bracketBlocks.map((block) => {
-        const blockKey = (block as any).blockKey;
+        const blockKey = (block as any).blockKey || '';
         const isUnlocked = (block as any).isUnlocked ?? true;
         const isBlockCompleted = (block as any).isCompleted ?? false;
-        const borderColor = isDoubleElim && blockKey ? getSchedulerBlockColor(blockKey) : "border-l-primary";
+        const borderColor = getSchedulerBlockColor(blockKey);
+        const badgeColor = getSchedulerBadgeColor(blockKey);
         const completedInBlock = block.matches.filter(e => e.match.status === "completed").length;
         const totalInBlock = block.matches.length;
         const blockPct = totalInBlock > 0 ? Math.round((completedInBlock / totalInBlock) * 100) : 0;
@@ -666,11 +667,13 @@ const MatchSequenceViewer = ({
             key={block.label}
             className={`rounded-xl border bg-card/30 overflow-hidden border-l-4 ${borderColor} ${!isUnlocked && isDoubleElim ? 'opacity-40' : ''}`}
           >
-            {/* Block header */}
-            <div className="px-4 py-3 border-b border-border/50 bg-muted/20">
+            {/* Block header — highly visible */}
+            <div className={`px-4 py-3 border-b border-border/50 ${badgeColor.split(' ').filter(c => c.startsWith('bg-'))[0] || 'bg-muted/20'}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold text-foreground">{block.label}</h3>
+                  <h3 className={`text-sm font-black tracking-tight ${badgeColor.split(' ').filter(c => c.startsWith('text-') || c.startsWith('dark:text-')).join(' ') || 'text-foreground'}`}>
+                    {block.label}
+                  </h3>
                   {isDoubleElim && !isUnlocked && (
                     <Badge variant="outline" className="text-[9px] gap-0.5 text-muted-foreground border-border/50 px-1.5 py-0">
                       <Lock className="h-2.5 w-2.5" /> Bloqueado

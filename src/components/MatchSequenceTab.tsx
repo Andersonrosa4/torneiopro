@@ -82,17 +82,17 @@ const MatchRow = ({
 
   return (
     <div
-      className={`group relative flex items-stretch rounded-lg border bg-secondary/60 transition-all hover:shadow-md ${
+      className={`group relative flex items-stretch rounded-lg border-2 bg-secondary/60 transition-all hover:shadow-md ${
         isCompleted
-          ? "border-success/25"
+          ? "border-success/40"
           : hasTeams
-          ? "border-primary/20 hover:border-primary/40"
+          ? "border-black/20 hover:border-primary/40 shadow-sm"
           : "border-border/60"
       }`}
     >
       {/* Number */}
-      <div className={`flex items-center justify-center w-10 shrink-0 rounded-l-lg text-xs font-bold ${
-        isCompleted ? "bg-success/10 text-success" : hasTeams ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+      <div className={`flex items-center justify-center w-10 shrink-0 rounded-l-lg text-xs font-black border-r border-black/10 ${
+        isCompleted ? "bg-success/20 text-success" : hasTeams ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
       }`}>
         {idx}
       </div>
@@ -102,14 +102,14 @@ const MatchRow = ({
         {/* Teams */}
         <div className="flex items-center gap-2">
           <div className="flex-1 min-w-0 flex items-center gap-1.5">
-            <span className={`text-xs font-medium truncate ${
-              t1Win ? "text-success font-bold" : match.team1_id ? "text-foreground" : "text-muted-foreground italic"
+            <span className={`text-xs font-black truncate ${
+              t1Win ? "text-success" : match.team1_id ? "text-foreground" : "text-muted-foreground italic font-normal"
             }`}>
               {team1Name}
             </span>
-            <span className="text-[10px] text-muted-foreground/60 shrink-0">vs</span>
-            <span className={`text-xs font-medium truncate ${
-              t2Win ? "text-success font-bold" : match.team2_id ? "text-foreground" : "text-muted-foreground italic"
+            <span className="text-[10px] text-muted-foreground/60 shrink-0 font-bold">vs</span>
+            <span className={`text-xs font-black truncate ${
+              t2Win ? "text-success" : match.team2_id ? "text-foreground" : "text-muted-foreground italic font-normal"
             }`}>
               {team2Name}
             </span>
@@ -168,10 +168,10 @@ const BlockSection = ({
   return (
     <div className={`rounded-xl border bg-card/60 overflow-hidden border-l-4 ${borderColor} ${locked ? "opacity-40" : ""}`}>
       {/* Header */}
-      <div className="px-4 py-3 border-b border-border/50 bg-muted/20">
+      <div className={`px-4 py-3 border-b border-black/20 bg-muted/20 ${isDE && blockKey ? getSchedulerBadgeColor(blockKey).split(' ').filter(c => c.startsWith('bg-'))[0] : ''}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-bold text-foreground">{label}</h3>
+            <h3 className={`text-sm font-black uppercase tracking-widest ${isDE && blockKey ? getSchedulerBadgeColor(blockKey).split(' ').filter(c => c.startsWith('text-')).join(' ') : 'text-foreground'}`} style={{ textShadow: '1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 0 15px rgba(255,255,255,0.8)' }}>{label}</h3>
             {locked && (
               <Badge variant="outline" className="text-[9px] gap-0.5 text-muted-foreground border-border/50 px-1.5 py-0">
                 <Lock className="h-2.5 w-2.5" /> Bloqueado

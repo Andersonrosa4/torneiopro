@@ -489,14 +489,26 @@ const MatchSequenceViewer = ({
   const displaySequence = useMemo(() => sequence, [sequence]);
 
   // Build match number map from scheduler (same as bracket view) for consistent numbering
+  // Only count matches that have at least one team assigned to avoid numbering gaps
   const matchNumberMap = useMemo(() => {
     const seq = schedulerSequence(matches as any);
     const map = new Map<string, number>();
-    seq.forEach((m, i) => map.set(m.id, i + 1));
-    // Also number group stage and other matches not in scheduler
-    let next = map.size + 1;
+    let num = 1;
+    // First: number group stage matches (round 0) in order
+    for (const m of matches.filter(m => m.round === 0)) {
+      if (m.team1_id || m.team2_id) {
+        map.set(m.id, num++);
+      }
+    }
+    // Then: number elimination matches from scheduler order, only if they have teams
+    for (const m of seq) {
+      if (!map.has(m.id) && (matches.find(om => om.id === m.id)?.team1_id || matches.find(om => om.id === m.id)?.team2_id)) {
+        map.set(m.id, num++);
+      }
+    }
+    // Finally: any remaining matches without teams get high numbers
     for (const m of matches) {
-      if (!map.has(m.id)) map.set(m.id, next++);
+      if (!map.has(m.id)) map.set(m.id, num++);
     }
     return map;
   }, [matches]);

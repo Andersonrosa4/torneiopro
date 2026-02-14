@@ -556,7 +556,8 @@ const MatchSequenceViewer = ({
         const mergedGroups: { key: string; label: string; matches: { match: Match; globalIndex: number }[]; isCompleted: boolean; isUnlocked: boolean }[] = [];
         
         for (const sb of schedulerBlocks) {
-          const blockMatches = sb.matches.filter(m => m.team1_id && m.team2_id);
+          // Show ALL matches — including those waiting for teams (Chapéu/A definir)
+          const blockMatches = sb.matches;
           if (blockMatches.length === 0) continue;
           const mappedMatches = blockMatches
             .map(m => ({ match: m as Match, globalIndex: matchNumberMap.get(m.id) ?? 0 }))

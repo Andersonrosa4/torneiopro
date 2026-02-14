@@ -68,13 +68,25 @@ const MatchCard = ({
   matchNumberMap?: Map<string, number>;
 }) => {
   const isCompleted = match.status === "completed";
-  const t1Win = match.winner_team_id === match.team1_id && isCompleted;
-  const t2Win = match.winner_team_id === match.team2_id && isCompleted;
   const hasBothTeams = match.team1_id && match.team2_id;
   const isWaiting = !hasBothTeams;
 
   // Compute feeders from actual feeder mapping with real match numbers
   const feeders = allMatches ? getSlotFeeders(match, allMatches, matchNumberMap) : { team1: null, team2: null };
+
+  // DISPLAY SWAP: If team1 has loser feeder and team2 has winner feeder, swap visually
+  // so the winner feeder (Venc.) always appears on top
+  const shouldSwap = feeders.team1?.type === 'loser' && feeders.team2?.type === 'winner';
+
+  const topTeamId = shouldSwap ? match.team2_id : match.team1_id;
+  const bottomTeamId = shouldSwap ? match.team1_id : match.team2_id;
+  const topScore = shouldSwap ? match.score2 : match.score1;
+  const bottomScore = shouldSwap ? match.score1 : match.score2;
+  const topFeeder = shouldSwap ? feeders.team2 : feeders.team1;
+  const bottomFeeder = shouldSwap ? feeders.team1 : feeders.team2;
+
+  const topWin = match.winner_team_id === topTeamId && isCompleted;
+  const bottomWin = match.winner_team_id === bottomTeamId && isCompleted;
 
   const sizeClasses = {
     small: "w-[140px] text-[10px]",
@@ -121,45 +133,52 @@ const MatchCard = ({
         </div>
       )}
 
-      {/* Team 1 + Feeder */}
+      {/* Top Team (always winner feeder when mixed) */}
       <div className="space-y-0.5">
-        <div className={`flex items-center justify-between px-2 py-1.5 ${t1Win ? "bg-success/10" : ""}`}>
-          <span className={`truncate flex-1 ${t1Win ? "font-bold text-success" : isWaiting && !match.team1_id ? "text-muted-foreground/50 italic" : "team-name"}`}>
-            {getName(match.team1_id)}
+        <div className={`flex items-center justify-between px-2 py-1.5 ${topWin ? "bg-success/10" : ""}`}>
+          <span className={`truncate flex-1 ${topWin ? "font-bold text-success" : isWaiting && !topTeamId ? "text-muted-foreground/50 italic" : "team-name"}`}>
+            {getName(topTeamId)}
           </span>
-          {match.score1 !== null && isCompleted && (
-            <span className={`font-mono ml-1 font-bold ${t1Win ? "text-success" : "text-muted-foreground"}`}>
-              {match.score1}
+          {topScore !== null && isCompleted && (
+            <span className={`font-mono ml-1 font-bold ${topWin ? "text-success" : "text-muted-foreground"}`}>
+              {topScore}
             </span>
           )}
         </div>
-        {feeders.team1 && (
+        {topFeeder && (
           <div className="px-2 pb-1 text-[7px] text-muted-foreground/60 font-medium">
-            ({feeders.team1.label})
+            ({topFeeder.label})
           </div>
         )}
       </div>
 
       <div className="border-t border-border/30" />
 
-      {/* Team 2 + Feeder */}
+      {/* Bottom Team (always loser feeder when mixed) */}
       <div className="space-y-0.5">
-        <div className={`flex items-center justify-between px-2 py-1.5 ${t2Win ? "bg-success/10" : ""}`}>
-          <span className={`truncate flex-1 ${t2Win ? "font-bold text-success" : isWaiting && !match.team2_id ? "text-muted-foreground/50 italic" : "team-name"}`}>
-            {getName(match.team2_id)}
+        <div className={`flex items-center justify-between px-2 py-1.5 ${bottomWin ? "bg-success/10" : ""}`}>
+          <span className={`truncate flex-1 ${bottomWin ? "font-bold text-success" : isWaiting && !bottomTeamId ? "text-muted-foreground/50 italic" : "team-name"}`}>
+            {getName(bottomTeamId)}
           </span>
-          {match.score2 !== null && isCompleted && (
-            <span className={`font-mono ml-1 font-bold ${t2Win ? "text-success" : "text-muted-foreground"}`}>
-              {match.score2}
+          {bottomScore !== null && isCompleted && (
+            <span className={`font-mono ml-1 font-bold ${bottomWin ? "text-success" : "text-muted-foreground"}`}>
+              {bottomScore}
             </span>
           )}
         </div>
-        {feeders.team2 && (
+        {bottomFeeder && (
           <div className="px-2 pb-1 text-[7px] text-muted-foreground/60 font-medium">
-            ({feeders.team2.label})
+            ({bottomFeeder.label})
           </div>
         )}
       </div>
+
+      {/* Status */}
+      <div className="flex justify-center border-t border-border/20 px-2 py-1">
+        {statusBadge}
+      </div>
+    </div>
+  );
 
       {/* Status */}
       <div className="flex justify-center border-t border-border/20 px-2 py-1">

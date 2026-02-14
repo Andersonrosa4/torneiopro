@@ -104,8 +104,10 @@ const MatchCard = ({
     >
       {/* Match number label */}
       {matchNumber != null && (
-        <div className="px-2 pt-1 text-[8px] font-semibold text-muted-foreground/70 leading-none">
-          Jogo {matchNumber}
+        <div className="px-2 pt-2 pb-0.5 flex items-center justify-between">
+          <span className="inline-flex items-center rounded-sm bg-primary/15 border border-primary/20 px-1.5 py-0.5 text-[10px] font-black text-primary uppercase tracking-tighter leading-none shadow-sm">
+            JOGO {matchNumber}
+          </span>
         </div>
       )}
       {scale === "final" && (

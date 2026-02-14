@@ -102,7 +102,7 @@ const TournamentDetail = () => {
   const [editP1, setEditP1] = useState("");
   const [editP2, setEditP2] = useState("");
   const [fictitiousCount, setFictitiousCount] = useState("4");
-  const declareWinnerMutex = useRef(false);
+  const declareWinnerMutex = useRef(new Set<string>());
   const [fictitiousDialogOpen, setFictitiousDialogOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState("");
@@ -837,16 +837,16 @@ const TournamentDetail = () => {
   };
 
   const declareWinner = async (matchId: string, winnerId: string) => {
-    // MUTEX: Prevent concurrent executions that cause duplicate rounds
-    if (declareWinnerMutex.current) {
-      toast.info("Aguarde a operação anterior ser concluída...");
+    // MUTEX: Per-match lock to allow concurrent declarations on different matches
+    if (declareWinnerMutex.current.has(matchId)) {
+      toast.info("Aguarde a operação anterior desta partida...");
       return;
     }
-    declareWinnerMutex.current = true;
+    declareWinnerMutex.current.add(matchId);
     
     try {
     const match = matches.find((m) => m.id === matchId);
-    if (!match || !id) { declareWinnerMutex.current = false; return; }
+    if (!match || !id) { declareWinnerMutex.current.delete(matchId); return; }
 
     // ── AGGRESSIVE CASCADE RESET ──
      // If match was already completed, reset ALL downstream matches before re-declaring
@@ -1315,7 +1315,7 @@ const TournamentDetail = () => {
 
     fetchData();
     } finally {
-      declareWinnerMutex.current = false;
+      declareWinnerMutex.current.delete(matchId);
     }
   };
 

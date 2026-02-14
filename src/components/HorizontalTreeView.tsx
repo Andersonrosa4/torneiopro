@@ -142,24 +142,26 @@ const HTreeMatchCard = ({
   );
 };
 
-/* ─── SVG Connectors ─── */
+/* ─── SVG L-shaped Connectors ─── */
 const TreeConnectors = ({
   containerRef,
   matches,
+  reversed,
 }: {
   containerRef: React.RefObject<HTMLDivElement>;
   matches: Match[];
+  reversed?: boolean;
 }) => {
-  const [paths, setPaths] = useState<{ d: string; completed: boolean }[]>([]);
+  const [paths, setPaths] = useState<string[]>([]);
 
   const computePaths = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
 
     const containerRect = container.getBoundingClientRect();
-    const newPaths: { d: string; completed: boolean }[] = [];
+    const newPaths: string[] = [];
 
-    const drawConnection = (srcId: string, dstId: string, completed: boolean) => {
+    const drawConnection = (srcId: string, dstId: string) => {
       const srcEl = container.querySelector(`[data-match-id="${srcId}"]`);
       const dstEl = container.querySelector(`[data-match-id="${dstId}"]`);
       if (!srcEl || !dstEl) return;
@@ -167,29 +169,32 @@ const TreeConnectors = ({
       const srcR = srcEl.getBoundingClientRect();
       const dstR = dstEl.getBoundingClientRect();
 
-      const x1 = srcR.right - containerRect.left;
-      const y1 = srcR.top + srcR.height / 2 - containerRect.top;
-      const x2 = dstR.left - containerRect.left;
-      const y2 = dstR.top + dstR.height / 2 - containerRect.top;
+      let x1: number, y1: number, x2: number, y2: number;
+      if (reversed) {
+        x1 = srcR.left - containerRect.left;
+        y1 = srcR.top + srcR.height / 2 - containerRect.top;
+        x2 = dstR.right - containerRect.left;
+        y2 = dstR.top + dstR.height / 2 - containerRect.top;
+      } else {
+        x1 = srcR.right - containerRect.left;
+        y1 = srcR.top + srcR.height / 2 - containerRect.top;
+        x2 = dstR.left - containerRect.left;
+        y2 = dstR.top + dstR.height / 2 - containerRect.top;
+      }
 
-      // Simple straight line from source to destination
-      const d = `M ${x1} ${y1} L ${x2} ${y2}`;
-      newPaths.push({ d, completed });
+      const midX = (x1 + x2) / 2;
+      newPaths.push(`M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`);
     };
 
     for (const m of matches) {
       if (m.next_win_match_id) {
         const next = matches.find(n => n.id === m.next_win_match_id);
-        if (next) drawConnection(m.id, next.id, m.status === "completed");
-      }
-      if (m.next_lose_match_id) {
-        const next = matches.find(n => n.id === m.next_lose_match_id);
-        if (next) drawConnection(m.id, next.id, false);
+        if (next) drawConnection(m.id, next.id);
       }
     }
 
     setPaths(newPaths);
-  }, [containerRef, matches]);
+  }, [containerRef, matches, reversed]);
 
   useEffect(() => {
     const timer = setTimeout(computePaths, 300);
@@ -204,12 +209,12 @@ const TreeConnectors = ({
 
   return (
     <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 0, overflow: "visible" }}>
-      {paths.map((p, i) => (
+      {paths.map((d, i) => (
         <path
           key={i}
-          d={p.d}
+          d={d}
           fill="none"
-          stroke={p.completed ? "hsl(var(--success) / 0.4)" : "hsl(var(--primary) / 0.3)"}
+          stroke="hsl(var(--muted-foreground) / 0.25)"
           strokeWidth="1.5"
         />
       ))}
@@ -295,6 +300,7 @@ const TreeSection = ({
   colorClass: string;
   reversed?: boolean;
 }) => {
+  const sectionRef = useRef<HTMLDivElement>(null);
   if (sectionMatches.length === 0) return null;
 
   const { rounds, roundGroups, positions } = buildTreeLayout(sectionMatches);
@@ -312,7 +318,8 @@ const TreeSection = ({
         <span>{icon}</span>
         <span>{label}</span>
       </div>
-      <div className="flex gap-10" style={{ minHeight: totalHeight }}>
+      <div ref={sectionRef} className="relative flex gap-10" style={{ minHeight: totalHeight }}>
+        <TreeConnectors containerRef={sectionRef} matches={sectionMatches} reversed={reversed} />
         {displayRounds.map((round, ci) => {
           const roundMatches = roundGroups[round];
           const matchCount = roundMatches.length;
@@ -435,7 +442,7 @@ const HorizontalTreeView = ({ matches, getName, matchNumberMap }: HorizontalTree
 
   return (
     <div ref={containerRef} className="relative overflow-x-auto pb-4" style={{ WebkitOverflowScrolling: "touch" }}>
-      {/* Connectors removed */}
+      <TreeConnectors containerRef={containerRef} matches={knockoutMatches} />
       <div className="relative space-y-4" style={{ zIndex: 1 }}>
         {sections.isDE ? (
           <>

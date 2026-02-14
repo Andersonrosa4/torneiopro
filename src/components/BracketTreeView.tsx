@@ -188,7 +188,6 @@ const BracketConnectors = ({
     const containerRect = container.getBoundingClientRect();
     const newPaths: string[] = [];
 
-    // Find matches that feed into other matches
     for (const m of matches) {
       if (!m.next_win_match_id) continue;
       const nextMatch = matches.find(n => n.id === m.next_win_match_id);
@@ -215,8 +214,8 @@ const BracketConnectors = ({
         y2 = dstR.top + dstR.height / 2 - containerRect.top;
       }
 
-      // Simple straight line from source to destination
-      newPaths.push(`M ${x1} ${y1} L ${x2} ${y2}`);
+      const midX = (x1 + x2) / 2;
+      newPaths.push(`M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`);
     }
 
     setPaths(newPaths);
@@ -236,7 +235,7 @@ const BracketConnectors = ({
   return (
     <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 0 }}>
       {paths.map((d, i) => (
-        <path key={i} d={d} fill="none" stroke="hsl(var(--primary) / 0.35)" strokeWidth="1.5" />
+        <path key={i} d={d} fill="none" stroke="hsl(var(--muted-foreground) / 0.25)" strokeWidth="1.5" />
       ))}
     </svg>
   );
@@ -290,7 +289,7 @@ const BracketColumn = ({
         {reversed ? <ChevronLeft className="h-3 w-3 ml-auto opacity-50" /> : <ChevronRight className="h-3 w-3 ml-auto opacity-50" />}
       </div>
       <div ref={containerRef} className="relative overflow-x-auto pb-2">
-        {/* Connectors removed */}
+        <BracketConnectors containerRef={containerRef} matches={bracketMatches} reversed={reversed} />
         <div className="flex gap-6 relative" style={{ zIndex: 1 }}>
           {displayRounds.map((round) => {
             const roundMatches = roundGroups[round].sort((a, b) => a.position - b.position);
@@ -745,7 +744,8 @@ const NormalKnockoutConnectors = ({
       const y2 = dstR.top + dstR.height / 2 - containerRect.top;
 
       const midX = (x1 + x2) / 2;
-      newPaths.push({ d: `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`, completed });
+      // L-shaped: horizontal to midpoint, vertical to destination Y, horizontal to destination
+      newPaths.push({ d: `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`, completed });
     };
 
     if (hasExplicitLinks) {
@@ -786,9 +786,8 @@ const NormalKnockoutConnectors = ({
           key={i}
           d={p.d}
           fill="none"
-          stroke={p.completed ? "hsl(var(--success) / 0.45)" : "hsl(var(--primary) / 0.35)"}
-          strokeWidth="2"
-          strokeDasharray={p.completed ? "none" : "5 3"}
+          stroke="hsl(var(--muted-foreground) / 0.25)"
+          strokeWidth="1.5"
         />
       ))}
     </svg>
@@ -869,7 +868,7 @@ const NormalKnockout = ({
   return (
     <div className="rounded-xl border border-border bg-card/50 p-4">
       <div ref={containerRef} className="relative overflow-x-auto">
-        {/* Connectors removed */}
+        <NormalKnockoutConnectors containerRef={containerRef} knockoutMatches={knockoutMatches} />
         <div className="flex gap-10 relative" style={{ zIndex: 1, minHeight: totalHeight }}>
           {rounds.map((round) => {
             const roundMatches = roundGroups[round];

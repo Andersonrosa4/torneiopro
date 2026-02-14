@@ -637,22 +637,24 @@ const GroupStageView = ({
 
   return (
     <div className="space-y-4">
-      {/* ── Group stage: each group as a BracketColumn-style container ── */}
+      {/* ── Group stage: each group rendered as grid cards ── */}
       <div className="space-y-4">
         {groupNumbers.map((gNum) => {
           const gMatches = groupMatchesByGroup[gNum] || [];
           return (
-            <BracketColumn
-              key={gNum}
-              bracketMatches={gMatches}
-              getName={getName}
-              label={`Grupo ${numberToLetter(gNum)}`}
-              icon="⚽"
-              colorAccent="border-primary/20 bg-primary/[0.03]"
-              reversed={false}
-              allMatches={allMatches}
-              matchNumberMap={matchNumberMap}
-            />
+            <div key={gNum} className="rounded-xl border border-primary/20 bg-primary/[0.03] p-3 space-y-2">
+              <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground flex items-center gap-1.5">
+                <span>⚽</span>
+                <span>Grupo {numberToLetter(gNum)}</span>
+              </div>
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
+                {gMatches.map((match) => (
+                  <div key={match.id} data-match-id={match.id} className="[&>div]:w-full">
+                    <MatchCard match={match} getName={getName} scale="normal" allMatches={allMatches} matchNumber={matchNumberMap?.get(match.id)} matchNumberMap={matchNumberMap} />
+                  </div>
+                ))}
+              </div>
+            </div>
           );
         })}
       </div>

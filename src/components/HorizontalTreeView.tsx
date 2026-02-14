@@ -153,12 +153,6 @@ const HTreeMatchCard = ({
       </div>
     </div>
   );
-
-      <div className="flex justify-center border-t border-border/20 px-2 py-1">
-        {statusBadge}
-      </div>
-    </div>
-  );
 };
 
 /* ─── SVG L-shaped Connectors ─── */

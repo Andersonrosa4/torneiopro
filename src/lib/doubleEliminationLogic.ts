@@ -312,42 +312,46 @@ function buildLosersBracketWithFeeders(
     const incoming: { source: MatchData; linkField: 'next_win_match_id' | 'next_lose_match_id' }[] = [];
 
     if (ri === 0 && survivors.length === 0) {
-      // ── Rodada 1: Espelhamento reverso com anti-consecutivo ──
+      // ── Rodada 1: Espelhamento reverso ──
       // Parear primeiro com último, segundo com penúltimo, etc.
-      // REGRA 12: O último jogo dos Winners (maior posição) NUNCA pode
-      // alimentar o primeiro jogo dos Losers (posição 1), pois isso
-      // criaria uma situação de back-to-back na sequência.
       const sources = winnersInRound.map(m => ({
         source: m,
         linkField: 'next_lose_match_id' as const,
       }));
 
       // Construir pares espelhados
+      type SourceEntry = typeof sources[0];
+      const pairs: [SourceEntry, SourceEntry][] = [];
       let left = 0;
       let right = sources.length - 1;
       while (left < right) {
-        incoming.push(sources[left]);
-        incoming.push(sources[right]);
+        pairs.push([sources[left], sources[right]]);
         left++;
         right--;
       }
-      // Se ímpar, o do meio fica sozinho
-      if (left === right) {
-        incoming.push(sources[left]);
+
+      // ── REGRA 12: Ordenar pares por max position ASCENDENTE ──
+      // Quem jogou antes na Winners joga primeiro na Losers.
+      // Pares com jogos recentes (maior position) ficam por último,
+      // dando mais tempo de descanso. Isso também resolve o
+      // anti-consecutivo naturalmente (o último jogo dos Winners
+      // nunca será o primeiro dos Losers).
+      pairs.sort((a, b) => {
+        const maxA = Math.max(a[0].source.position, a[1].source.position);
+        const maxB = Math.max(b[0].source.position, b[1].source.position);
+        return maxA - maxB;
+      });
+
+      // Achatar pares de volta ao incoming
+      for (const [p1, p2] of pairs) {
+        incoming.push(p1);
+        incoming.push(p2);
       }
 
-      // ── Anti-consecutivo: mover o último source (maior posição) para fora do primeiro par ──
-      // O último source por posição está no incoming[1] (segundo do primeiro par).
-      // Trocá-lo com o elemento incoming[3] (segundo do segundo par), se existir.
-      if (incoming.length >= 4) {
-        const lastSourcePos = Math.max(...sources.map(s => s.source.position));
-        if (incoming[1].source.position === lastSourcePos) {
-          // Swap with incoming[3] to move it to the second losers match
-          [incoming[1], incoming[3]] = [incoming[3], incoming[1]];
-        } else if (incoming[0].source.position === lastSourcePos) {
-          // Edge case: if it ended up at index 0
-          [incoming[0], incoming[2]] = [incoming[2], incoming[0]];
-        }
+      // Se ímpar, o do meio fica sozinho
+      if (sources.length % 2 === 1) {
+        const midIdx = Math.floor(sources.length / 2);
+        incoming.push(sources[midIdx]);
       }
     } else {
       // ── Rodadas subsequentes: intercalar survivors com novos perdedores ──

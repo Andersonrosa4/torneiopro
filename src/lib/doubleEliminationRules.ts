@@ -121,16 +121,18 @@
 // Semifinal/Final: reset total dessas fases.
 
 // ═══════════════════════════════════════════════════
-// REGRA 12: ANTI-CONSECUTIVO (BACK-TO-BACK PROIBIDO)
+// REGRA 12: ORDENAÇÃO POR DESCANSO (EARLIEST-FIRST)
 // ═══════════════════════════════════════════════════
-// Nenhum time pode jogar duas partidas consecutivas na sequência.
-// A correção é feita na GERAÇÃO DO BRACKET (não no scheduler):
-// No espelhamento reverso da R1 dos Perdedores, o último jogo dos
-// Vencedores (maior posição) NUNCA alimenta o primeiro jogo dos
-// Perdedores. O feeder é trocado com outro par do espelhamento
-// para garantir pelo menos 1 jogo de intervalo.
-// PROIBIDO: trocar a posição/ordem dos jogos no scheduler como
-// "gambiarra" — a correção DEVE ser nos feeders da geração.
+// Na R1 da Chave dos Perdedores, após o espelhamento reverso,
+// os pares são ORDENADOS pelo máximo número de jogo (position)
+// de forma ASCENDENTE. Isso garante que:
+//   - Times que jogaram antes na Winners jogam primeiro na Losers
+//   - Times que acabaram de jogar ficam para o final, tendo descanso
+//   - O anti-consecutivo é resolvido naturalmente: o par com o
+//     último jogo da Winners é sempre o último jogo da Losers R1
+// PROIBIDO: trocar a posição/ordem dos jogos no scheduler ou
+// fazer swaps ad-hoc — a ordenação por max-position é a única
+// forma correta de garantir descanso.
 
 export const DOUBLE_ELIMINATION_RULES_VERSION = '1.2.0';
 export const DOUBLE_ELIMINATION_RULES_DATE = '2026-02-14';

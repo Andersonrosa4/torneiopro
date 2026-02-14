@@ -74,15 +74,22 @@ function generateDoubleEliminationSequence(matches: Match[]): Match[] {
     }
   }
 
-  const hasDoubleElimStructure = elimination.some(m => m.bracket_half);
-
-  if (hasDoubleElimStructure) {
-    const blocks = buildSchedulerBlocks(elimination as any);
+  // Always use scheduler blocks for double elimination to enforce WA → WB → LS → LI order
+  const blocks = buildSchedulerBlocks(elimination as any);
+  if (blocks.length > 0) {
     return [...groupInterleaved, ...blocks.flatMap(b => b.matches as Match[])];
-  } else {
-    const interleavedElim = generateInterleavedSequence(elimination);
-    return [...groupInterleaved, ...interleavedElim];
   }
+
+  // Fallback: sort by bracket_half (upper/WA first, then lower/WB) within each round
+  const sorted = [...elimination].sort((a, b) => {
+    if (a.round !== b.round) return a.round - b.round;
+    const halfOrder = (h: string | null | undefined) => h === 'upper' ? 0 : h === 'lower' ? 1 : 2;
+    const ha = halfOrder(a.bracket_half);
+    const hb = halfOrder(b.bracket_half);
+    if (ha !== hb) return ha - hb;
+    return a.position - b.position;
+  });
+  return [...groupInterleaved, ...sorted];
 }
 
 function resolveByeConflicts(sequence: Match[]): Match[] {
@@ -497,9 +504,7 @@ const MatchSequenceViewer = ({
       }
 
       const eliminationMatches = matches.filter(m => m.round > 0);
-      const hasDoubleElimStructure = eliminationMatches.some(m => m.bracket_half);
-
-      if (hasDoubleElimStructure) {
+      const hasDoubleElimStructure = eliminationMatches.some(m => m.bracket_half) || tournamentFormat === 'double_elimination';
         const schedulerBlocks = buildSchedulerBlocks(eliminationMatches);
         for (const sb of schedulerBlocks) {
           const blockMatches = sb.matches.filter(m => m.team1_id && m.team2_id);

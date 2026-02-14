@@ -171,7 +171,7 @@ const BlockSection = ({
       <div className={`px-4 py-3 border-b border-black/20 bg-muted/20 ${isDE && blockKey ? getSchedulerBadgeColor(blockKey).split(' ').filter(c => c.startsWith('bg-'))[0] : ''}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h3 className={`text-sm font-black uppercase tracking-widest ${isDE && blockKey ? getSchedulerBadgeColor(blockKey).split(' ').filter(c => c.startsWith('text-')).join(' ') : 'text-foreground'}`} style={{ textShadow: '1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 0 15px rgba(255,255,255,0.8)' }}>{label}</h3>
+            <h3 className={`text-sm font-black uppercase tracking-widest ${isDE && blockKey ? getSchedulerBadgeColor(blockKey).split(' ').filter(c => c.startsWith('text-')).join(' ') : 'text-foreground'}`} style={{ textShadow: '0 0 20px rgba(255,255,255,1), 0 0 40px rgba(255,255,255,0.9), 0 0 60px rgba(255,255,255,0.6), 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000' }}>{label}</h3>
             {locked && (
               <Badge variant="outline" className="text-[9px] gap-0.5 text-muted-foreground border-border/50 px-1.5 py-0">
                 <Lock className="h-2.5 w-2.5" /> Bloqueado

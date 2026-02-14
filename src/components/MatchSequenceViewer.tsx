@@ -663,7 +663,7 @@ const MatchSequenceViewer = ({
             <div className={`px-4 py-3 border-b border-black/20 rounded-t-lg ${badgeColor.split(' ').filter(c => c.startsWith('bg-'))[0] || 'bg-muted/20'}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <h3 className={`text-sm font-black uppercase tracking-widest ${badgeColor.split(' ').filter(c => c.startsWith('text-') || c.startsWith('dark:text-')).join(' ') || 'text-foreground'}`} style={{ textShadow: '1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 0 15px rgba(255,255,255,0.8)' }}>
+                  <h3 className={`text-sm font-black uppercase tracking-widest ${badgeColor.split(' ').filter(c => c.startsWith('text-') || c.startsWith('dark:text-')).join(' ') || 'text-foreground'}`} style={{ textShadow: '0 0 20px rgba(255,255,255,1), 0 0 40px rgba(255,255,255,0.9), 0 0 60px rgba(255,255,255,0.6), 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000' }}>
                     {block.label}
                   </h3>
                   {isDoubleElim && !isUnlocked && (

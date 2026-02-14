@@ -66,7 +66,7 @@ const Index = () => {
           <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-primary shadow-glow">
             <Trophy className="h-10 w-10 text-primary-foreground" />
           </div>
-          <h1 className="text-5xl sm:text-6xl font-bold tracking-tight text-white font-display">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight text-white font-display">
             Gestão Pro
           </h1>
           <p className="mt-3 text-lg text-[hsl(35_30%_80%)]">
@@ -74,7 +74,7 @@ const Index = () => {
           </p>
         </motion.div>
 
-        <div className="grid w-full gap-6 sm:grid-cols-3">
+        <div className="grid w-full gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-3">
           {sports.map((sport, i) => (
             <motion.button
               key={sport.id}
@@ -86,7 +86,7 @@ const Index = () => {
               style={{ boxShadow: `0 4px 20px ${sport.glowColor}` }}
             >
               {/* Sport image */}
-              <div className="relative h-52 sm:h-56 overflow-hidden">
+              <div className="relative h-40 sm:h-52 md:h-56 overflow-hidden">
                 <img
                   src={sport.image}
                   alt={sport.name}

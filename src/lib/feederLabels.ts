@@ -45,30 +45,56 @@ export function getSlotFeeders(
       m.next_lose_match_id === targetMatch.id
   );
 
-  const sortedFeeders = feedingMatches.sort(
-    (a, b) => a.position - b.position
-  );
-
-  sortedFeeders.forEach((feeder, idx) => {
+  for (const feeder of feedingMatches) {
     const isWinnerFeeder = feeder.next_win_match_id === targetMatch.id;
     const type = isWinnerFeeder ? 'winner' : 'loser';
     const prefix = isWinnerFeeder ? 'Venc.' : 'Perd.';
-    
-    // Use matchNumberMap for the real sequence number
     const num = matchNumberMap?.get(feeder.id) ?? feeder.position;
-    
+
     const feederLabel: FeederInfo = {
       label: `${prefix}${num}`,
       type,
       matchNumber: feeder.id,
     };
 
-    if (idx === 0) {
+    // Determine which slot this feeder ACTUALLY fills
+    let slot: 'team1' | 'team2' | null = null;
+
+    if (isWinnerFeeder && feeder.winner_team_id) {
+      // Winner feeder: check where the winner ended up
+      if (feeder.winner_team_id === targetMatch.team1_id) slot = 'team1';
+      else if (feeder.winner_team_id === targetMatch.team2_id) slot = 'team2';
+    } else if (!isWinnerFeeder && feeder.winner_team_id) {
+      // Loser feeder: the loser is the OTHER team
+      const loserId = feeder.team1_id === feeder.winner_team_id ? feeder.team2_id : feeder.team1_id;
+      if (loserId && loserId === targetMatch.team1_id) slot = 'team1';
+      else if (loserId && loserId === targetMatch.team2_id) slot = 'team2';
+    }
+
+    // Fallback when match not yet played: use slot convention rules
+    if (!slot) {
+      if (isWinnerFeeder && feeder.bracket_type === 'losers' && targetMatch.bracket_type === 'losers') {
+        slot = 'team1'; // losers survivor → always team1
+      } else if (!isWinnerFeeder && feeder.bracket_type === 'winners' && targetMatch.bracket_type === 'losers') {
+        slot = 'team2'; // winners loser dropping → always team2
+      } else if (isWinnerFeeder && feeder.bracket_type === 'winners' && targetMatch.bracket_type === 'winners') {
+        slot = feeder.position % 2 === 1 ? 'team1' : 'team2';
+      } else {
+        slot = !feeders.team1 ? 'team1' : 'team2';
+      }
+    }
+
+    // Assign to correct slot, with collision fallback
+    if (slot === 'team1' && !feeders.team1) {
       feeders.team1 = feederLabel;
-    } else if (idx === 1) {
+    } else if (slot === 'team2' && !feeders.team2) {
+      feeders.team2 = feederLabel;
+    } else if (!feeders.team1) {
+      feeders.team1 = feederLabel;
+    } else if (!feeders.team2) {
       feeders.team2 = feederLabel;
     }
-  });
+  }
 
   // Round 1 matches have no feeders — leave null (no labels shown)
 

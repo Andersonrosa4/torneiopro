@@ -6,7 +6,7 @@ import { Trophy, Save, Download, FileText, Sheet, Pencil, Lock, CheckCircle2, Cl
 import { exportMatchSequence } from "@/lib/exportUtils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getEliminationRoundLabel, getEliminationRoundShortLabel } from "@/lib/roundLabels";
-import { buildSchedulerBlocks, getSchedulerBlockColor, getSchedulerBadgeColor, type SchedulerBlock } from "@/lib/roundScheduler";
+import { buildSchedulerBlocks, schedulerSequence, getSchedulerBlockColor, getSchedulerBadgeColor, type SchedulerBlock } from "@/lib/roundScheduler";
 
 /* Helper: Convert number to letter (1→A, 2→B, etc) */
 const numberToLetter = (num: number): string => {
@@ -467,6 +467,19 @@ const MatchSequenceViewer = ({
   const sequence = useMemo(() => generateSequence(matches, tournamentFormat), [matches, tournamentFormat]);
   const displaySequence = useMemo(() => sequence, [sequence]);
 
+  // Build match number map from scheduler (same as bracket view) for consistent numbering
+  const matchNumberMap = useMemo(() => {
+    const seq = schedulerSequence(matches as any);
+    const map = new Map<string, number>();
+    seq.forEach((m, i) => map.set(m.id, i + 1));
+    // Also number group stage and other matches not in scheduler
+    let next = map.size + 1;
+    for (const m of matches) {
+      if (!map.has(m.id)) map.set(m.id, next++);
+    }
+    return map;
+  }, [matches]);
+
   const matchCountByRound = useMemo(() => {
     const counts: Record<number, number> = {};
     matches.forEach(m => { counts[m.round] = (counts[m.round] || 0) + 1; });
@@ -483,7 +496,6 @@ const MatchSequenceViewer = ({
 
     if (tournamentFormat === 'double_elimination') {
       const blocks: { label: string; matches: { match: Match; globalIndex: number }[]; blockKey: string; isUnlocked: boolean; isCompleted: boolean }[] = [];
-      let idx = 1;
 
       const groupStage = displaySequence.filter(m => m.round === 0);
       if (groupStage.length > 0) {
@@ -494,7 +506,7 @@ const MatchSequenceViewer = ({
           const chunk = groupStage.slice(i, i + matchesPerRound);
           blocks.push({
             label: `Fase de Grupos — Rodada ${roundNum}`,
-            matches: chunk.map(m => ({ match: m, globalIndex: idx++ })),
+            matches: chunk.map(m => ({ match: m, globalIndex: matchNumberMap.get(m.id) ?? 0 })),
             blockKey: `GS_R${roundNum}`,
             isUnlocked: true,
             isCompleted: chunk.every(m => m.status === 'completed'),
@@ -510,9 +522,12 @@ const MatchSequenceViewer = ({
         for (const sb of schedulerBlocks) {
           const blockMatches = sb.matches.filter(m => m.team1_id && m.team2_id);
           if (blockMatches.length === 0) continue;
+          const mappedMatches = blockMatches
+            .map(m => ({ match: m as Match, globalIndex: matchNumberMap.get(m.id) ?? 0 }))
+            .sort((a, b) => a.globalIndex - b.globalIndex);
           blocks.push({
             label: sb.label,
-            matches: blockMatches.map(m => ({ match: m as Match, globalIndex: idx++ })),
+            matches: mappedMatches,
             blockKey: sb.key,
             isUnlocked: sb.isUnlocked,
             isCompleted: sb.isCompleted,
@@ -525,7 +540,7 @@ const MatchSequenceViewer = ({
           const roundMatches = knockoutDisplay.filter(m => m.round === r);
           blocks.push({
             label: getEliminationRoundLabel(r, matchCountByRound[r] || 0),
-            matches: roundMatches.map(m => ({ match: m, globalIndex: idx++ })),
+            matches: roundMatches.map(m => ({ match: m, globalIndex: matchNumberMap.get(m.id) ?? 0 })),
             blockKey: `KO_R${r}`,
             isUnlocked: true,
             isCompleted: roundMatches.every(m => m.status === 'completed'),
@@ -548,7 +563,7 @@ const MatchSequenceViewer = ({
         const chunk = groupStage.slice(i, i + matchesPerRound);
         groups.push({
           label: `Fase de Grupos — Rodada ${roundNum}`,
-          matches: chunk.map(m => ({ match: m, globalIndex: 0 })),
+          matches: chunk.map(m => ({ match: m, globalIndex: matchNumberMap.get(m.id) ?? 0 })),
           blockKey: `GS_R${roundNum}`,
           isCompleted: chunk.every(m => m.status === 'completed'),
         });
@@ -562,21 +577,19 @@ const MatchSequenceViewer = ({
         const roundMatches = knockoutStage.filter(m => m.round === r);
         groups.push({
           label: getRoundLabel(r),
-          matches: roundMatches.map(m => ({ match: m, globalIndex: 0 })),
+          matches: roundMatches.map(m => ({ match: m, globalIndex: matchNumberMap.get(m.id) ?? 0 })),
           blockKey: `KO_R${r}`,
           isCompleted: roundMatches.every(m => m.status === 'completed'),
         });
       }
     }
 
-    let idx = 1;
+    // Sort matches within each block by their matchNumberMap order
     for (const g of groups) {
-      for (const entry of g.matches) {
-        entry.globalIndex = idx++;
-      }
+      g.matches.sort((a, b) => a.globalIndex - b.globalIndex);
     }
     return groups;
-  }, [displaySequence, matches, matchCountByRound, tournamentFormat]);
+  }, [displaySequence, matches, matchCountByRound, matchNumberMap, tournamentFormat]);
 
   // Stats
   const realMatches = useMemo(() => matches.filter(m => m.team1_id && m.team2_id), [matches]);

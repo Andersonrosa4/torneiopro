@@ -355,18 +355,32 @@ const MatchCard = ({
             <span className={`text-xs flex-1 truncate font-black ${t1Win ? "text-success" : match.team1_id === null ? "text-muted-foreground italic font-normal" : "text-foreground"}`}>
               {match.team1_id ? team1Name : "Chapéu"}
             </span>
-...
+          </div>
+          <span className="text-[10px] text-muted-foreground/50 pl-0.5">vs</span>
+          <div className="flex items-center gap-1.5 min-h-[22px]">
             <span className={`text-xs flex-1 truncate font-black ${t2Win ? "text-success" : match.team2_id === null ? "text-muted-foreground italic font-normal" : "text-foreground"}`}>
               {match.team2_id ? team2Name : "Chapéu"}
             </span>
-            {isOwner && hasTeams && !isCompleted && match.team2_id && (
-              <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px] gap-0.5 text-primary hover:bg-primary/10 shrink-0"
+          </div>
+        </div>
+
+        {/* Declare winner buttons — own row to avoid name truncation */}
+        {isOwner && hasTeams && !isCompleted && !isEditing && (
+          <div className="flex items-center gap-2 pt-0.5 flex-wrap">
+            {match.team1_id && (
+              <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px] gap-0.5 text-primary hover:bg-primary/10"
+                onClick={() => handleDeclareTeamWinner(match.team1_id!)}>
+                <Trophy className="h-3 w-3" /> {team1Name.split(" / ")[0]}
+              </Button>
+            )}
+            {match.team2_id && (
+              <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px] gap-0.5 text-primary hover:bg-primary/10"
                 onClick={() => handleDeclareTeamWinner(match.team2_id!)}>
-                <Trophy className="h-3 w-3" /> Vencedor
+                <Trophy className="h-3 w-3" /> {team2Name.split(" / ")[0]}
               </Button>
             )}
           </div>
-        </div>
+        )}
 
         {/* Score editing with sets */}
         {hasTeams && canScore && (
@@ -397,9 +411,23 @@ const MatchCard = ({
                 <Save className="h-3 w-3" /> Salvar
               </Button>
               {isEditing && (
-                <Button size="sm" variant="ghost" className="h-5 px-2 text-[10px]" onClick={() => setIsEditing(false)}>
-                  Cancelar
-                </Button>
+                <>
+                  {match.team1_id && (
+                    <Button size="sm" variant="outline" className="h-5 px-2 text-[10px] gap-0.5 border-success/40 text-success hover:bg-success/10"
+                      onClick={() => handleDeclareTeamWinner(match.team1_id!)}>
+                      <Trophy className="h-3 w-3" /> {team1Name.split(" / ")[0]}
+                    </Button>
+                  )}
+                  {match.team2_id && (
+                    <Button size="sm" variant="outline" className="h-5 px-2 text-[10px] gap-0.5 border-success/40 text-success hover:bg-success/10"
+                      onClick={() => handleDeclareTeamWinner(match.team2_id!)}>
+                      <Trophy className="h-3 w-3" /> {team2Name.split(" / ")[0]}
+                    </Button>
+                  )}
+                  <Button size="sm" variant="ghost" className="h-5 px-2 text-[10px]" onClick={() => setIsEditing(false)}>
+                    Cancelar
+                  </Button>
+                </>
               )}
             </div>
           </div>

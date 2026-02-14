@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSportTheme } from "@/contexts/SportContext";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,13 +28,34 @@ const CreateTournament = () => {
     category: "",
     event_date: "",
     location: "",
+    tournament_code: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+
+    const normalizedCode = form.tournament_code.trim().toUpperCase();
+    if (!normalizedCode) {
+      toast.error("O código do torneio é obrigatório.");
+      return;
+    }
+
     setLoading(true);
     setSelectedSport(form.sport as any);
+
+    // Check if code already exists
+    const { data: existing } = await supabase
+      .from("tournaments")
+      .select("id")
+      .eq("tournament_code", normalizedCode)
+      .maybeSingle();
+
+    if (existing) {
+      toast.error("Já existe um torneio utilizando este código. Escolha outro código.");
+      setLoading(false);
+      return;
+    }
 
     const { data, error } = await organizerQuery({
       table: "tournaments",
@@ -48,6 +70,7 @@ const CreateTournament = () => {
         location: form.location || null,
         created_by: organizerId || "",
         status: "draft",
+        tournament_code: normalizedCode,
       },
       select: "*",
       single: true,
@@ -56,7 +79,7 @@ const CreateTournament = () => {
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success(`Torneio criado! Código: ${data.tournament_code}`);
+      toast.success(`Torneio criado! Código: ${normalizedCode}`);
       navigate(`/tournaments/${data.id}`);
     }
     setLoading(false);
@@ -83,6 +106,18 @@ const CreateTournament = () => {
                 placeholder="Ex: Campeonato de Verão 2026"
                 required
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="tournament_code">Código do Torneio</Label>
+              <Input
+                id="tournament_code"
+                value={form.tournament_code}
+                onChange={(e) => setForm({ ...form, tournament_code: e.target.value })}
+                placeholder="Ex: VERAO2026"
+                required
+              />
+              <p className="text-xs text-muted-foreground">Letras e números. Será convertido para maiúsculas.</p>
             </div>
 
             <div className="space-y-2">

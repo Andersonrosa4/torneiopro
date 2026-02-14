@@ -394,7 +394,7 @@ export type Database = {
           registration_value: number | null
           sport: Database["public"]["Enums"]["sport_type"]
           status: Database["public"]["Enums"]["tournament_status"]
-          tournament_code: string | null
+          tournament_code: string
           updated_at: string
         }
         Insert: {
@@ -414,7 +414,7 @@ export type Database = {
           registration_value?: number | null
           sport?: Database["public"]["Enums"]["sport_type"]
           status?: Database["public"]["Enums"]["tournament_status"]
-          tournament_code?: string | null
+          tournament_code: string
           updated_at?: string
         }
         Update: {
@@ -434,7 +434,7 @@ export type Database = {
           registration_value?: number | null
           sport?: Database["public"]["Enums"]["sport_type"]
           status?: Database["public"]["Enums"]["tournament_status"]
-          tournament_code?: string | null
+          tournament_code?: string
           updated_at?: string
         }
         Relationships: []

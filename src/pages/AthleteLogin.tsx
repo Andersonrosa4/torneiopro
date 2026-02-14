@@ -17,8 +17,9 @@ const AthleteLogin = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (code.length !== 5) {
-      toast.error("O código deve ter 5 dígitos");
+    const normalizedCode = code.trim().toUpperCase();
+    if (!normalizedCode) {
+      toast.error("Digite o código do torneio");
       return;
     }
     setLoading(true);
@@ -26,7 +27,7 @@ const AthleteLogin = () => {
     const { data, error } = await supabase
       .from("tournaments")
       .select("id, name")
-      .eq("tournament_code", code)
+      .eq("tournament_code", normalizedCode)
       .single();
 
     if (error || !data) {
@@ -71,11 +72,9 @@ const AthleteLogin = () => {
                 <Input
                   id="code"
                   value={code}
-                  onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 5))}
-                  placeholder="00000"
-                  className="pl-10 text-center text-2xl tracking-[0.5em] font-mono"
-                  maxLength={5}
-                  inputMode="numeric"
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder="Ex: VERAO2026"
+                  className="pl-10 text-center text-2xl tracking-[0.3em] font-mono uppercase"
                   required
                 />
               </div>
@@ -83,7 +82,7 @@ const AthleteLogin = () => {
             <Button
               type="submit"
               className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90"
-              disabled={loading || code.length !== 5}
+              disabled={loading || code.trim().length === 0}
             >
               {loading ? "Buscando..." : "Entrar no Torneio"}
             </Button>

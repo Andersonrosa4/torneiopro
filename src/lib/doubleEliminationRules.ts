@@ -28,9 +28,15 @@
 // ═══════════════════════════════════════════════════════════════
 // REGRA 2: IRON RULE — CONVENÇÃO DE SLOTS (BLINDADA)
 // ═══════════════════════════════════════════════════════════════
-// Em partidas da Chave dos Perdedores com feeders mistos:
+// Em partidas da Chave dos Perdedores R2+:
 //   • Sobrevivente dos Perdedores (Venc.) → SEMPRE team1_id (topo do card)
 //   • Perdedor caindo dos Vencedores (Perd.) → SEMPRE team2_id (base do card)
+//
+// Em partidas da Chave dos Perdedores R1 (AMBOS são droppers):
+//   • Dropper de posição ÍMPAR da Winners → team1_id
+//   • Dropper de posição PAR da Winners → team2_id
+//   ⛔ NUNCA usar team2_id fixo quando dois droppers alimentam a mesma
+//      partida — isso causa race condition e perda de dados.
 //
 // SAFETY NET: Se slot preferido ocupado → usar o outro com log [🚨 SLOT COLLISION].
 // Se ambos ocupados → log [💀 BOTH SLOTS FULL] — situação crítica.

@@ -179,13 +179,6 @@ const MatchCard = ({
       </div>
     </div>
   );
-
-      {/* Status */}
-      <div className="flex justify-center border-t border-border/20 px-2 py-1">
-        {statusBadge}
-      </div>
-    </div>
-  );
 };
 
 /* ────────────────────────────────────────────────────

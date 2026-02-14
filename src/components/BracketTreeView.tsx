@@ -263,8 +263,6 @@ const BracketColumn = ({
   allMatches: Match[];
   matchNumberMap?: Map<string, number>;
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-
   if (bracketMatches.length === 0) return null;
 
   const roundGroups: Record<number, Match[]> = {};
@@ -288,8 +286,7 @@ const BracketColumn = ({
         <span>{label}</span>
         {reversed ? <ChevronLeft className="h-3 w-3 ml-auto opacity-50" /> : <ChevronRight className="h-3 w-3 ml-auto opacity-50" />}
       </div>
-      <div ref={containerRef} className="relative overflow-x-auto pb-2">
-        <BracketConnectors containerRef={containerRef} matches={bracketMatches} reversed={reversed} />
+      <div className="relative overflow-x-auto pb-2">
         <div className="flex gap-6 relative" style={{ zIndex: 1 }}>
           {displayRounds.map((round) => {
             const roundMatches = roundGroups[round].sort((a, b) => a.position - b.position);
@@ -922,11 +919,13 @@ const DEGlobalConnectors = ({
   allMatches: Match[];
 }) => {
   const [paths, setPaths] = useState<string[]>([]);
+  const [svgSize, setSvgSize] = useState({ w: 0, h: 0 });
 
   const computePaths = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
     const containerRect = container.getBoundingClientRect();
+    setSvgSize({ w: container.scrollWidth, h: container.scrollHeight });
     const newPaths: string[] = [];
 
     for (const m of allMatches) {
@@ -938,7 +937,6 @@ const DEGlobalConnectors = ({
       const srcR = srcEl.getBoundingClientRect();
       const dstR = dstEl.getBoundingClientRect();
 
-      // Determine direction: if dst is to the left of src, reversed
       const srcCx = srcR.left + srcR.width / 2;
       const dstCx = dstR.left + dstR.width / 2;
       const goingLeft = dstCx < srcCx;
@@ -972,7 +970,10 @@ const DEGlobalConnectors = ({
   if (paths.length === 0) return null;
 
   return (
-    <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 0, overflow: "visible" }}>
+    <svg
+      className="absolute top-0 left-0 pointer-events-none"
+      style={{ zIndex: 0, overflow: "visible", width: svgSize.w, height: svgSize.h }}
+    >
       {paths.map((d, i) => (
         <path key={i} d={d} fill="none" stroke="hsl(var(--muted-foreground) / 0.3)" strokeWidth="1.5" />
       ))}

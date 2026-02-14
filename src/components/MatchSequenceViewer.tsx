@@ -1,9 +1,8 @@
-import { useState, useMemo, useEffect, memo, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Save, Download, FileText, Sheet, Pencil, Lock } from "lucide-react";
-import { motion } from "framer-motion";
+import { Trophy, Save, Download, FileText, Sheet, Pencil, Lock, CheckCircle2, Clock, AlertCircle, ListOrdered } from "lucide-react";
 import { exportMatchSequence } from "@/lib/exportUtils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getEliminationRoundLabel, getEliminationRoundShortLabel } from "@/lib/roundLabels";
@@ -60,11 +59,9 @@ function generateSequence(matches: Match[], tournamentFormat: string): Match[] {
 }
 
 function generateDoubleEliminationSequence(matches: Match[]): Match[] {
-  // Group stage matches (round 0) come first, interleaved by bracket
   const groupStage = matches.filter(m => m.round === 0);
   const elimination = matches.filter(m => m.round > 0);
-  
-  // Interleave group stage by bracket_number
+
   const groupInterleaved: Match[] = [];
   if (groupStage.length > 0) {
     const brackets = [...new Set(groupStage.map(m => m.bracket_number || 1))].sort((a, b) => a - b);
@@ -76,16 +73,13 @@ function generateDoubleEliminationSequence(matches: Match[]): Match[] {
       }
     }
   }
-  
-  // Check if elimination matches have bracket_half (true double elimination structure)
+
   const hasDoubleElimStructure = elimination.some(m => m.bracket_half);
-  
+
   if (hasDoubleElimStructure) {
-    // Use round scheduler for strict ordering
     const blocks = buildSchedulerBlocks(elimination as any);
     return [...groupInterleaved, ...blocks.flatMap(b => b.matches as Match[])];
   } else {
-    // Fallback: interleave by round/bracket (e.g. group stage → single elim knockout)
     const interleavedElim = generateInterleavedSequence(elimination);
     return [...groupInterleaved, ...interleavedElim];
   }
@@ -172,39 +166,14 @@ function hasTeamOverlap(a: Match, b: Match): boolean {
   return teamsA.some((t) => teamsB.includes(t));
 }
 
-// ─── Block Label Helpers ─────────────────────────────────────
-
-function getBracketBlockLabel(match: Match): string {
-  const bt = match.bracket_type || 'winners';
-  const bh = match.bracket_half;
-  if (bt === 'winners' && bh === 'upper') return 'Vencedores – Chave A';
-  if (bt === 'winners' && bh === 'lower') return 'Vencedores – Chave B';
-  if (bt === 'winners' && !bh) return 'Final dos Vencedores';
-  if (bt === 'losers' && bh === 'upper') return 'Perdedores – Chave A';
-  if (bt === 'losers' && bh === 'lower') return 'Perdedores – Chave B';
-  if (bt === 'semi_final') return 'Semifinais';
-  if (bt === 'final') return 'Final';
-  if (bt === 'third_place') return 'Disputa 3º Lugar';
-  return 'Outros';
-}
-
-function getBracketBlockColor(blockLabel: string): string {
-  if (blockLabel.startsWith('Vencedores')) return 'border-l-blue-500';
-  if (blockLabel.startsWith('Perdedores')) return 'border-l-orange-500';
-  if (blockLabel.startsWith('Semifinais')) return 'border-l-purple-500';
-  if (blockLabel === 'Final' || blockLabel === 'Final dos Vencedores') return 'border-l-amber-500';
-  if (blockLabel === 'Disputa 3º Lugar') return 'border-l-emerald-500';
-  return 'border-l-primary';
-}
+// ─── Helpers ─────────────────────────────────────
 
 function getMatchGroupId(match: Match): string {
   if (match.round === 0) return `Grupo ${numberToLetter(match.bracket_number || 1)}`;
-  if (match.bracket_type === 'winners' && match.bracket_half) return `Chave dos Vencedores - ${match.bracket_half === 'upper' ? 'Superior' : 'Inferior'}`;
-  if (match.bracket_type === 'winners' && !match.bracket_half) return 'Final dos Vencedores';
-  if (match.bracket_type === 'losers') return `Perdedores (${match.bracket_half === 'upper' ? 'Superior' : 'Inferior'})`;
-  if (match.bracket_type === 'semi_final') return `Semifinal ${match.bracket_half === 'upper' ? '1' : '2'}`;
+  if (match.bracket_type === 'winners' && match.bracket_half) return `Vencedores ${match.bracket_half === 'upper' ? 'A' : 'B'}`;
+  if (match.bracket_type === 'losers') return `Perdedores ${match.bracket_half === 'upper' ? 'Sup.' : 'Inf.'}`;
+  if (match.bracket_type === 'semi_final') return `Semifinal`;
   if (match.bracket_type === 'final') return 'Final';
-  if (match.bracket_type === 'third_place') return 'Disputa 3º Lugar';
   return `Chave ${match.bracket_number || 1}`;
 }
 
@@ -212,243 +181,38 @@ function getRoundShortLabel(round: number, matchCountInRound: number): string {
   return getEliminationRoundShortLabel(round, matchCountInRound);
 }
 
-// ─── Main Component ──────────────────────────────────────────
-
-const MatchSequenceViewer = ({
-  matches,
-  teams,
-  isOwner,
-  numSets,
-  tournamentName = "",
-  sport = "",
-  eventDate,
-  tournamentFormat = 'single_elimination',
-  onDeclareWinner,
-  onUpdateScore,
-  onAutoResult,
-}: MatchSequenceViewerProps) => {
-  const getTeamName = (teamId: string | null) => {
-    if (!teamId) return "A definir";
-    const team = teams.find((t) => t.id === teamId);
-    return team ? `${team.player1_name} / ${team.player2_name}` : "A definir";
-  };
-
-  const sequence = useMemo(() => generateSequence(matches, tournamentFormat), [matches, tournamentFormat]);
-  // RULE: Exibir TODAS as partidas (inclusive slots de espera/Chapéu com apenas um time)
-  // Chapéus serão renderizados como cards cinza com rótulo especial
-  const displaySequence = useMemo(() => 
-    sequence, // Mostrar todos (tanto matches reais quanto Chapéus)
-    [sequence]
-  );
-
-  const matchCountByRound = useMemo(() => {
-    const counts: Record<number, number> = {};
-    matches.forEach(m => { counts[m.round] = (counts[m.round] || 0) + 1; });
-    return counts;
-  }, [matches]);
-
-  const getRoundLabel = (round: number) => {
-    return getEliminationRoundLabel(round, matchCountByRound[round] || 0);
-  };
-
-  // Group by bracket blocks for double elimination, or by round for others
-  const bracketBlocks = useMemo(() => {
-    if (displaySequence.length === 0) return [];
-
-    if (tournamentFormat === 'double_elimination') {
-      const blocks: { label: string; matches: { match: Match; globalIndex: number }[]; blockKey: string; isUnlocked: boolean; isCompleted: boolean }[] = [];
-      let idx = 1;
-
-      // Group stage matches (round 0) first
-      const groupStage = displaySequence.filter(m => m.round === 0);
-      if (groupStage.length > 0) {
-        const bracketCount = new Set(groupStage.map(m => m.bracket_number || 1)).size;
-        const matchesPerRound = Math.max(bracketCount, 1);
-        let roundNum = 1;
-        for (let i = 0; i < groupStage.length; i += matchesPerRound) {
-          const chunk = groupStage.slice(i, i + matchesPerRound);
-          blocks.push({
-            label: `Fase de Grupos — Rodada ${roundNum}`,
-            matches: chunk.map(m => ({ match: m, globalIndex: idx++ })),
-            blockKey: `GS_R${roundNum}`,
-            isUnlocked: true,
-            isCompleted: chunk.every(m => m.status === 'completed'),
-          });
-          roundNum++;
-        }
-      }
-
-      // Elimination matches
-      const eliminationMatches = matches.filter(m => m.round > 0);
-      const hasDoubleElimStructure = eliminationMatches.some(m => m.bracket_half);
-      
-      if (hasDoubleElimStructure) {
-        // Use round scheduler for true double elimination
-        const schedulerBlocks = buildSchedulerBlocks(eliminationMatches);
-        for (const sb of schedulerBlocks) {
-          const blockMatches = sb.matches.filter(m => m.team1_id && m.team2_id);
-          if (blockMatches.length === 0) continue;
-          const entries = blockMatches.map(m => ({ match: m as Match, globalIndex: idx++ }));
-          blocks.push({ 
-            label: sb.label, 
-            matches: entries, 
-            blockKey: sb.key, 
-            isUnlocked: sb.isUnlocked, 
-            isCompleted: sb.isCompleted 
-          });
-        }
-      } else {
-        // Fallback: group knockout by round (group stage → single elim)
-        const knockoutDisplay = displaySequence.filter(m => m.round > 0);
-        const knockoutRounds = [...new Set(knockoutDisplay.map(m => m.round))].sort((a, b) => a - b);
-        for (const r of knockoutRounds) {
-          const roundMatches = knockoutDisplay.filter(m => m.round === r);
-          blocks.push({
-            label: getEliminationRoundLabel(r, matchCountByRound[r] || 0),
-            matches: roundMatches.map(m => ({ match: m, globalIndex: idx++ })),
-            blockKey: `KO_R${r}`,
-            isUnlocked: true,
-            isCompleted: roundMatches.every(m => m.status === 'completed'),
-          });
-        }
-      }
-      return blocks;
-    }
-
-    // Non-double-elimination: group by round
-    const groups: { label: string; matches: { match: Match; globalIndex: number }[] }[] = [];
-    const groupStage = displaySequence.filter((m) => m.round === 0);
-    const knockoutStage = displaySequence.filter((m) => m.round > 0);
-
-    if (groupStage.length > 0) {
-      const bracketCount = new Set(groupStage.map((m) => m.bracket_number || 1)).size;
-      const matchesPerRound = Math.max(bracketCount, 1);
-      let roundNum = 1;
-      for (let i = 0; i < groupStage.length; i += matchesPerRound) {
-        const chunk = groupStage.slice(i, i + matchesPerRound);
-        groups.push({ label: `Rodada ${roundNum}`, matches: chunk.map((m) => ({ match: m, globalIndex: 0 })) });
-        roundNum++;
-      }
-    }
-
-    if (knockoutStage.length > 0) {
-      const knockoutRounds = [...new Set(knockoutStage.map((m) => m.round))].sort((a, b) => a - b);
-      for (const r of knockoutRounds) {
-        const roundMatches = knockoutStage.filter((m) => m.round === r);
-        groups.push({ label: getRoundLabel(r), matches: roundMatches.map((m) => ({ match: m, globalIndex: 0 })) });
-      }
-    }
-
-    let idx = 1;
-    for (const g of groups) {
-      for (const entry of g.matches) {
-        entry.globalIndex = idx++;
-      }
-    }
-    return groups;
-  }, [displaySequence, matchCountByRound, tournamentFormat]);
-
-  if (displaySequence.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
-        <p className="text-muted-foreground">Gere o chaveamento primeiro para ver a sequência de partidas.</p>
-      </div>
-    );
-  }
-
-  const handleExport = (format: "pdf" | "xlsx" | "csv") => {
-    const meta = { tournamentName, sport, date: eventDate };
-    const rows = sequence.map((m, idx) => ({
-      order: idx + 1,
-      round: getRoundLabel(m.round),
-      group: getMatchGroupId(m),
-      team1: getTeamName(m.team1_id),
-      team2: getTeamName(m.team2_id),
-      score: m.status === "completed" ? `${m.score1 ?? 0} × ${m.score2 ?? 0}` : "-",
-      winner: m.winner_team_id ? getTeamName(m.winner_team_id) : "-",
-      status: m.status === "completed" ? "Finalizado" : "Pendente",
-    }));
-    exportMatchSequence(format, rows, meta);
-  };
-
-  const isDoubleElim = tournamentFormat === 'double_elimination';
-
+/* ═══════════════════════════════════════════
+   Progress Summary
+   ═══════════════════════════════════════════ */
+const ProgressSummary = ({ total, completed, pending }: { total: number; completed: number; pending: number }) => {
+  const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
   return (
-    <section className="space-y-4">
-      <div className="flex justify-end">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-1">
-              <Download className="h-4 w-4" /> Exportar
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onClick={() => handleExport("pdf")}>
-              <FileText className="h-4 w-4 mr-2" /> PDF
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExport("xlsx")}>
-              <Sheet className="h-4 w-4 mr-2" /> Excel (.xlsx)
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExport("csv")}>
-              <FileText className="h-4 w-4 mr-2" /> CSV
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {bracketBlocks.map((block) => {
-        const blockKey = (block as any).blockKey;
-        const isUnlocked = (block as any).isUnlocked ?? true;
-        const isBlockCompleted = (block as any).isCompleted ?? false;
-        const borderColor = isDoubleElim && blockKey ? getSchedulerBlockColor(blockKey) : getBracketBlockColor(block.label);
-        
-        return (
-        <div
-          key={block.label}
-          className={`rounded-lg border bg-card/30 overflow-hidden ${isDoubleElim ? `border-l-4 ${borderColor}` : ''} ${!isUnlocked && isDoubleElim ? 'opacity-50' : ''}`}
-        >
-          <div className="px-4 py-3 border-b border-primary/30 bg-gradient-to-r from-primary/15 to-accent/10">
-            <div className="flex items-center gap-2">
-              <h3 className="text-base font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                {block.label}
-              </h3>
-              {isDoubleElim && !isUnlocked && (
-                <Badge variant="outline" className="text-[10px] gap-1 text-muted-foreground">
-                  <Lock className="h-3 w-3" /> Bloqueado
-                </Badge>
-              )}
-              {isDoubleElim && isBlockCompleted && (
-                <Badge className="bg-success/20 text-success border-0 text-[10px]">✓ Concluído</Badge>
-              )}
-            </div>
-            <span className="text-xs text-muted-foreground">
-              {block.matches.length} {block.matches.length === 1 ? 'partida' : 'partidas'}
-            </span>
-          </div>
-          <div className="p-2 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
-            {block.matches.map(({ match, globalIndex }) => (
-              <MatchCard
-                key={match.id}
-                match={match}
-                index={globalIndex}
-                getTeamName={getTeamName}
-                getRoundLabel={(r) => getRoundShortLabel(r, matchCountByRound[r] || 0)}
-                isOwner={isOwner}
-                numSets={numSets}
-                onDeclareWinner={onDeclareWinner}
-                onUpdateScore={onUpdateScore}
-                onAutoResult={onAutoResult}
-              />
-            ))}
-          </div>
+    <div className="rounded-xl border border-border bg-card/80 backdrop-blur-sm p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <ListOrdered className="h-4 w-4 text-primary" />
+          <span className="text-sm font-bold text-foreground">Progresso do Torneio</span>
         </div>
-      )})}
-    </section>
+        <span className="text-xs font-mono font-bold text-primary">{pct}%</span>
+      </div>
+      <div className="h-2 rounded-full bg-muted overflow-hidden">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-success" /> {completed} finalizadas</span>
+        <span className="flex items-center gap-1"><Clock className="h-3 w-3 text-warning" /> {pending} pendentes</span>
+        <span className="flex items-center gap-1"><AlertCircle className="h-3 w-3 text-muted-foreground/50" /> {total - completed - pending} aguardando</span>
+      </div>
+    </div>
   );
 };
 
-// ─── Match Card ──────────────────────────────────────────────
-
+/* ═══════════════════════════════════════════
+   Match Card (with admin controls)
+   ═══════════════════════════════════════════ */
 interface MatchCardProps {
   match: Match;
   index: number;
@@ -480,7 +244,6 @@ const MatchCard = ({
 
   const [setScores, setSetScores] = useState(initSets);
   const [isEditing, setIsEditing] = useState(false);
-  
 
   useEffect(() => {
     setSetScores(initSets());
@@ -490,8 +253,10 @@ const MatchCard = ({
   const team1Name = getTeamName(match.team1_id);
   const team2Name = getTeamName(match.team2_id);
   const hasTeams = match.team1_id && match.team2_id;
-  const hasOneTeam = (match.team1_id && !match.team2_id) || (!match.team1_id && match.team2_id); // Chapéu
+  const hasOneTeam = (match.team1_id && !match.team2_id) || (!match.team1_id && match.team2_id);
   const canScore = isOwner && hasTeams && (!isCompleted || isEditing);
+  const t1Win = match.winner_team_id === match.team1_id && isCompleted;
+  const t2Win = match.winner_team_id === match.team2_id && isCompleted;
 
   const setsWon = useMemo(() => {
     let t1 = 0, t2 = 0;
@@ -526,13 +291,6 @@ const MatchCard = ({
     });
   };
 
-  const getStatusBadge = () => {
-    if (hasOneTeam) return <Badge className="bg-muted text-muted-foreground border-border text-[10px]">Chapéu</Badge>;
-    if (isCompleted) return <Badge className="bg-success/20 text-success border-0 text-[10px]">Finalizado</Badge>;
-    if (hasTeams) return <Badge className="bg-warning/20 text-warning border-0 text-[10px]">Aguardando</Badge>;
-    return <Badge variant="outline" className="text-muted-foreground text-[10px]">A definir</Badge>;
-  };
-
   const handleDeclareTeamWinner = (winnerId: string) => {
     if (totalScore1 > 0 || totalScore2 > 0) {
       if (onAutoResult) {
@@ -554,124 +312,386 @@ const MatchCard = ({
 
   return (
     <div
-      className={`flex flex-col gap-1 rounded-lg border bg-card px-3 py-1.5 transition-colors ${
-        isCompleted ? "border-success/30 opacity-80" : hasTeams ? "border-primary/20" : "border-border"
+      className={`group relative flex items-stretch rounded-lg border bg-card transition-all hover:shadow-md ${
+        isCompleted
+          ? "border-success/25"
+          : hasTeams
+          ? "border-primary/20 hover:border-primary/40"
+          : "border-border/60"
       }`}
     >
-      {/* Header row */}
-      <div className="flex items-center gap-1.5 flex-wrap">
-        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground shrink-0">
-          {index}
-        </span>
-        <Badge variant="outline" className="text-[9px] shrink-0 font-semibold px-1.5 py-0">
-          {getRoundLabel(match.round)}
-        </Badge>
-        {getStatusBadge()}
-        {isCompleted && !isEditing && <Trophy className="h-3.5 w-3.5 text-success ml-auto shrink-0" />}
+      {/* Number column */}
+      <div className={`flex items-center justify-center w-9 shrink-0 rounded-l-lg text-[11px] font-bold ${
+        isCompleted ? "bg-success/10 text-success" : hasTeams ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+      }`}>
+        {index}
       </div>
 
-      {/* Teams with inline declare winner buttons */}
-       <div className="flex flex-col gap-0.5">
-         {/* Team 1 */}
-         <div className="flex items-center gap-1.5 min-h-[24px]">
-           <span className={`text-xs flex-1 truncate ${isCompleted && !isEditing && match.winner_team_id === match.team1_id ? "text-success font-bold" : match.team1_id === null ? "text-muted-foreground italic" : "team-name"}`}>
-             {match.team1_id ? team1Name : "Chapéu"}
-           </span>
-           {isOwner && hasTeams && !isCompleted && match.team1_id && (
-             <Button
-               size="sm"
-               variant="ghost"
-               className="h-5 px-1.5 text-[10px] gap-0.5 text-primary hover:bg-primary/10 shrink-0"
-               onClick={() => handleDeclareTeamWinner(match.team1_id!)}
-             >
-               <Trophy className="h-3 w-3" /> Vencedor
-             </Button>
-           )}
-         </div>
-         <span className="text-[10px] text-muted-foreground pl-0.5">vs</span>
-         {/* Team 2 */}
-         <div className="flex items-center gap-1.5 min-h-[24px]">
-           <span className={`text-xs flex-1 truncate ${isCompleted && !isEditing && match.winner_team_id === match.team2_id ? "text-success font-bold" : match.team2_id === null ? "text-muted-foreground italic" : "team-name"}`}>
-             {match.team2_id ? team2Name : "Chapéu"}
-           </span>
-           {isOwner && hasTeams && !isCompleted && match.team2_id && (
-             <Button
-               size="sm"
-               variant="ghost"
-               className="h-5 px-1.5 text-[10px] gap-0.5 text-primary hover:bg-primary/10 shrink-0"
-               onClick={() => handleDeclareTeamWinner(match.team2_id!)}
-             >
-               <Trophy className="h-3 w-3" /> Vencedor
-             </Button>
-           )}
-         </div>
-       </div>
+      {/* Main content */}
+      <div className="flex-1 min-w-0 px-3 py-1.5 space-y-0.5">
+        {/* Header: round badge + status */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Badge variant="outline" className="text-[9px] shrink-0 font-semibold px-1.5 py-0 border-border/50">
+            {getRoundLabel(match.round)}
+          </Badge>
+          {hasOneTeam && <Badge className="bg-muted text-muted-foreground border-border text-[9px] px-1.5 py-0">Chapéu</Badge>}
+          {isCompleted && !isEditing && <Trophy className="h-3 w-3 text-success ml-auto shrink-0" />}
+          {!isCompleted && hasTeams && (
+            <Badge className="bg-warning/15 text-warning border-0 text-[9px] px-1.5 py-0 ml-auto">Pendente</Badge>
+          )}
+        </div>
 
-      {/* Score editing with sets — ONLY for real matches (both teams present) */}
-       {hasTeams && canScore && (
-         <div className="space-y-1 mt-0.5">
-           <div className="flex items-center gap-1.5 flex-wrap">
-             {setScores.map((s, idx) => (
-               <div key={idx} className="flex items-center gap-0.5">
-                 <span className="text-[9px] text-muted-foreground font-medium">S{idx + 1}</span>
-                 <Input value={s.s1} onChange={(e) => updateSetScore(idx, "s1", e.target.value)} className="h-6 w-9 text-center text-[11px] p-0" />
-                 <span className="text-[10px] text-muted-foreground">×</span>
-                 <Input value={s.s2} onChange={(e) => updateSetScore(idx, "s2", e.target.value)} className="h-6 w-9 text-center text-[11px] p-0" />
-                 {idx < setScores.length - 1 && <span className="text-muted-foreground mx-0.5">|</span>}
-               </div>
-             ))}
-           </div>
+        {/* Teams */}
+        <div className="flex flex-col gap-0">
+          <div className="flex items-center gap-1.5 min-h-[22px]">
+            <span className={`text-xs flex-1 truncate ${t1Win ? "text-success font-bold" : match.team1_id === null ? "text-muted-foreground italic" : "text-foreground"}`}>
+              {match.team1_id ? team1Name : "Chapéu"}
+            </span>
+            {isOwner && hasTeams && !isCompleted && match.team1_id && (
+              <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px] gap-0.5 text-primary hover:bg-primary/10 shrink-0"
+                onClick={() => handleDeclareTeamWinner(match.team1_id!)}>
+                <Trophy className="h-3 w-3" /> Vencedor
+              </Button>
+            )}
+          </div>
+          <span className="text-[10px] text-muted-foreground/50 pl-0.5">vs</span>
+          <div className="flex items-center gap-1.5 min-h-[22px]">
+            <span className={`text-xs flex-1 truncate ${t2Win ? "text-success font-bold" : match.team2_id === null ? "text-muted-foreground italic" : "text-foreground"}`}>
+              {match.team2_id ? team2Name : "Chapéu"}
+            </span>
+            {isOwner && hasTeams && !isCompleted && match.team2_id && (
+              <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px] gap-0.5 text-primary hover:bg-primary/10 shrink-0"
+                onClick={() => handleDeclareTeamWinner(match.team2_id!)}>
+                <Trophy className="h-3 w-3" /> Vencedor
+              </Button>
+            )}
+          </div>
+        </div>
 
-           <div className="flex items-center gap-1.5 flex-wrap">
-             <span className="text-[10px] text-muted-foreground">
-               {totalScore1}×{totalScore2} | Sets: {setsWon.t1}×{setsWon.t2}
-             </span>
-             {autoWinnerId && (
-               <Badge className="bg-success/20 text-success border-0 text-[10px] px-1.5 py-0">
-                 Vencedor: {getTeamName(autoWinnerId).split(" / ")[0]}
-               </Badge>
-             )}
-           </div>
+        {/* Score editing with sets */}
+        {hasTeams && canScore && (
+          <div className="space-y-1 mt-0.5 pt-1 border-t border-border/30">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {setScores.map((s, idx) => (
+                <div key={idx} className="flex items-center gap-0.5">
+                  <span className="text-[9px] text-muted-foreground font-medium">S{idx + 1}</span>
+                  <Input value={s.s1} onChange={(e) => updateSetScore(idx, "s1", e.target.value)} className="h-6 w-9 text-center text-[11px] p-0" />
+                  <span className="text-[10px] text-muted-foreground">×</span>
+                  <Input value={s.s2} onChange={(e) => updateSetScore(idx, "s2", e.target.value)} className="h-6 w-9 text-center text-[11px] p-0" />
+                  {idx < setScores.length - 1 && <span className="text-muted-foreground/40 mx-0.5">|</span>}
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] text-muted-foreground tabular-nums">
+                {totalScore1}×{totalScore2} | Sets: {setsWon.t1}×{setsWon.t2}
+              </span>
+              {autoWinnerId && (
+                <Badge className="bg-success/15 text-success border-0 text-[9px] px-1.5 py-0">
+                  Vencedor: {getTeamName(autoWinnerId).split(" / ")[0]}
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Button size="sm" variant="outline" className="h-5 px-2 text-[10px] gap-0.5" onClick={handleSaveScoreOnly}>
+                <Save className="h-3 w-3" /> Salvar
+              </Button>
+              {isEditing && (
+                <Button size="sm" variant="ghost" className="h-5 px-2 text-[10px]" onClick={() => setIsEditing(false)}>
+                  Cancelar
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
 
-           <div className="flex items-center gap-1.5 flex-wrap">
-             <Button size="sm" variant="outline" className="h-5 px-2 text-[10px] gap-0.5" onClick={handleSaveScoreOnly}>
-               <Save className="h-3 w-3" /> Salvar
-             </Button>
-             {isEditing && (
-               <Button size="sm" variant="ghost" className="h-5 px-2 text-[10px]" onClick={() => setIsEditing(false)}>
-                 Cancelar
-               </Button>
-             )}
-           </div>
-         </div>
-       )}
+        {/* Completed score display */}
+        {hasTeams && !canScore && (
+          <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+            <span className="text-sm font-mono font-bold tabular-nums">
+              {match.score1 ?? "-"} <span className="text-muted-foreground/40">×</span> {match.score2 ?? "-"}
+            </span>
+            {isCompleted && match.winner_team_id && (
+              <Badge className="bg-success/15 text-success border-0 text-[9px] px-1.5 py-0">
+                {getTeamName(match.winner_team_id)}
+              </Badge>
+            )}
+            {isOwner && isCompleted && (
+              <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px] gap-0.5 ml-auto" onClick={() => setIsEditing(true)}>
+                <Pencil className="h-3 w-3" /> Corrigir
+              </Button>
+            )}
+          </div>
+        )}
 
-       {/* Completed / Read-only score display */}
-       {hasTeams && !canScore && (
-         <div className="flex items-center gap-1.5 flex-wrap">
-           <span className="text-xs font-mono font-bold">
-             {match.score1 ?? "-"} × {match.score2 ?? "-"}
-           </span>
-           {isCompleted && match.winner_team_id && (
-             <Badge className="bg-success/20 text-success border-0 text-[10px] px-1.5 py-0">
-               {getTeamName(match.winner_team_id)}
-             </Badge>
-           )}
-           {isOwner && isCompleted && (
-             <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px] gap-0.5" onClick={() => setIsEditing(true)}>
-               <Pencil className="h-3 w-3" /> Corrigir
-             </Button>
-           )}
-         </div>
-       )}
-
-       {/* Chapéu slot — show waiting message */}
-       {hasOneTeam && (
-         <div className="flex items-center gap-1.5 flex-wrap px-0.5 py-1 rounded bg-muted/30">
-           <span className="text-xs text-muted-foreground italic">Aguardando adversário real...</span>
-         </div>
-       )}
+        {/* Chapéu slot */}
+        {hasOneTeam && (
+          <div className="flex items-center gap-1.5 px-0.5 py-0.5 rounded bg-muted/20">
+            <span className="text-[10px] text-muted-foreground italic">Aguardando adversário...</span>
+          </div>
+        )}
+      </div>
     </div>
+  );
+};
+
+/* ═══════════════════════════════════════════
+   MAIN COMPONENT
+   ═══════════════════════════════════════════ */
+const MatchSequenceViewer = ({
+  matches,
+  teams,
+  isOwner,
+  numSets,
+  tournamentName = "",
+  sport = "",
+  eventDate,
+  tournamentFormat = 'single_elimination',
+  onDeclareWinner,
+  onUpdateScore,
+  onAutoResult,
+}: MatchSequenceViewerProps) => {
+  const getTeamName = (teamId: string | null) => {
+    if (!teamId) return "A definir";
+    const team = teams.find((t) => t.id === teamId);
+    return team ? `${team.player1_name} / ${team.player2_name}` : "A definir";
+  };
+
+  const sequence = useMemo(() => generateSequence(matches, tournamentFormat), [matches, tournamentFormat]);
+  const displaySequence = useMemo(() => sequence, [sequence]);
+
+  const matchCountByRound = useMemo(() => {
+    const counts: Record<number, number> = {};
+    matches.forEach(m => { counts[m.round] = (counts[m.round] || 0) + 1; });
+    return counts;
+  }, [matches]);
+
+  const getRoundLabel = (round: number) => {
+    return getEliminationRoundLabel(round, matchCountByRound[round] || 0);
+  };
+
+  // Build bracket blocks
+  const bracketBlocks = useMemo(() => {
+    if (displaySequence.length === 0) return [];
+
+    if (tournamentFormat === 'double_elimination') {
+      const blocks: { label: string; matches: { match: Match; globalIndex: number }[]; blockKey: string; isUnlocked: boolean; isCompleted: boolean }[] = [];
+      let idx = 1;
+
+      const groupStage = displaySequence.filter(m => m.round === 0);
+      if (groupStage.length > 0) {
+        const bracketCount = new Set(groupStage.map(m => m.bracket_number || 1)).size;
+        const matchesPerRound = Math.max(bracketCount, 1);
+        let roundNum = 1;
+        for (let i = 0; i < groupStage.length; i += matchesPerRound) {
+          const chunk = groupStage.slice(i, i + matchesPerRound);
+          blocks.push({
+            label: `Fase de Grupos — Rodada ${roundNum}`,
+            matches: chunk.map(m => ({ match: m, globalIndex: idx++ })),
+            blockKey: `GS_R${roundNum}`,
+            isUnlocked: true,
+            isCompleted: chunk.every(m => m.status === 'completed'),
+          });
+          roundNum++;
+        }
+      }
+
+      const eliminationMatches = matches.filter(m => m.round > 0);
+      const hasDoubleElimStructure = eliminationMatches.some(m => m.bracket_half);
+
+      if (hasDoubleElimStructure) {
+        const schedulerBlocks = buildSchedulerBlocks(eliminationMatches);
+        for (const sb of schedulerBlocks) {
+          const blockMatches = sb.matches.filter(m => m.team1_id && m.team2_id);
+          if (blockMatches.length === 0) continue;
+          blocks.push({
+            label: sb.label,
+            matches: blockMatches.map(m => ({ match: m as Match, globalIndex: idx++ })),
+            blockKey: sb.key,
+            isUnlocked: sb.isUnlocked,
+            isCompleted: sb.isCompleted,
+          });
+        }
+      } else {
+        const knockoutDisplay = displaySequence.filter(m => m.round > 0);
+        const knockoutRounds = [...new Set(knockoutDisplay.map(m => m.round))].sort((a, b) => a - b);
+        for (const r of knockoutRounds) {
+          const roundMatches = knockoutDisplay.filter(m => m.round === r);
+          blocks.push({
+            label: getEliminationRoundLabel(r, matchCountByRound[r] || 0),
+            matches: roundMatches.map(m => ({ match: m, globalIndex: idx++ })),
+            blockKey: `KO_R${r}`,
+            isUnlocked: true,
+            isCompleted: roundMatches.every(m => m.status === 'completed'),
+          });
+        }
+      }
+      return blocks;
+    }
+
+    // Non-DE
+    const groups: { label: string; matches: { match: Match; globalIndex: number }[]; blockKey?: string; isCompleted?: boolean }[] = [];
+    const groupStage = displaySequence.filter(m => m.round === 0);
+    const knockoutStage = displaySequence.filter(m => m.round > 0);
+
+    if (groupStage.length > 0) {
+      const bracketCount = new Set(groupStage.map(m => m.bracket_number || 1)).size;
+      const matchesPerRound = Math.max(bracketCount, 1);
+      let roundNum = 1;
+      for (let i = 0; i < groupStage.length; i += matchesPerRound) {
+        const chunk = groupStage.slice(i, i + matchesPerRound);
+        groups.push({
+          label: `Fase de Grupos — Rodada ${roundNum}`,
+          matches: chunk.map(m => ({ match: m, globalIndex: 0 })),
+          blockKey: `GS_R${roundNum}`,
+          isCompleted: chunk.every(m => m.status === 'completed'),
+        });
+        roundNum++;
+      }
+    }
+
+    if (knockoutStage.length > 0) {
+      const knockoutRounds = [...new Set(knockoutStage.map(m => m.round))].sort((a, b) => a - b);
+      for (const r of knockoutRounds) {
+        const roundMatches = knockoutStage.filter(m => m.round === r);
+        groups.push({
+          label: getRoundLabel(r),
+          matches: roundMatches.map(m => ({ match: m, globalIndex: 0 })),
+          blockKey: `KO_R${r}`,
+          isCompleted: roundMatches.every(m => m.status === 'completed'),
+        });
+      }
+    }
+
+    let idx = 1;
+    for (const g of groups) {
+      for (const entry of g.matches) {
+        entry.globalIndex = idx++;
+      }
+    }
+    return groups;
+  }, [displaySequence, matchCountByRound, tournamentFormat]);
+
+  // Stats
+  const realMatches = useMemo(() => matches.filter(m => m.team1_id && m.team2_id), [matches]);
+  const completedCount = useMemo(() => realMatches.filter(m => m.status === "completed").length, [realMatches]);
+  const pendingCount = useMemo(() => realMatches.filter(m => m.status !== "completed").length, [realMatches]);
+
+  if (displaySequence.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
+        <p className="text-muted-foreground">Gere o chaveamento primeiro para ver a sequência de partidas.</p>
+      </div>
+    );
+  }
+
+  const handleExport = (format: "pdf" | "xlsx" | "csv") => {
+    const meta = { tournamentName, sport, date: eventDate };
+    const rows = sequence.map((m, idx) => ({
+      order: idx + 1,
+      round: getRoundLabel(m.round),
+      group: getMatchGroupId(m),
+      team1: getTeamName(m.team1_id),
+      team2: getTeamName(m.team2_id),
+      score: m.status === "completed" ? `${m.score1 ?? 0} × ${m.score2 ?? 0}` : "-",
+      winner: m.winner_team_id ? getTeamName(m.winner_team_id) : "-",
+      status: m.status === "completed" ? "Finalizado" : "Pendente",
+    }));
+    exportMatchSequence(format, rows, meta);
+  };
+
+  const isDoubleElim = tournamentFormat === 'double_elimination';
+
+  return (
+    <section className="space-y-4">
+      {/* Header with export */}
+      <div className="flex items-center justify-between">
+        <ProgressSummary total={realMatches.length} completed={completedCount} pending={pendingCount} />
+      </div>
+
+      {/* Export button */}
+      <div className="flex justify-end">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+              <Download className="h-3.5 w-3.5" /> Exportar
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => handleExport("pdf")}>
+              <FileText className="h-4 w-4 mr-2" /> PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("xlsx")}>
+              <Sheet className="h-4 w-4 mr-2" /> Excel (.xlsx)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("csv")}>
+              <FileText className="h-4 w-4 mr-2" /> CSV
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Blocks */}
+      {bracketBlocks.map((block) => {
+        const blockKey = (block as any).blockKey;
+        const isUnlocked = (block as any).isUnlocked ?? true;
+        const isBlockCompleted = (block as any).isCompleted ?? false;
+        const borderColor = isDoubleElim && blockKey ? getSchedulerBlockColor(blockKey) : "border-l-primary";
+        const completedInBlock = block.matches.filter(e => e.match.status === "completed").length;
+        const totalInBlock = block.matches.length;
+        const blockPct = totalInBlock > 0 ? Math.round((completedInBlock / totalInBlock) * 100) : 0;
+
+        return (
+          <div
+            key={block.label}
+            className={`rounded-xl border bg-card/30 overflow-hidden border-l-4 ${borderColor} ${!isUnlocked && isDoubleElim ? 'opacity-40' : ''}`}
+          >
+            {/* Block header */}
+            <div className="px-4 py-3 border-b border-border/50 bg-muted/20">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-foreground">{block.label}</h3>
+                  {isDoubleElim && !isUnlocked && (
+                    <Badge variant="outline" className="text-[9px] gap-0.5 text-muted-foreground border-border/50 px-1.5 py-0">
+                      <Lock className="h-2.5 w-2.5" /> Bloqueado
+                    </Badge>
+                  )}
+                  {isBlockCompleted && (
+                    <Badge className="bg-success/15 text-success border-0 text-[9px] px-1.5 py-0">
+                      <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" /> Concluído
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground tabular-nums">{completedInBlock}/{totalInBlock}</span>
+                  <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div className="h-full rounded-full bg-success transition-all duration-300" style={{ width: `${blockPct}%` }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Match cards */}
+            <div className="p-2 grid gap-1.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(280px,1fr))]">
+              {block.matches.map(({ match, globalIndex }) => (
+                <MatchCard
+                  key={match.id}
+                  match={match}
+                  index={globalIndex}
+                  getTeamName={getTeamName}
+                  getRoundLabel={(r) => getRoundShortLabel(r, matchCountByRound[r] || 0)}
+                  isOwner={isOwner}
+                  numSets={numSets}
+                  onDeclareWinner={onDeclareWinner}
+                  onUpdateScore={onUpdateScore}
+                  onAutoResult={onAutoResult}
+                />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </section>
   );
 };
 

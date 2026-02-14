@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Lock } from "lucide-react";
+import { Trophy, Lock, CheckCircle2, Clock, AlertCircle, ListOrdered } from "lucide-react";
 import { getEliminationRoundLabel } from "@/lib/roundLabels";
-import { buildSchedulerBlocks, getSchedulerBlockColor } from "@/lib/roundScheduler";
+import { buildSchedulerBlocks, getSchedulerBlockColor, getSchedulerBadgeColor } from "@/lib/roundScheduler";
 
 /* Helper: Convert number to letter (1→A, 2→B, etc) */
 const numberToLetter = (num: number): string => {
@@ -31,112 +31,195 @@ interface Team {
 interface MatchSequenceTabProps {
   matches: Match[];
   teams: Team[];
-  tournamentFormat?: string; // 'single_elimination' | 'double_elimination' | 'group_stage'
+  tournamentFormat?: string;
 }
 
+/* ─── Progress Bar ─── */
+const ProgressSummary = ({ total, completed, pending }: { total: number; completed: number; pending: number }) => {
+  const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+  return (
+    <div className="rounded-xl border border-border bg-card/80 backdrop-blur-sm p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <ListOrdered className="h-4 w-4 text-primary" />
+          <span className="text-sm font-bold text-foreground">Progresso do Torneio</span>
+        </div>
+        <span className="text-xs font-mono font-bold text-primary">{pct}%</span>
+      </div>
+      <div className="h-2 rounded-full bg-muted overflow-hidden">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-success" /> {completed} finalizadas</span>
+        <span className="flex items-center gap-1"><Clock className="h-3 w-3 text-warning" /> {pending} pendentes</span>
+        <span className="flex items-center gap-1"><AlertCircle className="h-3 w-3 text-muted-foreground/50" /> {total - completed - pending} aguardando</span>
+      </div>
+    </div>
+  );
+};
+
+/* ─── Match Row ─── */
+const MatchRow = ({
+  match,
+  idx,
+  getTeamName,
+  getRoundLabel,
+}: {
+  match: Match;
+  idx: number;
+  getTeamName: (id: string | null) => string;
+  getRoundLabel: (round: number) => string;
+}) => {
+  const isCompleted = match.status === "completed";
+  const team1Name = getTeamName(match.team1_id);
+  const team2Name = getTeamName(match.team2_id);
+  const t1Win = match.winner_team_id === match.team1_id && isCompleted;
+  const t2Win = match.winner_team_id === match.team2_id && isCompleted;
+  const hasTeams = match.team1_id && match.team2_id;
+
+  return (
+    <div
+      className={`group relative flex items-stretch rounded-lg border bg-card transition-all hover:shadow-md ${
+        isCompleted
+          ? "border-success/25"
+          : hasTeams
+          ? "border-primary/20 hover:border-primary/40"
+          : "border-border/60"
+      }`}
+    >
+      {/* Number */}
+      <div className={`flex items-center justify-center w-10 shrink-0 rounded-l-lg text-xs font-bold ${
+        isCompleted ? "bg-success/10 text-success" : hasTeams ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+      }`}>
+        {idx}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0 px-3 py-2 space-y-1">
+        {/* Teams */}
+        <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0 flex items-center gap-1.5">
+            <span className={`text-xs font-medium truncate ${
+              t1Win ? "text-success font-bold" : match.team1_id ? "text-foreground" : "text-muted-foreground italic"
+            }`}>
+              {team1Name}
+            </span>
+            <span className="text-[10px] text-muted-foreground/60 shrink-0">vs</span>
+            <span className={`text-xs font-medium truncate ${
+              t2Win ? "text-success font-bold" : match.team2_id ? "text-foreground" : "text-muted-foreground italic"
+            }`}>
+              {team2Name}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Score / Status */}
+      <div className="flex items-center gap-2 px-3 shrink-0">
+        {isCompleted && (
+          <>
+            <span className="text-sm font-mono font-bold text-foreground tabular-nums">
+              {match.score1} <span className="text-muted-foreground/50">×</span> {match.score2}
+            </span>
+            <Trophy className="h-3.5 w-3.5 text-success" />
+          </>
+        )}
+        {!isCompleted && hasTeams && (
+          <Badge className="bg-warning/15 text-warning border-0 text-[10px] px-2">Pendente</Badge>
+        )}
+        {!isCompleted && !hasTeams && (
+          <Badge variant="outline" className="text-muted-foreground/60 text-[10px] px-2 border-border/40">Aguardando</Badge>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* ─── Block Section ─── */
+const BlockSection = ({
+  label,
+  items,
+  blockKey,
+  isUnlocked,
+  isCompleted,
+  isDE,
+  getTeamName,
+  getRoundLabel,
+}: {
+  label: string;
+  items: { match: Match; idx: number }[];
+  blockKey?: string;
+  isUnlocked?: boolean;
+  isCompleted?: boolean;
+  isDE: boolean;
+  getTeamName: (id: string | null) => string;
+  getRoundLabel: (round: number) => string;
+}) => {
+  const completedCount = items.filter(i => i.match.status === "completed").length;
+  const totalCount = items.length;
+  const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+  const borderColor = isDE && blockKey ? getSchedulerBlockColor(blockKey) : "border-l-primary";
+  const locked = isDE && isUnlocked === false;
+
+  return (
+    <div className={`rounded-xl border bg-card/30 overflow-hidden border-l-4 ${borderColor} ${locked ? "opacity-40" : ""}`}>
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-border/50 bg-muted/20">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold text-foreground">{label}</h3>
+            {locked && (
+              <Badge variant="outline" className="text-[9px] gap-0.5 text-muted-foreground border-border/50 px-1.5 py-0">
+                <Lock className="h-2.5 w-2.5" /> Bloqueado
+              </Badge>
+            )}
+            {isDE && isCompleted && (
+              <Badge className="bg-success/15 text-success border-0 text-[9px] px-1.5 py-0">
+                <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" /> Concluído
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-muted-foreground tabular-nums">{completedCount}/{totalCount}</span>
+            <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full bg-success transition-all duration-300"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Match List */}
+      <div className="p-2 space-y-1.5">
+        {items.map(({ match, idx }) => (
+          <MatchRow
+            key={match.id}
+            match={match}
+            idx={idx}
+            getTeamName={getTeamName}
+            getRoundLabel={getRoundLabel}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════
+   MAIN COMPONENT
+   ═══════════════════════════════════════════ */
 const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_elimination' }: MatchSequenceTabProps) => {
   const getTeamName = (teamId: string | null) => {
     if (!teamId) return "A definir";
     const team = teams.find((t) => t.id === teamId);
     return team ? `${team.player1_name} / ${team.player2_name}` : "A definir";
   };
-
-  const getGroupId = (match: Match & { bracket_type?: string; bracket_half?: string | null }) => {
-    if (match.round === 0) return `Grupo ${numberToLetter(match.bracket_number || 1)}`;
-    if ((match as any).bracket_type === 'winners' && (match as any).bracket_half) return `Chave dos Vencedores - ${(match as any).bracket_half === 'upper' ? 'Superior' : 'Inferior'}`;
-    if ((match as any).bracket_type === 'winners' && !(match as any).bracket_half) return 'Final dos Vencedores';
-    if ((match as any).bracket_type === 'losers') return `Perdedores (${(match as any).bracket_half === 'upper' ? 'Superior' : 'Inferior'})`;
-    if ((match as any).bracket_type === 'cross_semi') return `Semifinal Cruzada ${(match as any).bracket_half === 'upper' ? '1' : '2'}`;
-    if ((match as any).bracket_type === 'final') return 'Final';
-    if ((match as any).bracket_type === 'third_place') return 'Disputa 3º Lugar';
-    return `Chave ${match.bracket_number || 1}`;
-  };
-
-  const getBracketColor = (match: Match & { bracket_type?: string }) => {
-    if ((match as any).bracket_type === 'winners') return 'bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-500/30';
-    if ((match as any).bracket_type === 'losers') return 'bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-500/30';
-    if ((match as any).bracket_type === 'cross_semi') return 'bg-purple-500/20 text-purple-700 dark:text-purple-400 border-purple-500/30';
-    if ((match as any).bracket_type === 'final') return 'bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30';
-    return 'bg-primary/20 text-primary border-primary/30';
-  };
-
-  // Generate match sequence based on tournament format
-  const sequence = useMemo(() => {
-    if (matches.length === 0) return [];
-
-    if (tournamentFormat === 'double_elimination') {
-      // Group stage first (round 0), then elimination via scheduler
-      const groupStage = matches.filter(m => m.round === 0);
-      const elimination = matches.filter(m => m.round > 0);
-      
-      const groupInterleaved: Match[] = [];
-      if (groupStage.length > 0) {
-        const brackets = [...new Set(groupStage.map(m => m.bracket_number || 1))].sort((a, b) => a - b);
-        const positions = [...new Set(groupStage.map(m => m.position))].sort((a, b) => a - b);
-        for (const pos of positions) {
-          for (const b of brackets) {
-            const match = groupStage.find(m => (m.bracket_number || 1) === b && m.position === pos);
-            if (match) groupInterleaved.push(match);
-          }
-        }
-      }
-      
-      const hasDoubleElimStructure = elimination.some(m => (m as any).bracket_half);
-      
-      if (hasDoubleElimStructure) {
-        const schedulerBlocks = buildSchedulerBlocks(elimination as any);
-        const result: Match[] = [...groupInterleaved];
-        for (const block of schedulerBlocks) {
-          result.push(...(block.matches as Match[]));
-        }
-        return result;
-      } else {
-        // Fallback: interleave knockout by round/bracket
-        const rounds = [...new Set(elimination.map(m => m.round))].sort((a, b) => a - b);
-        const brackets = [...new Set(elimination.map(m => m.bracket_number || 1))].sort((a, b) => a - b);
-        const ordered: Match[] = [...groupInterleaved];
-        for (const round of rounds) {
-          const roundMatches = elimination.filter(m => m.round === round);
-          const byBracket: Record<number, Match[]> = {};
-          for (const b of brackets) {
-            byBracket[b] = roundMatches.filter(m => (m.bracket_number || 1) === b).sort((a, b2) => a.position - b2.position);
-          }
-          const maxLen = Math.max(...Object.values(byBracket).map(a => a.length));
-          for (let i = 0; i < maxLen; i++) {
-            for (const b of brackets) {
-              if (byBracket[b][i]) ordered.push(byBracket[b][i]);
-            }
-          }
-        }
-        return ordered;
-      }
-    }
-
-    // OUTROS FORMATOS: Interleaving entre chaves
-    const rounds = [...new Set(matches.map((m) => m.round))].sort((a, b) => a - b);
-    const brackets = [...new Set(matches.map((m) => m.bracket_number || 1))].sort((a, b) => a - b);
-    const ordered: Match[] = [];
-    for (const round of rounds) {
-      const roundMatches = matches.filter((m) => m.round === round);
-      const byBracket: Record<number, Match[]> = {};
-      for (const b of brackets) {
-        byBracket[b] = roundMatches.filter((m) => (m.bracket_number || 1) === b).sort((a, b2) => a.position - b2.position);
-      }
-      const maxLen = Math.max(...Object.values(byBracket).map((a) => a.length));
-      for (let i = 0; i < maxLen; i++) {
-        for (const b of brackets) {
-          if (byBracket[b][i]) ordered.push(byBracket[b][i]);
-        }
-      }
-    }
-    return ordered;
-  }, [matches, tournamentFormat]);
-
-  // REGRA: só exibir partidas onde AMBOS os times estão definidos
-  const displaySequence = useMemo(() => 
-    sequence.filter(m => m.team1_id && m.team2_id),
-    [sequence]
-  );
 
   const matchCountByRound = useMemo(() => {
     const counts: Record<number, number> = {};
@@ -148,30 +231,50 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
     return getEliminationRoundLabel(round, matchCountByRound[round] || 0);
   };
 
-  // Group into display rounds
+  // Build grouped blocks
   const groupedRounds = useMemo(() => {
-    if (displaySequence.length === 0) return [];
+    if (matches.length === 0) return [];
+
+    const displayMatches = matches.filter(m => m.team1_id && m.team2_id);
+    if (displayMatches.length === 0) return [];
 
     const groups: { label: string; items: { match: Match; idx: number }[]; blockKey?: string; isUnlocked?: boolean; isCompleted?: boolean }[] = [];
 
-    const groupStage = displaySequence.filter((m) => m.round === 0);
-    const knockoutStage = displaySequence.filter((m) => m.round > 0);
+    const groupStage = displayMatches.filter(m => m.round === 0);
+    const knockoutStage = displayMatches.filter(m => m.round > 0);
 
+    // Group stage: split into interleaved rounds
     if (groupStage.length > 0) {
-      const bracketCount = new Set(groupStage.map((m) => m.bracket_number || 1)).size;
-      const perRound = Math.max(bracketCount, 1);
+      const brackets = [...new Set(groupStage.map(m => m.bracket_number || 1))].sort((a, b) => a - b);
+      const positions = [...new Set(groupStage.map(m => m.position))].sort((a, b) => a - b);
+
+      const interleaved: Match[] = [];
+      for (const pos of positions) {
+        for (const b of brackets) {
+          const match = groupStage.find(m => (m.bracket_number || 1) === b && m.position === pos);
+          if (match) interleaved.push(match);
+        }
+      }
+
+      const perRound = Math.max(brackets.length, 1);
       let roundNum = 1;
-      for (let i = 0; i < groupStage.length; i += perRound) {
-        const chunk = groupStage.slice(i, i + perRound);
-        groups.push({ label: `Rodada ${roundNum}`, items: chunk.map((m) => ({ match: m, idx: 0 })) });
+      for (let i = 0; i < interleaved.length; i += perRound) {
+        const chunk = interleaved.slice(i, i + perRound);
+        groups.push({
+          label: `Fase de Grupos — Rodada ${roundNum}`,
+          items: chunk.map(m => ({ match: m, idx: 0 })),
+          blockKey: `GS_R${roundNum}`,
+          isUnlocked: true,
+          isCompleted: chunk.every(m => m.status === "completed"),
+        });
         roundNum++;
       }
     }
 
+    // Knockout
     if (knockoutStage.length > 0) {
       const hasDoubleElimStructure = matches.some(m => m.round > 0 && (m as any).bracket_half);
-      if (tournamentFormat === 'double_elimination' && hasDoubleElimStructure) {
-        // Use round scheduler blocks for true double elimination
+      if (tournamentFormat === "double_elimination" && hasDoubleElimStructure) {
         const eliminationOnly = matches.filter(m => m.round > 0);
         const schedulerBlocks = buildSchedulerBlocks(eliminationOnly as any);
         for (const sb of schedulerBlocks) {
@@ -179,23 +282,25 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
           if (blockMatches.length === 0) continue;
           groups.push({
             label: sb.label,
-            items: blockMatches.map((m) => ({ match: m, idx: 0 })),
+            items: blockMatches.map(m => ({ match: m, idx: 0 })),
             blockKey: sb.key,
             isUnlocked: sb.isUnlocked,
             isCompleted: sb.isCompleted,
           });
         }
       } else {
-        const rounds = [...new Set(knockoutStage.map((m) => m.round))].sort((a, b) => a - b);
+        const rounds = [...new Set(knockoutStage.map(m => m.round))].sort((a, b) => a - b);
         for (const r of rounds) {
+          const rMatches = knockoutStage.filter(m => m.round === r);
           groups.push({
             label: getRoundLabel(r),
-            items: knockoutStage.filter((m) => m.round === r).map((m) => ({ match: m, idx: 0 })),
+            items: rMatches.map(m => ({ match: m, idx: 0 })),
           });
         }
       }
     }
 
+    // Number all items globally
     let counter = 1;
     for (const g of groups) {
       for (const entry of g.items) {
@@ -203,9 +308,14 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
       }
     }
     return groups;
-  }, [displaySequence, matches, matchCountByRound, tournamentFormat]);
+  }, [matches, tournamentFormat, matchCountByRound]);
 
-  if (displaySequence.length === 0) {
+  // Stats
+  const displayMatches = useMemo(() => matches.filter(m => m.team1_id && m.team2_id), [matches]);
+  const completedCount = useMemo(() => displayMatches.filter(m => m.status === "completed").length, [displayMatches]);
+  const pendingCount = useMemo(() => displayMatches.filter(m => m.status !== "completed" && m.team1_id && m.team2_id).length, [displayMatches]);
+
+  if (displayMatches.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
         <p className="text-muted-foreground">Gere o chaveamento primeiro para ver a sequência de partidas.</p>
@@ -213,80 +323,28 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
     );
   }
 
-  return (
-    <section className="space-y-3">
-      <h2 className="text-xl font-semibold mb-4">Sequência de Partidas</h2>
-      {groupedRounds.map((group) => {
-        const isDE = tournamentFormat === 'double_elimination';
-        const borderColor = isDE && group.blockKey ? `border-l-4 ${getSchedulerBlockColor(group.blockKey)}` : '';
-        return (
-        <div key={group.label} className={`space-y-2 ${borderColor} ${isDE && group.isUnlocked === false ? 'opacity-50' : ''} ${borderColor ? 'pl-3 rounded-lg' : ''}`}>
-          <div className="flex items-center gap-2">
-            <h3 className="text-lg font-semibold text-primary mt-4 mb-1 border-b border-border pb-1">
-              {group.label}
-            </h3>
-            {isDE && group.isUnlocked === false && (
-              <Badge variant="outline" className="text-[10px] gap-1 text-muted-foreground mt-3">
-                <Lock className="h-3 w-3" /> Bloqueado
-              </Badge>
-            )}
-            {isDE && group.isCompleted && (
-              <Badge className="bg-success/20 text-success border-0 text-[10px] mt-3">✓ Concluído</Badge>
-            )}
-          </div>
-           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
-             {group.items.map(({ match, idx }) => {
-             const isCompleted = match.status === "completed";
-             const team1Name = getTeamName(match.team1_id);
-             const team2Name = getTeamName(match.team2_id);
-             const hasTeams = match.team1_id && match.team2_id;
+  const isDE = tournamentFormat === "double_elimination";
 
-             return (
-               <div
-                key={match.id}
-                className={`flex items-center gap-4 rounded-lg border bg-card px-4 py-3 shadow-card transition-all ${
-                  isCompleted ? "border-success/30 opacity-80" : hasTeams ? "border-primary/30" : "border-border"
-                }`}
-              >
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground shrink-0">
-                  {idx}
-                </span>
-                <div className="flex-1 min-w-0">
-                 <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="outline" className="text-xs shrink-0 font-semibold">
-                      {getRoundLabel(match.round)}
-                    </Badge>
-                    <Badge className={`text-xs shrink-0 font-semibold border ${getBracketColor(match)}`}>
-                      {getGroupId(match)}
-                    </Badge>
-                    <span className={`text-sm truncate ${team1Name === "A definir" ? "text-muted-foreground" : "team-name"}`}>{team1Name}</span>
-                    <span className="text-xs text-muted-foreground">vs</span>
-                    <span className={`text-sm truncate ${team2Name === "A definir" ? "text-muted-foreground" : "team-name"}`}>{team2Name}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {isCompleted && (
-                    <>
-                      <span className="text-sm font-mono font-bold">
-                        {match.score1} - {match.score2}
-                      </span>
-                      <Trophy className="h-4 w-4 text-success" />
-                    </>
-                  )}
-                  {!isCompleted && hasTeams && (
-                    <Badge className="bg-warning/20 text-warning border-0">Pendente</Badge>
-                  )}
-                  {!isCompleted && !hasTeams && (
-                    <Badge variant="outline" className="text-muted-foreground">Aguardando</Badge>
-                  )}
-                </div>
-               </div>
-             );
-           })}
-           </div>
-         </div>
-       )})}
-     </section>
+  return (
+    <section className="space-y-4">
+      {/* Progress */}
+      <ProgressSummary total={displayMatches.length} completed={completedCount} pending={pendingCount} />
+
+      {/* Blocks */}
+      {groupedRounds.map((group) => (
+        <BlockSection
+          key={group.label}
+          label={group.label}
+          items={group.items}
+          blockKey={group.blockKey}
+          isUnlocked={group.isUnlocked}
+          isCompleted={group.isCompleted}
+          isDE={isDE}
+          getTeamName={getTeamName}
+          getRoundLabel={getRoundLabel}
+        />
+      ))}
+    </section>
   );
 };
 

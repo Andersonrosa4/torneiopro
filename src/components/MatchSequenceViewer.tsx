@@ -576,7 +576,7 @@ const MatchSequenceViewer = ({
       }
     }
     return groups;
-  }, [displaySequence, matchCountByRound, tournamentFormat]);
+  }, [displaySequence, matches, matchCountByRound, tournamentFormat]);
 
   // Stats
   const realMatches = useMemo(() => matches.filter(m => m.team1_id && m.team2_id), [matches]);

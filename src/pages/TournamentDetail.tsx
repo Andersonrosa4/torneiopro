@@ -84,6 +84,7 @@ interface Match {
   bracket_half: string | null;
   next_win_match_id: string | null;
   next_lose_match_id: string | null;
+  is_chapeu?: boolean | null;
 }
 
 const TournamentDetail = () => {
@@ -1079,6 +1080,13 @@ const TournamentDetail = () => {
             const hasTeam1 = !!pm.team1_id;
             const hasTeam2 = !!pm.team2_id;
             if (hasTeam1 === hasTeam2) continue; // Both filled or both empty — skip
+            
+            // GUARD: In DE, only auto-complete matches explicitly marked as chapéu
+            // Losers bracket matches with 1 team are NOT BYEs — they're waiting for losers to drop
+            if (isDoubleElimination && !pm.is_chapeu) {
+              console.log(`[BYE:Skip] Match ${pm.id} (${pm.bracket_type} ${pm.bracket_half} R${pm.round}P${pm.position}) has 1 team but is NOT chapéu — skipping BYE auto-completion`);
+              continue;
+            }
             
             // Check if any incomplete match feeds into this one
             const pendingFeeders = modalityMatches.filter(

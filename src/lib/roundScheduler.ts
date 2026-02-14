@@ -20,6 +20,8 @@ interface SchedulerMatch {
   bracket_number?: number;
   bracket_type?: string;
   bracket_half?: string | null;
+  next_win_match_id?: string | null;
+  next_lose_match_id?: string | null;
 }
 
 export interface SchedulerBlock {
@@ -190,7 +192,76 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
     });
   }
 
+  // ── Anti-back-to-back: reorder matches within blocks to prevent consecutive feeder conflicts ──
+  // A team should never play in match N and then immediately in match N+1.
+  // We detect this via next_win_match_id / next_lose_match_id links.
+  reorderBlocksToAvoidBackToBack(blocks);
+
   return blocks;
+}
+
+/**
+ * Reorder matches within blocks so no match directly feeds into the very next match in sequence.
+ * This prevents a team from finishing one game and immediately playing the next.
+ */
+function reorderBlocksToAvoidBackToBack(blocks: SchedulerBlock[]): void {
+  // Build a set of all feeder relationships: sourceId → targetId
+  const allMatches = blocks.flatMap(b => b.matches);
+  const feederTargets = new Set<string>();
+  for (const m of allMatches) {
+    if (m.next_win_match_id) feederTargets.add(`${m.id}→${m.next_win_match_id}`);
+    if (m.next_lose_match_id) feederTargets.add(`${m.id}→${m.next_lose_match_id}`);
+  }
+
+  function isDirectFeeder(fromMatch: SchedulerMatch, toMatch: SchedulerMatch): boolean {
+    return feederTargets.has(`${fromMatch.id}→${toMatch.id}`);
+  }
+
+  // For each block, check if first match has a direct feeder from the last match of the previous block
+  for (let bi = 1; bi < blocks.length; bi++) {
+    const prevBlock = blocks[bi - 1];
+    const currBlock = blocks[bi];
+    if (prevBlock.matches.length === 0 || currBlock.matches.length < 2) continue;
+
+    const lastPrev = prevBlock.matches[prevBlock.matches.length - 1];
+
+    // Check if first match of current block is fed by last match of previous block
+    if (isDirectFeeder(lastPrev, currBlock.matches[0])) {
+      // Find another match in this block that is NOT a direct feeder from lastPrev
+      let swapIdx = -1;
+      for (let mi = 1; mi < currBlock.matches.length; mi++) {
+        if (!isDirectFeeder(lastPrev, currBlock.matches[mi])) {
+          swapIdx = mi;
+          break;
+        }
+      }
+      if (swapIdx !== -1) {
+        [currBlock.matches[0], currBlock.matches[swapIdx]] = 
+          [currBlock.matches[swapIdx], currBlock.matches[0]];
+      }
+    }
+  }
+
+  // Also check within each block for consecutive feeder conflicts
+  for (const block of blocks) {
+    for (let i = 0; i < block.matches.length - 1; i++) {
+      if (isDirectFeeder(block.matches[i], block.matches[i + 1])) {
+        // Find a non-conflicting match to swap with
+        let swapIdx = -1;
+        for (let j = i + 2; j < block.matches.length; j++) {
+          if (!isDirectFeeder(block.matches[i], block.matches[j]) &&
+              (i + 2 >= block.matches.length || !isDirectFeeder(block.matches[j], block.matches[i + 2]))) {
+            swapIdx = j;
+            break;
+          }
+        }
+        if (swapIdx !== -1) {
+          [block.matches[i + 1], block.matches[swapIdx]] = 
+            [block.matches[swapIdx], block.matches[i + 1]];
+        }
+      }
+    }
+  }
 }
 
 /**

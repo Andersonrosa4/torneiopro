@@ -130,7 +130,9 @@ export function processDoubleEliminationAdvance(
   }
 
   // ── LOSER PLACEMENT — MIRROR CROSSING ENFORCED ──
-  if (loserId && currentMatch.next_lose_match_id) {
+  // GUARD: Semifinal/Final losers are IMMEDIATELY ELIMINATED
+  const isSemiFinalOrFinal = currentMatch.bracket_type === 'semi_final' || currentMatch.bracket_type === 'final';
+  if (loserId && currentMatch.next_lose_match_id && !isSemiFinalOrFinal) {
     const nextLoseMatch = matches.find(m => m.id === currentMatch.next_lose_match_id);
     if (nextLoseMatch) {
       // VALIDATE: If current match is winners, losers target MUST be opposite side

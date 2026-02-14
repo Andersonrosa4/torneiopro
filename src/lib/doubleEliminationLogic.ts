@@ -1,8 +1,8 @@
 /**
  * Double Elimination Bracket Generation Logic v8 - MODELO CUSTOM
  *
- * FORMULA ABSOLUTA: Total matches = (2 × N) − 2 para final única
- * Para 32 equipes: (2 × 32) − 2 = 62 partidas
+ * FORMULA ABSOLUTA: Total matches = (2 × N) − 3 para final única
+ * Para 32 equipes: (2 × 32) − 3 = 61 partidas
  *
  * Estrutura (para 32 equipes):
  *   Winners Upper (A): 15 partidas

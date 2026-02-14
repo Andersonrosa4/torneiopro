@@ -92,11 +92,11 @@
 // Se ambos são do mesmo tipo (winner+winner ou sem feeder), sem swap.
 
 // ═══════════════════════════════════════════════════
-// REGRA 8: ESPELHAMENTO REVERSO NA R1 DOS PERDEDORES
+// REGRA 8: PAREAMENTO SEQUENCIAL NA R1 DOS PERDEDORES
 // ═══════════════════════════════════════════════════
-// Na Rodada 1 da Chave dos Perdedores, o pareamento segue
-// espelhamento reverso: primeiro com último, segundo com penúltimo.
-// Evita confrontos sequenciais imediatos.
+// Na Rodada 1 da Chave dos Perdedores, o pareamento é SEQUENCIAL
+// por order de position: Perd.1 vs Perd.2, Perd.3 vs Perd.4, etc.
+// Quem jogou antes na Winners joga primeiro na Losers.
 
 // ═══════════════════════════════════════════════════
 // REGRA 9: ANTI-REPETIÇÃO NAS RODADAS INICIAIS

@@ -74,7 +74,8 @@ export function getSlotFeeders(
     // Fallback when match not yet played: use slot convention rules
     if (!slot) {
       if (isWinnerFeeder && feeder.bracket_type === 'losers' && targetMatch.bracket_type === 'losers') {
-        slot = 'team1'; // losers survivor → always team1
+        // Position-based: two losers matches may feed the same next match
+        slot = feeder.position % 2 === 1 ? 'team1' : 'team2';
       } else if (!isWinnerFeeder && feeder.bracket_type === 'winners' && targetMatch.bracket_type === 'losers') {
         // MUST match doubleEliminationAdvance.ts: position-based slot for droppers
         slot = feeder.position % 2 === 1 ? 'team1' : 'team2';

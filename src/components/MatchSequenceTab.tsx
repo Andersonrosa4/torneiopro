@@ -38,7 +38,7 @@ interface MatchSequenceTabProps {
 const ProgressSummary = ({ total, completed, pending }: { total: number; completed: number; pending: number }) => {
   const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
   return (
-    <div className="rounded-xl border border-border bg-card/80 backdrop-blur-sm p-4 space-y-3">
+    <div className="rounded-xl border border-border bg-card backdrop-blur-sm p-4 space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <ListOrdered className="h-4 w-4 text-primary" />
@@ -82,7 +82,7 @@ const MatchRow = ({
 
   return (
     <div
-      className={`group relative flex items-stretch rounded-lg border bg-card transition-all hover:shadow-md ${
+      className={`group relative flex items-stretch rounded-lg border bg-secondary/60 transition-all hover:shadow-md ${
         isCompleted
           ? "border-success/25"
           : hasTeams
@@ -166,7 +166,7 @@ const BlockSection = ({
   const locked = isDE && isUnlocked === false;
 
   return (
-    <div className={`rounded-xl border bg-card/30 overflow-hidden border-l-4 ${borderColor} ${locked ? "opacity-40" : ""}`}>
+    <div className={`rounded-xl border bg-card/60 overflow-hidden border-l-4 ${borderColor} ${locked ? "opacity-40" : ""}`}>
       {/* Header */}
       <div className="px-4 py-3 border-b border-border/50 bg-muted/20">
         <div className="flex items-center justify-between">

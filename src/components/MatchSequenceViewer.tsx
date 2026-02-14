@@ -319,20 +319,20 @@ const MatchCard = ({
 
   return (
     <div
-      className={`group relative flex items-stretch rounded-lg border bg-card transition-all hover:shadow-md ${
+      className={`group relative flex items-stretch rounded-lg border-2 bg-card transition-all hover:shadow-md ${
         isCompleted
-          ? "border-success/25"
+          ? "border-success/40 shadow-[0_0_10px_rgba(34,197,94,0.1)]"
           : hasTeams
-          ? "border-primary/20 hover:border-primary/40"
-          : "border-border/60"
+          ? "border-black/20 hover:border-primary/60 shadow-sm"
+          : "border-border/60 opacity-90"
       }`}
     >
       {/* Number column */}
-      <div className={`flex flex-col items-center justify-center w-11 shrink-0 rounded-l-lg ${
-        isCompleted ? "bg-success/10 text-success" : hasTeams ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+      <div className={`flex flex-col items-center justify-center w-11 shrink-0 rounded-l-lg border-r border-black/10 ${
+        isCompleted ? "bg-success/20 text-success" : hasTeams ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
       }`}>
-        <span className="text-[7px] uppercase font-black leading-none mb-0.5 opacity-70">Jogo</span>
-        <span className="text-sm font-black tabular-nums leading-none">{index}</span>
+        <span className="text-[7px] uppercase font-black leading-none mb-0.5 opacity-90">Jogo</span>
+        <span className="text-sm font-black tabular-nums leading-none drop-shadow-sm">{index}</span>
       </div>
 
       {/* Main content */}
@@ -352,19 +352,11 @@ const MatchCard = ({
         {/* Teams */}
         <div className="flex flex-col gap-0">
           <div className="flex items-center gap-1.5 min-h-[22px]">
-            <span className={`text-xs flex-1 truncate ${t1Win ? "text-success font-bold" : match.team1_id === null ? "text-muted-foreground italic" : "text-foreground"}`}>
+            <span className={`text-xs flex-1 truncate font-black ${t1Win ? "text-success" : match.team1_id === null ? "text-muted-foreground italic font-normal" : "text-foreground"}`}>
               {match.team1_id ? team1Name : "Chapéu"}
             </span>
-            {isOwner && hasTeams && !isCompleted && match.team1_id && (
-              <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[10px] gap-0.5 text-primary hover:bg-primary/10 shrink-0"
-                onClick={() => handleDeclareTeamWinner(match.team1_id!)}>
-                <Trophy className="h-3 w-3" /> Vencedor
-              </Button>
-            )}
-          </div>
-          <span className="text-[10px] text-muted-foreground/50 pl-0.5">vs</span>
-          <div className="flex items-center gap-1.5 min-h-[22px]">
-            <span className={`text-xs flex-1 truncate ${t2Win ? "text-success font-bold" : match.team2_id === null ? "text-muted-foreground italic" : "text-foreground"}`}>
+...
+            <span className={`text-xs flex-1 truncate font-black ${t2Win ? "text-success" : match.team2_id === null ? "text-muted-foreground italic font-normal" : "text-foreground"}`}>
               {match.team2_id ? team2Name : "Chapéu"}
             </span>
             {isOwner && hasTeams && !isCompleted && match.team2_id && (
@@ -668,10 +660,10 @@ const MatchSequenceViewer = ({
             className={`rounded-xl border bg-card/30 overflow-hidden border-l-4 ${borderColor} ${!isUnlocked && isDoubleElim ? 'opacity-40' : ''}`}
           >
             {/* Block header — highly visible */}
-            <div className={`px-4 py-3 border-b border-border/50 ${badgeColor.split(' ').filter(c => c.startsWith('bg-'))[0] || 'bg-muted/20'}`}>
+            <div className={`px-4 py-3 border-b border-black/20 rounded-t-lg ${badgeColor.split(' ').filter(c => c.startsWith('bg-'))[0] || 'bg-muted/20'}`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <h3 className={`text-sm font-black tracking-tight ${badgeColor.split(' ').filter(c => c.startsWith('text-') || c.startsWith('dark:text-')).join(' ') || 'text-foreground'}`} style={{ textShadow: '0 0 12px rgba(255,255,255,0.6), 0 0 24px rgba(255,255,255,0.3), 0 1px 4px rgba(0,0,0,0.9)' }}>
+                  <h3 className={`text-sm font-black uppercase tracking-widest ${badgeColor.split(' ').filter(c => c.startsWith('text-') || c.startsWith('dark:text-')).join(' ') || 'text-foreground'}`} style={{ textShadow: '1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 0 15px rgba(255,255,255,0.8)' }}>
                     {block.label}
                   </h3>
                   {isDoubleElim && !isUnlocked && (

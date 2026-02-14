@@ -407,9 +407,9 @@ const MatchSequenceViewer = ({
           key={block.label}
           className={`rounded-lg border bg-card/30 overflow-hidden ${isDoubleElim ? `border-l-4 ${borderColor}` : ''} ${!isUnlocked && isDoubleElim ? 'opacity-50' : ''}`}
         >
-          <div className="px-4 py-3 border-b border-border bg-muted/30">
+          <div className="px-4 py-3 border-b border-primary/30 bg-gradient-to-r from-primary/15 to-accent/10">
             <div className="flex items-center gap-2">
-              <h3 className="text-base font-bold text-foreground tracking-tight">
+              <h3 className="text-base font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                 {block.label}
               </h3>
               {isDoubleElim && !isUnlocked && (

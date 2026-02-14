@@ -76,9 +76,12 @@ function determineSlotInNextMatch(
 
   let preferredSlot: 'team1_id' | 'team2_id';
 
-  // ─── Losers survivor advancing within losers → ALWAYS team1_id ───
+  // ─── Losers survivor advancing within losers ───
+  // When two losers matches feed the SAME next match (e.g. R4P1 + R4P2 → R5P1),
+  // we MUST use position-based logic to avoid both writing to team1_id.
+  // Odd position → team1_id, Even position → team2_id (same as winners).
   if (isWinner && currentMatch.bracket_type === 'losers' && nextMatch.bracket_type === 'losers') {
-    preferredSlot = 'team1_id';
+    preferredSlot = currentMatch.position % 2 === 1 ? 'team1_id' : 'team2_id';
   }
   // ─── Winners loser dropping INTO losers ───
   // Two winners matches may feed the SAME losers match (sequential pairing).
@@ -338,8 +341,9 @@ function processLegacyAdvancement(
   if (bt === 'losers' && bh) {
     const nextMatch = findNextInSameBracket();
     if (nextMatch) {
-      // IRON RULE: Losers survivors ALWAYS go to team1_id
-      result.winnerUpdates.push({ matchId: nextMatch.id, data: { team1_id: winnerId } });
+      // Position-based: odd → team1_id, even → team2_id (matches primary logic)
+      const loserSurvivorSlot = currentMatch.position % 2 === 1 ? 'team1_id' : 'team2_id';
+      result.winnerUpdates.push({ matchId: nextMatch.id, data: { [loserSurvivorSlot]: winnerId } });
     } else if (isFinalOfHalf()) {
       // Campeão Losers → semifinal com CRUZAMENTO CORRETO
       // Losers Upper (has W-B losers) → Semi upper (Semi 1, with W-A champ) = SAME half

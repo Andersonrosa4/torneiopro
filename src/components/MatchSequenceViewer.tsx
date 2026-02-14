@@ -505,6 +505,7 @@ const MatchSequenceViewer = ({
 
       const eliminationMatches = matches.filter(m => m.round > 0);
       const hasDoubleElimStructure = eliminationMatches.some(m => m.bracket_half) || tournamentFormat === 'double_elimination';
+      if (hasDoubleElimStructure) {
         const schedulerBlocks = buildSchedulerBlocks(eliminationMatches);
         for (const sb of schedulerBlocks) {
           const blockMatches = sb.matches.filter(m => m.team1_id && m.team2_id);

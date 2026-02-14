@@ -324,15 +324,23 @@ function buildLosersBracketWithFeeders(
       }
     } else {
       // ── Rodadas subsequentes: intercalar survivors com novos perdedores ──
-      // Alternando: survivor, novo perdedor, survivor, novo perdedor...
+      // REGRA 9 (ANTI-REMATCH): Os novos perdedores que caem da Winners são
+      // intercalados em ordem REVERSA com os sobreviventes da Losers.
+      // Isso garante que o sobrevivente do primeiro jogo da Losers R1
+      // (que tinha Perd.9 vs Perd.10) NÃO enfrente o perdedor da Winners R2
+      // que veio do vencedor de jogo 9 ou 10. A inversão maximiza a distância
+      // entre ex-adversários, evitando rematches nas rodadas 1-2 da Losers.
       const surv = survivors.map(m => ({
         source: m,
         linkField: 'next_win_match_id' as const,
       }));
-      const newLosers = winnersInRound.map(m => ({
-        source: m,
-        linkField: 'next_lose_match_id' as const,
-      }));
+      const newLosers = winnersInRound
+        .map(m => ({
+          source: m,
+          linkField: 'next_lose_match_id' as const,
+        }))
+        .sort((a, b) => a.source.position - b.source.position)
+        .reverse(); // REVERSO: últimos droppers com primeiros survivors
 
       // Intercalar
       const maxLen = Math.max(surv.length, newLosers.length);

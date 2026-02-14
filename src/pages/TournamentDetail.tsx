@@ -954,7 +954,10 @@ const TournamentDetail = () => {
     const loserId = match.team1_id === winnerId ? match.team2_id : match.team1_id;
 
     // Rule 26: Only set winner + status here; scores are saved separately by updateScore/handleAutoResult
-    await organizerQuery({
+    // Optimistic UI update FIRST for instant feedback
+    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, winner_team_id: winnerId, status: 'completed' as any } : m));
+
+    organizerQuery({
       table: "matches",
       operation: "update",
       data: {
@@ -1313,7 +1316,7 @@ const TournamentDetail = () => {
       }
     }
 
-    fetchData();
+    // Realtime subscription handles UI refresh automatically — no need for fetchData() here
     } finally {
       declareWinnerMutex.current.delete(matchId);
     }

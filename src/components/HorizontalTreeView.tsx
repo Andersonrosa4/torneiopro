@@ -431,7 +431,7 @@ const HorizontalTreeView = ({ matches, getName, matchNumberMap }: HorizontalTree
 
   return (
     <div ref={containerRef} className="relative overflow-x-auto pb-4" style={{ WebkitOverflowScrolling: "touch" }}>
-      <TreeConnectors containerRef={containerRef} matches={allElimMatches} />
+      {/* Connectors removed */}
       <div className="relative space-y-4" style={{ zIndex: 1 }}>
         {sections.isDE ? (
           <>

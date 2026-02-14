@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
     }
 
     // Allowed tables
-    const allowedTables = ["tournaments", "teams", "matches", "participants", "rankings", "organizers", "user_roles", "modalities"];
+    const allowedTables = ["tournaments", "teams", "matches", "participants", "rankings", "organizers", "user_roles", "modalities", "groups", "classificacao_grupos"];
     if (!allowedTables.includes(table)) {
       return new Response(
         JSON.stringify({ error: `Tabela '${table}' não permitida` }),

@@ -237,6 +237,21 @@ export function getSchedulerBlockColor(key: string): string {
   if (key.startsWith('LI')) return 'border-l-amber-400';
   if (key === 'SEMI') return 'border-l-purple-500';
   if (key === 'FINAL') return 'border-l-yellow-500';
+  // Group stage
+  if (key.startsWith('GS')) return 'border-l-emerald-500';
+  // Knockout rounds — cycle through distinct colors
+  if (key.startsWith('KO_R')) {
+    const round = parseInt(key.replace('KO_R', ''), 10) || 1;
+    const colors = [
+      'border-l-cyan-500',
+      'border-l-violet-500',
+      'border-l-rose-500',
+      'border-l-teal-500',
+      'border-l-fuchsia-500',
+      'border-l-indigo-500',
+    ];
+    return colors[(round - 1) % colors.length];
+  }
   return 'border-l-primary';
 }
 
@@ -250,5 +265,18 @@ export function getSchedulerBadgeColor(key: string): string {
   if (key.startsWith('LI')) return 'bg-amber-400/20 text-amber-600 dark:text-amber-400 border-amber-400/30';
   if (key === 'SEMI') return 'bg-purple-500/20 text-purple-600 dark:text-purple-400 border-purple-500/30';
   if (key === 'FINAL') return 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border-yellow-500/30';
+  if (key.startsWith('GS')) return 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
+  if (key.startsWith('KO_R')) {
+    const round = parseInt(key.replace('KO_R', ''), 10) || 1;
+    const colors = [
+      'bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 border-cyan-500/30',
+      'bg-violet-500/20 text-violet-600 dark:text-violet-400 border-violet-500/30',
+      'bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-500/30',
+      'bg-teal-500/20 text-teal-600 dark:text-teal-400 border-teal-500/30',
+      'bg-fuchsia-500/20 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-500/30',
+      'bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border-indigo-500/30',
+    ];
+    return colors[(round - 1) % colors.length];
+  }
   return 'bg-primary/20 text-primary border-primary/30';
 }

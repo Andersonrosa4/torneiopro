@@ -533,13 +533,14 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
   if (winnersUpperFinal) winnersUpperFinal.next_win_match_id = semi1._temp_id;
   if (winnersLowerFinal) winnersLowerFinal.next_win_match_id = semi2._temp_id;
 
-  // 6. Linkagem Losers → Semifinais (CRUZAMENTO)
-  //    Campeão Losers B (lower) → Semi 1 (team2) — cruza com Winners A
-  //    Campeão Losers A (upper) → Semi 2 (team2) — cruza com Winners B
-  const losersUpperFinal = getLastRoundMatch(losersUpper);  // Losers A (upper)
-  const losersLowerFinal = getLastRoundMatch(losersLower);  // Losers B (lower)
-  if (losersLowerFinal) losersLowerFinal.next_win_match_id = semi1._temp_id;  // Losers B → Semi 1
-  if (losersUpperFinal) losersUpperFinal.next_win_match_id = semi2._temp_id;  // Losers A → Semi 2
+  // 6. Linkagem Losers → Semifinais (CRUZAMENTO CORRETO)
+  //    Losers Upper (bracket 3, contém perdedores da Winners B) → Semi 1 (com Winners A) = CRUZAMENTO ✓
+  //    Losers Lower (bracket 4, contém perdedores da Winners A) → Semi 2 (com Winners B) = CRUZAMENTO ✓
+  //    REGRA: Jamais parear campeão Winners com perdedores do MESMO lado original.
+  const losersUpperFinal = getLastRoundMatch(losersUpper);  // Losers Upper (has W-B losers)
+  const losersLowerFinal = getLastRoundMatch(losersLower);  // Losers Lower (has W-A losers)
+  if (losersUpperFinal) losersUpperFinal.next_win_match_id = semi1._temp_id;  // W-B losers → Semi 1 (with W-A champ) ✓
+  if (losersLowerFinal) losersLowerFinal.next_win_match_id = semi2._temp_id;  // W-A losers → Semi 2 (with W-B champ) ✓
 
   // 7. Semifinais → Final
   semi1.next_win_match_id = finalMatch._temp_id;

@@ -330,11 +330,13 @@ function processLegacyAdvancement(
       // IRON RULE: Losers survivors ALWAYS go to team1_id
       result.winnerUpdates.push({ matchId: nextMatch.id, data: { team1_id: winnerId } });
     } else if (isFinalOfHalf()) {
-      // Campeão Losers → semifinal CRUZADA (lado oposto)
-      // Losers A (upper) → Semi 2 (lower), Losers B (lower) → Semi 1 (upper)
+      // Campeão Losers → semifinal com CRUZAMENTO CORRETO
+      // Losers Upper (has W-B losers) → Semi upper (Semi 1, with W-A champ) = SAME half
+      // Losers Lower (has W-A losers) → Semi lower (Semi 2, with W-B champ) = SAME half
+      // REGRA: Losers champion goes to semi of SAME bracket_half (not opposite!)
+      // because mirror routing already crossed the sides when losers entered.
       const semis = matches.filter(m => m.bracket_type === 'semi_final');
-      const crossHalf = oppositeSide(bh);
-      const targetSemi = semis.find(m => m.bracket_half === crossHalf);
+      const targetSemi = semis.find(m => m.bracket_half === bh);
       if (targetSemi) {
         result.winnerUpdates.push({ matchId: targetSemi.id, data: { team2_id: winnerId } });
       }

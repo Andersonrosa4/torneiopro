@@ -552,19 +552,44 @@ const MatchSequenceViewer = ({
       const hasDoubleElimStructure = eliminationMatches.some(m => m.bracket_half) || tournamentFormat === 'double_elimination';
       if (hasDoubleElimStructure) {
         const schedulerBlocks = buildSchedulerBlocks(eliminationMatches);
+        // Merge all non-semi/final blocks into a single "Jogos" block
+        const jogosMatches: { match: Match; globalIndex: number }[] = [];
+        let jogosAllCompleted = true;
+        
         for (const sb of schedulerBlocks) {
           const blockMatches = sb.matches.filter(m => m.team1_id && m.team2_id);
           if (blockMatches.length === 0) continue;
           const mappedMatches = blockMatches
             .map(m => ({ match: m as Match, globalIndex: matchNumberMap.get(m.id) ?? 0 }))
             .sort((a, b) => a.globalIndex - b.globalIndex);
-          blocks.push({
-            label: sb.label,
-            matches: mappedMatches,
-            blockKey: sb.key,
-            isUnlocked: sb.isUnlocked,
-            isCompleted: sb.isCompleted,
-          });
+
+          if (sb.key === 'SEMI' || sb.key === 'FINAL') {
+            blocks.push({
+              label: sb.label,
+              matches: mappedMatches,
+              blockKey: sb.key,
+              isUnlocked: sb.isUnlocked,
+              isCompleted: sb.isCompleted,
+            });
+          } else {
+            jogosMatches.push(...mappedMatches);
+            if (!sb.isCompleted) jogosAllCompleted = false;
+          }
+        }
+        
+        if (jogosMatches.length > 0) {
+          jogosMatches.sort((a, b) => a.globalIndex - b.globalIndex);
+          // Insert "Jogos" block before Semi/Final
+          const semiIdx = blocks.findIndex(b => (b as any).blockKey === 'SEMI' || (b as any).blockKey === 'FINAL');
+          const jogosEntry = {
+            label: 'Jogos',
+            matches: jogosMatches,
+            blockKey: 'JOGOS',
+            isUnlocked: true,
+            isCompleted: jogosAllCompleted,
+          };
+          if (semiIdx >= 0) blocks.splice(semiIdx, 0, jogosEntry);
+          else blocks.push(jogosEntry);
         }
       } else {
         const knockoutDisplay = displaySequence.filter(m => m.round > 0);
@@ -696,7 +721,7 @@ const MatchSequenceViewer = ({
 
         return (
           <div
-            key={block.label}
+            key={blockKey || block.label}
             className={`rounded-xl border bg-card/30 overflow-hidden border-l-4 ${borderColor} ${!isUnlocked && isDoubleElim ? 'opacity-40' : ''}`}
           >
             {/* Block header — highly visible */}
@@ -734,7 +759,16 @@ const MatchSequenceViewer = ({
                   match={match}
                   index={globalIndex}
                   getTeamName={getTeamName}
-                  getRoundLabel={(r) => getRoundShortLabel(r, matchCountByRound[r] || 0)}
+                  getRoundLabel={(r) => {
+                    // For DE: show "Jogos" on all cards except semi_final and final
+                    if (isDoubleElim) {
+                      const m = match;
+                      if (m.bracket_type === 'semi_final') return 'Semifinal';
+                      if (m.bracket_type === 'final') return 'Final';
+                      return 'Jogos';
+                    }
+                    return getRoundShortLabel(r, matchCountByRound[r] || 0);
+                  }}
                   isOwner={isOwner}
                   numSets={numSets}
                   onDeclareWinner={onDeclareWinner}

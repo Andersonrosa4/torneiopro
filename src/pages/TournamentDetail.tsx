@@ -121,6 +121,12 @@ const TournamentDetail = () => {
     [matches, selectedModality]
   );
 
+  // Detect if group stage exists for current modality (round=0 matches)
+  const hasGroupStageGenerated = useMemo(() => 
+    filteredMatches.some(m => m.round === 0),
+    [filteredMatches]
+  );
+
   // Reads use direct supabase (SELECT policies are true)
   const fetchData = useCallback(async () => {
     if (!id) return;
@@ -165,6 +171,10 @@ const TournamentDetail = () => {
   // All writes go through organizerQuery
   const addTeam = async () => {
     if (!player1.trim() || !player2.trim() || !id) return;
+    if (hasGroupStageGenerated) {
+      toast.error("❌ Fase de grupos já gerada. Faça o reset completo para alterar equipes.");
+      return;
+    }
     const { error } = await organizerQuery({
       table: "teams",
       operation: "insert",
@@ -184,6 +194,10 @@ const TournamentDetail = () => {
 
   const addFictitiousTeams = async () => {
     if (!id) return;
+    if (hasGroupStageGenerated) {
+      toast.error("❌ Fase de grupos já gerada. Faça o reset completo para alterar equipes.");
+      return;
+    }
     const count = Number(fictitiousCount);
     if (count < 1 || count > 64) { toast.error("Quantidade inválida"); return; }
     const newTeams = [];
@@ -210,6 +224,10 @@ const TournamentDetail = () => {
   };
 
   const removeTeam = async (tid: string) => {
+    if (hasGroupStageGenerated) {
+      toast.error("❌ Fase de grupos já gerada. Faça o reset completo para remover equipes.");
+      return;
+    }
     await organizerQuery({ table: "teams", operation: "delete", filters: { id: tid } });
     fetchData();
   };
@@ -261,7 +279,9 @@ const TournamentDetail = () => {
     gamesPerSet?: number;
     seedTeamIds?: string[];
     useGroupStage: boolean;
+    groupMode: "by_count" | "by_size";
     numGroups: number;
+    groupSize: number;
     teamsPerGroupAdvancing: number;
     byeTeamIds: string[];
     useIndex: boolean;
@@ -311,6 +331,10 @@ const TournamentDetail = () => {
 
     if (config.useGroupStage) {
       // === GROUP STAGE ===
+      const totalTeams = filteredTeams.length;
+      const numGroups = config.numGroups;
+
+      // 1) Order teams: seeds first then shuffle, or full shuffle
       let arranged = [...filteredTeams];
       if (config.useSeeds && config.seedTeamIds && config.seedTeamIds.length > 0) {
         const seeds = arranged.filter(t => config.seedTeamIds!.includes(t.id));
@@ -320,14 +344,82 @@ const TournamentDetail = () => {
         arranged.sort(() => Math.random() - 0.5);
       }
 
-      const groups: typeof arranged[] = Array.from({ length: config.numGroups }, () => []);
+      // 2) Snake (zig-zag) distribution into balanced groups
+      const groupSlots: typeof arranged[] = Array.from({ length: numGroups }, () => []);
       arranged.forEach((team, i) => {
-        groups[i % config.numGroups].push(team);
+        const cycle = Math.floor(i / numGroups);
+        const pos = i % numGroups;
+        const groupIdx = cycle % 2 === 0 ? pos : (numGroups - 1 - pos);
+        groupSlots[groupIdx].push(team);
       });
 
+      // 3) Validate: no group with only 1 team
+      if (groupSlots.some(g => g.length < 2)) {
+        toast.error("❌ Erro: Configuração inválida — algum grupo ficaria com apenas 1 dupla.");
+        return;
+      }
+
+      // 4) Validate max difference = 1
+      const sizes = groupSlots.map(g => g.length);
+      if (Math.max(...sizes) - Math.min(...sizes) > 1) {
+        toast.error("❌ Erro: Grupos desbalanceados.");
+        return;
+      }
+
+      // 5) Create group records in DB
+      const groupRecords = groupSlots.map((_, g) => ({
+        tournament_id: id!,
+        name: `Grupo ${String.fromCharCode(65 + g)}`,
+      }));
+      const { data: createdGroups, error: groupError } = await organizerQuery({
+        table: "groups",
+        operation: "insert",
+        data: groupRecords,
+      });
+      if (groupError) { toast.error(groupError.message); return; }
+
+      // Fetch created groups to get IDs
+      const { data: dbGroups } = await publicQuery({
+        table: "groups",
+        filters: { tournament_id: id },
+        order: { column: "created_at", ascending: true },
+      });
+      if (!dbGroups || dbGroups.length < numGroups) {
+        toast.error("❌ Erro ao buscar grupos criados.");
+        return;
+      }
+      // Use the last N groups (in case there were old ones)
+      const relevantGroups = dbGroups.slice(-numGroups);
+
+      // 6) Create classificacao_grupos records
+      const classificacaoRecords: any[] = [];
+      for (let g = 0; g < numGroups; g++) {
+        for (const team of groupSlots[g]) {
+          classificacaoRecords.push({
+            tournament_id: id!,
+            group_id: relevantGroups[g].id,
+            team_id: team.id,
+            pontos: 0,
+            jogos: 0,
+            vitorias: 0,
+            derrotas: 0,
+            sets_pro: 0,
+            sets_contra: 0,
+            saldo_sets: 0,
+          });
+        }
+      }
+      const { error: classError } = await organizerQuery({
+        table: "classificacao_grupos",
+        operation: "insert",
+        data: classificacaoRecords,
+      });
+      if (classError) { toast.error(classError.message); return; }
+
+      // 7) Create group matches (round-robin within each group)
       const newMatches: any[] = [];
-      for (let g = 0; g < groups.length; g++) {
-        const groupTeams = groups[g];
+      for (let g = 0; g < groupSlots.length; g++) {
+        const groupTeams = groupSlots[g];
         let pos = 1;
         for (let i = 0; i < groupTeams.length; i++) {
           for (let j = i + 1; j < groupTeams.length; j++) {
@@ -364,7 +456,7 @@ const TournamentDetail = () => {
         });
       }
       
-      toast.success(`Fase de grupos gerada! ${config.numGroups} grupo(s) criado(s)${config.useIndex ? ` + ${config.numIndexTeams} índice` : ""}.`);
+      toast.success(`Fase de grupos gerada! ${numGroups} grupo(s) criado(s) com distribuição snake${config.useIndex ? ` + ${config.numIndexTeams} índice` : ""}.`);
       fetchData();
     } else if (config.bracketMode === "double_elimination") {
       // === DOUBLE ELIMINATION ===

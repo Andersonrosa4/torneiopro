@@ -26,7 +26,9 @@ interface GenerateBracketDialogProps {
     gamesPerSet?: number;
     seedTeamIds?: string[];
     useGroupStage: boolean;
+    groupMode: "by_count" | "by_size";
     numGroups: number;
+    groupSize: number;
     teamsPerGroupAdvancing: number;
     byeTeamIds: string[];
     useIndex: boolean;
@@ -49,7 +51,9 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
   const [sideATeamIds, setSideATeamIds] = useState<string[]>([]);
   const [sideBTeamIds, setSideBTeamIds] = useState<string[]>([]);
   const [useGroupStage, setUseGroupStage] = useState(true);
+  const [groupMode, setGroupMode] = useState<"by_count" | "by_size">("by_count");
   const [numGroups, setNumGroups] = useState("2");
+  const [groupSize, setGroupSize] = useState("4");
   const [teamsPerGroupAdvancing, setTeamsPerGroupAdvancing] = useState("2");
   const [byeTeamIds, setByeTeamIds] = useState<string[]>([]);
   const [useIndex, setUseIndex] = useState(false);
@@ -58,10 +62,22 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
   const isBeachTennis = sport === "beach_tennis";
   const supportsIndex = sport === "beach_volleyball" || sport === "futevolei";
 
-  // Calculate knockout phase based on advancing teams
-  const groups = Number(numGroups) || 2;
+  // Calculate effective groups based on mode
+  const effectiveGroups = groupMode === "by_count"
+    ? (Number(numGroups) || 2)
+    : Math.ceil(teamCount / (Number(groupSize) || 4));
   const advancing = Number(teamsPerGroupAdvancing) || 2;
-  const totalAdvancing = groups * advancing;
+  const totalAdvancing = effectiveGroups * advancing;
+
+  // Validate: would any group have only 1 team?
+  const wouldHaveSingleTeamGroup = (() => {
+    if (!useGroupStage) return false;
+    const ng = effectiveGroups;
+    if (ng < 1) return true;
+    const baseSize = Math.floor(teamCount / ng);
+    // If baseSize is 0, some groups will be empty or have 1
+    return baseSize < 2 && (teamCount % ng) > 0 && baseSize < 1 || (baseSize === 1 && teamCount % ng === 0);
+  })();
 
   const getKnockoutPhase = (count: number) => {
     if (count <= 2) return "Final";
@@ -102,7 +118,9 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
       gamesPerSet: isBeachTennis ? Number(gamesPerSet) : undefined,
       seedTeamIds: useSeeds === "true" ? selectedSeedIds : undefined,
       useGroupStage: bracketMode === "normal" ? useGroupStage : false,
-      numGroups: groups,
+      groupMode,
+      numGroups: effectiveGroups,
+      groupSize: Number(groupSize) || 4,
       teamsPerGroupAdvancing: advancing,
       byeTeamIds: [], // BYEs disabled
       useIndex: supportsIndex && useIndex,
@@ -122,7 +140,7 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
   };
 
   const setOptions = isBeachTennis ? [2, 3, 4] : [1, 3, 5];
-  const maxGroups = Math.min(Math.floor(teamCount / 2), 8);
+  const maxGroups = Math.min(Math.floor(teamCount / 2), 16);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -238,20 +256,57 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
 
                   {useGroupStage && (
                     <div className="space-y-4 pl-7">
+                      {/* Mode toggle: by count or by size */}
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold">Definir grupos por:</Label>
+                        <RadioGroup value={groupMode} onValueChange={(v) => setGroupMode(v as "by_count" | "by_size")} className="flex gap-4">
+                          <div className="flex items-center gap-2">
+                            <RadioGroupItem value="by_count" id="byCount" />
+                            <Label htmlFor="byCount" className="text-sm cursor-pointer">Quantidade de grupos</Label>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <RadioGroupItem value="by_size" id="bySize" />
+                            <Label htmlFor="bySize" className="text-sm cursor-pointer">Tamanho do grupo</Label>
+                          </div>
+                        </RadioGroup>
+                      </div>
+
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <Label className="text-sm">Nº de Grupos</Label>
-                          <Select value={numGroups} onValueChange={setNumGroups}>
-                            <SelectTrigger className="bg-card">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Array.from({ length: maxGroups }, (_, i) => i + 1).map(n => (
-                                <SelectItem key={n} value={String(n)}>{n} grupo{n > 1 ? "s" : ""}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        {groupMode === "by_count" ? (
+                          <div className="space-y-1.5">
+                            <Label className="text-sm">Nº de Grupos</Label>
+                            <Select value={numGroups} onValueChange={setNumGroups}>
+                              <SelectTrigger className="bg-card">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.from({ length: maxGroups }, (_, i) => i + 1).map(n => (
+                                  <SelectItem key={n} value={String(n)}>{n} grupo{n > 1 ? "s" : ""}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                              ~{Math.floor(teamCount / effectiveGroups)} duplas por grupo
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5">
+                            <Label className="text-sm">Duplas por Grupo</Label>
+                            <Select value={groupSize} onValueChange={setGroupSize}>
+                              <SelectTrigger className="bg-card">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.from({ length: Math.max(teamCount - 1, 1) }, (_, i) => i + 2).map(n => (
+                                  <SelectItem key={n} value={String(n)}>{n} duplas</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                              = {effectiveGroups} grupo(s)
+                            </p>
+                          </div>
+                        )}
                         <div className="space-y-1.5">
                           <Label className="text-sm">Avançam por grupo</Label>
                           <Select value={teamsPerGroupAdvancing} onValueChange={setTeamsPerGroupAdvancing}>
@@ -267,7 +322,13 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                         </div>
                       </div>
 
-                      {/* Todas as duplas devem jogar */}
+                      {wouldHaveSingleTeamGroup && (
+                        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3">
+                          <p className="text-xs text-destructive font-semibold">
+                            ⚠️ Configuração inválida: algum grupo ficaria com apenas 1 dupla.
+                          </p>
+                        </div>
+                      )}
 
                       {/* Index advancement (Volleyball/Futevolei only) */}
                       {supportsIndex && (
@@ -309,7 +370,7 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                       <div className="rounded-lg border border-primary/30 bg-primary/10 p-3">
                         <p className="text-sm font-bold text-primary">Fase de Grupos</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {groups} grupo(s) × {advancing} avançando = {totalAdvancing} duplas na eliminatória
+                          {effectiveGroups} grupo(s) × {advancing} avançando = {totalAdvancing} duplas na eliminatória
                         </p>
                       </div>
                     </div>
@@ -484,6 +545,7 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
               </Button>
               <Button
                 onClick={handleGenerate}
+                disabled={bracketMode === "normal" && useGroupStage && wouldHaveSingleTeamGroup}
                 className="flex-1 bg-gradient-primary text-primary-foreground hover:opacity-90"
               >
                 Gerar {bracketMode === "normal" ? "Chaveamento" : "Dupla Eliminação"}

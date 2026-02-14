@@ -953,15 +953,13 @@ const TournamentDetail = () => {
     // Get loser ID
     const loserId = match.team1_id === winnerId ? match.team2_id : match.team1_id;
 
-    // Rule 26: Declarar vencedor sem placar salva 0x0
+    // Rule 26: Only set winner + status here; scores are saved separately by updateScore/handleAutoResult
     await organizerQuery({
       table: "matches",
       operation: "update",
       data: {
         winner_team_id: winnerId,
         status: "completed",
-        score1: match.score1 ?? 0,
-        score2: match.score2 ?? 0,
       },
       filters: { id: matchId },
     });

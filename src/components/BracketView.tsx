@@ -107,11 +107,16 @@ const MatchCard = ({
 
   return (
     <div className={`w-64 rounded-lg border bg-card shadow-card ${isFinal ? "border-primary/40 shadow-glow" : "border-border"} ${isCompleted ? "opacity-80" : ""}`}>
-      {isFinal && (
-        <div className="flex items-center justify-center gap-1 rounded-t-lg bg-gradient-primary px-2 py-1 text-xs font-bold text-primary-foreground">
-          <Trophy className="h-3 w-3" /> FINAL
-        </div>
-      )}
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/50">
+        <span className="text-[10px] font-black text-primary uppercase tracking-wider">
+          JOGO {match.position}
+        </span>
+        {isFinal && (
+          <div className="flex items-center gap-1 rounded-full bg-gradient-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
+            <Trophy className="h-2.5 w-2.5" /> FINAL
+          </div>
+        )}
+      </div>
       <div className={`flex items-center gap-2 border-b border-border px-3 py-2 ${match.winner_team_id === match.team1_id && isCompleted ? "bg-success/10" : ""}`}>
         <span className={`flex-1 text-sm truncate ${match.winner_team_id === match.team1_id && isCompleted ? "text-success font-bold" : p1Name === "A definir" ? "text-muted-foreground" : "team-name"}`}>
           {p1Name}

@@ -328,10 +328,11 @@ const MatchCard = ({
       }`}
     >
       {/* Number column */}
-      <div className={`flex items-center justify-center w-9 shrink-0 rounded-l-lg text-[11px] font-bold ${
+      <div className={`flex flex-col items-center justify-center w-11 shrink-0 rounded-l-lg ${
         isCompleted ? "bg-success/10 text-success" : hasTeams ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
       }`}>
-        {index}
+        <span className="text-[7px] uppercase font-black leading-none mb-0.5 opacity-70">Jogo</span>
+        <span className="text-sm font-black tabular-nums leading-none">{index}</span>
       </div>
 
       {/* Main content */}

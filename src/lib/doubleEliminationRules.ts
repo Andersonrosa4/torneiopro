@@ -99,11 +99,14 @@
 // Quem jogou antes na Winners joga primeiro na Losers.
 
 // ═══════════════════════════════════════════════════
-// REGRA 9: ANTI-REPETIÇÃO NAS RODADAS INICIAIS
+// REGRA 9: ANTI-REMATCH NAS RODADAS 1-2 DOS PERDEDORES
 // ═══════════════════════════════════════════════════
-// Nas rodadas 1-2 dos perdedores, o sistema verifica se duas equipes
-// já se enfrentaram antes. Se houver rematch, busca slot alternativo
-// na mesma rodada. Se não houver alternativa, mantém o pareamento.
+// Na R2 dos Perdedores, os novos perdedores que caem da Winners são
+// intercalados em ordem REVERSA com os sobreviventes da R1.
+// Ex: Sobrevivente do 1º jogo da Losers R1 (Perd.9 vs Perd.10)
+// enfrenta o dropper do ÚLTIMO jogo da Winners R2, não do primeiro.
+// Isso impede que um time enfrente seu ex-adversário da Winners
+// antes da Rodada 3 dos Perdedores.
 
 // ═══════════════════════════════════════════════════
 // REGRA 10: CHAPÉU (SLOT DE ESPERA)

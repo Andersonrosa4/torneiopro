@@ -17,6 +17,7 @@ import CreateTournament from "./pages/CreateTournament";
 import TournamentDetail from "./pages/TournamentDetail";
 import NotFound from "./pages/NotFound";
 import SimulationTest from "./pages/SimulationTest";
+import SystemDiagnostics from "./pages/SystemDiagnostics";
 import { supabase } from "@/integrations/supabase/client";
 
 const queryClient = new QueryClient();
@@ -49,6 +50,7 @@ const App = () => (
               <Route path="/tournaments/new" element={<ProtectedRoute><CreateTournament /></ProtectedRoute>} />
               <Route path="/tournaments/:id" element={<ProtectedRoute><TournamentDetail /></ProtectedRoute>} />
                <Route path="/simulation-test" element={<SimulationTest />} />
+               <Route path="/diagnostics" element={<ProtectedRoute><SystemDiagnostics /></ProtectedRoute>} />
                <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>

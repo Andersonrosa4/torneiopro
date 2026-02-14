@@ -1022,39 +1022,40 @@ const DEBracketLayout = ({
       <div
         style={isMobile ? { transform: `scale(${mobileZoom})`, transformOrigin: 'top left', width: `${100 / mobileZoom}%` } : undefined}
       >
-        <div ref={globalRef} className="relative min-w-[900px] grid grid-cols-[1fr_auto_1fr] gap-4 items-start">
+        <div ref={globalRef} className="relative min-w-[900px]">
           <DEGlobalConnectors containerRef={globalRef} allMatches={allMatches.filter(m => m.round > 0)} />
-
-          {/* ── LEFT: Winners (L → R) ── */}
-          <div className="space-y-4 relative" style={{ zIndex: 1 }}>
-            <div className="text-center">
-              <span className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70 border-b border-primary/20 pb-1 px-4">
-                Chave dos Vencedores →
-              </span>
+          <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-start relative" style={{ zIndex: 1 }}>
+            {/* ── LEFT: Winners (L → R) ── */}
+            <div className="space-y-4">
+              <div className="text-center">
+                <span className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70 border-b border-primary/20 pb-1 px-4">
+                  Chave dos Vencedores →
+                </span>
+              </div>
+              <BracketColumn bracketMatches={winnersA} getName={getName} label="Vencedores A" icon="🏆" colorAccent="border-primary/20 bg-primary/[0.03]" reversed={false} allMatches={allMatches} matchNumberMap={matchNumberMap} />
+              <BracketColumn bracketMatches={winnersB} getName={getName} label="Vencedores B" icon="🏆" colorAccent="border-primary/15 bg-primary/[0.02]" reversed={false} allMatches={allMatches} matchNumberMap={matchNumberMap} />
             </div>
-            <BracketColumn bracketMatches={winnersA} getName={getName} label="Vencedores A" icon="🏆" colorAccent="border-primary/20 bg-primary/[0.03]" reversed={false} allMatches={allMatches} matchNumberMap={matchNumberMap} />
-            <BracketColumn bracketMatches={winnersB} getName={getName} label="Vencedores B" icon="🏆" colorAccent="border-primary/15 bg-primary/[0.02]" reversed={false} allMatches={allMatches} matchNumberMap={matchNumberMap} />
-          </div>
 
-          {/* ── CENTER: Semifinals + Final ── */}
-          <div className="flex flex-col items-center justify-center min-w-[200px] pt-8 relative" style={{ zIndex: 1 }}>
-            <div className="mb-4">
-              <span className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] text-accent/80 border-b border-accent/20 pb-1 px-4">
-                Fase Final
-              </span>
+            {/* ── CENTER: Semifinals + Final ── */}
+            <div className="flex flex-col items-center justify-center min-w-[200px] pt-8">
+              <div className="mb-4">
+                <span className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] text-accent/80 border-b border-accent/20 pb-1 px-4">
+                  Fase Final
+                </span>
+              </div>
+              <CenterColumn crossSemis={semiFinals} finalMatches={finalMatches} getName={getName} allMatches={allMatches} matchNumberMap={matchNumberMap} />
             </div>
-            <CenterColumn crossSemis={semiFinals} finalMatches={finalMatches} getName={getName} allMatches={allMatches} matchNumberMap={matchNumberMap} />
-          </div>
 
-          {/* ── RIGHT: Losers (R → L) ── */}
-          <div className="space-y-4 relative" style={{ zIndex: 1 }}>
-            <div className="text-center">
-              <span className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] text-destructive/60 border-b border-destructive/20 pb-1 px-4">
-                ← Chave dos Perdedores
-              </span>
+            {/* ── RIGHT: Losers (R → L) ── */}
+            <div className="space-y-4">
+              <div className="text-center">
+                <span className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] text-destructive/60 border-b border-destructive/20 pb-1 px-4">
+                  ← Chave dos Perdedores
+                </span>
+              </div>
+              <BracketColumn bracketMatches={losersA} getName={getName} label="Perdedores Superiores" icon="⬇" colorAccent="border-destructive/15 bg-destructive/[0.03]" reversed={true} allMatches={allMatches} matchNumberMap={matchNumberMap} />
+              <BracketColumn bracketMatches={losersB} getName={getName} label="Perdedores Inferiores" icon="⬇" colorAccent="border-destructive/10 bg-destructive/[0.02]" reversed={true} allMatches={allMatches} matchNumberMap={matchNumberMap} />
             </div>
-            <BracketColumn bracketMatches={losersA} getName={getName} label="Perdedores Superiores" icon="⬇" colorAccent="border-destructive/15 bg-destructive/[0.03]" reversed={true} allMatches={allMatches} matchNumberMap={matchNumberMap} />
-            <BracketColumn bracketMatches={losersB} getName={getName} label="Perdedores Inferiores" icon="⬇" colorAccent="border-destructive/10 bg-destructive/[0.02]" reversed={true} allMatches={allMatches} matchNumberMap={matchNumberMap} />
           </div>
         </div>
 

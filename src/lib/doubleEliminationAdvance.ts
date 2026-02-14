@@ -64,11 +64,17 @@ function determineSlotInNextMatch(
 
   // For winners advancing within same bracket type
   if (isWinner && currentMatch.bracket_type === nextMatch.bracket_type) {
-    preferredSlot = currentMatch.position % 2 === 1 ? 'team1_id' : 'team2_id';
+    // Within losers bracket: survivor always goes to team1_id
+    if (currentMatch.bracket_type === 'losers') {
+      preferredSlot = 'team1_id';
+    } else {
+      preferredSlot = currentMatch.position % 2 === 1 ? 'team1_id' : 'team2_id';
+    }
   }
-  // For losers dropping to losers bracket
+  // For losers dropping from winners to losers bracket: always team2_id
+  // This prevents collision with losers bracket survivors who go to team1_id
   else if (!isWinner && currentMatch.bracket_type === 'winners' && nextMatch.bracket_type === 'losers') {
-    preferredSlot = (currentMatch.position - 1) % 2 === 0 ? 'team1_id' : 'team2_id';
+    preferredSlot = 'team2_id';
   }
   // Winners final → semi_final (mesmo lado)
   else if (isWinner && currentMatch.bracket_type === 'winners' && nextMatch.bracket_type === 'semi_final') {

@@ -460,6 +460,19 @@ const TournamentDetail = () => {
         });
       }
 
+      // If odd number of teams, create a chapéu slot for the last team
+      if (n % 2 === 1) {
+        newMatches.push({
+          tournament_id: id,
+          round: 1,
+          position: pairCount + 1,
+          team1_id: arranged[n - 1].id,
+          team2_id: null,
+          status: "pending",
+          modality_id: currentModalityId,
+        });
+      }
+
       // NO future rounds generated — they will be created dynamically by declareWinner
 
       const { error } = await organizerQuery({ table: "matches", operation: "insert", data: newMatches });
@@ -589,14 +602,15 @@ const TournamentDetail = () => {
 
     // === DISTRIBUTE CHAPÉUS ===
     const chapeuDistribution = distributeChapeus(allAdvancing, groupRankings);
-    const chapeuTeams = getChapeuTeams(chapeuDistribution);
-    const realTeams = getRealTeams(chapeuDistribution);
+    const chapeuTeamSet = new Set(getChapeuTeams(chapeuDistribution));
 
     // Build cross-pairings: 1st of group A always vs 2nd of last group (Z)
     //                       2nd of group A always vs 1st of last group (Z)
     //                       Then 1st B vs 2nd (penultimate), etc.
     const numGroups = brackets.length;
-    const pairings: { team1Id: string; team2Id: string | null }[] = [];
+    
+    // First, collect raw intended matchups (before chapéu adjustments)
+    const rawPairings: { team1: string; team2: string }[] = [];
 
     for (let i = 0; i < Math.ceil(numGroups / 2); i++) {
       const rightIdx = numGroups - 1 - i;
@@ -606,57 +620,115 @@ const TournamentDetail = () => {
       if (groupRight) {
         // 1st of group[i] vs 2nd of group[rightIdx]
         if (groupI[0] && groupRight[1]) {
-          const team1 = groupI[0].teamId;
-          const team2 = groupRight[1].teamId;
-          // If team1 is in Chapéu, pair with null (waiting); otherwise pair with real opponent
-          const finalTeam2 = chapeuTeams.includes(team1) ? null : team2;
-          pairings.push({ team1Id: team1, team2Id: finalTeam2 });
+          rawPairings.push({ team1: groupI[0].teamId, team2: groupRight[1].teamId });
         }
         // 2nd of group[i] vs 1st of group[rightIdx]
         if (groupI[1] && groupRight[0]) {
-          const team1 = groupI[1].teamId;
-          const team2 = groupRight[0].teamId;
-          // If team1 is in Chapéu, pair with null (waiting); otherwise pair with real opponent
-          const finalTeam2 = chapeuTeams.includes(team1) ? null : team2;
-          pairings.push({ team1Id: team1, team2Id: finalTeam2 });
+          rawPairings.push({ team1: groupI[1].teamId, team2: groupRight[0].teamId });
         }
       } else {
         // Odd number of groups: middle group plays within itself
         if (groupI[0] && groupI[1]) {
-          const team1 = groupI[0].teamId;
-          const team2 = groupI[1].teamId;
-          // If team1 is in Chapéu, pair with null (waiting); otherwise pair with real opponent
-          const finalTeam2 = chapeuTeams.includes(team1) ? null : team2;
-          pairings.push({ team1Id: team1, team2Id: finalTeam2 });
+          rawPairings.push({ team1: groupI[0].teamId, team2: groupI[1].teamId });
         }
       }
     }
 
-    // Add any index teams as extra pairings if needed
+    // Add index teams as raw pairings
     if (indexTeamIds.length > 0) {
-      // Index teams fill remaining spots — pair them sequentially
       for (let i = 0; i < indexTeamIds.length - 1; i += 2) {
-        const team1 = indexTeamIds[i];
-        const team2 = indexTeamIds[i + 1];
-        // If team1 is in Chapéu, pair with null (waiting); otherwise pair with real opponent
-        const finalTeam2 = chapeuTeams.includes(team1) ? null : team2;
-        pairings.push({ team1Id: team1, team2Id: finalTeam2 });
+        rawPairings.push({ team1: indexTeamIds[i], team2: indexTeamIds[i + 1] });
       }
-      // Handle odd index team
       if (indexTeamIds.length % 2 === 1) {
-        pairings.push({ team1Id: indexTeamIds[indexTeamIds.length - 1], team2Id: null });
+        rawPairings.push({ team1: indexTeamIds[indexTeamIds.length - 1], team2: '' });
       }
+    }
+
+    // Now convert raw pairings to final matches, handling chapéus
+    // RULE: Chapéu team gets its own match (team + null), positioned BEFORE its paired real match
+    // So: chapéu at position 1, real match at position 2 → winner of pos 2 fills chapéu pos 1
+    const pairings: { team1Id: string; team2Id: string | null }[] = [];
+    const usedInChapeu = new Set<string>();
+
+    // Separate chapéu pairings from real pairings
+    const chapeuPairings: typeof rawPairings = [];
+    const realPairings: typeof rawPairings = [];
+
+    for (const pair of rawPairings) {
+      const t1Chapeu = chapeuTeamSet.has(pair.team1);
+      const t2Chapeu = chapeuTeamSet.has(pair.team2);
+      
+      if (t1Chapeu || t2Chapeu) {
+        chapeuPairings.push(pair);
+      } else {
+        realPairings.push(pair);
+      }
+    }
+
+    // For each chapéu pairing: create chapéu match + real match as adjacent pair
+    for (const pair of chapeuPairings) {
+      const chapeuTeam = chapeuTeamSet.has(pair.team1) ? pair.team1 : pair.team2;
+      const realTeam = chapeuTeam === pair.team1 ? pair.team2 : pair.team1;
+      
+      // Position: Chapéu first (odd position), then real match needs to be paired with remaining teams
+      // The chapéu team waits; the real team from this pair needs a real opponent
+      pairings.push({ team1Id: chapeuTeam, team2Id: null }); // Chapéu slot
+      usedInChapeu.add(realTeam);
+    }
+
+    // The teams that were "freed" from chapéu pairings need to be paired together as real matches
+    const freedTeams = Array.from(usedInChapeu);
+    for (let i = 0; i < freedTeams.length - 1; i += 2) {
+      pairings.push({ team1Id: freedTeams[i], team2Id: freedTeams[i + 1] });
+    }
+    if (freedTeams.length % 2 === 1) {
+      // Odd freed team — becomes another chapéu
+      pairings.push({ team1Id: freedTeams[freedTeams.length - 1], team2Id: null });
+    }
+
+    // Add all fully real pairings
+    for (const pair of realPairings) {
+      if (pair.team2 === '') {
+        pairings.push({ team1Id: pair.team1, team2Id: null });
+      } else {
+        pairings.push({ team1Id: pair.team1, team2Id: pair.team2 });
+      }
+    }
+
+    // Reorder so chapéu matches are at ODD positions (1, 3, 5...) 
+    // and their paired real matches are at EVEN positions (2, 4, 6...)
+    // This is crucial for the declareWinner adjacency logic
+    const chapeuSlots = pairings.filter(p => p.team2Id === null);
+    const realSlots = pairings.filter(p => p.team2Id !== null);
+    const orderedPairings: typeof pairings = [];
+    
+    let chapIdx = 0;
+    let realIdx = 0;
+    
+    // Interleave: for each chapéu, place chapéu then real match
+    while (chapIdx < chapeuSlots.length && realIdx < realSlots.length) {
+      orderedPairings.push(chapeuSlots[chapIdx]); // odd position
+      orderedPairings.push(realSlots[realIdx]);    // even position
+      chapIdx++;
+      realIdx++;
+    }
+    // Add remaining (all chapéu or all real)
+    while (chapIdx < chapeuSlots.length) {
+      orderedPairings.push(chapeuSlots[chapIdx++]);
+    }
+    while (realIdx < realSlots.length) {
+      orderedPairings.push(realSlots[realIdx++]);
     }
 
     const newMatches: any[] = [];
 
-    for (let i = 0; i < pairings.length; i++) {
+    for (let i = 0; i < orderedPairings.length; i++) {
       newMatches.push({
         tournament_id: id,
         round: 1,
         position: i + 1,
-        team1_id: pairings[i].team1Id,
-        team2_id: pairings[i].team2Id,
+        team1_id: orderedPairings[i].team1Id,
+        team2_id: orderedPairings[i].team2Id,
         status: "pending",
         bracket_number: 1,
         modality_id: modalityId,
@@ -975,58 +1047,106 @@ const TournamentDetail = () => {
 
         const currentRound = match.round;
         const roundMatches = relevantMatches.filter((m: any) => m.round === currentRound);
-        const allRoundDone = roundMatches.every((m: any) => m.status === "completed");
 
-        if (allRoundDone) {
-          if (currentRound === 0) {
-            // GROUP STAGE completed → auto-generate knockout
-            await generateKnockoutFromGroups();
-          } else {
-            // KNOCKOUT round completed → generate next round
-            const nextRound = currentRound + 1;
+        // === CHAPÉU INJECTION ===
+        // When a real match completes, check if any Chapéu in the same round needs the winner
+        // A Chapéu is a match with exactly one team (team1_id set, team2_id null)
+        const chapeuMatches = roundMatches.filter((m: any) =>
+          m.status === 'pending' &&
+          ((m.team1_id && !m.team2_id) || (!m.team1_id && m.team2_id))
+        );
+
+        if (chapeuMatches.length > 0) {
+          // For each completed real match in this round, inject its winner
+          // into the paired Chapéu match
+          // Pairing logic: matches are paired by position adjacency
+          // i.e., position 1+2 → next round pos 1, position 3+4 → next round pos 2
+          const completedRealMatches = roundMatches.filter((m: any) =>
+            m.status === 'completed' && m.team1_id && m.team2_id && m.winner_team_id
+          );
+
+          for (const chapeu of chapeuMatches) {
+            // Find the paired real match:
+            // Positions are paired: (1,2), (3,4), etc.
+            // The chapéu and its paired match share the same next-round destination
+            const chapeuPos = chapeu.position;
+            const pairedPos = chapeuPos % 2 === 1 ? chapeuPos + 1 : chapeuPos - 1;
             
-            // FRESH CHECK: Query DB right before insert to prevent race-condition duplicates
-            const { data: freshCheckMatches } = await organizerQuery({
-              table: "matches",
-              operation: "select",
-              filters: { tournament_id: id },
-              order: [{ column: "round" }, { column: "position" }],
-            });
+            const pairedMatch = completedRealMatches.find((m: any) => m.position === pairedPos);
             
-            const freshRelevant = freshCheckMatches
-              ? (modalityId ? freshCheckMatches.filter((m: any) => m.modality_id === modalityId) : freshCheckMatches)
-              : [];
-            const existingNextRound = (freshRelevant as any[]).filter((m: any) => m.round === nextRound);
-            
-            if (existingNextRound.length > 0) {
-              console.log(`[NextRound] Round ${nextRound} already exists (${existingNextRound.length} matches), skipping generation.`);
+            if (pairedMatch && pairedMatch.winner_team_id) {
+              // Inject the winner from the paired real match into the chapéu's empty slot
+              const emptySlot = !chapeu.team2_id ? 'team2_id' : 'team1_id';
+              await organizerQuery({
+                table: "matches",
+                operation: "update",
+                data: { [emptySlot]: pairedMatch.winner_team_id },
+                filters: { id: chapeu.id },
+              });
+              // Update in-memory
+              chapeu[emptySlot] = pairedMatch.winner_team_id;
+              console.log(`[Chapéu:Fill] Injected ${pairedMatch.winner_team_id} into chapéu match ${chapeu.id} slot ${emptySlot}`);
+            }
+          }
+        }
+
+        // Re-check: now that chapéus may have been filled, are ALL matches done?
+        // Refetch to get latest state
+        const { data: postChapeuMatches } = await organizerQuery({
+          table: "matches",
+          operation: "select",
+          filters: { tournament_id: id },
+          order: [{ column: "round" }, { column: "position" }],
+        });
+
+        if (postChapeuMatches) {
+          const postRelevant = modalityId
+            ? postChapeuMatches.filter((m: any) => m.modality_id === modalityId)
+            : postChapeuMatches;
+          const postRoundMatches = (postRelevant as any[]).filter((m: any) => m.round === currentRound);
+          const allRoundDone = postRoundMatches.every((m: any) => m.status === "completed");
+
+          if (allRoundDone) {
+            if (currentRound === 0) {
+              // GROUP STAGE completed → auto-generate knockout
+              await generateKnockoutFromGroups();
             } else {
-              const freshRoundMatches = (freshRelevant as any[]).filter((m: any) => m.round === currentRound);
-              const winners = freshRoundMatches
-                .filter((m: any) => m.winner_team_id)
-                .map((m: any) => m.winner_team_id as string);
+              // KNOCKOUT round completed → generate next round
+              const nextRound = currentRound + 1;
+              
+              // FRESH CHECK: Query DB right before insert to prevent race-condition duplicates
+              const existingNextRound = (postRelevant as any[]).filter((m: any) => m.round === nextRound);
+              
+              if (existingNextRound.length > 0) {
+                console.log(`[NextRound] Round ${nextRound} already exists (${existingNextRound.length} matches), skipping generation.`);
+              } else {
+                const freshRoundMatches = postRoundMatches;
+                const winners = freshRoundMatches
+                  .filter((m: any) => m.winner_team_id)
+                  .map((m: any) => m.winner_team_id as string);
 
-              if (winners.length >= 2) {
-                const nextMatches: any[] = [];
-                const pairCount = Math.floor(winners.length / 2);
+                if (winners.length >= 2) {
+                  const nextMatches: any[] = [];
+                  const pairCount = Math.floor(winners.length / 2);
 
-                for (let i = 0; i < pairCount; i++) {
-                  nextMatches.push({
-                    tournament_id: id,
-                    round: nextRound,
-                    position: i + 1,
-                    team1_id: winners[i * 2],
-                    team2_id: winners[i * 2 + 1],
-                    status: "pending",
-                    bracket_number: match.bracket_number || 1,
-                    modality_id: modalityId,
-                  });
+                  for (let i = 0; i < pairCount; i++) {
+                    nextMatches.push({
+                      tournament_id: id,
+                      round: nextRound,
+                      position: i + 1,
+                      team1_id: winners[i * 2],
+                      team2_id: winners[i * 2 + 1],
+                      status: "pending",
+                      bracket_number: match.bracket_number || 1,
+                      modality_id: modalityId,
+                    });
+                  }
+
+                  await organizerQuery({ table: "matches", operation: "insert", data: nextMatches });
+                  toast.success(`Próxima fase gerada! ${nextMatches.length} partida(s) criada(s).`);
+                } else if (winners.length === 1) {
+                  toast.success("🏆 Torneio finalizado! Campeão definido!");
                 }
-
-                await organizerQuery({ table: "matches", operation: "insert", data: nextMatches });
-                toast.success(`Próxima fase gerada! ${nextMatches.length} partida(s) criada(s).`);
-              } else if (winners.length === 1) {
-                toast.success("🏆 Torneio finalizado! Campeão definido!");
               }
             }
           }

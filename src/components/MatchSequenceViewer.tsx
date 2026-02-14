@@ -488,24 +488,35 @@ const MatchSequenceViewer = ({
   const sequence = useMemo(() => generateSequence(matches, tournamentFormat), [matches, tournamentFormat]);
   const displaySequence = useMemo(() => sequence, [sequence]);
 
-  // Build match number map from scheduler for consistent sequential numbering
-  // ALL matches are numbered in strict scheduler order — no gaps, no skips
+  // ╔══════════════════════════════════════════════════════════════════════╗
+  // ║  BLINDAGEM: NUMERAÇÃO SEQUENCIAL ESTRITA (REGRA 12 — IMUTÁVEL)    ║
+  // ║                                                                      ║
+  // ║  TODOS os jogos são numerados na ordem do scheduler, sem exceção.   ║
+  // ║  ⛔ PROIBIDO: filtrar por team1_id/team2_id antes de numerar.      ║
+  // ║  ⛔ PROIBIDO: numerar jogos com equipes primeiro e sem equipes     ║
+  // ║     depois — isso CAUSA SALTOS na numeração (bug histórico).       ║
+  // ║  ⛔ PROIBIDO: usar a ordem do banco de dados (matches array)       ║
+  // ║     para numerar — SEMPRE usar schedulerSequence().                  ║
+  // ║                                                                      ║
+  // ║  A numeração é: Grupos (round 0) → Eliminação (scheduler order).   ║
+  // ║  Resultado: 1, 2, 3, 4... sem saltos, SEMPRE.                      ║
+  // ╚══════════════════════════════════════════════════════════════════════╝
   const matchNumberMap = useMemo(() => {
     const map = new Map<string, number>();
     let num = 1;
-    // First: number group stage matches (round 0) in order
+    // Fase de grupos (round 0) — ordenados por position
     const groupMatches = matches.filter(m => m.round === 0).sort((a, b) => a.position - b.position);
     for (const m of groupMatches) {
       map.set(m.id, num++);
     }
-    // Then: number ALL elimination matches in strict scheduler order
+    // Eliminação — TODOS os jogos na ordem do scheduler, SEM filtro de equipes
     const seq = schedulerSequence(matches as any);
     for (const m of seq) {
       if (!map.has(m.id)) {
         map.set(m.id, num++);
       }
     }
-    // Safety: any match somehow missed
+    // Safety net: qualquer jogo não coberto
     for (const m of matches) {
       if (!map.has(m.id)) map.set(m.id, num++);
     }

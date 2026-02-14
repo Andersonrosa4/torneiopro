@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
-import { Plus, Trophy, Users, Calendar, ArrowRight, MapPin, ArrowLeft, Trash2 } from "lucide-react";
+import { Plus, Trophy, Users, Calendar, ArrowRight, MapPin, ArrowLeft, Trash2, Stethoscope } from "lucide-react";
 import { toast } from "sonner";
 import { organizerQuery } from "@/lib/organizerApi";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -135,10 +135,19 @@ const Dashboard = () => {
 
         <Tabs defaultValue="tournaments">
           {isAdmin && (
-            <TabsList className="mb-4">
-              <TabsTrigger value="tournaments">Meus Torneios</TabsTrigger>
-              <TabsTrigger value="users">Gestão de Usuários</TabsTrigger>
-            </TabsList>
+            <>
+              <TabsList className="mb-4">
+                <TabsTrigger value="tournaments">Meus Torneios</TabsTrigger>
+                <TabsTrigger value="users">Gestão de Usuários</TabsTrigger>
+              </TabsList>
+              <div className="mb-4">
+                <Link to="/diagnostics">
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Stethoscope className="h-4 w-4" /> Diagnóstico do Sistema
+                  </Button>
+                </Link>
+              </div>
+            </>
           )}
 
           {isAdmin && (

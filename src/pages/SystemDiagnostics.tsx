@@ -117,6 +117,7 @@ const SystemDiagnostics = () => {
   const matchHasField = (field: string) => matchColumns.includes(field);
 
   const checklist = [
+    { label: "groups existe", ok: tableExists("groups") },
     { label: "classificacao_grupos existe", ok: tableExists("classificacao_grupos") },
     { label: "matches possui campo lado", ok: matchHasField("bracket_half") },
     { label: "matches possui campo origem", ok: matchHasField("next_win_match_id") || matchHasField("next_lose_match_id") },

@@ -912,8 +912,164 @@ const NormalKnockout = ({
 };
 
 /* ────────────────────────────────────────────────────
-   Mobile List View — partidas em lista vertical agrupadas por rodada
+   DE Global Connectors — draws lines across all columns
    ──────────────────────────────────────────────────── */
+const DEGlobalConnectors = ({
+  containerRef,
+  allMatches,
+}: {
+  containerRef: React.RefObject<HTMLDivElement>;
+  allMatches: Match[];
+}) => {
+  const [paths, setPaths] = useState<string[]>([]);
+
+  const computePaths = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const containerRect = container.getBoundingClientRect();
+    const newPaths: string[] = [];
+
+    for (const m of allMatches) {
+      if (!m.next_win_match_id) continue;
+      const srcEl = container.querySelector(`[data-match-id="${m.id}"]`);
+      const dstEl = container.querySelector(`[data-match-id="${m.next_win_match_id}"]`);
+      if (!srcEl || !dstEl) continue;
+
+      const srcR = srcEl.getBoundingClientRect();
+      const dstR = dstEl.getBoundingClientRect();
+
+      // Determine direction: if dst is to the left of src, reversed
+      const srcCx = srcR.left + srcR.width / 2;
+      const dstCx = dstR.left + dstR.width / 2;
+      const goingLeft = dstCx < srcCx;
+
+      let x1: number, y1: number, x2: number, y2: number;
+      if (goingLeft) {
+        x1 = srcR.left - containerRect.left;
+        y1 = srcR.top + srcR.height / 2 - containerRect.top;
+        x2 = dstR.right - containerRect.left;
+        y2 = dstR.top + dstR.height / 2 - containerRect.top;
+      } else {
+        x1 = srcR.right - containerRect.left;
+        y1 = srcR.top + srcR.height / 2 - containerRect.top;
+        x2 = dstR.left - containerRect.left;
+        y2 = dstR.top + dstR.height / 2 - containerRect.top;
+      }
+
+      const midX = (x1 + x2) / 2;
+      newPaths.push(`M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`);
+    }
+
+    setPaths(newPaths);
+  }, [containerRef, allMatches]);
+
+  useEffect(() => {
+    const timer = setTimeout(computePaths, 400);
+    window.addEventListener("resize", computePaths);
+    return () => { clearTimeout(timer); window.removeEventListener("resize", computePaths); };
+  }, [computePaths]);
+
+  if (paths.length === 0) return null;
+
+  return (
+    <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 0, overflow: "visible" }}>
+      {paths.map((d, i) => (
+        <path key={i} d={d} fill="none" stroke="hsl(var(--muted-foreground) / 0.3)" strokeWidth="1.5" />
+      ))}
+    </svg>
+  );
+};
+
+/* ────────────────────────────────────────────────────
+   DE Bracket Layout — wraps the 3-column grid with global connectors
+   ──────────────────────────────────────────────────── */
+const DEBracketLayout = ({
+  zoomContainerRef,
+  isMobile,
+  mobileZoom,
+  winnersA,
+  winnersB,
+  losersA,
+  losersB,
+  semiFinals,
+  finalMatches,
+  getName,
+  allMatches,
+  matchNumberMap,
+}: {
+  zoomContainerRef: React.RefObject<HTMLDivElement>;
+  isMobile: boolean;
+  mobileZoom: number;
+  winnersA: Match[];
+  winnersB: Match[];
+  losersA: Match[];
+  losersB: Match[];
+  semiFinals: Match[];
+  finalMatches: Match[];
+  getName: (id: string | null) => string;
+  allMatches: Match[];
+  matchNumberMap?: Map<string, number>;
+}) => {
+  const globalRef = useRef<HTMLDivElement>(null);
+
+  return (
+    <div
+      ref={zoomContainerRef}
+      className="overflow-x-auto overflow-y-hidden pb-4"
+      style={{ touchAction: "pan-x pinch-zoom", WebkitOverflowScrolling: "touch" }}
+    >
+      <div
+        style={isMobile ? { transform: `scale(${mobileZoom})`, transformOrigin: 'top left', width: `${100 / mobileZoom}%` } : undefined}
+      >
+        <div ref={globalRef} className="relative min-w-[900px] grid grid-cols-[1fr_auto_1fr] gap-4 items-start">
+          <DEGlobalConnectors containerRef={globalRef} allMatches={allMatches.filter(m => m.round > 0)} />
+
+          {/* ── LEFT: Winners (L → R) ── */}
+          <div className="space-y-4 relative" style={{ zIndex: 1 }}>
+            <div className="text-center">
+              <span className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70 border-b border-primary/20 pb-1 px-4">
+                Chave dos Vencedores →
+              </span>
+            </div>
+            <BracketColumn bracketMatches={winnersA} getName={getName} label="Vencedores A" icon="🏆" colorAccent="border-primary/20 bg-primary/[0.03]" reversed={false} allMatches={allMatches} matchNumberMap={matchNumberMap} />
+            <BracketColumn bracketMatches={winnersB} getName={getName} label="Vencedores B" icon="🏆" colorAccent="border-primary/15 bg-primary/[0.02]" reversed={false} allMatches={allMatches} matchNumberMap={matchNumberMap} />
+          </div>
+
+          {/* ── CENTER: Semifinals + Final ── */}
+          <div className="flex flex-col items-center justify-center min-w-[200px] pt-8 relative" style={{ zIndex: 1 }}>
+            <div className="mb-4">
+              <span className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] text-accent/80 border-b border-accent/20 pb-1 px-4">
+                Fase Final
+              </span>
+            </div>
+            <CenterColumn crossSemis={semiFinals} finalMatches={finalMatches} getName={getName} allMatches={allMatches} matchNumberMap={matchNumberMap} />
+          </div>
+
+          {/* ── RIGHT: Losers (R → L) ── */}
+          <div className="space-y-4 relative" style={{ zIndex: 1 }}>
+            <div className="text-center">
+              <span className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] text-destructive/60 border-b border-destructive/20 pb-1 px-4">
+                ← Chave dos Perdedores
+              </span>
+            </div>
+            <BracketColumn bracketMatches={losersA} getName={getName} label="Perdedores Superiores" icon="⬇" colorAccent="border-destructive/15 bg-destructive/[0.03]" reversed={true} allMatches={allMatches} matchNumberMap={matchNumberMap} />
+            <BracketColumn bracketMatches={losersB} getName={getName} label="Perdedores Inferiores" icon="⬇" colorAccent="border-destructive/10 bg-destructive/[0.02]" reversed={true} allMatches={allMatches} matchNumberMap={matchNumberMap} />
+          </div>
+        </div>
+
+        {/* Legend */}
+        <div className="mt-4 rounded-lg bg-card/50 border border-border/50 p-3 text-[10px] flex flex-wrap gap-x-6 gap-y-1 justify-center text-muted-foreground/70">
+          <span>← <strong className="text-primary/70">Vencedores</strong> crescem para o centro</span>
+          <span><strong className="text-destructive/70">Perdedores</strong> crescem para o centro →</span>
+          <span>🏆 <strong className="text-accent/70">Semifinais + Final</strong> no centro</span>
+          <span>⚠️ Derrota no Perdedores = Eliminação</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 const MobileListView = ({
   matches,
   getName,
@@ -1127,95 +1283,22 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
       )}
 
 
-      {/* Double Elimination — 3-column layout (original mode) */}
+      {/* Double Elimination — 3-column layout with global connectors */}
       {viewMode === 'bracket' && isDoubleElimination && (
-        <div
-          ref={zoomContainerRef}
-          className="overflow-x-auto overflow-y-hidden pb-4"
-          style={{ touchAction: "pan-x pinch-zoom", WebkitOverflowScrolling: "touch" }}
-        >
-          <div
-            style={isMobile ? { transform: `scale(${mobileZoom})`, transformOrigin: 'top left', width: `${100 / mobileZoom}%` } : undefined}
-          >
-            <div className="min-w-[900px] grid grid-cols-[1fr_auto_1fr] gap-4 items-start">
-              {/* ── LEFT: Winners (L → R) ── */}
-              <div className="space-y-4">
-                <div className="text-center">
-                  <span className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70 border-b border-primary/20 pb-1 px-4">
-                    Chave dos Vencedores →
-                  </span>
-                </div>
-                <BracketColumn
-                  bracketMatches={winnersA}
-                  getName={getName}
-                  label="Vencedores A"
-                  icon="🏆"
-                  colorAccent="border-primary/20 bg-primary/[0.03]"
-                  reversed={false}
-                  allMatches={matches}
-                  matchNumberMap={matchNumberMap}
-                />
-                <BracketColumn
-                  bracketMatches={winnersB}
-                  getName={getName}
-                  label="Vencedores B"
-                  icon="🏆"
-                  colorAccent="border-primary/15 bg-primary/[0.02]"
-                  reversed={false}
-                  allMatches={matches}
-                  matchNumberMap={matchNumberMap}
-                />
-              </div>
-
-              {/* ── CENTER: Semifinals + Final ── */}
-              <div className="flex flex-col items-center justify-center min-w-[200px] pt-8">
-                <div className="mb-4">
-                  <span className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] text-accent/80 border-b border-accent/20 pb-1 px-4">
-                    Fase Final
-                  </span>
-                </div>
-                <CenterColumn crossSemis={semiFinals} finalMatches={finalMatches} getName={getName} allMatches={matches} matchNumberMap={matchNumberMap} />
-              </div>
-
-              {/* ── RIGHT: Losers (R → L) ── */}
-              <div className="space-y-4">
-                <div className="text-center">
-                  <span className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] text-destructive/60 border-b border-destructive/20 pb-1 px-4">
-                    ← Chave dos Perdedores
-                  </span>
-                </div>
-                <BracketColumn
-                  bracketMatches={losersA}
-                  getName={getName}
-                  label="Perdedores Superiores"
-                  icon="⬇"
-                  colorAccent="border-destructive/15 bg-destructive/[0.03]"
-                  reversed={true}
-                  allMatches={matches}
-                  matchNumberMap={matchNumberMap}
-                />
-                <BracketColumn
-                  bracketMatches={losersB}
-                  getName={getName}
-                  label="Perdedores Inferiores"
-                  icon="⬇"
-                  colorAccent="border-destructive/10 bg-destructive/[0.02]"
-                  reversed={true}
-                  allMatches={matches}
-                  matchNumberMap={matchNumberMap}
-                />
-              </div>
-            </div>
-
-            {/* Legend */}
-            <div className="mt-4 rounded-lg bg-card/50 border border-border/50 p-3 text-[10px] flex flex-wrap gap-x-6 gap-y-1 justify-center text-muted-foreground/70">
-              <span>← <strong className="text-primary/70">Vencedores</strong> crescem para o centro</span>
-              <span><strong className="text-destructive/70">Perdedores</strong> crescem para o centro →</span>
-              <span>🏆 <strong className="text-accent/70">Semifinais + Final</strong> no centro</span>
-              <span>⚠️ Derrota no Perdedores = Eliminação</span>
-            </div>
-          </div>
-        </div>
+        <DEBracketLayout
+          zoomContainerRef={zoomContainerRef}
+          isMobile={isMobile}
+          mobileZoom={mobileZoom}
+          winnersA={winnersA}
+          winnersB={winnersB}
+          losersA={losersA}
+          losersB={losersB}
+          semiFinals={semiFinals}
+          finalMatches={finalMatches}
+          getName={getName}
+          allMatches={matches}
+          matchNumberMap={matchNumberMap}
+        />
       )}
 
       {/* Normal Knockout (non-DE, original mode) */}

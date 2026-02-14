@@ -28,7 +28,7 @@ const AthleteLogin = () => {
       .from("tournaments")
       .select("id, name")
       .eq("tournament_code", normalizedCode)
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       toast.error("Código de torneio não encontrado");

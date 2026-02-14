@@ -290,7 +290,7 @@ const BracketColumn = ({
         {reversed ? <ChevronLeft className="h-3 w-3 ml-auto opacity-50" /> : <ChevronRight className="h-3 w-3 ml-auto opacity-50" />}
       </div>
       <div ref={containerRef} className="relative overflow-x-auto pb-2">
-        <BracketConnectors containerRef={containerRef} matches={bracketMatches} reversed={reversed} />
+        {/* Connectors removed */}
         <div className="flex gap-6 relative" style={{ zIndex: 1 }}>
           {displayRounds.map((round) => {
             const roundMatches = roundGroups[round].sort((a, b) => a.position - b.position);
@@ -666,12 +666,7 @@ const GroupStageView = ({
 
       {!hasKnockout && knockoutRounds.length > 0 && (
         <div ref={containerRef} className="relative overflow-x-auto pb-4 rounded-xl border border-border bg-card/50 p-4" style={{ WebkitOverflowScrolling: "touch" }}>
-          <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground mb-3">
-            🏆 Fase Eliminatória (Previsão)
-          </div>
-          {previewConnections.length > 0 && (
-            <FullBracketConnectors containerRef={containerRef} connections={previewConnections} />
-          )}
+          {/* Connectors removed */}
           <div className="flex gap-10 relative" style={{ zIndex: 1 }}>
             {knockoutRounds.map((roundMatches, ri) => {
               const roundLabel = knockoutRoundLabels[ri]?.label || `Rodada ${ri + 1}`;
@@ -873,11 +868,8 @@ const NormalKnockout = ({
 
   return (
     <div className="rounded-xl border border-border bg-card/50 p-4">
-      <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground mb-3">
-        🏆 Eliminatória
-      </div>
       <div ref={containerRef} className="relative overflow-x-auto">
-        <NormalKnockoutConnectors containerRef={containerRef} knockoutMatches={knockoutMatches} />
+        {/* Connectors removed */}
         <div className="flex gap-10 relative" style={{ zIndex: 1, minHeight: totalHeight }}>
           {rounds.map((round) => {
             const roundMatches = roundGroups[round];

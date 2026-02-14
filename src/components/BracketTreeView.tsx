@@ -975,7 +975,7 @@ const MobileListView = ({
             <h4 className="text-xs font-bold text-foreground">{block.label}</h4>
             <span className="text-[10px] text-muted-foreground">{block.matches.length} {block.matches.length === 1 ? 'partida' : 'partidas'}</span>
           </div>
-          <div className="p-2 space-y-2">
+          <div className="p-2 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
             {block.matches.map(match => {
               const isCompleted = match.status === 'completed';
               const t1Win = match.winner_team_id === match.team1_id && isCompleted;

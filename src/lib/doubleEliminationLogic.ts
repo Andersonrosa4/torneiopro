@@ -312,46 +312,15 @@ function buildLosersBracketWithFeeders(
     const incoming: { source: MatchData; linkField: 'next_win_match_id' | 'next_lose_match_id' }[] = [];
 
     if (ri === 0 && survivors.length === 0) {
-      // ── Rodada 1: Espelhamento reverso ──
-      // Parear primeiro com último, segundo com penúltimo, etc.
-      const sources = winnersInRound.map(m => ({
-        source: m,
-        linkField: 'next_lose_match_id' as const,
-      }));
+      // ── Rodada 1: Pareamento sequencial ──
+      // Perd.9 vs Perd.10, Perd.11 vs Perd.12, etc.
+      // Ordenados por position ascendente (quem jogou antes, joga primeiro).
+      const sources = winnersInRound
+        .map(m => ({ source: m, linkField: 'next_lose_match_id' as const }))
+        .sort((a, b) => a.source.position - b.source.position);
 
-      // Construir pares espelhados
-      type SourceEntry = typeof sources[0];
-      const pairs: [SourceEntry, SourceEntry][] = [];
-      let left = 0;
-      let right = sources.length - 1;
-      while (left < right) {
-        pairs.push([sources[left], sources[right]]);
-        left++;
-        right--;
-      }
-
-      // ── REGRA 12: Ordenar pares por max position ASCENDENTE ──
-      // Quem jogou antes na Winners joga primeiro na Losers.
-      // Pares com jogos recentes (maior position) ficam por último,
-      // dando mais tempo de descanso. Isso também resolve o
-      // anti-consecutivo naturalmente (o último jogo dos Winners
-      // nunca será o primeiro dos Losers).
-      pairs.sort((a, b) => {
-        const maxA = Math.max(a[0].source.position, a[1].source.position);
-        const maxB = Math.max(b[0].source.position, b[1].source.position);
-        return maxA - maxB;
-      });
-
-      // Achatar pares de volta ao incoming
-      for (const [p1, p2] of pairs) {
-        incoming.push(p1);
-        incoming.push(p2);
-      }
-
-      // Se ímpar, o do meio fica sozinho
-      if (sources.length % 2 === 1) {
-        const midIdx = Math.floor(sources.length / 2);
-        incoming.push(sources[midIdx]);
+      for (const s of sources) {
+        incoming.push(s);
       }
     } else {
       // ── Rodadas subsequentes: intercalar survivors com novos perdedores ──

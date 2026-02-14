@@ -2,7 +2,7 @@
  * Double Elimination Round Scheduler
  * 
  * Enforces strict execution order per round:
- *   W-A R1 → W-B R1 → L-A R1 → L-B R1 → W-A R2 → W-B R2 → L-A R2 → L-B R2 → ... → Semis → Final
+ *   W-A R1 → W-B R1 → L-S R1 → L-I R1 → W-A R2 → W-B R2 → L-S R2 → L-I R2 → ... → Semis → Final
  * 
  * Dependencies:
  *   - Losers R only unlocks when Winners A R AND Winners B R are both completed
@@ -107,16 +107,9 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
     }
 
     if (cat === 'LS' || cat === 'LI') {
-      // Losers R depends on Winners A R + Winners B R being complete (losers drop from same round)
+      // Losers R depends only on Winners A R + Winners B R being complete
       if (groups.has(`WA_R${r}`)) deps.push(`WA_R${r}`);
       if (groups.has(`WB_R${r}`)) deps.push(`WB_R${r}`);
-      // Also depend on the next round of winners if it exists (strict execution order)
-      const nextRoundIdx = sortedRounds.indexOf(r) + 1;
-      if (nextRoundIdx < sortedRounds.length) {
-        const nextR = sortedRounds[nextRoundIdx];
-        if (groups.has(`WA_R${nextR}`)) deps.push(`WA_R${nextR}`);
-        if (groups.has(`WB_R${nextR}`)) deps.push(`WB_R${nextR}`);
-      }
     }
 
     // Within same category pair: WB depends on WA, LI depends on LS
@@ -137,26 +130,14 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
     });
   }
 
-  // Emit blocks in correct execution order:
-  // WA R1, WB R1, WA R2, WB R2, LS R1, LI R1, WA R3, WB R3, LS R2, LI R2, ...
-  // Pattern: For each winners round R, emit WA R + WB R, then LS (R-1) + LI (R-1)
-  for (let i = 0; i < sortedRounds.length; i++) {
-    const r = sortedRounds[i];
-    // Emit Winners for this round
+  // Emit blocks in strict sequential order:
+  // WA R1, WB R1, LS R1, LI R1, WA R2, WB R2, LS R2, LI R2, ... → Semis → Final
+  // This ensures match numbering is always sequential without jumps.
+  for (const r of sortedRounds) {
     createBlock('WA', r);
     createBlock('WB', r);
-    // Emit Losers for PREVIOUS round (losers R-1 execute after winners R)
-    if (i > 0) {
-      const prevR = sortedRounds[i - 1];
-      createBlock('LS', prevR);
-      createBlock('LI', prevR);
-    }
-  }
-  // Emit Losers for the LAST winners round (if any)
-  if (sortedRounds.length > 0) {
-    const lastR = sortedRounds[sortedRounds.length - 1];
-    createBlock('LS', lastR);
-    createBlock('LI', lastR);
+    createBlock('LS', r);
+    createBlock('LI', r);
   }
 
   // Semifinals

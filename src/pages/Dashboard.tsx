@@ -60,16 +60,17 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
 
   const fetchTournaments = async () => {
-    let query = supabase
-      .from("tournaments")
-      .select("*")
-      .order("created_at", { ascending: false });
-
+    const filters: Record<string, any> = {};
     if (!isAdmin) {
-      query = query.eq("created_by", organizerId || "");
+      filters.created_by = organizerId || "";
     }
 
-    const { data, error } = await query;
+    const { data, error } = await organizerQuery<Tournament[]>({
+      table: "tournaments",
+      operation: "select",
+      filters: Object.keys(filters).length > 0 ? filters : undefined,
+      order: { column: "created_at", ascending: false },
+    });
     if (!error && data) setTournaments(data);
     setLoading(false);
   };
@@ -94,7 +95,12 @@ const Dashboard = () => {
     e.stopPropagation();
     await organizerQuery({ table: "rankings", operation: "delete", filters: { tournament_id: tournamentId } });
     // Nullify FK refs before deleting matches
-    const { data: tournamentMatches } = await supabase.from("matches").select("id").eq("tournament_id", tournamentId);
+    const { data: tournamentMatches } = await organizerQuery<{ id: string }[]>({
+      table: "matches",
+      operation: "select",
+      select: "id",
+      filters: { tournament_id: tournamentId },
+    });
     if (tournamentMatches) {
       for (const m of tournamentMatches) {
         await organizerQuery({ table: "matches", operation: "update", data: { next_win_match_id: null, next_lose_match_id: null }, filters: { id: m.id } });

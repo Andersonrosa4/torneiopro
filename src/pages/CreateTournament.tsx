@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSportTheme } from "@/contexts/SportContext";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +13,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import ThemedBackground from "@/components/ThemedBackground";
-import { organizerQuery } from "@/lib/organizerApi";
+import { organizerQuery, publicQuery } from "@/lib/organizerApi";
 
 const CreateTournament = () => {
   const { organizerId, user } = useAuth();
@@ -45,11 +45,12 @@ const CreateTournament = () => {
     setSelectedSport(form.sport as any);
 
     // Check if code already exists
-    const { data: existing } = await supabase
-      .from("tournaments")
-      .select("id")
-      .eq("tournament_code", normalizedCode)
-      .maybeSingle();
+    const { data: existing } = await publicQuery({
+      table: "tournaments",
+      select: "id",
+      filters: { tournament_code: normalizedCode },
+      maybeSingle: true,
+    });
 
     if (existing) {
       toast.error("Já existe um torneio utilizando este código. Escolha outro código.");

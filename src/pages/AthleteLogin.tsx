@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { publicQuery } from "@/lib/organizerApi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,11 +24,12 @@ const AthleteLogin = () => {
     }
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from("tournaments")
-      .select("id, name")
-      .eq("tournament_code", normalizedCode)
-      .maybeSingle();
+    const { data, error } = await publicQuery<{ id: string; name: string }>({
+      table: "tournaments",
+      select: "id, name",
+      filters: { tournament_code: normalizedCode },
+      maybeSingle: true,
+    });
 
     if (error || !data) {
       toast.error("Código de torneio não encontrado");

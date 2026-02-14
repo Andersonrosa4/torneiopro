@@ -33,3 +33,22 @@ export async function organizerQuery<T = any>(options: QueryOptions): Promise<{ 
 
   return { data: data?.data ?? null, error: null };
 }
+
+/**
+ * Public query - no authentication required. Only supports SELECT.
+ */
+export async function publicQuery<T = any>(options: Omit<QueryOptions, "operation" | "data"> & { operation?: "select" }): Promise<{ data: T | null; error: any }> {
+  const { data, error } = await supabase.functions.invoke("organizer-api", {
+    body: { ...options, operation: "select" },
+  });
+
+  if (error) {
+    return { data: null, error };
+  }
+
+  if (data?.error) {
+    return { data: null, error: { message: data.error } };
+  }
+
+  return { data: data?.data ?? null, error: null };
+}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { publicQuery } from "@/lib/organizerApi";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { TrendingUp } from "lucide-react";
@@ -37,11 +38,12 @@ const PublicRankingsView = () => {
       }
 
       // Busca torneio pelo código
-      const { data: tourData } = await supabase
-        .from("tournaments")
-        .select("id, name, sport")
-        .eq("tournament_code", code)
-        .single();
+      const { data: tourData } = await publicQuery<{ id: string; name: string; sport: string }>({
+        table: "tournaments",
+        select: "id, name, sport",
+        filters: { tournament_code: code },
+        single: true,
+      });
 
       if (!tourData) {
         toast.error("Torneio não encontrado");
@@ -52,11 +54,11 @@ const PublicRankingsView = () => {
       setTournament(tourData);
 
       // Busca rankings
-      const { data: rankData } = await supabase
-        .from("rankings")
-        .select("*")
-        .eq("tournament_id", tourData.id)
-        .order("points", { ascending: false });
+      const { data: rankData } = await publicQuery<RankingEntry[]>({
+        table: "rankings",
+        filters: { tournament_id: tourData.id },
+        order: { column: "points", ascending: false },
+      });
 
       setRankings(rankData || []);
       setLoading(false);

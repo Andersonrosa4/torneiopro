@@ -1028,18 +1028,18 @@ const DEBracketLayout = ({
             {/* ── LEFT: Winners (L → R) ── */}
             <div className="space-y-4">
               <div className="text-center">
-                <span className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70 border-b border-primary/20 pb-1 px-4">
+                <span className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] text-primary/80 border-b border-primary/40 pb-1 px-4">
                   Chave dos Vencedores →
                 </span>
               </div>
-              <BracketColumn bracketMatches={winnersA} getName={getName} label="Vencedores A" icon="🏆" colorAccent="border-primary/20 bg-primary/[0.03]" reversed={false} allMatches={allMatches} matchNumberMap={matchNumberMap} />
-              <BracketColumn bracketMatches={winnersB} getName={getName} label="Vencedores B" icon="🏆" colorAccent="border-primary/15 bg-primary/[0.02]" reversed={false} allMatches={allMatches} matchNumberMap={matchNumberMap} />
+              <BracketColumn bracketMatches={winnersA} getName={getName} label="Vencedores A" icon="🏆" colorAccent="border-primary/40 bg-primary/[0.1]" reversed={false} allMatches={allMatches} matchNumberMap={matchNumberMap} />
+              <BracketColumn bracketMatches={winnersB} getName={getName} label="Vencedores B" icon="🏆" colorAccent="border-primary/30 bg-primary/[0.08]" reversed={false} allMatches={allMatches} matchNumberMap={matchNumberMap} />
             </div>
 
             {/* ── CENTER: Semifinals + Final ── */}
             <div className="flex flex-col items-center justify-center min-w-[200px] pt-8">
               <div className="mb-4">
-                <span className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] text-accent/80 border-b border-accent/20 pb-1 px-4">
+                <span className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] text-accent/90 border-b border-accent/40 pb-1 px-4">
                   Fase Final
                 </span>
               </div>
@@ -1049,12 +1049,12 @@ const DEBracketLayout = ({
             {/* ── RIGHT: Losers (R → L) ── */}
             <div className="space-y-4">
               <div className="text-center">
-                <span className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] text-destructive/60 border-b border-destructive/20 pb-1 px-4">
+                <span className="inline-block text-[10px] font-bold uppercase tracking-[0.2em] text-destructive/80 border-b border-destructive/40 pb-1 px-4">
                   ← Chave dos Perdedores
                 </span>
               </div>
-              <BracketColumn bracketMatches={losersA} getName={getName} label="Perdedores Superiores" icon="⬇" colorAccent="border-destructive/15 bg-destructive/[0.03]" reversed={true} allMatches={allMatches} matchNumberMap={matchNumberMap} />
-              <BracketColumn bracketMatches={losersB} getName={getName} label="Perdedores Inferiores" icon="⬇" colorAccent="border-destructive/10 bg-destructive/[0.02]" reversed={true} allMatches={allMatches} matchNumberMap={matchNumberMap} />
+              <BracketColumn bracketMatches={losersA} getName={getName} label="Perdedores Superiores" icon="⬇" colorAccent="border-destructive/40 bg-destructive/[0.1]" reversed={true} allMatches={allMatches} matchNumberMap={matchNumberMap} />
+              <BracketColumn bracketMatches={losersB} getName={getName} label="Perdedores Inferiores" icon="⬇" colorAccent="border-destructive/30 bg-destructive/[0.08]" reversed={true} allMatches={allMatches} matchNumberMap={matchNumberMap} />
             </div>
           </div>
         </div>

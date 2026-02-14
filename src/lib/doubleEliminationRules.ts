@@ -120,5 +120,16 @@
 // Edições na Losers regeneram apenas Losers a partir do ponto.
 // Semifinal/Final: reset total dessas fases.
 
-export const DOUBLE_ELIMINATION_RULES_VERSION = '1.0.0';
+// ═══════════════════════════════════════════════════
+// REGRA 12: ANTI-CONSECUTIVO (BACK-TO-BACK PROIBIDO)
+// ═══════════════════════════════════════════════════
+// Nenhum time pode jogar duas partidas consecutivas na sequência.
+// O scheduler detecta automaticamente feeders (next_win/next_lose)
+// e reordena partidas dentro do mesmo bloco para garantir que o
+// perdedor/vencedor de um jogo N nunca jogue imediatamente no jogo N+1.
+// Exemplo: se o Jogo 16 alimenta o Jogo 17 via next_lose_match_id,
+// o Jogo 17 é trocado por outro jogo do mesmo bloco que não tenha
+// conflito de feeder.
+
+export const DOUBLE_ELIMINATION_RULES_VERSION = '1.1.0';
 export const DOUBLE_ELIMINATION_RULES_DATE = '2026-02-14';

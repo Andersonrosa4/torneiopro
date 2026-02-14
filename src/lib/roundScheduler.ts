@@ -95,29 +95,27 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
 
     const deps: string[] = [];
 
+    if (cat === 'WA' || cat === 'WB') {
+      if (r > sortedRounds[0]) {
+        const prevR = sortedRounds[sortedRounds.indexOf(r) - 1];
+        if (prevR !== undefined) {
+          // Winners R depends on previous round of WINNERS being complete (no circular dep)
+          if (groups.has(`WA_R${prevR}`)) deps.push(`WA_R${prevR}`);
+          if (groups.has(`WB_R${prevR}`)) deps.push(`WB_R${prevR}`);
+        }
+      }
+    }
+
     if (cat === 'LS' || cat === 'LI') {
-      // Losers R depends on Winners A R+1 + Winners B R+1 (next round of winners must be complete)
+      // Losers R depends on Winners A R + Winners B R being complete (losers drop from same round)
+      if (groups.has(`WA_R${r}`)) deps.push(`WA_R${r}`);
+      if (groups.has(`WB_R${r}`)) deps.push(`WB_R${r}`);
+      // Also depend on the next round of winners if it exists (strict execution order)
       const nextRoundIdx = sortedRounds.indexOf(r) + 1;
       if (nextRoundIdx < sortedRounds.length) {
         const nextR = sortedRounds[nextRoundIdx];
         if (groups.has(`WA_R${nextR}`)) deps.push(`WA_R${nextR}`);
         if (groups.has(`WB_R${nextR}`)) deps.push(`WB_R${nextR}`);
-      }
-    }
-
-    if (cat === 'WA' || cat === 'WB') {
-      if (r > sortedRounds[0]) {
-        const prevR = sortedRounds[sortedRounds.indexOf(r) - 1];
-        if (prevR !== undefined) {
-          // Winners R depends on Losers of previous round (if they exist)
-          if (groups.has(`LS_R${prevR}`)) deps.push(`LS_R${prevR}`);
-          if (groups.has(`LI_R${prevR}`)) deps.push(`LI_R${prevR}`);
-          // If no losers existed for prevR, depend on previous winners
-          if (!groups.has(`LS_R${prevR}`) && !groups.has(`LI_R${prevR}`)) {
-            if (groups.has(`WA_R${prevR}`)) deps.push(`WA_R${prevR}`);
-            if (groups.has(`WB_R${prevR}`)) deps.push(`WB_R${prevR}`);
-          }
-        }
       }
     }
 

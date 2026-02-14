@@ -642,9 +642,9 @@ const GroupStageView = ({
         {groupNumbers.map((gNum) => {
           const gMatches = groupMatchesByGroup[gNum] || [];
           return (
-            <div key={gNum} className="rounded-xl border border-primary/20 bg-primary/[0.03] p-3 space-y-2">
-              <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground flex items-center gap-1.5">
-                <span>⚽</span>
+            <div key={gNum} className="rounded-xl border border-primary/30 bg-gradient-to-r from-primary/15 to-accent/10 p-4 space-y-2">
+              <div className="text-xs font-bold uppercase tracking-[0.2em] bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent flex items-center gap-2 pb-1">
+                <span className="text-primary">⚽</span>
                 <span>Grupo {numberToLetter(gNum)}</span>
               </div>
               <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">

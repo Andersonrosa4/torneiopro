@@ -26,6 +26,7 @@ interface Match {
   bracket_number?: number;
   bracket_type?: string;
   bracket_half?: string | null;
+  next_win_match_id?: string | null;
 }
 
 interface Team {
@@ -343,6 +344,8 @@ interface MatchCardProps {
   isOwner: boolean;
   numSets: number;
   tournamentFormat: string;
+  allMatches: Match[];
+  matchNumberMap: Map<string, number>;
   onDeclareWinner: (matchId: string, winnerId: string) => void;
   onUpdateScore: (matchId: string, score1: number, score2: number) => void;
   onAutoResult?: (matchId: string, score1: number, score2: number, winnerId: string) => void;
@@ -356,6 +359,8 @@ const MatchCard = ({
   isOwner,
   numSets,
   tournamentFormat,
+  allMatches,
+  matchNumberMap,
   onDeclareWinner,
   onUpdateScore,
   onAutoResult,
@@ -374,8 +379,34 @@ const MatchCard = ({
   }, [numSets, match.id]);
 
   const isCompleted = match.status === "completed";
-  const team1Name = getTeamName(match.team1_id);
-  const team2Name = getTeamName(match.team2_id);
+
+  // Build feeder labels for empty slots (knockout only)
+  const feederLabels = useMemo(() => {
+    if (match.round === 0) return { team1: null, team2: null };
+    const feeders = allMatches.filter(m => m.next_win_match_id === match.id);
+    let team1Label: string | null = null;
+    let team2Label: string | null = null;
+    for (const f of feeders) {
+      const fNum = matchNumberMap.get(f.id);
+      if (!fNum) continue;
+      // Determine which slot this feeder fills: odd position → team1, even → team2
+      if (f.position % 2 === 1) {
+        team1Label = `Venc. Jogo ${fNum}`;
+      } else {
+        team2Label = `Venc. Jogo ${fNum}`;
+      }
+    }
+    // If only one feeder found, assign to the empty slot
+    if (feeders.length === 1 && team1Label && !team2Label) {
+      // feeder fills team1, leave team2 as null
+    } else if (feeders.length === 1 && !team1Label && team2Label) {
+      // feeder fills team2, leave team1 as null
+    }
+    return { team1: team1Label, team2: team2Label };
+  }, [match.id, match.round, allMatches, matchNumberMap]);
+
+  const team1Name = match.team1_id ? getTeamName(match.team1_id) : (feederLabels.team1 || "A definir");
+  const team2Name = match.team2_id ? getTeamName(match.team2_id) : (feederLabels.team2 || "A definir");
   const hasTeams = match.team1_id && match.team2_id;
   const hasOneTeam = (match.team1_id && !match.team2_id) || (!match.team1_id && match.team2_id);
   const canScore = isOwner && hasTeams && (!isCompleted || isEditing);
@@ -471,8 +502,8 @@ const MatchCard = ({
         {/* Team 1 */}
         <div className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 -mx-1 ${t1Win ? "bg-success/10 ring-1 ring-success/30" : ""}`}>
           {t1Win && <Trophy className="h-3 w-3 text-success shrink-0" />}
-          <span className={`text-xs truncate font-bold leading-tight ${t1Win ? "text-success" : !match.team1_id ? "text-muted-foreground/40 italic font-normal" : "text-foreground"}`}>
-            {match.team1_id ? team1Name : "A definir"}
+          <span className={`text-xs truncate font-bold leading-tight ${t1Win ? "text-success" : !match.team1_id ? "text-muted-foreground/50 italic font-normal" : "text-foreground"}`}>
+            {team1Name}
           </span>
           {isOwner && hasTeams && !isCompleted && !isEditing && match.team1_id && (
             <Button size="sm" variant="ghost" className="h-5 w-5 p-0 ml-auto shrink-0 text-primary/60 hover:text-primary hover:bg-primary/10"
@@ -485,8 +516,8 @@ const MatchCard = ({
         {/* Team 2 */}
         <div className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 -mx-1 ${t2Win ? "bg-success/10 ring-1 ring-success/30" : ""}`}>
           {t2Win && <Trophy className="h-3 w-3 text-success shrink-0" />}
-          <span className={`text-xs truncate font-bold leading-tight ${t2Win ? "text-success" : !match.team2_id ? "text-muted-foreground/40 italic font-normal" : "text-foreground"}`}>
-            {match.team2_id ? team2Name : "A definir"}
+          <span className={`text-xs truncate font-bold leading-tight ${t2Win ? "text-success" : !match.team2_id ? "text-muted-foreground/50 italic font-normal" : "text-foreground"}`}>
+            {team2Name}
           </span>
           {isOwner && hasTeams && !isCompleted && !isEditing && match.team2_id && (
             <Button size="sm" variant="ghost" className="h-5 w-5 p-0 ml-auto shrink-0 text-primary/60 hover:text-primary hover:bg-primary/10"
@@ -895,6 +926,8 @@ const MatchSequenceViewer = ({
                   isOwner={isOwner}
                   numSets={numSets}
                   tournamentFormat={tournamentFormat}
+                  allMatches={matches}
+                  matchNumberMap={matchNumberMap}
                   onDeclareWinner={onDeclareWinner}
                   onUpdateScore={onUpdateScore}
                   onAutoResult={onAutoResult}

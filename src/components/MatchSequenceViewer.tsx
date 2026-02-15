@@ -845,7 +845,7 @@ const MatchSequenceViewer = ({
             </div>
 
             {/* Match cards — 2 col grid */}
-            <div className="p-2 sm:p-3 grid gap-2 grid-cols-1 sm:grid-cols-2">
+            <div className="p-2 sm:p-2.5 grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {block.matches.map(({ match, globalIndex }) => (
                 <MatchCard
                   key={match.id}

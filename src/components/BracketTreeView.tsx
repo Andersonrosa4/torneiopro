@@ -688,10 +688,8 @@ const GroupStageView = ({
         })}
       </div>
 
-      {/* ── Knockout stage (real matches or preview placeholders) ── */}
-      {hasKnockout && knockoutMatches.length > 0 && (
-        <NormalKnockout matches={allMatches} getName={getName} matchNumberMap={matchNumberMap} />
-      )}
+      {/* ── Knockout stage: only show preview placeholders when knockout not yet generated ── */}
+      {/* Real knockout matches are rendered by the main component below */}
 
       {!hasKnockout && knockoutRounds.length > 0 && (
         <div ref={containerRef} className="relative overflow-x-auto pb-4 rounded-xl border border-border bg-card/50 p-4" style={{ WebkitOverflowScrolling: "touch" }}>

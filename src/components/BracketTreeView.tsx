@@ -645,22 +645,41 @@ const GroupStageView = ({
 
   const previewConnections = [...groupToKnockoutConnections, ...knockoutConnections];
 
+  // Extract unique teams per group from group matches
+  const teamsByGroup = useMemo(() => {
+    const map: Record<number, string[]> = {};
+    groupNumbers.forEach(gNum => {
+      const gMatches = groupMatchesByGroup[gNum] || [];
+      const teamIds = new Set<string>();
+      gMatches.forEach(m => {
+        if (m.team1_id) teamIds.add(m.team1_id);
+        if (m.team2_id) teamIds.add(m.team2_id);
+      });
+      map[gNum] = Array.from(teamIds);
+    });
+    return map;
+  }, [groupNumbers, groupMatchesByGroup]);
+
   return (
     <div className="space-y-4">
-      {/* ── Group stage: each group rendered as grid cards ── */}
-      <div className="space-y-4">
+      {/* ── Group stage: show team roster per group ── */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {groupNumbers.map((gNum) => {
-          const gMatches = groupMatchesByGroup[gNum] || [];
+          const teamIds = teamsByGroup[gNum] || [];
           return (
-            <div key={gNum} className="rounded-xl border border-primary/30 bg-gradient-to-r from-primary/15 to-accent/10 p-4 space-y-2">
+            <div key={gNum} className="rounded-xl border border-primary/30 bg-gradient-to-r from-primary/15 to-accent/10 p-4 space-y-3">
               <div className="text-xs font-bold uppercase tracking-[0.2em] bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent flex items-center gap-2 pb-1">
                 <span className="text-primary">⚽</span>
                 <span>Grupo {numberToLetter(gNum)}</span>
+                <span className="ml-auto text-[10px] text-muted-foreground font-normal normal-case tracking-normal">{teamIds.length} duplas</span>
               </div>
-              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
-                {gMatches.map((match) => (
-                  <div key={match.id} data-match-id={match.id} className="[&>div]:w-full">
-                    <MatchCard match={match} getName={getName} scale="normal" allMatches={allMatches} matchNumber={matchNumberMap?.get(match.id)} matchNumberMap={matchNumberMap} />
+              <div className="space-y-1.5">
+                {teamIds.map((teamId, idx) => (
+                  <div key={teamId} className="flex items-center gap-2 rounded-lg border border-border/50 bg-card/80 px-3 py-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary shrink-0">
+                      {idx + 1}
+                    </span>
+                    <span className="text-sm team-name truncate">{getName(teamId)}</span>
                   </div>
                 ))}
               </div>

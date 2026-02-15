@@ -93,24 +93,30 @@ const Dashboard = () => {
   const deleteTournament = async (tournamentId: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    await organizerQuery({ table: "rankings", operation: "delete", filters: { tournament_id: tournamentId } });
-    // Nullify FK refs before deleting matches
-    const { data: tournamentMatches } = await organizerQuery<{ id: string }[]>({
-      table: "matches",
-      operation: "select",
-      select: "id",
-      filters: { tournament_id: tournamentId },
-    });
-    if (tournamentMatches) {
-      for (const m of tournamentMatches) {
-        await organizerQuery({ table: "matches", operation: "update", data: { next_win_match_id: null, next_lose_match_id: null }, filters: { id: m.id } });
+    try {
+      // 1. Delete rankings
+      await organizerQuery({ table: "rankings", operation: "delete", filters: { tournament_id: tournamentId } });
+      // 2. Delete classificacao_grupos (depends on groups & teams)
+      await organizerQuery({ table: "classificacao_grupos", operation: "delete", filters: { tournament_id: tournamentId } });
+      // 3. Nullify match FK refs in bulk via undo_bracket operation
+      await organizerQuery({ table: "matches", operation: "undo_bracket", data: { tournament_id: tournamentId } } as any);
+      // 4. Delete participants
+      await organizerQuery({ table: "participants", operation: "delete", filters: { tournament_id: tournamentId } });
+      // 5. Delete teams
+      await organizerQuery({ table: "teams", operation: "delete", filters: { tournament_id: tournamentId } });
+      // 6. Delete modalities
+      await organizerQuery({ table: "modalities", operation: "delete", filters: { tournament_id: tournamentId } });
+      // 7. Delete the tournament itself
+      const { error } = await organizerQuery({ table: "tournaments", operation: "delete", filters: { id: tournamentId } });
+      if (error) {
+        toast.error("Erro ao excluir torneio: " + error.message);
+        return;
       }
+      setTournaments((prev) => prev.filter((t) => t.id !== tournamentId));
+      toast.success("Torneio excluído!");
+    } catch (err: any) {
+      toast.error("Erro ao excluir torneio.");
     }
-    await organizerQuery({ table: "matches", operation: "delete", filters: { tournament_id: tournamentId } });
-    await organizerQuery({ table: "teams", operation: "delete", filters: { tournament_id: tournamentId } });
-    await organizerQuery({ table: "tournaments", operation: "delete", filters: { id: tournamentId } });
-    setTournaments((prev) => prev.filter((t) => t.id !== tournamentId));
-    toast.success("Torneio excluído!");
   };
 
   return (

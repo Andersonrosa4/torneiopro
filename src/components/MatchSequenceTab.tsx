@@ -243,31 +243,56 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
     const groupStage = displayMatches.filter(m => m.round === 0);
     const knockoutStage = displayMatches.filter(m => m.round > 0);
 
-    // Group stage: split into interleaved rounds
+    // Group stage: proper round-robin rounds
     if (groupStage.length > 0) {
+      // Build round-robin rounds per bracket
       const brackets = [...new Set(groupStage.map(m => m.bracket_number || 1))].sort((a, b) => a - b);
-      const positions = [...new Set(groupStage.map(m => m.position))].sort((a, b) => a - b);
-
-      const interleaved: Match[] = [];
-      for (const pos of positions) {
-        for (const b of brackets) {
-          const match = groupStage.find(m => (m.bracket_number || 1) === b && m.position === pos);
-          if (match) interleaved.push(match);
+      const rrByBracket: Record<number, Match[][]> = {};
+      for (const b of brackets) {
+        const bMatches = groupStage.filter(m => (m.bracket_number || 1) === b);
+        // Greedy round-robin: no team plays twice per round
+        const remaining = [...bMatches];
+        const rounds: Match[][] = [];
+        while (remaining.length > 0) {
+          const round: Match[] = [];
+          const used = new Set<string>();
+          for (let i = 0; i < remaining.length; i++) {
+            const m = remaining[i];
+            if (m.team1_id && m.team2_id && !used.has(m.team1_id) && !used.has(m.team2_id)) {
+              round.push(m);
+              used.add(m.team1_id);
+              used.add(m.team2_id);
+              remaining.splice(i, 1);
+              i--;
+            }
+          }
+          if (round.length === 0 && remaining.length > 0) {
+            rounds.push([remaining.shift()!]);
+          } else {
+            rounds.push(round);
+          }
         }
+        rrByBracket[b] = rounds;
       }
 
-      const perRound = Math.max(brackets.length, 1);
-      let roundNum = 1;
-      for (let i = 0; i < interleaved.length; i += perRound) {
-        const chunk = interleaved.slice(i, i + perRound);
+      const maxRRRounds = Math.max(...Object.values(rrByBracket).map(rr => rr.length), 0);
+      for (let ri = 0; ri < maxRRRounds; ri++) {
+        const chunk: Match[] = [];
+        const matchesPerBracket = brackets.map(b => rrByBracket[b]?.[ri] || []);
+        const maxPerBracket = Math.max(...matchesPerBracket.map(m => m.length), 0);
+        for (let mi = 0; mi < maxPerBracket; mi++) {
+          for (let bi = 0; bi < brackets.length; bi++) {
+            if (matchesPerBracket[bi]?.[mi]) chunk.push(matchesPerBracket[bi][mi]);
+          }
+        }
+        if (chunk.length === 0) continue;
         groups.push({
-          label: `Fase de Grupos — Rodada ${roundNum}`,
+          label: `Fase de Grupos — Rodada ${ri + 1}`,
           items: chunk.map(m => ({ match: m, idx: 0 })),
-          blockKey: `GS_R${roundNum}`,
+          blockKey: `GS_R${ri + 1}`,
           isUnlocked: true,
           isCompleted: chunk.every(m => m.status === "completed"),
         });
-        roundNum++;
       }
     }
 

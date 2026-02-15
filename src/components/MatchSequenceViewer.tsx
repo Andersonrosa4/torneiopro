@@ -385,6 +385,20 @@ const MatchCard = ({
   // Build feeder labels for empty slots (knockout only)
   const feederLabels = useMemo(() => {
     if (match.round === 0) return { team1: null, team2: null };
+
+    // For Chaveamento Normal: the FIRST knockout round (right after groups)
+    // has teams from group standings, NOT from specific match winners.
+    // So we must NOT show "Venc. Jogo X" for that round — only "A definir".
+    const hasGroupStage = allMatches.some(m => m.round === 0);
+    const knockoutRounds = [...new Set(allMatches.filter(m => m.round > 0).map(m => m.round))].sort((a, b) => a - b);
+    const firstKnockoutRound = knockoutRounds[0] ?? 1;
+    const isFirstKnockoutRound = match.round === firstKnockoutRound;
+
+    // If there's a group stage AND this is the first knockout round,
+    // teams come from classification — no feeder labels possible
+    if (hasGroupStage && isFirstKnockoutRound && tournamentFormat !== 'double_elimination') {
+      return { team1: null, team2: null };
+    }
     
     // Method 1: Find feeders via next_win_match_id
     let feeders = allMatches.filter(m => m.next_win_match_id === match.id);
@@ -393,13 +407,16 @@ const MatchCard = ({
     // use positional logic: round R, pos P ← round R-1, pos (2P-1) and (2P)
     if (feeders.length === 0 && match.round > 0) {
       const prevRound = match.round - 1;
-      const pos1 = match.position * 2 - 1;
-      const pos2 = match.position * 2;
-      feeders = allMatches.filter(m => 
-        m.round === prevRound && 
-        (m.bracket_number || 1) === (match.bracket_number || 1) &&
-        (m.position === pos1 || m.position === pos2)
-      );
+      // Only use structural fallback if previous round is knockout (not groups)
+      if (prevRound > 0) {
+        const pos1 = match.position * 2 - 1;
+        const pos2 = match.position * 2;
+        feeders = allMatches.filter(m => 
+          m.round === prevRound && 
+          (m.bracket_number || 1) === (match.bracket_number || 1) &&
+          (m.position === pos1 || m.position === pos2)
+        );
+      }
     }
     
     let team1Label: string | null = null;
@@ -407,7 +424,6 @@ const MatchCard = ({
     for (const f of feeders) {
       const fNum = matchNumberMap.get(f.id);
       if (!fNum) continue;
-      // Determine which slot this feeder fills: odd position → team1, even → team2
       if (f.position % 2 === 1) {
         team1Label = `Venc. Jogo ${fNum}`;
       } else {
@@ -415,7 +431,7 @@ const MatchCard = ({
       }
     }
     return { team1: team1Label, team2: team2Label };
-  }, [match.id, match.round, match.position, match.bracket_number, allMatches, matchNumberMap]);
+  }, [match.id, match.round, match.position, match.bracket_number, allMatches, matchNumberMap, tournamentFormat]);
 
   const team1Name = match.team1_id ? getTeamName(match.team1_id) : (feederLabels.team1 || "A definir");
   const team2Name = match.team2_id ? getTeamName(match.team2_id) : (feederLabels.team2 || "A definir");

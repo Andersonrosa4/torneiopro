@@ -439,9 +439,11 @@ const MatchCard = ({
         )}
       </div>
 
-      {/* Teams row — single line each */}
+      {/* Teams row */}
       <div className="px-2.5 py-1.5 space-y-0.5">
-        <div className="flex items-center gap-1">
+        {/* Team 1 */}
+        <div className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 -mx-1 ${t1Win ? "bg-success/10 ring-1 ring-success/30" : ""}`}>
+          {t1Win && <Trophy className="h-3 w-3 text-success shrink-0" />}
           <span className={`text-xs truncate font-bold leading-tight ${t1Win ? "text-success" : !match.team1_id ? "text-muted-foreground/40 italic font-normal" : "text-foreground"}`}>
             {match.team1_id ? team1Name : "A definir"}
           </span>
@@ -451,10 +453,11 @@ const MatchCard = ({
               <Trophy className="h-2.5 w-2.5" />
             </Button>
           )}
-          {isCompleted && t1Win && <Trophy className="h-2.5 w-2.5 text-success ml-auto shrink-0" />}
         </div>
-        <span className="text-[9px] text-muted-foreground/30 font-medium leading-none">vs</span>
-        <div className="flex items-center gap-1">
+        <span className="text-[9px] text-muted-foreground/30 font-medium leading-none pl-1">vs</span>
+        {/* Team 2 */}
+        <div className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 -mx-1 ${t2Win ? "bg-success/10 ring-1 ring-success/30" : ""}`}>
+          {t2Win && <Trophy className="h-3 w-3 text-success shrink-0" />}
           <span className={`text-xs truncate font-bold leading-tight ${t2Win ? "text-success" : !match.team2_id ? "text-muted-foreground/40 italic font-normal" : "text-foreground"}`}>
             {match.team2_id ? team2Name : "A definir"}
           </span>
@@ -464,7 +467,7 @@ const MatchCard = ({
               <Trophy className="h-2.5 w-2.5" />
             </Button>
           )}
-          {isCompleted && t2Win && <Trophy className="h-2.5 w-2.5 text-success ml-auto shrink-0" />}
+          {isCompleted && !t1Win && !t2Win && <span className="text-muted-foreground/30 text-[9px] ml-auto">Empate</span>}
         </div>
       </div>
 

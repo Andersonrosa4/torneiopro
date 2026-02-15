@@ -731,7 +731,9 @@ const GroupStageView = ({
    Normal Knockout — proper tree bracket with connectors
    ──────────────────────────────────────────────────── */
 const KNOCKOUT_CARD_H = 94;
+const KNOCKOUT_CARD_H_MOBILE = 72;
 const KNOCKOUT_CARD_GAP = 16;
+const KNOCKOUT_CARD_GAP_MOBILE = 8;
 
 const NormalKnockoutConnectors = ({
   containerRef,
@@ -822,7 +824,7 @@ const NormalKnockoutConnectors = ({
   );
 };
 
-function buildKnockoutTreePositions(knockoutMatches: Match[]) {
+function buildKnockoutTreePositions(knockoutMatches: Match[], cardH = KNOCKOUT_CARD_H, cardGap = KNOCKOUT_CARD_GAP) {
   const roundGroups: Record<number, Match[]> = {};
   knockoutMatches.forEach(m => {
     if (!roundGroups[m.round]) roundGroups[m.round] = [];
@@ -833,7 +835,7 @@ function buildKnockoutTreePositions(knockoutMatches: Match[]) {
   if (rounds.length === 0) return { rounds: [], roundGroups, positions: new Map<string, number>() };
 
   const positions = new Map<string, number>();
-  const slotH = KNOCKOUT_CARD_H + KNOCKOUT_CARD_GAP;
+  const slotH = cardH + cardGap;
   const firstRound = rounds[0];
   roundGroups[firstRound].forEach((m, i) => { positions.set(m.id, i * slotH); });
 
@@ -875,42 +877,47 @@ const NormalKnockout = ({
   matches,
   getName,
   matchNumberMap,
-  disableInternalScroll,
+  isMobile,
 }: {
   matches: Match[];
   getName: (id: string | null) => string;
   matchNumberMap?: Map<string, number>;
-  disableInternalScroll?: boolean;
+  isMobile?: boolean;
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const knockoutMatches = matches.filter((m) => m.round > 0);
 
   if (knockoutMatches.length === 0) return null;
 
-  const { rounds, roundGroups, positions } = buildKnockoutTreePositions(knockoutMatches);
+  const cardH = isMobile ? KNOCKOUT_CARD_H_MOBILE : KNOCKOUT_CARD_H;
+  const cardGap = isMobile ? KNOCKOUT_CARD_GAP_MOBILE : KNOCKOUT_CARD_GAP;
+  const { rounds, roundGroups, positions } = buildKnockoutTreePositions(knockoutMatches, cardH, cardGap);
   const maxY = Math.max(0, ...Array.from(positions.values()));
-  const totalHeight = maxY + KNOCKOUT_CARD_H + 24;
+  const totalHeight = maxY + cardH + 24;
   const maxRound = Math.max(...rounds);
 
   const matchCountByRound: Record<number, number> = {};
   knockoutMatches.forEach(m => { matchCountByRound[m.round] = (matchCountByRound[m.round] || 0) + 1; });
 
+  const colMinWidth = isMobile ? 110 : 175;
+  const colGap = isMobile ? 'gap-4' : 'gap-10';
+
   return (
-    <div className="rounded-xl border border-border bg-card/50 p-4">
-      <div ref={containerRef} className={`relative ${disableInternalScroll ? '' : 'overflow-x-auto'}`}>
+    <div className={`rounded-xl border border-border bg-card/50 ${isMobile ? 'p-2' : 'p-4'}`}>
+      <div ref={containerRef} className="relative overflow-x-auto scrollbar-hide">
         <NormalKnockoutConnectors containerRef={containerRef} knockoutMatches={knockoutMatches} />
-        <div className="flex gap-10 relative" style={{ zIndex: 1, minHeight: totalHeight }}>
+        <div className={`flex ${colGap} relative`} style={{ zIndex: 1, minHeight: totalHeight }}>
           {rounds.map((round) => {
             const roundMatches = roundGroups[round];
             const matchCount = roundMatches.length;
             const isFinal = matchCount === 1 && round === maxRound;
             const isSemi = matchCount <= 2 && round === maxRound - 1 && !isFinal;
             const roundLabel = getEliminationRoundLabel(round, matchCountByRound[round] || 0);
-            const scale = isFinal ? "final" : isSemi ? "semi" : "normal";
+            const scale = isMobile ? "small" : (isFinal ? "final" : isSemi ? "semi" : "normal");
 
             return (
-              <div key={round} className="flex flex-col shrink-0 relative" style={{ minWidth: 175 }}>
-                <div className={`text-[9px] uppercase font-semibold mb-3 whitespace-nowrap rounded-full px-3 py-0.5 text-center ${
+              <div key={round} className="flex flex-col shrink-0 relative" style={{ minWidth: colMinWidth }}>
+                <div className={`text-[9px] uppercase font-semibold mb-2 whitespace-nowrap rounded-full px-2 py-0.5 text-center ${
                   isFinal || isSemi ? "bg-primary/15 text-primary" : "bg-muted/50 text-muted-foreground"
                 }`}>
                   {roundLabel}
@@ -1317,11 +1324,6 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
         <MobileListView matches={matches} getName={getName} matchNumberMap={matchNumberMap} />
       )}
 
-      {/* Mobile: Normal knockout uses list view automatically in bracket mode too */}
-      {isMobile && viewMode === 'bracket' && !isDoubleElimination && hasElimination && (
-        <MobileListView matches={matches} getName={getName} matchNumberMap={matchNumberMap} />
-      )}
-
       {/* Double Elimination — 3-column layout with global connectors */}
       {viewMode === 'bracket' && isDoubleElimination && (
         <DEBracketLayout
@@ -1340,9 +1342,9 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
         />
       )}
 
-      {/* Normal Knockout — desktop only tree view */}
-      {!isMobile && viewMode === 'bracket' && !isDoubleElimination && hasElimination && (
-        <NormalKnockout matches={matches.filter(m => m.round > 0)} getName={getName} matchNumberMap={matchNumberMap} />
+      {/* Normal Knockout tree view — responsive for mobile */}
+      {viewMode === 'bracket' && !isDoubleElimination && hasElimination && (
+        <NormalKnockout matches={matches.filter(m => m.round > 0)} getName={getName} matchNumberMap={matchNumberMap} isMobile={isMobile} />
       )}
     </div>
   );

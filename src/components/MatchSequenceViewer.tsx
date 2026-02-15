@@ -184,12 +184,60 @@ function hasTeamOverlap(a: Match, b: Match): boolean {
 }
 
 /** Organize group matches into rounds: 1 match per group per rodada.
- *  Each position = one rodada. Sorted by position so the interleaving
- *  produces Rodada 1 = pos 1 of each group, Rodada 2 = pos 2, etc. */
+ *  Uses the Circle Method to ORDER matches so no team plays back-to-back,
+ *  then returns each match as its own round for interleaving across brackets. */
 function buildRoundRobinRounds(groupMatches: Match[]): Match[][] {
-  return groupMatches
-    .sort((a, b) => a.position - b.position)
-    .map(m => [m]);
+  const teamIds = new Set<string>();
+  for (const m of groupMatches) {
+    if (m.team1_id) teamIds.add(m.team1_id);
+    if (m.team2_id) teamIds.add(m.team2_id);
+  }
+  const teams = [...teamIds];
+  const n = teams.length;
+  if (n <= 1) return groupMatches.map(m => [m]);
+
+  // Build match lookup by sorted pair of team IDs
+  const matchByPair = new Map<string, Match>();
+  for (const m of groupMatches) {
+    if (m.team1_id && m.team2_id) {
+      const key = [m.team1_id, m.team2_id].sort().join('|');
+      matchByPair.set(key, m);
+    }
+  }
+
+  // Circle method to determine optimal ordering (max rest between games)
+  const list = [...teams];
+  const BYE = '__BYE__';
+  if (n % 2 !== 0) list.push(BYE);
+  const total = list.length;
+  const numRounds = total - 1;
+
+  const ordered: Match[] = [];
+  const assigned = new Set<string>();
+
+  for (let r = 0; r < numRounds; r++) {
+    for (let i = 0; i < total / 2; i++) {
+      const a = list[i];
+      const b = list[total - 1 - i];
+      if (a === BYE || b === BYE) continue;
+      const key = [a, b].sort().join('|');
+      const match = matchByPair.get(key);
+      if (match && !assigned.has(match.id)) {
+        ordered.push(match);
+        assigned.add(match.id);
+      }
+    }
+    // Rotate: fix list[0], shift rest clockwise
+    const last = list.pop()!;
+    list.splice(1, 0, last);
+  }
+
+  // Safety net
+  const remaining = groupMatches.filter(m => !assigned.has(m.id));
+  ordered.push(...remaining);
+
+  // Each match = its own round (1 match per group per rodada)
+  return ordered.map(m => [m]);
 }
 
 /** Build interleaved group stage sequence with proper round-robin rounds across brackets */

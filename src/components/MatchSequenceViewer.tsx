@@ -867,8 +867,11 @@ const MatchSequenceViewer = ({
     );
   }
 
+  const sportDisplayLabels: Record<string, string> = {
+    beach_volleyball: "Vôlei de Praia", futevolei: "Futevôlei", beach_tennis: "Beach Tennis",
+  };
   const handleExport = (format: "pdf" | "xlsx" | "csv") => {
-    const meta = { tournamentName, sport, date: eventDate };
+    const meta = { tournamentName, sport: sportDisplayLabels[sport] || sport, date: eventDate };
     const rows = sequence.map((m, idx) => ({
       order: idx + 1,
       round: getRoundLabel(m.round),

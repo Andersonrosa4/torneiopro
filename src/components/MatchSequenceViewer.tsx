@@ -206,9 +206,11 @@ function buildRoundRobinRounds(groupMatches: Match[]): Match[][] {
   }
 
   // Circle method to determine optimal ordering (max rest between games)
+  // BYE is inserted at index 1 (not at end) so that teams[0] (the first/top
+  // team in the group) always plays in Round 1 instead of getting a bye.
   const list = [...teams];
   const BYE = '__BYE__';
-  if (n % 2 !== 0) list.push(BYE);
+  if (n % 2 !== 0) list.splice(1, 0, BYE);
   const total = list.length;
   const numRounds = total - 1;
 

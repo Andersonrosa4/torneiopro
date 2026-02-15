@@ -35,7 +35,7 @@ const AppHeader = () => {
               <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
             </div>
             <span className="text-base sm:text-lg font-bold tracking-tight text-foreground font-display">
-              Gestão Pro
+              Torneio Pro
             </span>
           </Link>
 

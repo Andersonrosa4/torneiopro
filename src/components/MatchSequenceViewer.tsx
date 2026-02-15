@@ -523,7 +523,10 @@ const MatchSequenceViewer = ({
     const map = new Map<string, number>();
     let num = 1;
     // Fase de grupos (round 0) — ordenados por position
-    const groupMatches = matches.filter(m => m.round === 0).sort((a, b) => a.position - b.position);
+    const groupMatches = matches.filter(m => m.round === 0).sort((a, b) => {
+      if (a.position !== b.position) return a.position - b.position;
+      return (a.bracket_number || 1) - (b.bracket_number || 1);
+    });
     for (const m of groupMatches) {
       map.set(m.id, num++);
     }

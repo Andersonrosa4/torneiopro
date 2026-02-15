@@ -67,7 +67,7 @@ const Index = () => {
             <Trophy className="h-10 w-10 text-primary-foreground" />
           </div>
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight text-white font-display">
-            Gestão Pro
+            Torneio Pro
           </h1>
           <p className="mt-3 text-lg text-[hsl(35_30%_80%)]">
             Sistema profissional de gestão de torneios

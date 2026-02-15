@@ -67,10 +67,10 @@ const HTreeMatchCard = ({
   const bottomWin = match.winner_team_id === bottomTeamId && isCompleted;
 
   const widthClass = {
-    small: "w-[120px]",
-    normal: "w-[140px]",
-    semi: "w-[155px]",
-    final: "w-[170px]",
+    small: "w-[105px]",
+    normal: "w-[120px]",
+    semi: "w-[135px]",
+    final: "w-[150px]",
   }[scale];
 
   const borderClass = (() => {
@@ -342,7 +342,7 @@ const TreeSection = ({
           const isSemi = matchCount <= 2 && origIdx >= totalRounds - 2 && !isFinal;
 
           return (
-            <div key={round} className="flex flex-col shrink-0 relative" style={{ minWidth: 155 }}>
+            <div key={round} className="flex flex-col shrink-0 relative" style={{ minWidth: 135 }}>
               <div className={`text-[9px] uppercase font-semibold mb-3 whitespace-nowrap rounded-full px-3 py-0.5 text-center ${
                 isFinal || isSemi ? "bg-primary/15 text-primary" : "bg-muted/50 text-muted-foreground"
               }`}>
@@ -420,7 +420,7 @@ const HorizontalTreeView = ({ matches, getName, matchNumberMap }: HorizontalTree
           const roundLabel = getEliminationRoundLabel(round, matchCountByRound[round] || 0);
 
           return (
-            <div key={round} className="flex flex-col shrink-0 relative" style={{ minWidth: 155 }}>
+            <div key={round} className="flex flex-col shrink-0 relative" style={{ minWidth: 135 }}>
               <div className={`text-[9px] uppercase font-semibold mb-3 whitespace-nowrap rounded-full px-3 py-0.5 text-center ${
                 isFinal || isSemi ? "bg-primary/15 text-primary" : "bg-muted/50 text-muted-foreground"
               }`}>

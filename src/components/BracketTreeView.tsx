@@ -89,10 +89,10 @@ const MatchCard = ({
   const bottomWin = match.winner_team_id === bottomTeamId && isCompleted;
 
   const sizeClasses = {
-    small: "w-[120px] text-[9px]",
-    normal: "w-[140px] text-[10px]",
-    semi: "w-[155px] text-[11px]",
-    final: "w-[170px] text-[11px]",
+    small: "w-[105px] text-[8px]",
+    normal: "w-[120px] text-[9px]",
+    semi: "w-[135px] text-[10px]",
+    final: "w-[150px] text-[10px]",
   };
 
   const borderClasses = (() => {
@@ -396,9 +396,9 @@ const PlaceholderMatchCard = ({
   roundLabel?: string;
 }) => {
   const sizeClasses = {
-    normal: "w-[140px] text-[10px]",
-    semi: "w-[155px] text-[11px]",
-    final: "w-[170px] text-[11px]",
+    normal: "w-[120px] text-[9px]",
+    semi: "w-[135px] text-[10px]",
+    final: "w-[150px] text-[10px]",
   };
   const borderClasses = {
     normal: "border-border/60",
@@ -698,7 +698,7 @@ const GroupStageView = ({
             {knockoutRounds.map((roundMatches, ri) => {
               const roundLabel = knockoutRoundLabels[ri]?.label || `Rodada ${ri + 1}`;
               return (
-                <div key={`ko-${ri}`} className="flex flex-col shrink-0" style={{ minWidth: 155 }}>
+                <div key={`ko-${ri}`} className="flex flex-col shrink-0" style={{ minWidth: 135 }}>
                   <div className={`text-[9px] uppercase font-semibold mb-3 whitespace-nowrap rounded-full px-3 py-0.5 text-center ${
                     roundMatches[0]?.scale === "final" || roundMatches[0]?.scale === "semi"
                       ? "bg-primary/15 text-primary"
@@ -907,7 +907,7 @@ const NormalKnockout = ({
             const scale = isFinal ? "final" : isSemi ? "semi" : "normal";
 
             return (
-              <div key={round} className="flex flex-col shrink-0 relative" style={{ minWidth: 155 }}>
+              <div key={round} className="flex flex-col shrink-0 relative" style={{ minWidth: 135 }}>
                 <div className={`text-[9px] uppercase font-semibold mb-3 rounded-full px-3 py-0.5 text-center truncate ${
                   isFinal || isSemi ? "bg-primary/15 text-primary" : "bg-muted/50 text-muted-foreground"
                 }`}>

@@ -1312,11 +1312,15 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
       {/* Group Stage */}
       {hasGroupStage && <GroupStageView groupMatches={groupMatches} getName={getName} allMatches={matches} matchNumberMap={matchNumberMap} />}
 
-      {/* Mobile List Mode */}
+      {/* Mobile List Mode — used when user selects list OR on mobile for normal knockout */}
       {isMobile && viewMode === 'list' && hasElimination && (
         <MobileListView matches={matches} getName={getName} matchNumberMap={matchNumberMap} />
       )}
 
+      {/* Mobile: Normal knockout uses list view automatically in bracket mode too */}
+      {isMobile && viewMode === 'bracket' && !isDoubleElimination && hasElimination && (
+        <MobileListView matches={matches} getName={getName} matchNumberMap={matchNumberMap} />
+      )}
 
       {/* Double Elimination — 3-column layout with global connectors */}
       {viewMode === 'bracket' && isDoubleElimination && (
@@ -1336,17 +1340,9 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
         />
       )}
 
-      {/* Normal Knockout (non-DE, original mode) */}
-      {viewMode === 'bracket' && !isDoubleElimination && hasElimination && (
-        <div
-          ref={!isDoubleElimination ? zoomContainerRef : undefined}
-          className={isMobile ? "overflow-x-auto overflow-y-hidden scrollbar-hide" : ""}
-          style={isMobile ? { touchAction: "pan-x pinch-zoom", WebkitOverflowScrolling: "touch" } : undefined}
-        >
-          <div style={isMobile ? { transform: `scale(${mobileZoom})`, transformOrigin: 'top left', width: `${100 / mobileZoom}%` } : undefined}>
-            <NormalKnockout matches={matches.filter(m => m.round > 0)} getName={getName} matchNumberMap={matchNumberMap} disableInternalScroll={isMobile} />
-          </div>
-        </div>
+      {/* Normal Knockout — desktop only tree view */}
+      {!isMobile && viewMode === 'bracket' && !isDoubleElimination && hasElimination && (
+        <NormalKnockout matches={matches.filter(m => m.round > 0)} getName={getName} matchNumberMap={matchNumberMap} />
       )}
     </div>
   );

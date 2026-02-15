@@ -183,64 +183,13 @@ function hasTeamOverlap(a: Match, b: Match): boolean {
   return teamsA.some((t) => teamsB.includes(t));
 }
 
-/** Organize group matches into proper round-robin rounds using the Circle Method.
- *  This guarantees the minimum number of rounds (n-1 for even, n for odd team counts)
- *  where no team plays twice in the same round. */
+/** Organize group matches into rounds: 1 match per group per rodada.
+ *  Each position = one rodada. Sorted by position so the interleaving
+ *  produces Rodada 1 = pos 1 of each group, Rodada 2 = pos 2, etc. */
 function buildRoundRobinRounds(groupMatches: Match[]): Match[][] {
-  // Collect unique teams
-  const teamIds = new Set<string>();
-  for (const m of groupMatches) {
-    if (m.team1_id) teamIds.add(m.team1_id);
-    if (m.team2_id) teamIds.add(m.team2_id);
-  }
-  const teams = [...teamIds];
-  const n = teams.length;
-  if (n <= 1) return groupMatches.length > 0 ? [groupMatches] : [];
-
-  // Build match lookup by sorted pair of team IDs
-  const matchByPair = new Map<string, Match>();
-  for (const m of groupMatches) {
-    if (m.team1_id && m.team2_id) {
-      const key = [m.team1_id, m.team2_id].sort().join('|');
-      matchByPair.set(key, m);
-    }
-  }
-
-  // Circle method: fix first element, rotate the rest
-  const list = [...teams];
-  const BYE = '__BYE__';
-  if (n % 2 !== 0) list.push(BYE);
-  const total = list.length;
-  const numRounds = total - 1;
-
-  const rounds: Match[][] = [];
-  const assigned = new Set<string>();
-
-  for (let r = 0; r < numRounds; r++) {
-    const roundMatches: Match[] = [];
-    for (let i = 0; i < total / 2; i++) {
-      const a = list[i];
-      const b = list[total - 1 - i];
-      if (a === BYE || b === BYE) continue;
-      const key = [a, b].sort().join('|');
-      const match = matchByPair.get(key);
-      if (match && !assigned.has(match.id)) {
-        roundMatches.push(match);
-        assigned.add(match.id);
-      }
-    }
-    if (roundMatches.length > 0) rounds.push(roundMatches);
-
-    // Rotate: fix list[0], shift rest clockwise
-    const last = list.pop()!;
-    list.splice(1, 0, last);
-  }
-
-  // Safety net: any unassigned matches go into a final round
-  const remaining = groupMatches.filter(m => !assigned.has(m.id));
-  if (remaining.length > 0) rounds.push(remaining);
-
-  return rounds;
+  return groupMatches
+    .sort((a, b) => a.position - b.position)
+    .map(m => [m]);
 }
 
 /** Build interleaved group stage sequence with proper round-robin rounds across brackets */

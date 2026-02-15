@@ -658,8 +658,9 @@ const TournamentDetail = () => {
 
     const brackets = Array.from(new Set<number>(groupMatches.map((m: any) => (m.bracket_number || 1) as number))).sort((a, b) => a - b);
 
-    // Get tournament config for index
-    const numIndexTeams = tournament?.num_brackets || 0;
+    // Index teams: NOT from num_brackets (that's the number of bracket halves).
+    // Index repescagem is not currently configurable — always 0.
+    const numIndexTeams = 0;
 
     // Build team names map
     const teamNames: Record<string, string> = {};

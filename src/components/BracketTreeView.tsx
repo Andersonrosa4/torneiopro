@@ -887,7 +887,7 @@ const NormalKnockout = ({
 
   const { rounds, roundGroups, positions } = buildKnockoutTreePositions(knockoutMatches);
   const maxY = Math.max(0, ...Array.from(positions.values()));
-  const totalHeight = maxY + KNOCKOUT_CARD_H + 24;
+  const totalHeight = maxY + KNOCKOUT_CARD_H + 60;
   const maxRound = Math.max(...rounds);
 
   const matchCountByRound: Record<number, number> = {};
@@ -895,7 +895,7 @@ const NormalKnockout = ({
 
   return (
     <div className="rounded-xl border border-border bg-card/50 p-4">
-      <div ref={containerRef} className="relative overflow-x-auto overflow-y-hidden pb-2" style={{ WebkitOverflowScrolling: "touch" }}>
+      <div ref={containerRef} className="relative overflow-x-auto overflow-y-hidden pb-6" style={{ WebkitOverflowScrolling: "touch" }}>
         <NormalKnockoutConnectors containerRef={containerRef} knockoutMatches={knockoutMatches} />
         <div className="flex gap-10 relative" style={{ zIndex: 1, minHeight: totalHeight }}>
           {rounds.map((round) => {

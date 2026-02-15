@@ -689,9 +689,7 @@ const GroupStageView = ({
       </div>
 
       {/* ── Knockout stage (real matches or preview placeholders) ── */}
-      {hasKnockout && knockoutMatches.length > 0 && (
-        <NormalKnockout matches={allMatches} getName={getName} matchNumberMap={matchNumberMap} />
-      )}
+      {/* Knockout is rendered by the parent BracketTreeView, not here */}
 
       {!hasKnockout && knockoutRounds.length > 0 && (
         <div ref={containerRef} className="relative overflow-x-auto pb-4 rounded-xl border border-border bg-card/50 p-4" style={{ WebkitOverflowScrolling: "touch" }}>
@@ -897,7 +895,7 @@ const NormalKnockout = ({
 
   return (
     <div className="rounded-xl border border-border bg-card/50 p-4">
-      <div ref={containerRef} className="relative overflow-x-auto">
+      <div ref={containerRef} className="relative overflow-x-auto overflow-y-hidden pb-2" style={{ WebkitOverflowScrolling: "touch" }}>
         <NormalKnockoutConnectors containerRef={containerRef} knockoutMatches={knockoutMatches} />
         <div className="flex gap-10 relative" style={{ zIndex: 1, minHeight: totalHeight }}>
           {rounds.map((round) => {
@@ -909,8 +907,8 @@ const NormalKnockout = ({
             const scale = isFinal ? "final" : isSemi ? "semi" : "normal";
 
             return (
-              <div key={round} className="flex flex-col shrink-0 relative" style={{ minWidth: 175 }}>
-                <div className={`text-[9px] uppercase font-semibold mb-3 whitespace-nowrap rounded-full px-3 py-0.5 text-center ${
+              <div key={round} className="flex flex-col shrink-0 relative" style={{ minWidth: 185 }}>
+                <div className={`text-[9px] uppercase font-semibold mb-3 rounded-full px-3 py-0.5 text-center truncate ${
                   isFinal || isSemi ? "bg-primary/15 text-primary" : "bg-muted/50 text-muted-foreground"
                 }`}>
                   {roundLabel}
@@ -1049,7 +1047,7 @@ const DEBracketLayout = ({
   return (
     <div
       ref={zoomContainerRef}
-      className="overflow-x-auto overflow-y-hidden pb-4"
+      className="overflow-x-auto pb-4"
       style={{ touchAction: "pan-x pinch-zoom", WebkitOverflowScrolling: "touch" }}
     >
       <div
@@ -1340,11 +1338,11 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
       {viewMode === 'bracket' && !isDoubleElimination && hasElimination && (
         <div
           ref={!isDoubleElimination ? zoomContainerRef : undefined}
-          className={isMobile ? "overflow-x-auto overflow-y-hidden" : ""}
+          className={isMobile ? "overflow-x-auto" : ""}
           style={isMobile ? { touchAction: "pan-x pinch-zoom", WebkitOverflowScrolling: "touch" } : undefined}
         >
           <div style={isMobile ? { transform: `scale(${mobileZoom})`, transformOrigin: 'top left', width: `${100 / mobileZoom}%` } : undefined}>
-            <NormalKnockout matches={matches.filter(m => m.round > 0)} getName={getName} matchNumberMap={matchNumberMap} />
+            <NormalKnockout matches={matches} getName={getName} matchNumberMap={matchNumberMap} />
           </div>
         </div>
       )}

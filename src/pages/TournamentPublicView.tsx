@@ -116,7 +116,7 @@ const TournamentPublicView = () => {
 
   return (
     <ThemedBackground>
-      <div className="container py-4 sm:py-8 px-3 sm:px-6">
+      <div className="container py-4 sm:py-8 px-3 sm:px-6 overflow-x-hidden">
         <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="mb-3 sm:mb-4 gap-2">
           <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Voltar</span>
         </Button>
@@ -190,7 +190,7 @@ const TournamentPublicView = () => {
             {/* Chaveamento — identical to organizer bracket tab */}
             <TabsContent value="bracket">
               {filteredMatches.length > 0 ? (
-                <section>
+                <section className="overflow-hidden">
                   <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
                     <Trophy className="h-5 w-5" /> Chaveamento
                   </h2>

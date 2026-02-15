@@ -441,6 +441,64 @@ const TournamentDetail = () => {
       const { error } = await organizerQuery({ table: "matches", operation: "insert", data: newMatches });
       if (error) { toast.error(error.message); return; }
 
+      // === PRE-GENERATE KNOCKOUT BRACKET STRUCTURE ===
+      // Create empty match shells for all elimination rounds so they appear in the Sequence tab immediately
+      const advancingCount = numGroups * config.teamsPerGroupAdvancing;
+      if (advancingCount >= 2) {
+        const nextPow = Math.pow(2, Math.ceil(Math.log2(advancingCount)));
+        const totalKORounds = Math.ceil(Math.log2(nextPow));
+        const koShells: any[] = [];
+        
+        for (let round = 1; round <= totalKORounds; round++) {
+          const matchesInRound = nextPow / Math.pow(2, round);
+          for (let pos = 1; pos <= matchesInRound; pos++) {
+            koShells.push({
+              tournament_id: id,
+              round,
+              position: pos,
+              team1_id: null,
+              team2_id: null,
+              status: "pending",
+              bracket_number: 1,
+              modality_id: currentModalityId,
+            });
+          }
+        }
+        
+        const { error: koErr } = await organizerQuery({ table: "matches", operation: "insert", data: koShells });
+        if (!koErr) {
+          // Fetch inserted to get IDs, then link next_win_match_id between rounds
+          const { data: koInserted } = await organizerQuery({
+            table: "matches",
+            operation: "select",
+            filters: { tournament_id: id },
+            order: [{ column: "round" }, { column: "position" }],
+          });
+          if (koInserted) {
+            const koOnly = (koInserted as any[]).filter(m => m.round >= 1 && m.modality_id === currentModalityId);
+            const linkUpdates = [];
+            for (const m of koOnly) {
+              if (m.round < totalKORounds) {
+                const nextPos = Math.ceil(m.position / 2);
+                const nextMatch = koOnly.find((nm: any) => nm.round === m.round + 1 && nm.position === nextPos);
+                if (nextMatch) {
+                  linkUpdates.push(
+                    organizerQuery({
+                      table: "matches",
+                      operation: "update",
+                      data: { next_win_match_id: nextMatch.id },
+                      filters: { id: m.id },
+                    })
+                  );
+                }
+              }
+            }
+            await Promise.all(linkUpdates);
+          }
+        }
+        console.log(`[PreGen] Knockout shells created: ${koShells.length} matches for ${totalKORounds} rounds (${advancingCount} advancing → padded to ${nextPow})`);
+      }
+
       await organizerQuery({
         table: "tournaments",
         operation: "update",
@@ -649,10 +707,11 @@ const TournamentDetail = () => {
       return;
     }
 
-    // GUARD: Check if knockout matches already exist (prevent duplicate generation)
+    // GUARD: Check if knockout matches already have TEAMS assigned (not just shells)
     const existingKnockout = relevantMatches.filter((m: any) => m.round >= 1);
-    if (existingKnockout.length > 0) {
-      console.log(`[generateKnockoutFromGroups] Knockout already exists (${existingKnockout.length} matches), skipping.`);
+    const knockoutWithTeams = existingKnockout.filter((m: any) => m.team1_id || m.team2_id);
+    if (knockoutWithTeams.length > 0) {
+      console.log(`[generateKnockoutFromGroups] Knockout already has teams assigned (${knockoutWithTeams.length} matches), skipping.`);
       return;
     }
 
@@ -814,27 +873,48 @@ const TournamentDetail = () => {
       orderedPairings.push(realSlots[realIdx++]);
     }
 
-    const newMatches: any[] = [];
+    // Find existing R1 match shells (pre-generated) and UPDATE them with classified teams
+    const existingR1 = existingKnockout
+      .filter((m: any) => m.round === 1)
+      .sort((a: any, b: any) => a.position - b.position);
 
-    for (let i = 0; i < orderedPairings.length; i++) {
-      newMatches.push({
-        tournament_id: id,
-        round: 1,
-        position: i + 1,
-        team1_id: orderedPairings[i].team1Id,
-        team2_id: orderedPairings[i].team2Id,
-        status: "pending",
-        bracket_number: 1,
-        modality_id: modalityId,
-      });
+    if (existingR1.length >= orderedPairings.length) {
+      // UPDATE existing shells with teams
+      for (let i = 0; i < orderedPairings.length; i++) {
+        const updates: any = {
+          team1_id: orderedPairings[i].team1Id || null,
+          team2_id: orderedPairings[i].team2Id || null,
+        };
+        if (!orderedPairings[i].team2Id) {
+          updates.is_chapeu = true;
+        }
+        await organizerQuery({
+          table: "matches",
+          operation: "update",
+          data: updates,
+          filters: { id: existingR1[i].id },
+        });
+      }
+      toast.success(`Fase de grupos concluída! Eliminatória preenchida com ${allAdvancing.length} duplas classificadas.`);
+    } else {
+      // Fallback: no pre-generated shells — insert new matches
+      const newMatches: any[] = [];
+      for (let i = 0; i < orderedPairings.length; i++) {
+        newMatches.push({
+          tournament_id: id,
+          round: 1,
+          position: i + 1,
+          team1_id: orderedPairings[i].team1Id,
+          team2_id: orderedPairings[i].team2Id,
+          status: "pending",
+          bracket_number: 1,
+          modality_id: modalityId,
+        });
+      }
+      const { error } = await organizerQuery({ table: "matches", operation: "insert", data: newMatches });
+      if (error) { toast.error(error.message); return; }
+      toast.success(`Fase de grupos concluída! Eliminatória gerada com ${allAdvancing.length} duplas classificadas (${orderedPairings.length} partidas).`);
     }
-
-    // NO future rounds — they are created dynamically by declareWinner
-
-    const { error } = await organizerQuery({ table: "matches", operation: "insert", data: newMatches });
-    if (error) { toast.error(error.message); return; }
-
-    toast.success(`Fase de grupos concluída! Eliminatória gerada com ${allAdvancing.length} duplas classificadas (${pairings.length} partidas).`);
     fetchData();
   };
 
@@ -1132,8 +1212,20 @@ const TournamentDetail = () => {
 
       toast.success("Avanço automático realizado!");
     } else {
-      // Normal bracket: dynamic next-round generation
-      // Re-fetch fresh state to check if all matches in this round are done
+      // Normal bracket: IMMEDIATE propagation via next_win_match_id
+      if (match.next_win_match_id) {
+        const isTopSlot = match.position % 2 === 1;
+        const slotField = isTopSlot ? 'team1_id' : 'team2_id';
+        await organizerQuery({
+          table: "matches",
+          operation: "update",
+          data: { [slotField]: winnerId },
+          filters: { id: match.next_win_match_id },
+        });
+        console.log(`[SE:Propagate] Winner ${winnerId} → Match ${match.next_win_match_id} (${slotField})`);
+      }
+
+      // Re-fetch fresh state to check round completion
       const { data: currentMatches } = await organizerQuery({
         table: "matches",
         operation: "select",

@@ -1338,12 +1338,10 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
       {viewMode === 'bracket' && !isDoubleElimination && hasElimination && (
         <div
           ref={!isDoubleElimination ? zoomContainerRef : undefined}
-          className={isMobile ? "overflow-x-auto" : ""}
-          style={isMobile ? { touchAction: "pan-x pinch-zoom", WebkitOverflowScrolling: "touch" } : undefined}
+          className="overflow-x-auto"
+          style={{ touchAction: "pan-x pinch-zoom", WebkitOverflowScrolling: "touch" }}
         >
-          <div style={isMobile ? { transform: `scale(${mobileZoom})`, transformOrigin: 'top left', width: `${100 / mobileZoom}%` } : undefined}>
-            <NormalKnockout matches={matches} getName={getName} matchNumberMap={matchNumberMap} />
-          </div>
+          <NormalKnockout matches={matches} getName={getName} matchNumberMap={matchNumberMap} />
         </div>
       )}
     </div>

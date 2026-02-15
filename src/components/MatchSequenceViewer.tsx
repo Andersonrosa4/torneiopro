@@ -409,49 +409,44 @@ const MatchCard = ({
 
   return (
     <div
-      className={`rounded-md border bg-card transition-all ${
+      className={`rounded-md border shadow-sm max-w-[420px] bg-card transition-all ${
         isCompleted
           ? "border-success/25"
           : hasTeams
-          ? "border-border/50"
-          : "border-border/20 opacity-60"
+          ? "border-border/40"
+          : "border-border/15 opacity-55"
       }`}
     >
-      {/* Header: JOGO X + Status — single compact line */}
-      <div className="flex items-center justify-between px-2.5 py-1 border-b border-border/15 bg-secondary/20">
+      {/* Header */}
+      <div className="flex items-center justify-between px-2.5 py-1 border-b border-border/10 bg-secondary/15">
         <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Jogo {index}</span>
-        {hasOneTeam && <Badge className="bg-muted text-muted-foreground border-0 text-[8px] px-1 py-0 h-4">Chapéu</Badge>}
-        {isCompleted && !isEditing && (
-          <Badge className="bg-success/15 text-success border-0 text-[8px] px-1.5 py-0 h-4">Finalizado</Badge>
-        )}
-        {!isCompleted && hasTeams && (
-          <Badge className="bg-warning/15 text-warning border-0 text-[8px] px-1.5 py-0 h-4">Pendente</Badge>
-        )}
-        {!isCompleted && !hasTeams && !hasOneTeam && (
-          <Badge variant="outline" className="text-muted-foreground/40 text-[8px] px-1.5 py-0 h-4 border-border/20">Aguardando</Badge>
-        )}
+        {hasOneTeam && <Badge className="bg-muted text-muted-foreground border-0 text-[8px] px-1 py-0 h-3.5 leading-none">Chapéu</Badge>}
+        {isCompleted && !isEditing && <Badge className="bg-success/15 text-success border-0 text-[8px] px-1.5 py-0 h-3.5 leading-none">Finalizado</Badge>}
+        {!isCompleted && hasTeams && <Badge className="bg-warning/15 text-warning border-0 text-[8px] px-1.5 py-0 h-3.5 leading-none">Pendente</Badge>}
+        {!isCompleted && !hasTeams && !hasOneTeam && <Badge variant="outline" className="text-muted-foreground/40 text-[8px] px-1 py-0 h-3.5 leading-none border-border/15">Aguardando</Badge>}
       </div>
 
-      {/* Body — compact */}
-      <div className="px-2.5 py-1.5 space-y-1">
+      <div className="px-2.5 py-1.5">
         {/* Team 1 */}
-        <div className="flex items-center gap-1 min-h-[18px]">
+        <div className="flex items-center gap-1 min-h-[20px]">
           {t1Win && <Trophy className="h-2.5 w-2.5 shrink-0 text-success" />}
-          <span className={`text-xs truncate ${t1Win ? "text-success font-semibold" : match.team1_id ? "text-foreground font-medium" : "text-muted-foreground/40 italic text-[10px]"}`}>
+          <span className={`text-[13px] truncate leading-tight ${t1Win ? "text-success font-semibold" : match.team1_id ? "text-foreground font-medium" : "text-muted-foreground/40 italic text-[10px]"}`}>
             {match.team1_id ? team1Name : "Chapéu"}
           </span>
         </div>
+        {/* Divider */}
+        <div className="h-px bg-border/15 my-0.5" />
         {/* Team 2 */}
-        <div className="flex items-center gap-1 min-h-[18px]">
+        <div className="flex items-center gap-1 min-h-[20px]">
           {t2Win && <Trophy className="h-2.5 w-2.5 shrink-0 text-success" />}
-          <span className={`text-xs truncate ${t2Win ? "text-success font-semibold" : match.team2_id ? "text-foreground font-medium" : "text-muted-foreground/40 italic text-[10px]"}`}>
+          <span className={`text-[13px] truncate leading-tight ${t2Win ? "text-success font-semibold" : match.team2_id ? "text-foreground font-medium" : "text-muted-foreground/40 italic text-[10px]"}`}>
             {match.team2_id ? team2Name : "Chapéu"}
           </span>
         </div>
 
-        {/* Winner buttons (when no score entered yet) */}
+        {/* Winner buttons */}
         {isOwner && hasTeams && !isCompleted && !isEditing && (
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 mt-1">
             {match.team1_id && (
               <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] gap-0.5 text-primary hover:bg-primary/10"
                 onClick={() => handleDeclareTeamWinner(match.team1_id!)}>
@@ -469,16 +464,16 @@ const MatchCard = ({
 
         {/* Score editing */}
         {hasTeams && canScore && (
-          <div className="space-y-1 pt-1 border-t border-border/10">
+          <div className="mt-1.5 pt-1 border-t border-border/10 space-y-0.5">
             {setScores.map((s, idx) => (
-              <div key={idx} className="flex items-center gap-1">
+              <div key={idx} className="flex items-center justify-center gap-1.5">
                 <span className="text-[9px] text-muted-foreground font-semibold w-5">S{idx + 1}</span>
-                <Input value={s.s1} onChange={(e) => updateSetScore(idx, "s1", e.target.value)} className="h-6 w-9 text-center text-[11px] p-0 font-bold bg-secondary/40 border-border/20" />
-                <span className="text-[9px] text-muted-foreground/50">×</span>
-                <Input value={s.s2} onChange={(e) => updateSetScore(idx, "s2", e.target.value)} className="h-6 w-9 text-center text-[11px] p-0 font-bold bg-secondary/40 border-border/20" />
+                <Input value={s.s1} onChange={(e) => updateSetScore(idx, "s1", e.target.value)} className="h-6 w-9 text-center text-[11px] p-0 font-bold bg-secondary/30 border-border/15" />
+                <span className="text-[9px] text-muted-foreground/40">×</span>
+                <Input value={s.s2} onChange={(e) => updateSetScore(idx, "s2", e.target.value)} className="h-6 w-9 text-center text-[11px] p-0 font-bold bg-secondary/30 border-border/15" />
               </div>
             ))}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between pt-0.5">
               <span className="text-[9px] text-muted-foreground tabular-nums">
                 {totalScore1}×{totalScore2} | Sets {setsWon.t1}×{setsWon.t2}
                 {autoWinnerId && <span className="text-success ml-1">✓ {getTeamName(autoWinnerId).split(" / ")[0]}</span>}
@@ -486,22 +481,12 @@ const MatchCard = ({
               <div className="flex items-center gap-1">
                 {isEditing && (
                   <>
-                    {match.team1_id && (
-                      <Button size="sm" variant="ghost" className="h-5 px-1 text-[8px] text-success"
-                        onClick={() => handleDeclareTeamWinner(match.team1_id!)}>
-                        <Trophy className="h-2.5 w-2.5" />
-                      </Button>
-                    )}
-                    {match.team2_id && (
-                      <Button size="sm" variant="ghost" className="h-5 px-1 text-[8px] text-success"
-                        onClick={() => handleDeclareTeamWinner(match.team2_id!)}>
-                        <Trophy className="h-2.5 w-2.5" />
-                      </Button>
-                    )}
-                    <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[8px] text-muted-foreground" onClick={() => setIsEditing(false)}>✕</Button>
+                    {match.team1_id && <Button size="sm" variant="ghost" className="h-5 px-1 text-[8px] text-success" onClick={() => handleDeclareTeamWinner(match.team1_id!)}><Trophy className="h-2.5 w-2.5" /></Button>}
+                    {match.team2_id && <Button size="sm" variant="ghost" className="h-5 px-1 text-[8px] text-success" onClick={() => handleDeclareTeamWinner(match.team2_id!)}><Trophy className="h-2.5 w-2.5" /></Button>}
+                    <Button size="sm" variant="ghost" className="h-5 px-1 text-[8px] text-muted-foreground" onClick={() => setIsEditing(false)}>✕</Button>
                   </>
                 )}
-                <Button size="sm" variant="outline" className="h-5 px-2 text-[9px] gap-0.5 border-border/30" onClick={handleSaveScoreOnly}>
+                <Button size="sm" variant="outline" className="h-5 px-2 text-[9px] gap-0.5 border-border/25" onClick={handleSaveScoreOnly}>
                   <Save className="h-2.5 w-2.5" /> Salvar
                 </Button>
               </div>
@@ -511,15 +496,13 @@ const MatchCard = ({
 
         {/* Completed score */}
         {hasTeams && !canScore && (
-          <div className="flex items-center justify-between pt-1 border-t border-border/10">
+          <div className="flex items-center justify-between mt-1 pt-1 border-t border-border/10">
             <div className="flex items-center gap-1.5">
               <span className="text-sm font-mono font-bold tabular-nums">
-                {match.score1 ?? "-"} <span className="text-muted-foreground/30">×</span> {match.score2 ?? "-"}
+                {match.score1 ?? "-"} <span className="text-muted-foreground/25">×</span> {match.score2 ?? "-"}
               </span>
               {isCompleted && match.winner_team_id && (
-                <Badge className="bg-success/10 text-success border-0 text-[8px] px-1 py-0 h-4">
-                  {getTeamName(match.winner_team_id).split(" / ")[0]}
-                </Badge>
+                <Badge className="bg-success/10 text-success border-0 text-[8px] px-1 py-0 h-3.5">{getTeamName(match.winner_team_id).split(" / ")[0]}</Badge>
               )}
             </div>
             {isOwner && isCompleted && (
@@ -530,10 +513,7 @@ const MatchCard = ({
           </div>
         )}
 
-        {/* Chapéu */}
-        {hasOneTeam && (
-          <span className="text-[9px] text-muted-foreground/50 italic">Aguardando adversário...</span>
-        )}
+        {hasOneTeam && <span className="text-[9px] text-muted-foreground/40 italic">Aguardando adversário...</span>}
       </div>
     </div>
   );
@@ -836,7 +816,7 @@ const MatchSequenceViewer = ({
             </div>
 
             {/* Match cards — 2 col grid */}
-            <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
+            <div className="grid gap-1.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {block.matches.map(({ match, globalIndex }) => (
                 <MatchCard
                   key={match.id}

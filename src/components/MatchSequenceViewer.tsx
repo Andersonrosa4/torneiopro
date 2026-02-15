@@ -383,7 +383,23 @@ const MatchCard = ({
   // Build feeder labels for empty slots (knockout only)
   const feederLabels = useMemo(() => {
     if (match.round === 0) return { team1: null, team2: null };
-    const feeders = allMatches.filter(m => m.next_win_match_id === match.id);
+    
+    // Method 1: Find feeders via next_win_match_id
+    let feeders = allMatches.filter(m => m.next_win_match_id === match.id);
+    
+    // Method 2: Structural fallback — if no feeders found via next_win_match_id,
+    // use positional logic: round R, pos P ← round R-1, pos (2P-1) and (2P)
+    if (feeders.length === 0 && match.round > 0) {
+      const prevRound = match.round - 1;
+      const pos1 = match.position * 2 - 1;
+      const pos2 = match.position * 2;
+      feeders = allMatches.filter(m => 
+        m.round === prevRound && 
+        (m.bracket_number || 1) === (match.bracket_number || 1) &&
+        (m.position === pos1 || m.position === pos2)
+      );
+    }
+    
     let team1Label: string | null = null;
     let team2Label: string | null = null;
     for (const f of feeders) {
@@ -396,14 +412,8 @@ const MatchCard = ({
         team2Label = `Venc. Jogo ${fNum}`;
       }
     }
-    // If only one feeder found, assign to the empty slot
-    if (feeders.length === 1 && team1Label && !team2Label) {
-      // feeder fills team1, leave team2 as null
-    } else if (feeders.length === 1 && !team1Label && team2Label) {
-      // feeder fills team2, leave team1 as null
-    }
     return { team1: team1Label, team2: team2Label };
-  }, [match.id, match.round, allMatches, matchNumberMap]);
+  }, [match.id, match.round, match.position, match.bracket_number, allMatches, matchNumberMap]);
 
   const team1Name = match.team1_id ? getTeamName(match.team1_id) : (feederLabels.team1 || "A definir");
   const team2Name = match.team2_id ? getTeamName(match.team2_id) : (feederLabels.team2 || "A definir");

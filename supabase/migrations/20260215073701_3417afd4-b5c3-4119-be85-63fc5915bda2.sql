@@ -1,0 +1,1 @@
+ALTER TABLE public.tournaments ALTER COLUMN tournament_code TYPE character varying(20);

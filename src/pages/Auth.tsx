@@ -103,7 +103,7 @@ const Auth = () => {
             <Trophy className="h-8 w-8 text-primary-foreground" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            Gestão Pro
+            Torneio Pro
           </h1>
           <p className="mt-2 text-muted-foreground">
             Entre para gerenciar seus torneios

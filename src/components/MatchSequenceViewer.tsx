@@ -409,112 +409,149 @@ const MatchCard = ({
 
   return (
     <div
-      className={`rounded-xl max-w-[420px] overflow-hidden transition-all ${
-        isCompleted ? "opacity-100" : hasTeams ? "opacity-100" : "opacity-45"
+      className={`group relative flex items-stretch rounded-xl border bg-card/95 backdrop-blur-sm transition-all ${
+        isCompleted
+          ? "border-success/50 shadow-[0_0_12px_rgba(34,197,94,0.15)]"
+          : hasTeams
+          ? "border-primary/30 shadow-[0_0_10px_hsl(var(--primary)/0.1)] hover:border-primary/50"
+          : "border-border/40 opacity-80"
       }`}
-      style={{
-        background: '#1f242a',
-        border: '1px solid #2d333b',
-        boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
-      }}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-1" style={{ borderBottom: '1px solid #2d333b' }}>
-        <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#6b7280' }}>Jogo {index}</span>
-        {hasOneTeam && <span className="text-[7px] font-semibold px-1.5 py-0.5 rounded" style={{ background: '#2d333b', color: '#6b7280' }}>Chapéu</span>}
-        {isCompleted && !isEditing && <span className="text-[7px] font-semibold px-1.5 py-0.5 rounded" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>Finalizado</span>}
-        {!isCompleted && hasTeams && <span className="text-[7px] font-semibold px-1.5 py-0.5 rounded" style={{ background: 'rgba(234,179,8,0.1)', color: '#eab308' }}>Pendente</span>}
-        {!isCompleted && !hasTeams && !hasOneTeam && <span className="text-[7px] px-1.5 py-0.5 rounded" style={{ background: '#2d333b', color: '#4b5563' }}>Aguardando</span>}
+      {/* Number column — large JOGO N */}
+      <div className={`flex flex-col items-center justify-center w-16 shrink-0 rounded-l-xl border-r border-border/20 ${
+        isCompleted ? "bg-success/10 text-success" : hasTeams ? "bg-primary/10 text-primary" : "bg-muted/30 text-muted-foreground"
+      }`}>
+        <span className="text-[8px] uppercase font-black leading-none mb-1 tracking-widest opacity-80">Jogo</span>
+        <span className="text-xl font-black tabular-nums leading-none">{index}</span>
       </div>
 
-      {/* Scoreboard */}
-      <div className="px-3 py-2 text-center space-y-0.5">
-        {/* Team 1 */}
-        <p className="text-[15px] font-semibold truncate leading-tight" style={{ color: t1Win ? '#22c55e' : match.team1_id ? '#e5e7eb' : '#4b5563' }}>
-          {match.team1_id ? team1Name : "A definir"}
-        </p>
+      {/* Main content */}
+      <div className="flex-1 min-w-0 px-3 py-2.5 space-y-1.5">
+        {/* Header: round badge + status */}
+        <div className="flex items-center justify-between gap-1.5">
+          <Badge variant="outline" className="text-[9px] shrink-0 font-semibold px-1.5 py-0 border-border/40 bg-muted/20">
+            {tournamentFormat === 'double_elimination' ? getDERoundBadgeLabel(match) : getRoundLabel(match.round)}
+          </Badge>
+          {hasOneTeam && <Badge className="bg-muted text-muted-foreground border-border text-[9px] px-1.5 py-0">Chapéu</Badge>}
+          {isCompleted && !isEditing && (
+            <Badge className="bg-success/20 text-success border-0 text-[9px] px-2 py-0.5 font-bold">Finalizado</Badge>
+          )}
+          {!isCompleted && hasTeams && (
+            <Badge className="bg-warning/20 text-warning border-0 text-[9px] px-2 py-0.5 font-bold">Pendente</Badge>
+          )}
+          {!isCompleted && !hasTeams && !hasOneTeam && (
+            <Badge variant="outline" className="text-muted-foreground/60 text-[9px] px-2 py-0.5 border-border/30">Aguardando</Badge>
+          )}
+        </div>
 
-        {/* Score block — between teams */}
-        {hasTeams && canScore && (
-          <div className="py-1 space-y-0.5">
-            {setScores.map((s, idx) => (
-              <div key={idx} className="flex items-center justify-center gap-2">
-                <span className="text-[9px] font-semibold w-4 text-right" style={{ color: '#6b7280' }}>S{idx + 1}</span>
-                <Input value={s.s1} onChange={(e) => updateSetScore(idx, "s1", e.target.value)}
-                  className="h-8 w-11 text-center text-base p-0 font-bold rounded-md"
-                  style={{ background: '#161b22', border: '1px solid #2d333b', color: '#e5e7eb' }} />
-                <span className="text-sm font-bold" style={{ color: '#4b5563' }}>×</span>
-                <Input value={s.s2} onChange={(e) => updateSetScore(idx, "s2", e.target.value)}
-                  className="h-8 w-11 text-center text-base p-0 font-bold rounded-md"
-                  style={{ background: '#161b22', border: '1px solid #2d333b', color: '#e5e7eb' }} />
-              </div>
-            ))}
-          </div>
-        )}
-        {hasTeams && !canScore && (
-          <div className="py-1">
-            <span className="text-xl font-mono font-bold tabular-nums" style={{ color: '#e5e7eb' }}>
-              {match.score1 ?? "-"} <span style={{ color: '#4b5563' }}>×</span> {match.score2 ?? "-"}
+        {/* Teams — prominent display */}
+        <div className="space-y-0">
+          <div className="min-h-[24px] flex items-center">
+            <span className={`text-sm truncate font-black ${t1Win ? "text-success" : match.team1_id === null ? "text-muted-foreground/50 italic font-normal text-xs" : "text-foreground"}`}>
+              {match.team1_id ? team1Name : "Chapéu"}
             </span>
           </div>
+          <span className="text-[10px] text-muted-foreground/40 font-medium pl-0.5">vs</span>
+          <div className="min-h-[24px] flex items-center">
+            <span className={`text-sm truncate font-black ${t2Win ? "text-success" : match.team2_id === null ? "text-muted-foreground/50 italic font-normal text-xs" : "text-foreground"}`}>
+              {match.team2_id ? team2Name : "Chapéu"}
+            </span>
+          </div>
+        </div>
+
+        {/* Declare winner buttons */}
+        {isOwner && hasTeams && !isCompleted && !isEditing && (
+          <div className="flex items-center gap-2 pt-1 flex-wrap">
+            {match.team1_id && (
+              <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px] gap-1 text-primary hover:bg-primary/10"
+                onClick={() => handleDeclareTeamWinner(match.team1_id!)}>
+                <Trophy className="h-3 w-3" /> {team1Name.split(" / ")[0]}
+              </Button>
+            )}
+            {match.team2_id && (
+              <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px] gap-1 text-primary hover:bg-primary/10"
+                onClick={() => handleDeclareTeamWinner(match.team2_id!)}>
+                <Trophy className="h-3 w-3" /> {team2Name.split(" / ")[0]}
+              </Button>
+            )}
+          </div>
         )}
 
-        {/* Team 2 */}
-        <p className="text-[15px] font-semibold truncate leading-tight" style={{ color: t2Win ? '#22c55e' : match.team2_id ? '#e5e7eb' : '#4b5563' }}>
-          {match.team2_id ? team2Name : "A definir"}
-        </p>
-
-        {/* Sets summary */}
+        {/* Score editing with sets */}
         {hasTeams && canScore && (
-          <p className="text-[8px] tabular-nums" style={{ color: '#6b7280' }}>
-            Sets {setsWon.t1}×{setsWon.t2}
-            {autoWinnerId && <span style={{ color: '#22c55e' }}> ✓</span>}
-          </p>
+          <div className="space-y-1.5 pt-1.5 border-t border-border/20">
+            <div className="flex items-center gap-2 flex-wrap">
+              {setScores.map((s, idx) => (
+                <div key={idx} className="flex items-center gap-1">
+                  <span className="text-[9px] text-muted-foreground font-bold">S{idx + 1}</span>
+                  <Input value={s.s1} onChange={(e) => updateSetScore(idx, "s1", e.target.value)} className="h-7 w-10 text-center text-xs p-0 font-bold bg-background/50" />
+                  <span className="text-[10px] text-muted-foreground font-bold">×</span>
+                  <Input value={s.s2} onChange={(e) => updateSetScore(idx, "s2", e.target.value)} className="h-7 w-10 text-center text-xs p-0 font-bold bg-background/50" />
+                  {idx < setScores.length - 1 && <span className="text-muted-foreground/30 mx-0.5 text-lg">|</span>}
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground tabular-nums">
+              {totalScore1}×{totalScore2} | Sets: {setsWon.t1}×{setsWon.t2}
+              {autoWinnerId && (
+                <Badge className="bg-success/15 text-success border-0 text-[9px] px-1.5 py-0 ml-1">
+                  Vencedor: {getTeamName(autoWinnerId).split(" / ")[0]}
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Button size="sm" variant="outline" className="h-6 px-2.5 text-[10px] gap-1 border-border/40" onClick={handleSaveScoreOnly}>
+                <Save className="h-3 w-3" /> Salvar
+              </Button>
+              {isEditing && (
+                <>
+                  {match.team1_id && (
+                    <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] gap-0.5 border-success/40 text-success hover:bg-success/10"
+                      onClick={() => handleDeclareTeamWinner(match.team1_id!)}>
+                      <Trophy className="h-3 w-3" /> {team1Name.split(" / ")[0]}
+                    </Button>
+                  )}
+                  {match.team2_id && (
+                    <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] gap-0.5 border-success/40 text-success hover:bg-success/10"
+                      onClick={() => handleDeclareTeamWinner(match.team2_id!)}>
+                      <Trophy className="h-3 w-3" /> {team2Name.split(" / ")[0]}
+                    </Button>
+                  )}
+                  <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setIsEditing(false)}>
+                    Cancelar
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
         )}
 
-        {hasOneTeam && <p className="text-[8px] italic" style={{ color: '#4b5563' }}>Aguardando adversário</p>}
+        {/* Completed score display */}
+        {hasTeams && !canScore && (
+          <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-border/20">
+            <span className="text-base font-mono font-black tabular-nums">
+              {match.score1 ?? "-"} <span className="text-muted-foreground/40">×</span> {match.score2 ?? "-"}
+            </span>
+            {isCompleted && match.winner_team_id && (
+              <Badge className="bg-success/15 text-success border-0 text-[9px] px-1.5 py-0">
+                {getTeamName(match.winner_team_id)}
+              </Badge>
+            )}
+            {isOwner && isCompleted && (
+              <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px] gap-1 ml-auto" onClick={() => setIsEditing(true)}>
+                <Pencil className="h-3 w-3" /> Corrigir
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Chapéu slot */}
+        {hasOneTeam && (
+          <div className="flex items-center gap-1.5 px-1 py-1 rounded bg-muted/10">
+            <span className="text-[10px] text-muted-foreground italic">Aguardando adversário...</span>
+          </div>
+        )}
       </div>
-
-      {/* Footer — save / edit / winner buttons */}
-      {hasTeams && (canScore || (isOwner && isCompleted)) && (
-        <div className="flex items-center justify-end gap-1 px-3 py-1" style={{ borderTop: '1px solid #2d333b' }}>
-          {canScore && isEditing && (
-            <>
-              {match.team1_id && <Button size="sm" variant="ghost" className="h-5 px-1 text-[8px] text-success" onClick={() => handleDeclareTeamWinner(match.team1_id!)}><Trophy className="h-2.5 w-2.5" /></Button>}
-              {match.team2_id && <Button size="sm" variant="ghost" className="h-5 px-1 text-[8px] text-success" onClick={() => handleDeclareTeamWinner(match.team2_id!)}><Trophy className="h-2.5 w-2.5" /></Button>}
-              <Button size="sm" variant="ghost" className="h-5 px-1 text-[8px] text-muted-foreground" onClick={() => setIsEditing(false)}>✕</Button>
-            </>
-          )}
-          {canScore && (
-            <Button size="sm" variant="outline" className="h-5 px-2 text-[9px] gap-0.5 border-border/20" onClick={handleSaveScoreOnly}>
-              <Save className="h-2.5 w-2.5" /> Salvar
-            </Button>
-          )}
-          {!canScore && isOwner && isCompleted && (
-            <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] gap-0.5" onClick={() => setIsEditing(true)}>
-              <Pencil className="h-2.5 w-2.5" /> Corrigir
-            </Button>
-          )}
-        </div>
-      )}
-
-      {/* Winner quick-declare (non-editing, pre-score) */}
-      {isOwner && hasTeams && !isCompleted && !isEditing && (
-        <div className="flex items-center justify-center gap-2 pb-1.5">
-          {match.team1_id && (
-            <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] gap-0.5 text-primary hover:bg-primary/10"
-              onClick={() => handleDeclareTeamWinner(match.team1_id!)}>
-              <Trophy className="h-2.5 w-2.5" /> {team1Name.split(" / ")[0]}
-            </Button>
-          )}
-          {match.team2_id && (
-            <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] gap-0.5 text-primary hover:bg-primary/10"
-              onClick={() => handleDeclareTeamWinner(match.team2_id!)}>
-              <Trophy className="h-2.5 w-2.5" /> {team2Name.split(" / ")[0]}
-            </Button>
-          )}
-        </div>
-      )}
     </div>
   );
 };
@@ -790,13 +827,13 @@ const MatchSequenceViewer = ({
         return (
           <div
             key={blockKey || block.label}
-            className={`space-y-3 ${!isUnlocked && isDoubleElim ? 'opacity-40' : ''}`}
+            className={`rounded-xl border border-primary/25 bg-card/20 backdrop-blur-sm overflow-hidden shadow-[0_0_15px_hsl(var(--primary)/0.08)] ${!isUnlocked && isDoubleElim ? 'opacity-40' : ''}`}
           >
-            {/* Round header — clean title + line */}
-            <div className="space-y-1.5">
+            {/* Block header — gradient bar */}
+            <div className="px-5 py-3 border-b border-primary/15 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">
+                <div className="flex items-center gap-2.5">
+                  <h3 className="text-sm font-black uppercase tracking-[0.15em] text-primary" style={{ textShadow: '0 0 20px rgba(255,255,255,1), 0 0 40px rgba(255,255,255,0.9), 0 0 60px rgba(255,255,255,0.6), 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000' }}>
                     {block.label}
                   </h3>
                   {isDoubleElim && !isUnlocked && (
@@ -810,13 +847,17 @@ const MatchSequenceViewer = ({
                     </Badge>
                   )}
                 </div>
-                <span className="text-[11px] text-muted-foreground tabular-nums">{completedInBlock}/{totalInBlock}</span>
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xs text-muted-foreground tabular-nums font-bold">{completedInBlock} / {totalInBlock}</span>
+                  <div className="w-20 h-2 rounded-full bg-muted/40 overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all duration-500" style={{ width: `${blockPct}%` }} />
+                  </div>
+                </div>
               </div>
-              <div className="h-px bg-border/40" />
             </div>
 
             {/* Match cards — 2 col grid */}
-            <div className="grid gap-1.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="p-3 grid gap-3 grid-cols-1 sm:grid-cols-2">
               {block.matches.map(({ match, globalIndex }) => (
                 <MatchCard
                   key={match.id}

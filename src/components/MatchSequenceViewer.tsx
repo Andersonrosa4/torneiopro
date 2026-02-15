@@ -147,7 +147,9 @@ function generateInterleavedSequence(matches: Match[]): Match[] {
     }
   }
 
-  return [...groupSequence, ...resolveConsecutiveConflicts(knockoutInterleaved)];
+  // Apply conflict resolution across the ENTIRE sequence (groups + knockout)
+  // This ensures no team plays their last group match and first knockout match back-to-back
+  return resolveConsecutiveConflicts([...groupSequence, ...knockoutInterleaved]);
 }
 
 function resolveConsecutiveConflicts(sequence: Match[]): Match[] {

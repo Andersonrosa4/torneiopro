@@ -37,7 +37,7 @@ const Index = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4">
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 pt-8">
       {/* Beach arena background */}
       <div className="absolute inset-0 bg-gradient-to-b from-[hsl(220_15%_8%)] via-[hsl(220_12%_12%)] to-[hsl(25_15%_14%)]" />
 

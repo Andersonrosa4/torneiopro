@@ -875,10 +875,12 @@ const NormalKnockout = ({
   matches,
   getName,
   matchNumberMap,
+  disableInternalScroll,
 }: {
   matches: Match[];
   getName: (id: string | null) => string;
   matchNumberMap?: Map<string, number>;
+  disableInternalScroll?: boolean;
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const knockoutMatches = matches.filter((m) => m.round > 0);
@@ -895,7 +897,7 @@ const NormalKnockout = ({
 
   return (
     <div className="rounded-xl border border-border bg-card/50 p-4">
-      <div ref={containerRef} className="relative overflow-x-auto">
+      <div ref={containerRef} className={`relative ${disableInternalScroll ? '' : 'overflow-x-auto'}`}>
         <NormalKnockoutConnectors containerRef={containerRef} knockoutMatches={knockoutMatches} />
         <div className="flex gap-10 relative" style={{ zIndex: 1, minHeight: totalHeight }}>
           {rounds.map((round) => {
@@ -1338,11 +1340,11 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
       {viewMode === 'bracket' && !isDoubleElimination && hasElimination && (
         <div
           ref={!isDoubleElimination ? zoomContainerRef : undefined}
-          className={isMobile ? "overflow-x-auto overflow-y-hidden" : ""}
+          className={isMobile ? "overflow-x-auto overflow-y-hidden scrollbar-hide" : ""}
           style={isMobile ? { touchAction: "pan-x pinch-zoom", WebkitOverflowScrolling: "touch" } : undefined}
         >
           <div style={isMobile ? { transform: `scale(${mobileZoom})`, transformOrigin: 'top left', width: `${100 / mobileZoom}%` } : undefined}>
-            <NormalKnockout matches={matches.filter(m => m.round > 0)} getName={getName} matchNumberMap={matchNumberMap} />
+            <NormalKnockout matches={matches.filter(m => m.round > 0)} getName={getName} matchNumberMap={matchNumberMap} disableInternalScroll={isMobile} />
           </div>
         </div>
       )}

@@ -1842,7 +1842,7 @@ const TournamentDetail = () => {
                       isOwner={isOwner}
                       numSets={tournament?.num_sets || 3}
                       tournamentName={tournament?.name || ""}
-                      sport={sportLabels[tournament?.sport] || tournament?.sport || ""}
+                      sport={tournament?.sport || ""}
                       eventDate={tournament?.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
                       onUpdateScore={updateScore}
                       onDeclareWinner={declareWinner}

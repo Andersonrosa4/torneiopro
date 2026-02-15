@@ -654,11 +654,30 @@ const MatchSequenceViewer = ({
   // ║                                                                      ║
   // ║  A numeração é: Grupos (round 0) → Eliminação (scheduler order).   ║
   // ║  Resultado: 1, 2, 3, 4... sem saltos, SEMPRE.                      ║
+  // ║                                                                      ║
+  // ║  CHAVEAMENTO NORMAL: usa displaySequence (conflict-resolved) para   ║
+  // ║  garantir que equipes não joguem consecutivamente entre fases.       ║
   // ╚══════════════════════════════════════════════════════════════════════╝
   const matchNumberMap = useMemo(() => {
     const map = new Map<string, number>();
     let num = 1;
-    // Fase de grupos (round 0) — round-robin interleaved order
+
+    if (tournamentFormat !== 'double_elimination') {
+      // Chaveamento Normal: use the conflict-resolved displaySequence for numbering
+      // This ensures no team plays back-to-back between group stage and knockout
+      for (const m of displaySequence) {
+        if (!map.has(m.id)) {
+          map.set(m.id, num++);
+        }
+      }
+      // Safety net
+      for (const m of matches) {
+        if (!map.has(m.id)) map.set(m.id, num++);
+      }
+      return map;
+    }
+
+    // Dupla Eliminação: original scheduler-based numbering (Regra 12)
     const groupMatches = matches.filter(m => m.round === 0);
     if (groupMatches.length > 0) {
       const { sequence: gsSeq } = buildGroupStageInterleaved(groupMatches);
@@ -678,7 +697,7 @@ const MatchSequenceViewer = ({
       if (!map.has(m.id)) map.set(m.id, num++);
     }
     return map;
-  }, [matches]);
+  }, [matches, displaySequence, tournamentFormat]);
 
   const matchCountByRound = useMemo(() => {
     const counts: Record<number, number> = {};

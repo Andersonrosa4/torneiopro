@@ -99,7 +99,12 @@ const Dashboard = () => {
       // 2. Delete classificacao_grupos (depends on groups & teams)
       await organizerQuery({ table: "classificacao_grupos", operation: "delete", filters: { tournament_id: tournamentId } });
       // 3. Nullify match FK refs in bulk via undo_bracket operation
-      await organizerQuery({ table: "matches", operation: "undo_bracket", data: { tournament_id: tournamentId } } as any);
+      // undo_bracket reads tournament_id from top-level body, so we pass it via organizerQuery's filters-like spread
+      const token = sessionStorage.getItem("organizer_token");
+      const orgId = sessionStorage.getItem("organizer_id");
+      await (await import("@/integrations/supabase/client")).supabase.functions.invoke("organizer-api", {
+        body: { token, organizerId: orgId, table: "matches", operation: "undo_bracket", tournament_id: tournamentId },
+      });
       // 4. Delete participants
       await organizerQuery({ table: "participants", operation: "delete", filters: { tournament_id: tournamentId } });
       // 5. Delete teams

@@ -85,7 +85,7 @@ const Auth = () => {
   }
 
   return (
-    <div className={`flex min-h-screen items-center justify-center bg-gradient-to-b ${sportBg} px-4 relative overflow-hidden`}>
+    <div className={`flex min-h-screen items-center justify-center bg-gradient-to-b ${sportBg} px-4 py-8 relative overflow-hidden`}>
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 left-1/4 w-32 h-full bg-gradient-to-b from-[hsl(var(--primary))_0.08] to-transparent rotate-12 animate-light-beam" />
         <div className="absolute top-0 right-1/3 w-24 h-full bg-gradient-to-b from-[hsl(var(--accent))_0.06] to-transparent -rotate-6 animate-light-beam" style={{ animationDelay: "2s" }} />

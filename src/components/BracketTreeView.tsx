@@ -89,10 +89,10 @@ const MatchCard = ({
   const bottomWin = match.winner_team_id === bottomTeamId && isCompleted;
 
   const sizeClasses = {
-    small: "w-[105px] text-[8px]",
-    normal: "w-[120px] text-[9px]",
-    semi: "w-[135px] text-[10px]",
-    final: "w-[150px] text-[10px]",
+    small: "w-[130px] text-[9px]",
+    normal: "w-[130px] text-[9px]",
+    semi: "w-[130px] text-[9px]",
+    final: "w-[140px] text-[10px]",
   };
 
   const borderClasses = (() => {
@@ -396,9 +396,9 @@ const PlaceholderMatchCard = ({
   roundLabel?: string;
 }) => {
   const sizeClasses = {
-    normal: "w-[120px] text-[9px]",
-    semi: "w-[135px] text-[10px]",
-    final: "w-[150px] text-[10px]",
+    normal: "w-[130px] text-[9px]",
+    semi: "w-[130px] text-[9px]",
+    final: "w-[140px] text-[10px]",
   };
   const borderClasses = {
     normal: "border-border/60",

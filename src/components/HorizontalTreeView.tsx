@@ -67,10 +67,10 @@ const HTreeMatchCard = ({
   const bottomWin = match.winner_team_id === bottomTeamId && isCompleted;
 
   const widthClass = {
-    small: "w-[105px]",
-    normal: "w-[120px]",
-    semi: "w-[135px]",
-    final: "w-[150px]",
+    small: "w-[130px]",
+    normal: "w-[130px]",
+    semi: "w-[130px]",
+    final: "w-[140px]",
   }[scale];
 
   const borderClass = (() => {

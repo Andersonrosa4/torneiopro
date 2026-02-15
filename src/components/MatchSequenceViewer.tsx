@@ -345,6 +345,7 @@ interface MatchCardProps {
   getRoundLabel: (round: number) => string;
   isOwner: boolean;
   numSets: number;
+  sport: string;
   tournamentFormat: string;
   allMatches: Match[];
   matchNumberMap: Map<string, number>;
@@ -360,6 +361,7 @@ const MatchCard = ({
   getRoundLabel,
   isOwner,
   numSets,
+  sport,
   tournamentFormat,
   allMatches,
   matchNumberMap,
@@ -452,8 +454,10 @@ const MatchCard = ({
     return { t1, t2 };
   }, [setScores]);
 
-  const totalScore1 = setScores.reduce((sum, s) => sum + (Number(s.s1) || 0), 0);
-  const totalScore2 = setScores.reduce((sum, s) => sum + (Number(s.s2) || 0), 0);
+  const isBeachTennis = sport === 'beach_tennis';
+  // Beach Tennis: score = sets won (not total games). Other sports: sum of all set scores.
+  const totalScore1 = isBeachTennis ? setsWon.t1 : setScores.reduce((sum, s) => sum + (Number(s.s1) || 0), 0);
+  const totalScore2 = isBeachTennis ? setsWon.t2 : setScores.reduce((sum, s) => sum + (Number(s.s2) || 0), 0);
 
   const autoWinnerId = useMemo(() => {
     const majority = Math.ceil(numSets / 2);
@@ -971,6 +975,7 @@ const MatchSequenceViewer = ({
                     return getRoundShortLabel(r, matchCountByRound[r] || 0);
                   }}
                   isOwner={isOwner}
+                  sport={sport}
                   numSets={numSets}
                   tournamentFormat={tournamentFormat}
                   allMatches={matches}

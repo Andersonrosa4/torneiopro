@@ -575,7 +575,7 @@ const TournamentDetail = () => {
       await organizerQuery({
         table: "tournaments",
         operation: "update",
-        data: { status: "in_progress" },
+        data: { status: "in_progress", format: "double_elimination" },
         filters: { id },
       });
       toast.success(`✅ Dupla Eliminação gerada! ${matchCount} partidas criadas.`);

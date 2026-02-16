@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Plus, Trash2, Trophy, Users, Shuffle, Copy, Pencil, Check, X, ArrowLeft, Undo2 } from "lucide-react";
+import { Plus, Trash2, Trophy, Users, Shuffle, Copy, Pencil, Check, X, ArrowLeft, Undo2, Download, Upload } from "lucide-react";
+import * as XLSX from "xlsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -1692,6 +1693,79 @@ const TournamentDetail = () => {
                         <Shuffle className="h-4 w-4" /> Embaralhar
                       </Button>
                     )}
+                  </div>
+                  {/* Excel import/export */}
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1"
+                      onClick={() => {
+                        const ws = XLSX.utils.aoa_to_sheet([
+                          ["Jogador 1", "Jogador 2"],
+                          ["João Silva", "Maria Santos"],
+                        ]);
+                        ws["!cols"] = [{ wch: 25 }, { wch: 25 }];
+                        const wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, ws, "Duplas");
+                        XLSX.writeFile(wb, `modelo_duplas_${tournament?.name || "torneio"}.xlsx`);
+                        toast.success("Modelo Excel exportado!");
+                      }}
+                    >
+                      <Download className="h-4 w-4" /> Exportar Modelo
+                    </Button>
+                    <label>
+                      <Button variant="outline" size="sm" className="gap-1 cursor-pointer" asChild>
+                        <span>
+                          <Upload className="h-4 w-4" /> Importar Excel
+                          <input
+                            type="file"
+                            accept=".xlsx,.xls,.csv"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file || !id) return;
+                              e.target.value = "";
+                              try {
+                                const data = await file.arrayBuffer();
+                                const wb = XLSX.read(data);
+                                const ws = wb.Sheets[wb.SheetNames[0]];
+                                const rows: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+                                // Skip header row, filter valid pairs
+                                const pairs = rows.slice(1).filter(r => r[0]?.toString().trim() && r[1]?.toString().trim());
+                                if (pairs.length === 0) {
+                                  toast.error("Nenhuma dupla encontrada na planilha.");
+                                  return;
+                                }
+                                if (hasGroupStageGenerated) {
+                                  toast.error("❌ Fase de grupos já gerada. Faça o reset para alterar equipes.");
+                                  return;
+                                }
+                                let added = 0;
+                                for (let i = 0; i < pairs.length; i++) {
+                                  const { error } = await organizerQuery({
+                                    table: "teams",
+                                    operation: "insert",
+                                    data: {
+                                      tournament_id: id,
+                                      player1_name: pairs[i][0].toString().trim(),
+                                      player2_name: pairs[i][1].toString().trim(),
+                                      seed: filteredTeams.length + added + 1,
+                                      modality_id: selectedModality?.id || null,
+                                    },
+                                  });
+                                  if (!error) added++;
+                                }
+                                fetchData();
+                                toast.success(`✅ ${added} dupla(s) importada(s) com sucesso!`);
+                              } catch {
+                                toast.error("Erro ao ler o arquivo.");
+                              }
+                            }}
+                          />
+                        </span>
+                      </Button>
+                    </label>
                   </div>
                 </section>
               )}

@@ -32,7 +32,7 @@ const AppHeader = () => {
       <div className="container flex h-14 sm:h-16 items-center justify-between px-3 sm:px-6">
         <div className="flex items-center gap-3 sm:gap-6">
           <Link to="/dashboard" className="flex items-center gap-2">
-            <img src={logoImg} alt="Torneio Pro" className="h-8 w-8 sm:h-9 sm:w-9 object-contain" style={{ mixBlendMode: 'screen' }} />
+            <img src={logoImg} alt="Torneio Pro" className="h-8 w-8 sm:h-9 sm:w-9 object-contain" style={{ mixBlendMode: 'lighten' }} />
           </Link>
 
           {/* Desktop nav */}

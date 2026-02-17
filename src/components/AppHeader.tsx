@@ -1,8 +1,9 @@
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Trophy, LayoutDashboard, LogOut, Plus, Menu } from "lucide-react";
+import { LayoutDashboard, LogOut, Plus, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import logoImg from "@/assets/logo-torneio-pro.webp";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 
@@ -31,12 +32,7 @@ const AppHeader = () => {
       <div className="container flex h-14 sm:h-16 items-center justify-between px-3 sm:px-6">
         <div className="flex items-center gap-3 sm:gap-6">
           <Link to="/dashboard" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg bg-gradient-primary">
-              <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
-            </div>
-            <span className="text-base sm:text-lg font-bold tracking-tight text-foreground font-display">
-              Torneio Pro
-            </span>
+            <img src={logoImg} alt="Torneio Pro" className="h-8 w-8 sm:h-9 sm:w-9 object-contain" />
           </Link>
 
           {/* Desktop nav */}

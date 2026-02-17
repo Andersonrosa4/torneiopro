@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Hash } from "lucide-react";
-import logoImg from "@/assets/logo-torneio-pro.png";
+import LogoImage from "@/components/LogoImage";
 import ThemedBackground from "@/components/ThemedBackground";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
 
@@ -55,7 +55,7 @@ const AthleteLogin = () => {
       >
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-32 w-32 items-center justify-center">
-            <img src={logoImg} alt="Torneio Pro" className="h-32 w-32 object-contain" />
+            <LogoImage className="h-32 w-32" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             Acesso do Atleta

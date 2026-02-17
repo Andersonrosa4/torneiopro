@@ -7,7 +7,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Lock, User, ArrowLeft, Mail } from "lucide-react";
-import logoImg from "@/assets/logo-torneio-pro.png";
+import LogoImage from "@/components/LogoImage";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
 import { useSportTheme } from "@/contexts/SportContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -101,7 +101,7 @@ const Auth = () => {
       >
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-32 w-32 items-center justify-center">
-            <img src={logoImg} alt="Torneio Pro" className="h-32 w-32 object-contain" />
+            <LogoImage className="h-32 w-32" />
           </div>
           <p className="mt-2 text-muted-foreground">
             Entre para gerenciar seus torneios

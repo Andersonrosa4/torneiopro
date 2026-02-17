@@ -16,6 +16,7 @@ const sports = [
     id: "futevolei",
     name: "Futevôlei",
     youtubeId: "1IxZVfraTfg",
+    start: 180,
     description: "Organize torneios de futevôlei",
     accent: "from-emerald-500/80 to-teal-600/80",
     glowColor: "hsl(155 55% 40% / 0.3)",
@@ -82,7 +83,7 @@ const Index = () => {
               {/* Sport image */}
                <div className="relative h-40 sm:h-52 md:h-56 overflow-hidden">
                 <iframe
-                  src={`https://www.youtube.com/embed/${sport.youtubeId}?autoplay=1&mute=1&loop=1&playlist=${sport.youtubeId}&controls=0&showinfo=0&rel=0&modestbranding=1&playsinline=1`}
+                  src={`https://www.youtube.com/embed/${sport.youtubeId}?autoplay=1&mute=1&loop=1&playlist=${sport.youtubeId}&controls=0&showinfo=0&rel=0&modestbranding=1&playsinline=1${sport.start ? `&start=${sport.start}` : ''}`}
                   allow="autoplay; encrypted-media"
                   allowFullScreen
                   className="absolute inset-0 h-[200%] w-[200%] -top-[50%] -left-[50%] pointer-events-none"

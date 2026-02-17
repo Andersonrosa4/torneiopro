@@ -19,6 +19,7 @@ const BracketTreeView = lazy(() => import("@/components/BracketTreeView"));
 const MatchSequenceViewer = lazy(() => import("@/components/MatchSequenceViewer"));
 const ClassificationTab = lazy(() => import("@/components/ClassificationTab"));
 const RankingsTab = lazy(() => import("@/components/RankingsTab"));
+const SportQuiz = lazy(() => import("@/components/SportQuiz"));
 
 const sportLabels: Record<string, string> = {
   beach_volleyball: "Vôlei de Praia",
@@ -165,6 +166,7 @@ const TournamentPublicView = () => {
               <TabsTrigger value="sequence" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm">Sequência</TabsTrigger>
               <TabsTrigger value="classification" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm">Class.</TabsTrigger>
               <TabsTrigger value="rankings" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm">Ranking</TabsTrigger>
+              <TabsTrigger value="quiz" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm">🎮 Quiz</TabsTrigger>
             </TabsList>
 
             <TabsContent value="teams">
@@ -269,6 +271,12 @@ const TournamentPublicView = () => {
                   tournamentName={tournament.name}
                   eventDate={tournament.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
                 />
+              </Suspense>
+            </TabsContent>
+
+            <TabsContent value="quiz">
+              <Suspense fallback={<div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
+                <SportQuiz tournamentId={id || ""} sport={tournament.sport} />
               </Suspense>
             </TabsContent>
           </Tabs>

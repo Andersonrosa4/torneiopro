@@ -389,6 +389,80 @@ export type Database = {
         }
         Relationships: []
       }
+      quiz_questions: {
+        Row: {
+          correct_option: string
+          created_at: string
+          id: string
+          option_a: string
+          option_b: string
+          option_c: string
+          option_d: string
+          question: string
+          sport: string
+        }
+        Insert: {
+          correct_option: string
+          created_at?: string
+          id?: string
+          option_a: string
+          option_b: string
+          option_c: string
+          option_d: string
+          question: string
+          sport: string
+        }
+        Update: {
+          correct_option?: string
+          created_at?: string
+          id?: string
+          option_a?: string
+          option_b?: string
+          option_c?: string
+          option_d?: string
+          question?: string
+          sport?: string
+        }
+        Relationships: []
+      }
+      quiz_scores: {
+        Row: {
+          created_at: string
+          id: string
+          player_name: string
+          score: number
+          sport: string
+          total_questions: number
+          tournament_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          player_name: string
+          score?: number
+          sport: string
+          total_questions?: number
+          tournament_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          player_name?: string
+          score?: number
+          sport?: string
+          total_questions?: number
+          tournament_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_scores_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rankings: {
         Row: {
           athlete_name: string

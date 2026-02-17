@@ -20,10 +20,11 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Public SELECT: no auth required
+    // Public operations: SELECT without auth, or INSERT to quiz_scores without auth
     const isPublicSelect = operation === "select" && !token && !organizerId;
+    const isPublicQuizInsert = operation === "insert" && table === "quiz_scores" && !token && !organizerId;
 
-    if (!isPublicSelect) {
+    if (!isPublicSelect && !isPublicQuizInsert) {
       // Validate auth for all non-public operations
       if (!token || !organizerId) {
         return new Response(
@@ -127,7 +128,7 @@ Deno.serve(async (req) => {
     }
 
     // Allowed tables
-    const allowedTables = ["tournaments", "teams", "matches", "participants", "rankings", "organizers", "user_roles", "modalities", "groups", "classificacao_grupos"];
+    const allowedTables = ["tournaments", "teams", "matches", "participants", "rankings", "organizers", "user_roles", "modalities", "groups", "classificacao_grupos", "quiz_questions", "quiz_scores"];
     if (!allowedTables.includes(table)) {
       return new Response(
         JSON.stringify({ error: `Tabela '${table}' não permitida` }),

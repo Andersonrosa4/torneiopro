@@ -21,20 +21,40 @@ const LogoImage = ({ className = "h-32 w-32" }: LogoImageProps) => {
       ctx.drawImage(img, 0, 0);
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
+      const w = canvas.width;
+      const h = canvas.height;
 
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        const brightness = (r + g + b) / 3;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * 4;
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          const brightness = (r + g + b) / 3;
+          const maxCh = Math.max(r, g, b);
+          const minCh = Math.min(r, g, b);
+          const saturation = maxCh === 0 ? 0 : (maxCh - minCh) / maxCh;
 
-        if (brightness > 250) {
-          // Pure white → fully transparent
-          data[i + 3] = 0;
-        } else if (brightness > 200 && r > 190 && g > 190 && b > 190) {
-          // Near-white with low saturation → fade out smoothly
-          const factor = (brightness - 200) / 50; // 0 to 1
-          data[i + 3] = Math.round(data[i + 3] * (1 - factor));
+          // Remove white and near-white pixels
+          if (brightness > 235) {
+            data[i + 3] = 0;
+          } else if (brightness > 180 && saturation < 0.15) {
+            const factor = Math.min(1, (brightness - 180) / 55);
+            data[i + 3] = Math.round(data[i + 3] * (1 - factor));
+          }
+
+          // Remove dark gray background pixels (low saturation, dark)
+          // The logo's actual content has color (gold, silver) so saturation > 0.1
+          if (brightness < 90 && saturation < 0.12) {
+            // Pure dark gray / near-black without color → likely background
+            if (brightness < 40) {
+              data[i + 3] = 0;
+            } else {
+              // Fade out dark grays
+              const factor = 1 - (brightness - 40) / 50;
+              data[i + 3] = Math.round(data[i + 3] * (1 - factor));
+            }
+          }
         }
       }
 

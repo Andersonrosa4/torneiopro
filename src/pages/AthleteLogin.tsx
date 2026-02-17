@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Trophy, Hash } from "lucide-react";
+import { Hash } from "lucide-react";
+import logoImg from "@/assets/logo-torneio-pro.png";
 import ThemedBackground from "@/components/ThemedBackground";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
 
@@ -53,8 +54,8 @@ const AthleteLogin = () => {
         className="w-full max-w-sm"
       >
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-primary shadow-glow">
-            <Trophy className="h-8 w-8 text-primary-foreground" />
+          <div className="mx-auto mb-4 flex h-32 w-32 items-center justify-center">
+            <img src={logoImg} alt="Torneio Pro" className="h-32 w-32 object-contain" style={{ mixBlendMode: 'darken' }} />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             Acesso do Atleta

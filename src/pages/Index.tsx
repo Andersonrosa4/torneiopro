@@ -1,8 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Trophy } from "lucide-react";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
 import beachVolleyImg from "@/assets/sport-beach-volleyball.jpg";
+import logoImg from "@/assets/logo-torneio-pro.webp";
 import futevoleiImg from "@/assets/sport-futevolei.jpg";
 import beachTennisImg from "@/assets/sport-beach-tennis.jpg";
 
@@ -63,12 +63,9 @@ const Index = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-12 text-center"
         >
-          <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-primary shadow-glow">
-            <Trophy className="h-10 w-10 text-primary-foreground" />
+          <div className="mx-auto mb-5 flex h-28 w-28 items-center justify-center">
+            <img src={logoImg} alt="Torneio Pro" className="h-28 w-28 object-contain" />
           </div>
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight text-white font-display">
-            Torneio Pro
-          </h1>
           <p className="mt-3 text-lg text-[hsl(35_30%_80%)]">
             Sistema profissional de gestão de torneios
           </p>

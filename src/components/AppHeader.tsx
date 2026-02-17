@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { LayoutDashboard, LogOut, Plus, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import logoImg from "@/assets/logo-torneio-pro.png";
+import LogoImage from "@/components/LogoImage";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 
@@ -32,7 +32,7 @@ const AppHeader = () => {
       <div className="container flex h-14 sm:h-16 items-center justify-between px-3 sm:px-6">
         <div className="flex items-center gap-3 sm:gap-6">
           <Link to="/dashboard" className="flex items-center gap-2">
-            <img src={logoImg} alt="Torneio Pro" className="h-9 w-9 object-contain" />
+            <LogoImage className="h-9 w-9" />
           </Link>
 
           {/* Desktop nav */}

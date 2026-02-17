@@ -32,9 +32,7 @@ const AppHeader = () => {
       <div className="container flex h-14 sm:h-16 items-center justify-between px-3 sm:px-6">
         <div className="flex items-center gap-3 sm:gap-6">
           <Link to="/dashboard" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90">
-              <img src={logoImg} alt="Torneio Pro" className="h-7 w-7 object-contain" />
-            </div>
+            <img src={logoImg} alt="Torneio Pro" className="h-9 w-9 object-contain" />
           </Link>
 
           {/* Desktop nav */}

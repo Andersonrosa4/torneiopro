@@ -100,8 +100,8 @@ const Auth = () => {
         className="w-full max-w-md relative z-10"
       >
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-32 w-32 items-center justify-center rounded-full bg-white/90 shadow-lg">
-            <img src={logoImg} alt="Torneio Pro" className="h-24 w-24 object-contain" />
+          <div className="mx-auto mb-4 flex h-32 w-32 items-center justify-center">
+            <img src={logoImg} alt="Torneio Pro" className="h-32 w-32 object-contain" />
           </div>
           <p className="mt-2 text-muted-foreground">
             Entre para gerenciar seus torneios

@@ -73,6 +73,7 @@ const LogoImage = ({ className = "h-32 w-32" }: LogoImageProps) => {
       src={dataUrl}
       alt="Torneio Pro"
       className={`${className} object-contain`}
+      style={{ clipPath: 'inset(2%)' }}
     />
   );
 };

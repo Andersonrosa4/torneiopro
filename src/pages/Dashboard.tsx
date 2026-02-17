@@ -14,6 +14,7 @@ import AppHeader from "@/components/AppHeader";
 import ThemedBackground from "@/components/ThemedBackground";
 import UserManagementTab from "@/components/UserManagementTab";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
+import PromoPopup from "@/components/PromoPopup";
 
 const statusLabels: Record<string, string> = {
   draft: "Rascunho",
@@ -126,6 +127,7 @@ const Dashboard = () => {
 
   return (
     <ThemedBackground>
+      <PromoPopup />
       <AppHeader />
       <main className="container py-4 sm:py-8 px-3 sm:px-6">
         <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="mb-3 sm:mb-4 gap-2">

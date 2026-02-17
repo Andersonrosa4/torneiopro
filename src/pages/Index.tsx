@@ -8,7 +8,7 @@ const sports = [
     id: "beach_volleyball",
     name: "Vôlei de Praia",
     youtubeId: "k4ux0jau_ws",
-    start: 300,
+    start: 720,
     description: "Organize torneios de vôlei de praia",
     accent: "from-amber-500/80 to-orange-600/80",
     glowColor: "hsl(35 85% 55% / 0.3)",

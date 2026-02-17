@@ -85,7 +85,7 @@ const Index = () => {
                   src={`https://www.youtube.com/embed/${sport.youtubeId}?autoplay=1&mute=1&loop=1&playlist=${sport.youtubeId}&controls=0&showinfo=0&rel=0&modestbranding=1&playsinline=1`}
                   allow="autoplay; encrypted-media"
                   allowFullScreen
-                  className="absolute inset-0 h-[140%] w-[140%] -top-[20%] -left-[20%] pointer-events-none"
+                  className="absolute inset-0 h-[200%] w-[200%] -top-[50%] -left-[50%] pointer-events-none"
                   style={{ border: 'none' }}
                   title={sport.name}
                 />

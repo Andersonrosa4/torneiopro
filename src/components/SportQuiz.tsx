@@ -179,7 +179,24 @@ const SportQuiz = ({ tournamentId, sport }: { tournamentId: string; sport: strin
       </section>
 
       {/* QUIZ AREA */}
-      <section className="rounded-xl border border-border bg-card p-4 sm:p-6 shadow-card">
+      <section className="relative rounded-xl border-2 border-primary/40 bg-gradient-to-br from-primary/5 via-card to-primary/5 p-4 sm:p-6 shadow-lg shadow-primary/10 overflow-hidden">
+        {/* Animated border glow */}
+        <motion.div
+          className="absolute inset-0 rounded-xl border-2 border-primary/20 pointer-events-none"
+          animate={{ opacity: [0.3, 0.7, 0.3] }}
+          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+        />
+        {/* Header badge */}
+        <div className="flex justify-center mb-4">
+          <motion.div
+            className="inline-flex items-center gap-2 rounded-full bg-primary/15 border border-primary/30 px-4 py-1.5"
+            animate={{ scale: [1, 1.03, 1] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <Gamepad2 className="h-4 w-4 text-primary" />
+            <span className="text-xs font-bold text-primary uppercase tracking-wider">Mini Game</span>
+          </motion.div>
+        </div>
         <AnimatePresence mode="wait">
           {phase === "start" && (
             <motion.div

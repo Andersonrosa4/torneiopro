@@ -50,6 +50,7 @@ interface MatchData {
   next_win_match_id: string | null;
   next_lose_match_id: string | null;
   winner_team_id?: string | null;
+  is_chapeu: boolean;
   _temp_id: string;
 }
 
@@ -131,6 +132,7 @@ function createMatch(
   bracketNumber: number,
   team1Id: string | null = null,
   team2Id: string | null = null,
+  isChapeu: boolean = false,
 ): MatchData {
   return {
     tournament_id: tournamentId,
@@ -145,20 +147,77 @@ function createMatch(
     bracket_number: bracketNumber,
     next_win_match_id: null,
     next_lose_match_id: null,
+    is_chapeu: isChapeu,
     _temp_id: crypto.randomUUID(),
   };
 }
 
 // ──────────────────────────────────────────────
-// Slot-based abstraction
+// Power of 2 Helpers
 // ──────────────────────────────────────────────
 
-type Slot = 
-  | { type: 'match'; match: MatchData }
-  | { type: 'team'; teamId: string };
+/**
+ * Retorna a potência de 2 mais próxima de N.
+ * Em caso de empate, prefere a inferior (menos chapéus).
+ */
+export function getBaseBracketSize(n: number): number {
+  if (n <= 1) return 1;
+  if ((n & (n - 1)) === 0) return n; // Já é potência de 2
+  const lower = Math.pow(2, Math.floor(Math.log2(n)));
+  const upper = lower * 2;
+  return (n - lower) <= (upper - n) ? lower : upper;
+}
 
 // ──────────────────────────────────────────────
-// Winners Bracket
+// Standard Power-of-2 Bracket (sem chapéu)
+// ──────────────────────────────────────────────
+
+function buildPow2Bracket(
+  teams: Team[],
+  tournamentId: string,
+  modalityId: string,
+  half: 'upper' | 'lower',
+  bracketNumber: number,
+): MatchData[] {
+  const N = teams.length;
+  const allMatches: MatchData[] = [];
+
+  // R1: N/2 partidas
+  const r1Matches: MatchData[] = [];
+  for (let i = 0; i < N; i += 2) {
+    const m = createMatch(
+      tournamentId, modalityId, 1, r1Matches.length + 1,
+      'winners', half, bracketNumber,
+      teams[i].id, teams[i + 1].id,
+    );
+    r1Matches.push(m);
+    allMatches.push(m);
+  }
+
+  let currentMatches = r1Matches;
+  let round = 2;
+
+  while (currentMatches.length > 1) {
+    const nextMatches: MatchData[] = [];
+    for (let i = 0; i < currentMatches.length; i += 2) {
+      const m = createMatch(
+        tournamentId, modalityId, round, nextMatches.length + 1,
+        'winners', half, bracketNumber,
+      );
+      currentMatches[i].next_win_match_id = m._temp_id;
+      currentMatches[i + 1].next_win_match_id = m._temp_id;
+      nextMatches.push(m);
+      allMatches.push(m);
+    }
+    currentMatches = nextMatches;
+    round++;
+  }
+
+  return allMatches;
+}
+
+// ──────────────────────────────────────────────
+// Winners Bracket — com lógica de Chapéu (Potência de 2 mais próxima)
 // ──────────────────────────────────────────────
 
 function buildWinnersBracket(
@@ -169,100 +228,185 @@ function buildWinnersBracket(
   bracketNumber: number,
   seedTeamIds: string[] = [],
 ): MatchData[] {
-  if (teams.length < 2) return [];
+  const N = teams.length;
+  if (N < 2) return [];
 
   const allMatches: MatchData[] = [];
-  const seeds = teams.filter(t => seedTeamIds.includes(t.id));
-  const nonSeeds = teams.filter(t => !seedTeamIds.includes(t.id));
+  const base = getBaseBracketSize(N);
 
-  const r1Matches: MatchData[] = [];
-  for (let i = 0; i + 1 < nonSeeds.length; i += 2) {
-    const m = createMatch(
-      tournamentId, modalityId, 1, r1Matches.length + 1,
-      'winners', half, bracketNumber,
-      nonSeeds[i].id, nonSeeds[i + 1].id,
-    );
-    r1Matches.push(m);
-    allMatches.push(m);
+  // Shuffle — seeds afetam posição, NÃO prioridade de chapéu
+  const shuffled = shuffle(teams);
+
+  // ── Caso perfeito: N é potência de 2 ──
+  if (N === base) {
+    return buildPow2Bracket(shuffled, tournamentId, modalityId, half, bracketNumber);
   }
 
-  let slots: Slot[] = r1Matches.map(m => ({ type: 'match' as const, match: m }));
+  let baseRoundMatches: MatchData[] = [];
+  let nextRound: number;
 
-  for (const s of seeds) {
-    slots.push({ type: 'team', teamId: s.id });
+  if (N > base) {
+    // ══════════════════════════════════════════════
+    // ROUND DOWN: Rodada preliminar (R0) necessária
+    // extras equipes jogam R0, restantes são Chapéu
+    // ══════════════════════════════════════════════
+    const extras = N - base;
+    const r0Teams = shuffled.slice(0, 2 * extras);
+    const directTeams = shuffled.slice(2 * extras); // Chapéu: esperam R0
+
+    console.log(`[Chapéu:${half}] N=${N}, base=${base}, preliminares=${extras}, diretos(chapéu)=${directTeams.length}`);
+
+    // R0 (round 1): partidas preliminares
+    const r0Matches: MatchData[] = [];
+    for (let i = 0; i < extras; i++) {
+      const m = createMatch(
+        tournamentId, modalityId, 1, i + 1,
+        'winners', half, bracketNumber,
+        r0Teams[i * 2].id, r0Teams[i * 2 + 1].id,
+      );
+      r0Matches.push(m);
+      allMatches.push(m);
+    }
+
+    // R1 (round 2): base/2 partidas
+    const r1Matches: MatchData[] = [];
+    let dIdx = 0;
+
+    // Chapéu matches: vencedor R0 vs equipe direta (jogo obrigatório)
+    for (let i = 0; i < r0Matches.length && dIdx < directTeams.length; i++) {
+      const m = createMatch(
+        tournamentId, modalityId, 2, r1Matches.length + 1,
+        'winners', half, bracketNumber,
+        null, directTeams[dIdx].id,
+        true, // is_chapeu: equipe direta aguardando vencedor do R0
+      );
+      r0Matches[i].next_win_match_id = m._temp_id;
+      r1Matches.push(m);
+      allMatches.push(m);
+      dIdx++;
+    }
+
+    // Partidas normais: restantes diretos entre si
+    while (dIdx + 1 < directTeams.length) {
+      const m = createMatch(
+        tournamentId, modalityId, 2, r1Matches.length + 1,
+        'winners', half, bracketNumber,
+        directTeams[dIdx].id, directTeams[dIdx + 1].id,
+      );
+      r1Matches.push(m);
+      allMatches.push(m);
+      dIdx += 2;
+    }
+
+    // R0 winners restantes (sem direct team para parear) → entre si
+    for (let i = directTeams.length; i < r0Matches.length; i += 2) {
+      if (i + 1 < r0Matches.length) {
+        const m = createMatch(
+          tournamentId, modalityId, 2, r1Matches.length + 1,
+          'winners', half, bracketNumber,
+        );
+        r0Matches[i].next_win_match_id = m._temp_id;
+        r0Matches[i + 1].next_win_match_id = m._temp_id;
+        r1Matches.push(m);
+        allMatches.push(m);
+      }
+    }
+
+    baseRoundMatches = r1Matches;
+    nextRound = 3;
+
+  } else {
+    // ══════════════════════════════════════════════
+    // ROUND UP: Chapéu em R1 (equipes aguardam R2)
+    // (base - N) equipes esperam para jogo obrigatório
+    // ══════════════════════════════════════════════
+    const chapeuCount = base - N;
+    const r1RealCount = N - base / 2;
+    const playingTeams = shuffled.slice(0, 2 * r1RealCount);
+    const chapeuTeams = shuffled.slice(2 * r1RealCount);
+
+    console.log(`[Chapéu:${half}] N=${N}, base=${base}, chapéus=${chapeuCount}, R1 reais=${r1RealCount}`);
+
+    // R1: partidas reais
+    const r1Matches: MatchData[] = [];
+    for (let i = 0; i < r1RealCount; i++) {
+      const m = createMatch(
+        tournamentId, modalityId, 1, r1Matches.length + 1,
+        'winners', half, bracketNumber,
+        playingTeams[i * 2].id, playingTeams[i * 2 + 1].id,
+      );
+      r1Matches.push(m);
+      allMatches.push(m);
+    }
+
+    // R2: chapéu matches (R1 winners vs chapéu teams) + restantes
+    const r2Matches: MatchData[] = [];
+    let cIdx = 0;
+
+    // Chapéu matches: vencedor R1 vs equipe chapéu (jogo obrigatório)
+    for (let i = 0; i < r1Matches.length && cIdx < chapeuTeams.length; i++) {
+      const m = createMatch(
+        tournamentId, modalityId, 2, r2Matches.length + 1,
+        'winners', half, bracketNumber,
+        null, chapeuTeams[cIdx].id,
+        true, // is_chapeu
+      );
+      r1Matches[i].next_win_match_id = m._temp_id;
+      r2Matches.push(m);
+      allMatches.push(m);
+      cIdx++;
+    }
+
+    // Restantes R1 winners entre si
+    const remainingR1 = r1Matches.slice(Math.min(r1Matches.length, chapeuTeams.length));
+    for (let i = 0; i < remainingR1.length; i += 2) {
+      const m = createMatch(
+        tournamentId, modalityId, 2, r2Matches.length + 1,
+        'winners', half, bracketNumber,
+      );
+      remainingR1[i].next_win_match_id = m._temp_id;
+      if (i + 1 < remainingR1.length) {
+        remainingR1[i + 1].next_win_match_id = m._temp_id;
+      }
+      r2Matches.push(m);
+      allMatches.push(m);
+    }
+
+    // Chapéu teams excedentes entre si (quando chapéuCount > r1RealCount)
+    while (cIdx + 1 < chapeuTeams.length) {
+      const m = createMatch(
+        tournamentId, modalityId, 2, r2Matches.length + 1,
+        'winners', half, bracketNumber,
+        chapeuTeams[cIdx].id, chapeuTeams[cIdx + 1].id,
+      );
+      r2Matches.push(m);
+      allMatches.push(m);
+      cIdx += 2;
+    }
+
+    baseRoundMatches = r2Matches;
+    nextRound = 3;
   }
 
-  if (nonSeeds.length % 2 === 1) {
-    slots.push({ type: 'team', teamId: nonSeeds[nonSeeds.length - 1].id });
-  }
+  // ── Rodadas seguintes até o campeão ──
+  let currentMatches = baseRoundMatches;
+  let round = nextRound;
 
-  const hasR1 = r1Matches.length > 0;
-  let round = hasR1 ? 2 : 1;
-
-  if (slots.length <= 1) return allMatches;
-
-  while (slots.length > 1) {
-    const nextSlots: Slot[] = [];
-    let pos = 1;
-
-    const matchSlots = slots.filter(s => s.type === 'match');
-    const teamSlots = slots.filter(s => s.type === 'team');
-
-    let mi = 0;
-    let ti = 0;
-
-    while (mi < matchSlots.length && ti < teamSlots.length) {
-      const ms = matchSlots[mi] as { type: 'match'; match: MatchData };
-      const ts = teamSlots[ti] as { type: 'team'; teamId: string };
-
+  while (currentMatches.length > 1) {
+    const nextMatches: MatchData[] = [];
+    for (let i = 0; i < currentMatches.length; i += 2) {
       const m = createMatch(
-        tournamentId, modalityId, round, pos++,
-        'winners', half, bracketNumber,
-        null, ts.teamId,
-      );
-      ms.match.next_win_match_id = m._temp_id;
-      allMatches.push(m);
-      nextSlots.push({ type: 'match', match: m });
-      mi++;
-      ti++;
-    }
-
-    while (mi + 1 < matchSlots.length) {
-      const ms1 = matchSlots[mi] as { type: 'match'; match: MatchData };
-      const ms2 = matchSlots[mi + 1] as { type: 'match'; match: MatchData };
-
-      const m = createMatch(
-        tournamentId, modalityId, round, pos++,
+        tournamentId, modalityId, round, nextMatches.length + 1,
         'winners', half, bracketNumber,
       );
-      ms1.match.next_win_match_id = m._temp_id;
-      ms2.match.next_win_match_id = m._temp_id;
+      currentMatches[i].next_win_match_id = m._temp_id;
+      if (i + 1 < currentMatches.length) {
+        currentMatches[i + 1].next_win_match_id = m._temp_id;
+      }
+      nextMatches.push(m);
       allMatches.push(m);
-      nextSlots.push({ type: 'match', match: m });
-      mi += 2;
     }
-
-    while (ti + 1 < teamSlots.length) {
-      const ts1 = teamSlots[ti] as { type: 'team'; teamId: string };
-      const ts2 = teamSlots[ti + 1] as { type: 'team'; teamId: string };
-
-      const m = createMatch(
-        tournamentId, modalityId, round, pos++,
-        'winners', half, bracketNumber,
-        ts1.teamId, ts2.teamId,
-      );
-      allMatches.push(m);
-      nextSlots.push({ type: 'match', match: m });
-      ti += 2;
-    }
-
-    if (mi < matchSlots.length) {
-      nextSlots.push(matchSlots[mi]);
-    } else if (ti < teamSlots.length) {
-      nextSlots.push(teamSlots[ti]);
-    }
-
-    slots = nextSlots;
+    currentMatches = nextMatches;
     round++;
   }
 
@@ -385,6 +529,7 @@ function buildLosersBracketWithFeeders(
        const chapeuMatch = createMatch(
          tournamentId, modalityId, losersRound, numMatches + 1,
          'losers', half, bracketNumber,
+         null, null, true, // is_chapeu
        );
        
        // Linkar o source ao Chapéu
@@ -426,6 +571,7 @@ function buildLosersBracketWithFeeders(
        const chapeuMatch = createMatch(
          tournamentId, modalityId, losersRound, numMatches + 1,
          'losers', half, bracketNumber,
+         null, null, true, // is_chapeu
        );
        survivors[survivors.length - 1].next_win_match_id = chapeuMatch._temp_id;
        // Determine slot: odd position = team1, even = team2

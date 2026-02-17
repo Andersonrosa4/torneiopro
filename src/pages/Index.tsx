@@ -16,7 +16,7 @@ const sports = [
   {
     id: "futevolei",
     name: "Futevôlei",
-    youtubeId: "NCtVoXl5qZw",
+    youtubeId: "7kSUCXB4MzU",
     description: "Organize torneios de futevôlei",
     accent: "from-emerald-500/80 to-teal-600/80",
     glowColor: "hsl(155 55% 40% / 0.3)",

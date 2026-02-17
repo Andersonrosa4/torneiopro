@@ -27,6 +27,7 @@ interface Match {
   bracket_type?: string;
   bracket_half?: string | null;
   next_win_match_id?: string | null;
+  is_chapeu?: boolean | null;
 }
 
 interface Team {
@@ -516,7 +517,7 @@ const MatchCard = ({
           <Badge variant="outline" className="text-[8px] font-semibold px-1 py-0 border-border/30 bg-transparent leading-none">
             {tournamentFormat === 'double_elimination' ? getDERoundBadgeLabel(match) : getRoundLabel(match.round)}
           </Badge>
-          {hasOneTeam && <Badge className="bg-muted text-muted-foreground border-border text-[8px] px-1 py-0">Chapéu</Badge>}
+          {(match.is_chapeu || hasOneTeam) && <Badge className="bg-muted text-muted-foreground border-border text-[8px] px-1 py-0">Chapéu</Badge>}
         </div>
         {isCompleted && !isEditing && (
           <Badge className="bg-success/20 text-success border-0 text-[8px] px-1.5 py-0 font-bold leading-tight">Finalizado</Badge>

@@ -6,12 +6,11 @@ import { Label } from "@/components/ui/label";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Lock, User, ArrowLeft, Mail } from "lucide-react";
+import { Lock, User, ArrowLeft, Mail, Shield, Users } from "lucide-react";
 import LogoImage from "@/components/LogoImage";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
 import { useSportTheme } from "@/contexts/SportContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Auth = () => {
   const [username, setUsername] = useState("");
@@ -87,64 +86,132 @@ const Auth = () => {
 
   return (
     <div className={`flex min-h-screen items-center justify-center bg-gradient-to-b ${sportBg} px-4 py-8 relative overflow-hidden`}>
+      {/* Ambient glow orbs */}
+      <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.15),transparent_70%)] blur-3xl pointer-events-none" />
+      <div className="absolute bottom-[-20%] right-[-10%] w-[400px] h-[400px] rounded-full bg-[radial-gradient(circle,hsl(var(--accent)/0.12),transparent_70%)] blur-3xl pointer-events-none" />
+
+      {/* Subtle grid pattern */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-[0.03]"
+        style={{
+          backgroundImage: `linear-gradient(hsl(var(--foreground)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground)) 1px, transparent 1px)`,
+          backgroundSize: "60px 60px",
+        }}
+      />
+
+      {/* Light beams */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-32 h-full bg-gradient-to-b from-[hsl(var(--primary))_0.08] to-transparent rotate-12 animate-light-beam" />
-        <div className="absolute top-0 right-1/3 w-24 h-full bg-gradient-to-b from-[hsl(var(--accent))_0.06] to-transparent -rotate-6 animate-light-beam" style={{ animationDelay: "2s" }} />
+        <div className="absolute top-0 left-1/4 w-32 h-full bg-gradient-to-b from-[hsl(var(--primary)/0.06)] to-transparent rotate-12 animate-light-beam" />
+        <div className="absolute top-0 right-1/3 w-24 h-full bg-gradient-to-b from-[hsl(var(--accent)/0.04)] to-transparent -rotate-6 animate-light-beam" style={{ animationDelay: "2s" }} />
       </div>
 
       <div className="absolute inset-0 sand-texture pointer-events-none" />
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ opacity: 0, y: 24, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
         className="w-full max-w-md relative z-10"
       >
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-32 w-32 items-center justify-center">
-            <LogoImage className="h-32 w-32" />
-          </div>
-          <p className="mt-2 text-muted-foreground">
-            Entre para gerenciar seus torneios
-          </p>
+        {/* Logo & title */}
+        <div className="mb-10 text-center">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.1, type: "spring", stiffness: 150 }}
+            className="mx-auto mb-5 flex h-28 w-28 items-center justify-center relative"
+          >
+            <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.2),transparent_70%)] blur-xl" />
+            <LogoImage className="h-28 w-28 relative z-10" />
+          </motion.div>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="text-sm text-muted-foreground tracking-wide uppercase"
+          >
+            Painel de Gestão
+          </motion.p>
         </div>
 
-        <div className="rounded-xl border border-border bg-card p-6 shadow-card">
-          <Tabs value={loginType} onValueChange={(v) => setLoginType(v as "admin" | "organizer")} className="mb-4">
-            <TabsList className="w-full">
-              <TabsTrigger value="admin" className="flex-1">Admin</TabsTrigger>
-              <TabsTrigger value="organizer" className="flex-1">Organizador</TabsTrigger>
-            </TabsList>
-          </Tabs>
+        {/* Login type toggle */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="mb-6"
+        >
+          <div className="flex rounded-xl p-1 bg-[hsl(var(--muted)/0.5)] border border-border/50 backdrop-blur-sm">
+            <button
+              type="button"
+              onClick={() => setLoginType("admin")}
+              className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-all duration-300 ${
+                loginType === "admin"
+                  ? "bg-gradient-primary text-primary-foreground shadow-glow"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Shield className="h-4 w-4" />
+              Admin
+            </button>
+            <button
+              type="button"
+              onClick={() => setLoginType("organizer")}
+              className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-all duration-300 ${
+                loginType === "organizer"
+                  ? "bg-gradient-primary text-primary-foreground shadow-glow"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Users className="h-4 w-4" />
+              Organizador
+            </button>
+          </div>
+        </motion.div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Glass card */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="rounded-2xl border border-[hsl(var(--border)/0.6)] bg-[hsl(var(--card)/0.6)] backdrop-blur-xl p-7 shadow-card relative overflow-hidden"
+        >
+          {/* Inner glow line at top */}
+          <div className="absolute top-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-[hsl(var(--primary)/0.4)] to-transparent" />
+
+          <form onSubmit={handleSubmit} className="space-y-5">
             {loginType === "admin" ? (
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Label htmlFor="email" className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+                  Email
+                </Label>
+                <div className="relative group">
+                  <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
                   <Input
                     id="email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="seu@email.com"
-                    className="pl-10"
+                    className="pl-11 h-12 rounded-xl bg-[hsl(var(--muted)/0.4)] border-[hsl(var(--border)/0.5)] focus:border-primary/50 focus:bg-[hsl(var(--muted)/0.6)] transition-all placeholder:text-muted-foreground/50"
                     required
                   />
                 </div>
               </div>
             ) : (
               <div className="space-y-2">
-                <Label htmlFor="username">Usuário</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Label htmlFor="username" className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+                  Usuário
+                </Label>
+                <div className="relative group">
+                  <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
                   <Input
                     id="username"
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="Seu usuário"
-                    className="pl-10"
+                    className="pl-11 h-12 rounded-xl bg-[hsl(var(--muted)/0.4)] border-[hsl(var(--border)/0.5)] focus:border-primary/50 focus:bg-[hsl(var(--muted)/0.6)] transition-all placeholder:text-muted-foreground/50"
                     required
                   />
                 </div>
@@ -152,16 +219,18 @@ const Auth = () => {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Label htmlFor="password" className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+                Senha
+              </Label>
+              <div className="relative group">
+                <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 <Input
                   id="password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Sua senha"
-                  className="pl-10"
+                  placeholder="••••••••"
+                  className="pl-11 h-12 rounded-xl bg-[hsl(var(--muted)/0.4)] border-[hsl(var(--border)/0.5)] focus:border-primary/50 focus:bg-[hsl(var(--muted)/0.6)] transition-all placeholder:text-muted-foreground/50"
                   required
                 />
               </div>
@@ -170,30 +239,42 @@ const Auth = () => {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90"
+              className="w-full h-12 rounded-xl bg-gradient-primary text-primary-foreground font-semibold text-base shadow-glow hover:opacity-90 transition-all active:scale-[0.98]"
             >
-              {loading ? "Autenticando..." : "Entrar"}
+              {loading ? (
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                  Autenticando...
+                </div>
+              ) : (
+                "Entrar"
+              )}
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-xs text-muted-foreground">
+          <div className="mt-5 pt-4 border-t border-border/30 text-center">
+            <p className="text-xs text-muted-foreground/70">
               Solicite ao Administrador para criar sua conta
             </p>
           </div>
-        </div>
+        </motion.div>
 
         <FlowAppsBranding variant="login-cta" />
 
-        <div className="mt-4 text-center">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="mt-5 text-center"
+        >
           <button
             onClick={() => navigate("/")}
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-all group"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
             Voltar para Seleção de Esporte
           </button>
-        </div>
+        </motion.div>
       </motion.div>
     </div>
   );

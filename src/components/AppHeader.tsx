@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { LayoutDashboard, LogOut, Plus, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import logoImg from "@/assets/logo-torneio-pro.webp";
+import logoImg from "@/assets/logo-torneio-pro.png";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 

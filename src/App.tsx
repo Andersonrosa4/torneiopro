@@ -19,6 +19,7 @@ import NotFound from "./pages/NotFound";
 import SimulationTest from "./pages/SimulationTest";
 import SystemDiagnostics from "./pages/SystemDiagnostics";
 import { supabase } from "@/integrations/supabase/client";
+import ScrollToTop from "@/components/ScrollToTop";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ const App = () => (
       <BrowserRouter>
         <SportProvider>
           <AuthProvider>
+            <ScrollToTop />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />

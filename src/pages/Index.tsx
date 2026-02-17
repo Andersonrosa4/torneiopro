@@ -5,7 +5,9 @@ import beachVolleyImg from "@/assets/sport-beach-volleyball.jpg";
 import beachVolleyVideo from "@/assets/sport-beach-volleyball.mp4";
 import LogoImage from "@/components/LogoImage";
 import futevoleiImg from "@/assets/sport-futevolei.jpg";
+import futevoleiVideo from "@/assets/sport-futevolei.mp4";
 import beachTennisImg from "@/assets/sport-beach-tennis.jpg";
+import beachTennisVideo from "@/assets/sport-beach-tennis.mp4";
 
 const sports = [
   {
@@ -21,6 +23,7 @@ const sports = [
     id: "futevolei",
     name: "Futevôlei",
     image: futevoleiImg,
+    video: futevoleiVideo,
     description: "Organize torneios de futevôlei",
     accent: "from-emerald-500/80 to-teal-600/80",
     glowColor: "hsl(155 55% 40% / 0.3)",
@@ -29,6 +32,7 @@ const sports = [
     id: "beach_tennis",
     name: "Beach Tennis",
     image: beachTennisImg,
+    video: beachTennisVideo,
     description: "Organize torneios de beach tennis",
     accent: "from-sky-500/80 to-blue-600/80",
     glowColor: "hsl(195 85% 45% / 0.3)",

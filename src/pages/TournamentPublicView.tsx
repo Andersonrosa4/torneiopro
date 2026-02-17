@@ -160,13 +160,16 @@ const TournamentPublicView = () => {
 
           {/* All tabs — identical structure to organizer */}
           <Tabs defaultValue="teams" className="w-full">
-            <TabsList className="flex flex-wrap gap-1.5 sm:gap-2 mb-4 sm:mb-5 h-auto bg-transparent p-0 w-full">
+            <TabsList className="flex flex-wrap gap-1.5 sm:gap-2 mb-1 sm:mb-2 h-auto bg-transparent p-0 w-full">
               <TabsTrigger value="teams" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm">Duplas</TabsTrigger>
               <TabsTrigger value="bracket" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm">Chave</TabsTrigger>
               <TabsTrigger value="sequence" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm">Sequência</TabsTrigger>
               <TabsTrigger value="classification" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm">Class.</TabsTrigger>
               <TabsTrigger value="rankings" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm">Ranking</TabsTrigger>
-              <TabsTrigger value="quiz" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-bold h-8 sm:h-9 rounded-[12px] border-2 border-primary/50 bg-primary/10 text-primary animate-pulse data-[state=active]:bg-primary/20 data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-md data-[state=active]:shadow-primary/20 data-[state=active]:animate-none">🎮 Quiz</TabsTrigger>
+            </TabsList>
+            {/* Quiz tab — full width, highlighted */}
+            <TabsList className="flex mb-4 sm:mb-5 h-auto bg-transparent p-0 w-full">
+              <TabsTrigger value="quiz" className="w-full text-sm sm:text-base font-extrabold h-10 sm:h-11 rounded-[12px] border-2 border-[#ffd700] bg-gradient-to-r from-[#ffd700]/20 via-primary/15 to-[#ffd700]/20 text-[#ffd700] shadow-lg shadow-[#ffd700]/15 data-[state=active]:from-[#ffd700]/30 data-[state=active]:via-primary/25 data-[state=active]:to-[#ffd700]/30 data-[state=active]:border-[#ffd700] data-[state=active]:text-[#ffd700] data-[state=active]:shadow-xl data-[state=active]:shadow-[#ffd700]/25 transition-all duration-300">🎮 Quiz — Teste seus conhecimentos!</TabsTrigger>
             </TabsList>
 
             <TabsContent value="teams">

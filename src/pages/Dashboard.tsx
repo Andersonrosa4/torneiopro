@@ -127,7 +127,7 @@ const Dashboard = () => {
 
   return (
     <ThemedBackground>
-      <PromoPopup />
+      
       <AppHeader />
       <main className="container py-4 sm:py-8 px-3 sm:px-6">
         <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="mb-3 sm:mb-4 gap-2">

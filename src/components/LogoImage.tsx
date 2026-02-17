@@ -35,11 +35,11 @@ const LogoImage = ({ className = "h-32 w-32" }: LogoImageProps) => {
           const minCh = Math.min(r, g, b);
           const saturation = maxCh === 0 ? 0 : (maxCh - minCh) / maxCh;
 
-          // Remove white and near-white pixels
-          if (brightness > 235) {
+          // Remove only very white pixels (preserve silver/metallic tones)
+          if (brightness > 245) {
             data[i + 3] = 0;
-          } else if (brightness > 180 && saturation < 0.15) {
-            const factor = Math.min(1, (brightness - 180) / 55);
+          } else if (brightness > 230 && saturation < 0.08) {
+            const factor = Math.min(1, (brightness - 230) / 15);
             data[i + 3] = Math.round(data[i + 3] * (1 - factor));
           }
 

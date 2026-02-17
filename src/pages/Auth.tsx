@@ -101,7 +101,7 @@ const Auth = () => {
       >
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-32 w-32 items-center justify-center">
-            <img src={logoImg} alt="Torneio Pro" className="h-32 w-32 object-contain" style={{ mixBlendMode: 'darken' }} />
+            <img src={logoImg} alt="Torneio Pro" className="h-32 w-32 object-contain" style={{ mixBlendMode: 'multiply' }} />
           </div>
           <p className="mt-2 text-muted-foreground">
             Entre para gerenciar seus torneios

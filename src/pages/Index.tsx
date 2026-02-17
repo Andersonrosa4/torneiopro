@@ -64,7 +64,7 @@ const Index = () => {
           className="mb-12 text-center"
         >
           <div className="mx-auto mb-5 flex h-44 w-44 items-center justify-center">
-            <img src={logoImg} alt="Torneio Pro" className="h-44 w-44 object-contain" style={{ mixBlendMode: 'darken' }} />
+            <img src={logoImg} alt="Torneio Pro" className="h-44 w-44 object-contain" style={{ mixBlendMode: 'multiply' }} />
           </div>
           <p className="mt-3 text-lg text-[hsl(35_30%_80%)]">
             Sistema profissional de gestão de torneios

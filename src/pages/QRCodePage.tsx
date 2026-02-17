@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ArrowLeft, Download, QrCode } from "lucide-react";
+import { ArrowLeft, Download, QrCode, Share2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import LogoImage from "@/components/LogoImage";
@@ -13,6 +13,13 @@ const QRCodePage = () => {
     link.href = qrCodeImage;
     link.download = "qrcode-torneiopro.png";
     link.click();
+  };
+
+  const handleWhatsApp = () => {
+    const text = encodeURIComponent(
+      "🏐 Acesse o Torneio Pro!\n\nEscaneie o QR Code ou clique no link abaixo para acessar:\n👉 https://torneio.pro"
+    );
+    window.open(`https://wa.me/?text=${text}`, "_blank");
   };
 
   return (
@@ -67,14 +74,23 @@ const QRCodePage = () => {
               Aponte a câmera do celular para o QR code acima
             </p>
 
-            <Button
-              onClick={handleDownload}
-              variant="outline"
-              className="w-full gap-2 rounded-xl"
-            >
-              <Download className="h-4 w-4" />
-              Baixar QR Code
-            </Button>
+            <div className="flex w-full gap-3">
+              <Button
+                onClick={handleDownload}
+                variant="outline"
+                className="flex-1 gap-2 rounded-xl"
+              >
+                <Download className="h-4 w-4" />
+                Baixar
+              </Button>
+              <Button
+                onClick={handleWhatsApp}
+                className="flex-1 gap-2 rounded-xl bg-[#25D366] hover:bg-[#1da851] text-white"
+              >
+                <Share2 className="h-4 w-4" />
+                WhatsApp
+              </Button>
+            </div>
           </div>
         </motion.div>
 

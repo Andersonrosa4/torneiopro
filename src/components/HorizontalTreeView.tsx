@@ -19,6 +19,7 @@ interface Match {
   bracket_half?: string | null;
   next_win_match_id?: string | null;
   next_lose_match_id?: string | null;
+  is_chapeu?: boolean | null;
 }
 
 interface HorizontalTreeViewProps {
@@ -50,6 +51,7 @@ const HTreeMatchCard = ({
   const isCompleted = match.status === "completed";
   const hasBothTeams = match.team1_id && match.team2_id;
   const isWaiting = !hasBothTeams;
+  const isChapeu = match.is_chapeu === true;
 
   const feeders = allMatches ? getSlotFeeders(match, allMatches, matchNumberMap) : { team1: null, team2: null };
 
@@ -97,6 +99,11 @@ const HTreeMatchCard = ({
           <span className="inline-flex items-center rounded-sm bg-primary/15 border border-primary/20 px-1.5 py-0.5 text-[10px] font-black text-primary uppercase tracking-tighter leading-none shadow-sm">
             JOGO {matchNumber}
           </span>
+          {isChapeu && (
+            <Badge className="bg-muted text-muted-foreground border-border text-[7px] px-1 py-0 leading-tight">
+              Chapéu
+            </Badge>
+          )}
         </div>
       )}
       {scale === "final" && (

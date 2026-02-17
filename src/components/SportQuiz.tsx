@@ -3,7 +3,7 @@ import { publicQuery } from "@/lib/organizerApi";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, CheckCircle, XCircle, Gamepad2, RotateCcw, Medal } from "lucide-react";
+import { Trophy, CheckCircle, XCircle, Gamepad2, RotateCcw, Medal, Star, Flame, Crown } from "lucide-react";
 
 interface QuizQuestion {
   id: string;
@@ -282,23 +282,128 @@ const SportQuiz = ({ tournamentId, sport }: { tournamentId: string; sport: strin
           {phase === "result" && (
             <motion.div
               key="result"
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
-              className="space-y-5 text-center"
+              className="space-y-5 text-center relative overflow-hidden"
             >
-              <Trophy className="h-14 w-14 mx-auto text-primary" />
-              <h3 className="text-2xl font-bold">Resultado</h3>
-              <p className="text-lg">
+              {/* Special effect for 8+ correct */}
+              {correctCount >= 8 && (
+                <>
+                  {/* Animated glow background */}
+                  <motion.div
+                    className="absolute inset-0 -z-10 rounded-xl"
+                    initial={{ opacity: 0 }}
+                    animate={{
+                      opacity: [0, 0.15, 0.08, 0.15],
+                      background: [
+                        "radial-gradient(circle, hsl(var(--primary) / 0.3) 0%, transparent 70%)",
+                        "radial-gradient(circle, hsl(var(--primary) / 0.5) 0%, transparent 70%)",
+                        "radial-gradient(circle, hsl(var(--primary) / 0.3) 0%, transparent 70%)",
+                      ],
+                    }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                  />
+                  {/* Floating stars */}
+                  {[...Array(8)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className="absolute text-primary/40"
+                      initial={{
+                        x: `${10 + Math.random() * 80}%`,
+                        y: "100%",
+                        opacity: 0,
+                        scale: 0.5 + Math.random() * 0.5,
+                        rotate: 0,
+                      }}
+                      animate={{
+                        y: "-20%",
+                        opacity: [0, 0.8, 0],
+                        rotate: 360,
+                      }}
+                      transition={{
+                        duration: 2.5 + Math.random() * 2,
+                        delay: i * 0.3,
+                        repeat: Infinity,
+                        ease: "easeOut",
+                      }}
+                    >
+                      <Star className="h-4 w-4 fill-current" />
+                    </motion.div>
+                  ))}
+                </>
+              )}
+
+              {/* Icon based on score */}
+              {correctCount >= 8 ? (
+                <motion.div
+                  initial={{ scale: 0, rotate: -180 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 12, delay: 0.2 }}
+                >
+                  {correctCount === 10 ? (
+                    <div className="relative mx-auto w-fit">
+                      <Crown className="h-16 w-16 text-primary mx-auto" />
+                      <motion.div
+                        animate={{ scale: [1, 1.2, 1] }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                        className="absolute -top-1 -right-1"
+                      >
+                        <Flame className="h-6 w-6 text-primary" />
+                      </motion.div>
+                    </div>
+                  ) : (
+                    <Trophy className="h-16 w-16 text-primary mx-auto" />
+                  )}
+                </motion.div>
+              ) : (
+                <Trophy className="h-14 w-14 mx-auto text-primary" />
+              )}
+
+              {/* Title with special animation for high scores */}
+              {correctCount >= 8 ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                >
+                  <h3 className="text-2xl font-bold bg-gradient-to-r from-primary via-primary/80 to-primary bg-clip-text text-transparent">
+                    {correctCount === 10 ? "🔥 PERFEITO! 🔥" : correctCount === 9 ? "⭐ INCRÍVEL!" : "🏆 EXCELENTE!"}
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {correctCount === 10
+                      ? "Você é um verdadeiro especialista!"
+                      : correctCount === 9
+                      ? "Quase perfeito! Impressionante!"
+                      : "Você manda muito bem!"}
+                  </p>
+                </motion.div>
+              ) : (
+                <h3 className="text-2xl font-bold">Resultado</h3>
+              )}
+
+              <motion.p
+                className="text-lg"
+                initial={correctCount >= 8 ? { opacity: 0, y: 10 } : {}}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: correctCount >= 8 ? 0.6 : 0 }}
+              >
                 <span className="font-semibold">{playerName}</span>, você acertou{" "}
-                <span className="text-green-500 font-bold">{correctCount}</span> de{" "}
-                <span className="font-bold">{questions.length}</span> perguntas!
-              </p>
+                <motion.span
+                  className="text-primary font-bold text-xl"
+                  animate={correctCount >= 8 ? { scale: [1, 1.3, 1] } : {}}
+                  transition={{ duration: 0.5, delay: 0.8 }}
+                >
+                  {correctCount}
+                </motion.span>{" "}
+                de <span className="font-bold">{questions.length}</span> perguntas!
+              </motion.p>
+
               <div className="flex justify-center gap-6 text-sm">
-                <span className="flex items-center gap-1.5 text-green-500">
+                <span className="flex items-center gap-1.5 text-primary">
                   <CheckCircle className="h-5 w-5" /> {correctCount} acertos
                 </span>
-                <span className="flex items-center gap-1.5 text-red-500">
+                <span className="flex items-center gap-1.5 text-destructive">
                   <XCircle className="h-5 w-5" /> {wrongCount} erros
                 </span>
               </div>

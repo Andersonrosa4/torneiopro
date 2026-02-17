@@ -54,8 +54,8 @@ const AthleteLogin = () => {
         className="w-full max-w-sm"
       >
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-32 w-32 items-center justify-center rounded-full bg-white/90 shadow-lg">
-            <img src={logoImg} alt="Torneio Pro" className="h-24 w-24 object-contain" />
+          <div className="mx-auto mb-4 flex h-32 w-32 items-center justify-center">
+            <img src={logoImg} alt="Torneio Pro" className="h-32 w-32 object-contain" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             Acesso do Atleta

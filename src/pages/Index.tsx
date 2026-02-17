@@ -63,8 +63,8 @@ const Index = () => {
           animate={{ opacity: 1, y: 0 }}
           className="mb-12 text-center"
         >
-          <div className="mx-auto mb-5 flex h-44 w-44 items-center justify-center rounded-full bg-white/90 shadow-lg">
-            <img src={logoImg} alt="Torneio Pro" className="h-36 w-36 object-contain" />
+          <div className="mx-auto mb-5 flex h-44 w-44 items-center justify-center">
+            <img src={logoImg} alt="Torneio Pro" className="h-44 w-44 object-contain" />
           </div>
           <p className="mt-3 text-lg text-[hsl(35_30%_80%)]">
             Sistema profissional de gestão de torneios

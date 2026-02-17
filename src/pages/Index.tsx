@@ -2,13 +2,15 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
 import LogoImage from "@/components/LogoImage";
+import beachVolleyVideo from "@/assets/sport-beach-volleyball.mp4";
+import futevoleiVideo from "@/assets/sport-futevolei.mp4";
+import beachTennisVideo from "@/assets/sport-beach-tennis.mp4";
 
 const sports = [
   {
     id: "beach_volleyball",
     name: "Vôlei de Praia",
-    youtubeId: "k4ux0jau_ws",
-    start: 720,
+    video: beachVolleyVideo,
     description: "Organize torneios de vôlei de praia",
     accent: "from-amber-500/80 to-orange-600/80",
     glowColor: "hsl(35 85% 55% / 0.3)",
@@ -16,7 +18,7 @@ const sports = [
   {
     id: "futevolei",
     name: "Futevôlei",
-    youtubeId: "NCtVoXl5qZw",
+    video: futevoleiVideo,
     description: "Organize torneios de futevôlei",
     accent: "from-emerald-500/80 to-teal-600/80",
     glowColor: "hsl(155 55% 40% / 0.3)",
@@ -24,7 +26,7 @@ const sports = [
   {
     id: "beach_tennis",
     name: "Beach Tennis",
-    youtubeId: "SwFnzHjkIBM",
+    video: beachTennisVideo,
     description: "Organize torneios de beach tennis",
     accent: "from-sky-500/80 to-blue-600/80",
     glowColor: "hsl(195 85% 45% / 0.3)",
@@ -80,15 +82,15 @@ const Index = () => {
               className="group relative overflow-hidden rounded-2xl border border-[hsl(0_0%_100%/0.12)] sport-card-glow cursor-pointer"
               style={{ boxShadow: `0 4px 20px ${sport.glowColor}` }}
             >
-              {/* Sport image */}
-               <div className="relative h-40 sm:h-52 md:h-56 overflow-hidden">
-                <iframe
-                  src={`https://www.youtube.com/embed/${sport.youtubeId}?autoplay=1&mute=1&loop=1&playlist=${sport.youtubeId}&controls=0&showinfo=0&rel=0&modestbranding=1&playsinline=1${sport.start ? `&start=${sport.start}` : ''}`}
-                  allow="autoplay; encrypted-media"
-                  allowFullScreen
-                  className="absolute inset-0 h-[200%] w-[200%] -top-[50%] -left-[50%] pointer-events-none"
-                  style={{ border: 'none' }}
-                  title={sport.name}
+              {/* Sport video */}
+              <div className="relative h-40 sm:h-52 md:h-56 overflow-hidden">
+                <video
+                  src={sport.video}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                 />
                 {/* Gradient overlay */}
                 <div className={`absolute inset-0 bg-gradient-to-t ${sport.accent}`} />

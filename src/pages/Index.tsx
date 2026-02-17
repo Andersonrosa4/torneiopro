@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
 import beachVolleyImg from "@/assets/sport-beach-volleyball.jpg";
-import logoImg from "@/assets/logo-torneio-pro.webp";
+import logoImg from "@/assets/logo-torneio-pro.png";
 import futevoleiImg from "@/assets/sport-futevolei.jpg";
 import beachTennisImg from "@/assets/sport-beach-tennis.jpg";
 

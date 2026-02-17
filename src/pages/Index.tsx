@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { QrCode } from "lucide-react";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
 import LogoImage from "@/components/LogoImage";
 
@@ -120,6 +121,13 @@ const Index = () => {
             className="rounded-full border border-[hsl(0_0%_100%/0.15)] bg-[hsl(0_0%_100%/0.06)] px-6 py-2.5 text-sm text-[hsl(35_30%_85%)] hover:bg-[hsl(0_0%_100%/0.12)] hover:text-white transition-all backdrop-blur-sm"
           >
             Sou atleta → Entrar com código do torneio
+          </button>
+          <button
+            onClick={() => navigate("/qrcode")}
+            className="mt-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-5 py-2 text-sm font-medium text-primary hover:bg-primary/20 transition-all backdrop-blur-sm"
+          >
+            <QrCode className="h-4 w-4" />
+            QR Code do App
           </button>
         </motion.div>
 

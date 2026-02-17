@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
 import beachVolleyImg from "@/assets/sport-beach-volleyball.jpg";
+import beachVolleyVideo from "@/assets/sport-beach-volleyball.mp4";
 import LogoImage from "@/components/LogoImage";
 import futevoleiImg from "@/assets/sport-futevolei.jpg";
 import beachTennisImg from "@/assets/sport-beach-tennis.jpg";
@@ -11,6 +12,7 @@ const sports = [
     id: "beach_volleyball",
     name: "Vôlei de Praia",
     image: beachVolleyImg,
+    video: beachVolleyVideo,
     description: "Organize torneios de vôlei de praia",
     accent: "from-amber-500/80 to-orange-600/80",
     glowColor: "hsl(35 85% 55% / 0.3)",
@@ -83,12 +85,24 @@ const Index = () => {
               style={{ boxShadow: `0 4px 20px ${sport.glowColor}` }}
             >
               {/* Sport image */}
-              <div className="relative h-40 sm:h-52 md:h-56 overflow-hidden">
-                <img
-                  src={sport.image}
-                  alt={sport.name}
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                />
+               <div className="relative h-40 sm:h-52 md:h-56 overflow-hidden">
+                {sport.video ? (
+                  <video
+                    src={sport.video}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    poster={sport.image}
+                  />
+                ) : (
+                  <img
+                    src={sport.image}
+                    alt={sport.name}
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  />
+                )}
                 {/* Gradient overlay */}
                 <div className={`absolute inset-0 bg-gradient-to-t ${sport.accent}`} />
 

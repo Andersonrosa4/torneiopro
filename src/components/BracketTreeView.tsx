@@ -314,7 +314,13 @@ const BracketColumn = ({
       <div className="relative overflow-x-auto pb-2">
         <div className="flex gap-6 relative" style={{ zIndex: 1 }}>
           {displayRounds.map((round) => {
-            const roundMatches = roundGroups[round].sort((a, b) => a.position - b.position);
+            // Sort by global game number when available — so JOGO 9 appears above JOGO 13
+            // within the same round column. Falls back to position if no numberMap.
+            const roundMatches = roundGroups[round].sort((a, b) => {
+              const aNum = matchNumberMap?.get(a.id) ?? a.position;
+              const bNum = matchNumberMap?.get(b.id) ?? b.position;
+              return aNum - bNum;
+            });
             return (
               <div key={round} className="flex flex-col items-center shrink-0" style={{ minWidth: 150 }}>
                 <div className="text-[9px] uppercase font-semibold text-muted-foreground/60 mb-2 whitespace-nowrap">

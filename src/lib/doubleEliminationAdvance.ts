@@ -156,13 +156,20 @@ export function processDoubleEliminationAdvance(
     const nextWinMatch = matches.find(m => m.id === currentMatch.next_win_match_id);
     if (nextWinMatch) {
       const slot = determineSlotInNextMatch(currentMatch, nextWinMatch, true);
+      const otherSlotW = slot === 'team1_id' ? 'team2_id' : 'team1_id';
 
       // ══════════════════════════════════════════════════════
-      // GUARD ANTI-AUTO-CONFRONTO: NUNCA colocar o mesmo time
-      // nos dois slots do mesmo jogo. Bloqueia imediatamente.
+      // GUARD ANTI-AUTO-CONFRONTO: se o time JÁ está no slot correto,
+      // não fazer nada (já está certo). Se está no outro slot, bloquear.
       // ══════════════════════════════════════════════════════
-      const otherSlotW = slot === 'team1_id' ? 'team2_id' : 'team1_id';
-      if (nextWinMatch[otherSlotW] && nextWinMatch[otherSlotW] === winnerId) {
+      if (nextWinMatch[slot] === winnerId) {
+        // Already in the right slot — no update needed
+        console.log(
+          `[✓ Winner already placed] ${winnerId} já está em ${slot} ` +
+          `de Match ${nextWinMatch.id}. Nenhuma atualização necessária.`
+        );
+      } else if (nextWinMatch[otherSlotW] && nextWinMatch[otherSlotW] === winnerId) {
+        // In the wrong slot — self-match would occur
         console.error(
           `[🚫 SELF-MATCH BLOCKED] Winner ${winnerId} já ocupa o slot ${otherSlotW} ` +
           `em Match ${nextWinMatch.id} (${nextWinMatch.bracket_type} R${nextWinMatch.round}P${nextWinMatch.position}). ` +
@@ -174,6 +181,8 @@ export function processDoubleEliminationAdvance(
           data: { [slot]: winnerId },
         });
       }
+    } else {
+      console.warn(`[⚠️ WINNER MATCH NOT FOUND] next_win_match_id=${currentMatch.next_win_match_id} not in matches array`);
     }
   }
 
@@ -189,9 +198,10 @@ export function processDoubleEliminationAdvance(
         if (nextLoseMatch.bracket_half !== expectedSide) {
           console.error(
             `[❌ MIRROR VIOLATION at runtime] Winners ${currentMatch.bracket_half} R${currentMatch.round}P${currentMatch.position} ` +
-            `→ Losers ${nextLoseMatch.bracket_half} (expected ${expectedSide}). Blocking placement.`
+            `→ Losers ${nextLoseMatch.bracket_half} (expected ${expectedSide}). Skipping loser placement only.`
           );
-          return result; // Block invalid placement
+          // Do NOT return — winner updates are still valid
+          return result;
         }
         console.log(
           `[✓ Mirror Route] Winners ${currentMatch.bracket_half} → Losers ${nextLoseMatch.bracket_half} (correct)`
@@ -234,7 +244,10 @@ export function processDoubleEliminationAdvance(
         }
       }
 
-      if (nextLoseMatch[otherSlotL] && nextLoseMatch[otherSlotL] === loserId) {
+      if (nextLoseMatch[slot] === loserId) {
+        // Already in the right slot — no update needed
+        console.log(`[✓ Loser already placed] ${loserId} já está em ${slot} de Match ${nextLoseMatch.id}.`);
+      } else if (nextLoseMatch[otherSlotL] && nextLoseMatch[otherSlotL] === loserId) {
         console.error(
           `[🚫 SELF-MATCH BLOCKED] Loser ${loserId} já ocupa o slot ${otherSlotL} ` +
           `em Match ${nextLoseMatch.id} (${nextLoseMatch.bracket_type} R${nextLoseMatch.round}P${nextLoseMatch.position}). ` +
@@ -265,6 +278,8 @@ export function processDoubleEliminationAdvance(
           data: { [slot]: loserId },
         });
       }
+    } else {
+      console.warn(`[⚠️ LOSER MATCH NOT FOUND] next_lose_match_id=${currentMatch.next_lose_match_id} not in matches array`);
     }
   }
 

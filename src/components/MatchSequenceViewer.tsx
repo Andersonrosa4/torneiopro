@@ -7,6 +7,7 @@ import { exportMatchSequence } from "@/lib/exportUtils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getEliminationRoundLabel, getEliminationRoundShortLabel } from "@/lib/roundLabels";
 import { buildSchedulerBlocks, schedulerSequence, getSchedulerBlockColor, getSchedulerBadgeColor, type SchedulerBlock } from "@/lib/roundScheduler";
+import { ManualMatchOverride } from "@/components/ManualMatchOverride";
 
 /* Helper: Convert number to letter (1→A, 2→B, etc) */
 const numberToLetter = (num: number): string => {
@@ -48,6 +49,7 @@ interface MatchSequenceViewerProps {
   onDeclareWinner: (matchId: string, winnerId: string) => void;
   onUpdateScore: (matchId: string, score1: number, score2: number) => void;
   onAutoResult?: (matchId: string, score1: number, score2: number, winnerId: string) => void;
+  onOverrideSaved?: () => void;
 }
 
 // ─── Sequence Generation Logic ───────────────────────────────
@@ -351,9 +353,11 @@ interface MatchCardProps {
   allMatches: Match[];
   matchNumberMap: Map<string, number>;
   isBlockUnlocked?: boolean;
+  teams: Team[];
   onDeclareWinner: (matchId: string, winnerId: string) => void;
   onUpdateScore: (matchId: string, score1: number, score2: number) => void;
   onAutoResult?: (matchId: string, score1: number, score2: number, winnerId: string) => void;
+  onOverrideSaved: () => void;
 }
 
 const MatchCard = ({
@@ -368,9 +372,11 @@ const MatchCard = ({
   allMatches,
   matchNumberMap,
   isBlockUnlocked = true,
+  teams,
   onDeclareWinner,
   onUpdateScore,
   onAutoResult,
+  onOverrideSaved,
 }: MatchCardProps) => {
   const initSets = () => {
     const sets: { s1: string; s2: string }[] = [];
@@ -619,22 +625,52 @@ const MatchCard = ({
             {match.score1 ?? "-"} <span className="text-muted-foreground/30">×</span> {match.score2 ?? "-"}
           </span>
           {isCompleted && match.winner_team_id && (
-            <Badge className="bg-success/10 text-success border-0 text-[8px] px-1 py-0 truncate max-w-[120px]">
+            <Badge className="bg-success/10 text-success border-0 text-[8px] px-1 py-0 truncate max-w-[100px]">
               {getTeamName(match.winner_team_id)}
             </Badge>
           )}
-          {isOwner && isCompleted && (
-            <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] gap-0.5 ml-auto" onClick={() => setIsEditing(true)}>
-              <Pencil className="h-2.5 w-2.5" /> Corrigir
-            </Button>
+          <div className="ml-auto flex items-center gap-1">
+            {isOwner && isCompleted && (
+              <Button size="sm" variant="ghost" className="h-5 px-1.5 text-[9px] gap-0.5" onClick={() => setIsEditing(true)}>
+                <Pencil className="h-2.5 w-2.5" /> Corrigir
+              </Button>
+            )}
+            {isOwner && (
+              <ManualMatchOverride
+                match={match}
+                matchNumber={index}
+                teams={teams}
+                onSaved={onOverrideSaved}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Chapéu slot — com Override disponível */}
+      {hasOneTeam && (
+        <div className="flex items-center justify-between px-2.5 pb-1.5">
+          <span className="text-[9px] text-muted-foreground/50 italic">Aguardando adversário...</span>
+          {isOwner && (
+            <ManualMatchOverride
+              match={match}
+              matchNumber={index}
+              teams={teams}
+              onSaved={onOverrideSaved}
+            />
           )}
         </div>
       )}
 
-      {/* Chapéu slot */}
-      {hasOneTeam && (
-        <div className="px-2.5 pb-1.5">
-          <span className="text-[9px] text-muted-foreground/50 italic">Aguardando adversário...</span>
+      {/* Partida vazia (sem nenhum time) — Override para colocar times manualmente */}
+      {!hasTeams && !hasOneTeam && isOwner && (
+        <div className="flex items-center justify-end px-2.5 pb-1.5">
+          <ManualMatchOverride
+            match={match}
+            matchNumber={index}
+            teams={teams}
+            onSaved={onOverrideSaved}
+          />
         </div>
       )}
     </div>
@@ -656,6 +692,7 @@ const MatchSequenceViewer = ({
   onDeclareWinner,
   onUpdateScore,
   onAutoResult,
+  onOverrideSaved,
 }: MatchSequenceViewerProps) => {
   const getTeamName = (teamId: string | null) => {
     if (!teamId) return "A definir";
@@ -984,9 +1021,11 @@ const MatchSequenceViewer = ({
                   allMatches={matches}
                   matchNumberMap={matchNumberMap}
                   isBlockUnlocked={isUnlocked}
+                  teams={teams}
                   onDeclareWinner={onDeclareWinner}
                   onUpdateScore={onUpdateScore}
                   onAutoResult={onAutoResult}
+                  onOverrideSaved={onOverrideSaved ?? (() => {})}
                 />
               ))}
             </div>

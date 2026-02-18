@@ -5,6 +5,27 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+async function createHmacToken(organizerId: string, role: string, secret: string): Promise<string> {
+  const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" })).replace(/=/g, "");
+  const payload = btoa(JSON.stringify({
+    organizerId,
+    role,
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + 86400, // 24 hours
+  })).replace(/=/g, "");
+  const data = `${header}.${payload}`;
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
+  const sig = btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/=/g, "");
+  return `${data}.${sig}`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -57,8 +78,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Create a simple token
-    const token = btoa(`${organizer.id}:${Date.now()}`);
+    // Create HMAC-signed token
+    const token = await createHmacToken(organizer.id, organizer.role, serviceRoleKey);
 
     // Update last_online_at asynchronously (fire-and-forget)
     supabase
@@ -78,7 +99,7 @@ Deno.serve(async (req) => {
     );
   } catch (error) {
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: "Erro interno do servidor" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

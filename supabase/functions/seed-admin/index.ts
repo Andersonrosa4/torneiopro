@@ -10,6 +10,17 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  // Require a secret header to prevent unauthorized access
+  const adminSetupSecret = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const authHeader = req.headers.get("Authorization");
+
+  if (!authHeader || authHeader !== `Bearer ${adminSetupSecret}`) {
+    return new Response(
+      JSON.stringify({ error: "Não autorizado" }),
+      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -18,10 +29,32 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const adminEmail = "joao2892002@gmail.com";
-    const adminPassword = "Juniora289@";
+    // Read credentials from environment secrets only
+    const adminEmail = Deno.env.get("ADMIN_EMAIL");
+    const adminPassword = Deno.env.get("ADMIN_PASSWORD");
 
-    // Check if admin already exists
+    if (!adminEmail || !adminPassword) {
+      return new Response(
+        JSON.stringify({ error: "Credenciais de admin não configuradas (ADMIN_EMAIL / ADMIN_PASSWORD)" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // One-time-use guard: if any admin role already exists, refuse to run
+    const { data: existingAdmin } = await supabase
+      .from("user_roles")
+      .select("id")
+      .eq("role", "admin")
+      .maybeSingle();
+
+    if (existingAdmin) {
+      return new Response(
+        JSON.stringify({ success: false, message: "Admin já existe. Função desabilitada." }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Check if admin already exists in auth
     const { data: existingUsers } = await supabase.auth.admin.listUsers();
     const existing = existingUsers?.users?.find((u) => u.email === adminEmail);
 
@@ -29,13 +62,11 @@ Deno.serve(async (req) => {
 
     if (existing) {
       userId = existing.id;
-      // Ensure password is up to date
       await supabase.auth.admin.updateUserById(userId, {
         password: adminPassword,
         email_confirm: true,
       });
     } else {
-      // Create admin user
       const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
         email: adminEmail,
         password: adminPassword,
@@ -54,19 +85,7 @@ Deno.serve(async (req) => {
     }
 
     // Ensure admin role exists
-    const { data: existingRole } = await supabase
-      .from("user_roles")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("role", "admin")
-      .maybeSingle();
-
-    if (!existingRole) {
-      await supabase.from("user_roles").insert({
-        user_id: userId,
-        role: "admin",
-      });
-    }
+    await supabase.from("user_roles").insert({ user_id: userId, role: "admin" });
 
     // Ensure profile exists
     const { data: existingProfile } = await supabase
@@ -104,7 +123,7 @@ Deno.serve(async (req) => {
     );
   } catch (error) {
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: "Erro interno do servidor" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

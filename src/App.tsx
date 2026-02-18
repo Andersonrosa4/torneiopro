@@ -21,6 +21,7 @@ import SystemDiagnostics from "./pages/SystemDiagnostics";
 import QRCodePage from "./pages/QRCodePage";
 import { supabase } from "@/integrations/supabase/client";
 import ScrollToTop from "@/components/ScrollToTop";
+import AiAssistant from "@/components/AiAssistant";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,7 @@ const App = () => (
         <SportProvider>
           <AuthProvider>
             <ScrollToTop />
+            <AiAssistant />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />

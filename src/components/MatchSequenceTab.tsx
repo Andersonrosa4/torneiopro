@@ -235,6 +235,9 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
   const groupedRounds = useMemo(() => {
     if (matches.length === 0) return [];
 
+    // Pass ALL matches to the scheduler (including chapéu with only 1 team)
+    // so it can correctly compute isUnlocked based on full match status
+    const allEliminationMatches = matches.filter(m => m.round > 0);
     const displayMatches = matches.filter(m => m.team1_id && m.team2_id);
     if (displayMatches.length === 0) return [];
 
@@ -300,8 +303,7 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
     if (knockoutStage.length > 0) {
       const hasDoubleElimStructure = matches.some(m => m.round > 0 && (m as any).bracket_half);
       if (tournamentFormat === "double_elimination" && hasDoubleElimStructure) {
-        const eliminationOnly = matches.filter(m => m.round > 0);
-        const schedulerBlocks = buildSchedulerBlocks(eliminationOnly as any);
+        const schedulerBlocks = buildSchedulerBlocks(allEliminationMatches as any);
         for (const sb of schedulerBlocks) {
           const blockMatches = (sb.matches as Match[]).filter(m => m.team1_id && m.team2_id);
           if (blockMatches.length === 0) continue;

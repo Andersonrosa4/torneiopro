@@ -350,6 +350,7 @@ interface MatchCardProps {
   tournamentFormat: string;
   allMatches: Match[];
   matchNumberMap: Map<string, number>;
+  isBlockUnlocked?: boolean;
   onDeclareWinner: (matchId: string, winnerId: string) => void;
   onUpdateScore: (matchId: string, score1: number, score2: number) => void;
   onAutoResult?: (matchId: string, score1: number, score2: number, winnerId: string) => void;
@@ -366,6 +367,7 @@ const MatchCard = ({
   tournamentFormat,
   allMatches,
   matchNumberMap,
+  isBlockUnlocked = true,
   onDeclareWinner,
   onUpdateScore,
   onAutoResult,
@@ -440,7 +442,9 @@ const MatchCard = ({
   const team2Name = match.team2_id ? getTeamName(match.team2_id) : (feederLabels.team2 || "A definir");
   const hasTeams = match.team1_id && match.team2_id;
   const hasOneTeam = (match.team1_id && !match.team2_id) || (!match.team1_id && match.team2_id);
-  const canScore = isOwner && hasTeams && (!isCompleted || isEditing);
+  // canScore: only allow interaction if the block is unlocked (or it's not a DE tournament)
+  const blockAllowsInteraction = tournamentFormat !== 'double_elimination' || isBlockUnlocked;
+  const canScore = isOwner && hasTeams && (!isCompleted || isEditing) && blockAllowsInteraction;
   const t1Win = match.winner_team_id === match.team1_id && isCompleted;
   const t2Win = match.winner_team_id === match.team2_id && isCompleted;
 
@@ -984,6 +988,7 @@ const MatchSequenceViewer = ({
                   tournamentFormat={tournamentFormat}
                   allMatches={matches}
                   matchNumberMap={matchNumberMap}
+                  isBlockUnlocked={isUnlocked}
                   onDeclareWinner={onDeclareWinner}
                   onUpdateScore={onUpdateScore}
                   onAutoResult={onAutoResult}

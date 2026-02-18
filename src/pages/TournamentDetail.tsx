@@ -1009,29 +1009,7 @@ const TournamentDetail = () => {
        }
      }
 
-    // Validate round order for double elimination — use FRESH data from DB
-    // IMPORTANT: Only check matches from the SAME modality to avoid cross-modality false positives
-    const modalityMatches = match.modality_id
-      ? matches.filter(m => m.modality_id === match.modality_id)
-      : matches;
-    const isDE = modalityMatches.some(m => m.bracket_type === 'losers' || m.bracket_type === 'final' || m.bracket_type === 'semi_final');
-    if (isDE && !isReDeclaration) {
-      // Fetch latest match statuses to avoid stale-state blocking
-      const { data: freshMatches } = await supabase
-        .from("matches")
-        .select("*")
-        .eq("tournament_id", id);
-      
-      if (freshMatches && freshMatches.length > 0) {
-        const { validateMatchStart } = await import("@/lib/roundScheduler");
-        const violation = validateMatchStart(matchId, freshMatches as any);
-        if (violation) {
-          toast.error(`⚠️ ${violation}`);
-          fetchData(); // Sync UI with fresh data
-          return;
-        }
-      }
-    }
+    // Round order validation removed — organizer can declare winners freely
 
     // Get loser ID
     const loserId = match.team1_id === winnerId ? match.team2_id : match.team1_id;

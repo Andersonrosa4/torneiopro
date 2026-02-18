@@ -156,10 +156,24 @@ export function processDoubleEliminationAdvance(
     const nextWinMatch = matches.find(m => m.id === currentMatch.next_win_match_id);
     if (nextWinMatch) {
       const slot = determineSlotInNextMatch(currentMatch, nextWinMatch, true);
-      result.winnerUpdates.push({
-        matchId: nextWinMatch.id,
-        data: { [slot]: winnerId },
-      });
+
+      // ══════════════════════════════════════════════════════
+      // GUARD ANTI-AUTO-CONFRONTO: NUNCA colocar o mesmo time
+      // nos dois slots do mesmo jogo. Bloqueia imediatamente.
+      // ══════════════════════════════════════════════════════
+      const otherSlotW = slot === 'team1_id' ? 'team2_id' : 'team1_id';
+      if (nextWinMatch[otherSlotW] && nextWinMatch[otherSlotW] === winnerId) {
+        console.error(
+          `[🚫 SELF-MATCH BLOCKED] Winner ${winnerId} já ocupa o slot ${otherSlotW} ` +
+          `em Match ${nextWinMatch.id} (${nextWinMatch.bracket_type} R${nextWinMatch.round}P${nextWinMatch.position}). ` +
+          `Colocação BLOQUEADA para evitar auto-confronto.`
+        );
+      } else {
+        result.winnerUpdates.push({
+          matchId: nextWinMatch.id,
+          data: { [slot]: winnerId },
+        });
+      }
     }
   }
 
@@ -186,29 +200,42 @@ export function processDoubleEliminationAdvance(
 
       let slot = determineSlotInNextMatch(currentMatch, nextLoseMatch, false);
 
-      // Anti-repetition check for losers bracket R1-R2
-      if (nextLoseMatch.bracket_type === 'losers' && nextLoseMatch.round <= 2) {
-        const oppositeSlot = slot === 'team1_id' ? 'team2_id' : 'team1_id';
-        const existingOpponent = nextLoseMatch[oppositeSlot];
+      // ══════════════════════════════════════════════════════
+      // GUARD ANTI-AUTO-CONFRONTO: NUNCA colocar o mesmo time
+      // nos dois slots do mesmo jogo. Bloqueia imediatamente.
+      // ══════════════════════════════════════════════════════
+      const otherSlotL = slot === 'team1_id' ? 'team2_id' : 'team1_id';
+      if (nextLoseMatch[otherSlotL] && nextLoseMatch[otherSlotL] === loserId) {
+        console.error(
+          `[🚫 SELF-MATCH BLOCKED] Loser ${loserId} já ocupa o slot ${otherSlotL} ` +
+          `em Match ${nextLoseMatch.id} (${nextLoseMatch.bracket_type} R${nextLoseMatch.round}P${nextLoseMatch.position}). ` +
+          `Colocação BLOQUEADA para evitar auto-confronto.`
+        );
+        // Skip — this team is already in the correct slot (chapéu pre-placed)
+      } else {
+        // Anti-repetition check for losers bracket R1-R2
+        if (nextLoseMatch.bracket_type === 'losers' && nextLoseMatch.round <= 2) {
+          const existingOpponent = nextLoseMatch[otherSlotL];
 
-        if (existingOpponent && haveTeamsPlayedBefore(matches, loserId, existingOpponent)) {
-          const altSlot = findAntiRepetitionAlternative(
-            matches, nextLoseMatch, loserId, slot
-          );
-          if (altSlot) {
-            result.loserUpdates.push({
-              matchId: altSlot.matchId,
-              data: { [altSlot.field]: loserId },
-            });
-            return result;
+          if (existingOpponent && haveTeamsPlayedBefore(matches, loserId, existingOpponent)) {
+            const altSlot = findAntiRepetitionAlternative(
+              matches, nextLoseMatch, loserId, slot
+            );
+            if (altSlot) {
+              result.loserUpdates.push({
+                matchId: altSlot.matchId,
+                data: { [altSlot.field]: loserId },
+              });
+              return result;
+            }
           }
         }
-      }
 
-      result.loserUpdates.push({
-        matchId: nextLoseMatch.id,
-        data: { [slot]: loserId },
-      });
+        result.loserUpdates.push({
+          matchId: nextLoseMatch.id,
+          data: { [slot]: loserId },
+        });
+      }
     }
   }
 

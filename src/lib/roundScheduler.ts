@@ -256,29 +256,45 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
       if (r > sortedRounds[0]) {
         const prevR = sortedRounds[sortedRounds.indexOf(r) - 1];
         if (prevR !== undefined) {
-          // Winners R depends on BOTH previous Winners AND previous Losers completing
+          // WA/WB R(n) waits for previous Winners round only
           if (groups.has(`WA_R${prevR}`)) deps.push(`WA_R${prevR}`);
           if (groups.has(`WB_R${prevR}`)) deps.push(`WB_R${prevR}`);
-          if (groups.has(`LS_R${prevR}`)) deps.push(`LS_R${prevR}`);
-          if (groups.has(`LI_R${prevR}`)) deps.push(`LI_R${prevR}`);
+        }
+      }
+      // WA/WB R(n) for n≥3 also waits for Losers R(n-2) to complete
+      // Enforces: W_R1 → W_R2 → L_R1 → W_R3 → L_R2 → W_R4 → ...
+      const losersR = r - 2;
+      if (losersR >= 1) {
+        if (groups.has(`LS_R${losersR}`)) deps.push(`LS_R${losersR}`);
+        if (groups.has(`LI_R${losersR}`)) deps.push(`LI_R${losersR}`);
+      }
+    }
+
+    if (cat === 'LS') {
+      // LS_Rn plays AFTER the next Winners round (WA_R(n+1) + WB_R(n+1)) completes
+      // Enforces: W_R1 → W_R2 → L_R1 → W_R3 → L_R2 → ...
+      const nextWinnersR = r + 1;
+      const hasNextWinners = groups.has(`WA_R${nextWinnersR}`) || groups.has(`WB_R${nextWinnersR}`);
+      if (hasNextWinners) {
+        if (groups.has(`WA_R${nextWinnersR}`)) deps.push(`WA_R${nextWinnersR}`);
+        if (groups.has(`WB_R${nextWinnersR}`)) deps.push(`WB_R${nextWinnersR}`);
+      } else {
+        // Last losers cycle — no next winners round, use real feeders
+        const realFeeders = losersBlockFeeders.get(key);
+        if (realFeeders && realFeeders.size > 0) {
+          for (const feederKey of realFeeders) {
+            if (groups.has(feederKey)) deps.push(feederKey);
+          }
         }
       }
     }
 
-    if (cat === 'LS' || cat === 'LI') {
-      const realFeeders = losersBlockFeeders.get(key);
-      if (realFeeders && realFeeders.size > 0) {
-        for (const feederKey of realFeeders) {
-          if (groups.has(feederKey)) deps.push(feederKey);
-        }
-      } else {
-        if (groups.has(`WA_R${r}`)) deps.push(`WA_R${r}`);
-        if (groups.has(`WB_R${r}`)) deps.push(`WB_R${r}`);
-      }
+    if (cat === 'LI') {
+      // LI_Rn plays immediately after LS_Rn (sequential within same losers cycle)
+      if (groups.has(`LS_R${r}`)) deps.push(`LS_R${r}`);
     }
 
     // WA and WB of same round run in PARALLEL — no intra-round WB→WA dependency
-    // LI also runs in parallel with LS of same round
 
     const isCompleted = catMatches.every(m => m.status === 'completed');
 

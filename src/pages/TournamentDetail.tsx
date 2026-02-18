@@ -1900,6 +1900,7 @@ const TournamentDetail = () => {
                       onDeclareWinner={declareWinner}
                       tournamentFormat={tournament?.format === 'double_elimination' ? 'double_elimination' : (selectedModality?.game_system || tournament?.format)}
                       onAutoResult={handleAutoResult}
+                      onOverrideSaved={fetchData}
                     />
                   </Suspense>
                 </section>

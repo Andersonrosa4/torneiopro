@@ -1056,63 +1056,10 @@ const DEGlobalConnectors = ({
   );
 };
 
-/* ────────────────────────────────────────────────────
-
-
-
-  const computePaths = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const containerRect = container.getBoundingClientRect();
-    setSvgSize({ w: container.scrollWidth, h: container.scrollHeight });
-    const newPaths: string[] = [];
-
-    for (const m of allMatches) {
-      if (!m.next_win_match_id) continue;
-      const srcEl = container.querySelector(`[data-match-id="${m.id}"]`);
-      const dstEl = container.querySelector(`[data-match-id="${m.next_win_match_id}"]`);
-      if (!srcEl || !dstEl) continue;
-
-      const srcR = srcEl.getBoundingClientRect();
-      const dstR = dstEl.getBoundingClientRect();
-
-      const srcCx = srcR.left + srcR.width / 2;
-      const dstCx = dstR.left + dstR.width / 2;
-      const goingLeft = dstCx < srcCx;
-
-      let x1: number, y1: number, x2: number, y2: number;
-      if (goingLeft) {
-        x1 = srcR.left - containerRect.left;
-        y1 = srcR.top + srcR.height / 2 - containerRect.top;
-        x2 = dstR.right - containerRect.left;
-        y2 = dstR.top + dstR.height / 2 - containerRect.top;
-      } else {
-        x1 = srcR.right - containerRect.left;
-        y1 = srcR.top + srcR.height / 2 - containerRect.top;
-        x2 = dstR.left - containerRect.left;
-        y2 = dstR.top + dstR.height / 2 - containerRect.top;
-      }
-
-      const midX = (x1 + x2) / 2;
-      newPaths.push(`M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`);
-    }
-
-    setPaths(newPaths);
-  }, [containerRef, allMatches]);
-
-  useEffect(() => {
-    const timer = setTimeout(computePaths, 400);
-    window.addEventListener("resize", computePaths);
-    return () => { clearTimeout(timer); window.removeEventListener("resize", computePaths); };
-  }, [computePaths]);
-
-  if (paths.length === 0) return null;
-
-  return (
-
 
 
 /* ────────────────────────────────────────────────────
+   DE Bracket Layout — 3-column layout with global connectors
    ──────────────────────────────────────────────────── */
 const DEBracketLayout = ({
   zoomContainerRef,

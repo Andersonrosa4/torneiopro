@@ -753,8 +753,6 @@ const NormalKnockout = ({
   return (
     <div className="rounded-xl border border-border bg-card/50 p-4">
       <div ref={containerRef} className="relative overflow-x-auto overflow-y-hidden pb-6" style={{ WebkitOverflowScrolling: "touch" }}>
-        {/* SVG Conectores — coordenadas reais de tela */}
-        <SVGConnectors containerRef={containerRef} matches={knockoutMatches} slotMap={slotMap} />
         <div className="flex gap-10 relative" style={{ zIndex: 1, minHeight: totalHeight }}>
           {rounds.map((round) => {
             const roundMatches = roundGroups[round];
@@ -843,9 +841,6 @@ const DEBracketLayout = ({
         style={isMobile ? { transform: `scale(${mobileZoom})`, transformOrigin: 'top left', width: `${100 / mobileZoom}%` } : undefined}
       >
         <div ref={globalRef} className="relative min-w-[900px]">
-          {/* SVG Conectores globais — coordenadas reais de tela */}
-          <SVGConnectors containerRef={globalRef} matches={eliminationMatches} slotMap={slotMap} />
-
           <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-start relative" style={{ zIndex: 1 }}>
             {/* ── LEFT: Winners (L → R) ── */}
             <div className="space-y-4">

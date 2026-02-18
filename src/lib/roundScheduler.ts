@@ -306,7 +306,8 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
   }
 
   // Priority queue: process blocks with no remaining deps
-  // Tie-break: prefer WA > WB > LS > LI (winners before losers), then lower round
+  // Sort rule: WINNERS always before LOSERS, then lower round, then WA>WB / LS>LI
+  const isWinnersBlock = (k: string) => k.startsWith('WA') || k.startsWith('WB');
   const catPriority = (k: string) => {
     if (k.startsWith('WA')) return 0;
     if (k.startsWith('WB')) return 1;
@@ -315,25 +316,28 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
     return 4;
   };
 
+  const blockSortFn = (a: string, b: string) => {
+    const aIsW = isWinnersBlock(a);
+    const bIsW = isWinnersBlock(b);
+    // Winners always before losers
+    if (aIsW !== bIsW) return aIsW ? -1 : 1;
+    // Within same group: lower round first
+    const aBlock = tempBlocks.get(a)!;
+    const bBlock = tempBlocks.get(b)!;
+    if (aBlock.round !== bBlock.round) return aBlock.round - bBlock.round;
+    // Same round: WA>WB or LS>LI
+    return catPriority(a) - catPriority(b);
+  };
+
   const queue: string[] = [];
   for (const [key, deg] of inDegree) {
     if (deg === 0) queue.push(key);
   }
-  queue.sort((a, b) => {
-    const aBlock = tempBlocks.get(a)!;
-    const bBlock = tempBlocks.get(b)!;
-    if (aBlock.round !== bBlock.round) return aBlock.round - bBlock.round;
-    return catPriority(a) - catPriority(b);
-  });
+  queue.sort(blockSortFn);
 
   const emitted = new Set<string>();
   while (queue.length > 0) {
-    queue.sort((a, b) => {
-      const aBlock = tempBlocks.get(a)!;
-      const bBlock = tempBlocks.get(b)!;
-      if (aBlock.round !== bBlock.round) return aBlock.round - bBlock.round;
-      return catPriority(a) - catPriority(b);
-    });
+    queue.sort(blockSortFn);
 
     const key = queue.shift()!;
     if (emitted.has(key)) continue;

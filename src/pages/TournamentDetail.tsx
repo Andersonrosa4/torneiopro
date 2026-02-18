@@ -1036,25 +1036,25 @@ const TournamentDetail = () => {
     const isDoubleElimination = modalityMatchesForDE.some(m => m.bracket_type === 'losers' || m.bracket_type === 'final' || m.bracket_type === 'semi_final');
 
     if (isDoubleElimination) {
-      // CRITICAL: Fetch fresh matches from DB AFTER saving winner to avoid stale state
+      // ══════════════════════════════════════════════════════════════════════
+      // IRON RULE: Buscar partidas SOMENTE da mesma modalidade.
+      // Nunca buscar por tournament_id pois mistura modalidades diferentes
+      // e causa falsos positivos nos guards anti-colisão do advanceLogic.
+      // Esta foi a causa raiz do bug de não propagação na chave de perdedores.
+      // ══════════════════════════════════════════════════════════════════════
+      const freshFilters = match.modality_id
+        ? { modality_id: match.modality_id }
+        : { tournament_id: id };
+
       const { data: freshMatches } = await organizerQuery({
         table: "matches",
         operation: "select",
-        filters: { tournament_id: id },
+        filters: freshFilters,
         order: [{ column: "round" }, { column: "position" }],
       });
-      const allFreshMatches = (freshMatches || matches) as typeof matches;
-
-      // ══════════════════════════════════════════════════════════════════════
-      // CRITICAL FIX: Filter by SAME modality ONLY before passing to advance logic.
-      // Passing matches from ALL modalities causes slot collision detection to
-      // incorrectly block legitimate placements (e.g., guards see "stale" data
-      // from other modalities' matches that share no relation to current flow).
-      // This was the root cause of teams not advancing in Losers bracket.
-      // ══════════════════════════════════════════════════════════════════════
-      const freshMatchList = match.modality_id
-        ? allFreshMatches.filter(m => m.modality_id === match.modality_id)
-        : allFreshMatches;
+      const freshMatchList = (freshMatches || (match.modality_id
+        ? matches.filter(m => m.modality_id === match.modality_id)
+        : matches)) as typeof matches;
 
       // Use the updated match data (winner already set)
       const freshMatch = freshMatchList.find(m => m.id === matchId) || { ...match, winner_team_id: winnerId, status: 'completed' };

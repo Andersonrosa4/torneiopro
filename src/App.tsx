@@ -19,21 +19,11 @@ import NotFound from "./pages/NotFound";
 import SimulationTest from "./pages/SimulationTest";
 import SystemDiagnostics from "./pages/SystemDiagnostics";
 import QRCodePage from "./pages/QRCodePage";
-import { supabase } from "@/integrations/supabase/client";
+
 import ScrollToTop from "@/components/ScrollToTop";
 import AiAssistant from "@/components/AiAssistant";
 
 const queryClient = new QueryClient();
-
-// Seed admin on first load
-const seedAdmin = async () => {
-  try {
-    await supabase.functions.invoke("seed-admin", { method: "POST" });
-  } catch (e) {
-    // Silent fail - admin may already exist
-  }
-};
-seedAdmin();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

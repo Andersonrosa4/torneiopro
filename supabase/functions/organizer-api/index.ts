@@ -5,6 +5,76 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+async function verifyHmacToken(
+  token: string,
+  secret: string
+): Promise<{ organizerId: string; role: string } | null> {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const [header, payload, sig] = parts;
+    const data = `${header}.${payload}`;
+
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+
+    // Pad base64url back to standard base64
+    const padded = sig.replace(/-/g, "+").replace(/_/g, "/") + "==".slice((sig.length * 3) % 4);
+    const sigBuffer = Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
+    const valid = await crypto.subtle.verify("HMAC", key, sigBuffer, new TextEncoder().encode(data));
+    if (!valid) return null;
+
+    // Decode payload
+    const paddedPayload = payload + "==".slice((payload.length * 3) % 4);
+    const claims = JSON.parse(atob(paddedPayload));
+
+    // Check expiry
+    if (claims.exp && claims.exp < Math.floor(Date.now() / 1000)) return null;
+
+    return { organizerId: claims.organizerId, role: claims.role };
+  } catch {
+    return null;
+  }
+}
+
+// Tables that are freely readable without auth (public data)
+const PUBLIC_READ_TABLES = new Set([
+  "tournaments", "teams", "matches", "participants", "modalities",
+  "groups", "classificacao_grupos", "quiz_questions", "quiz_scores", "rankings",
+]);
+
+// Tables that require admin role for any write
+const ADMIN_ONLY_TABLES = new Set(["organizers", "user_roles"]);
+
+// Tables that are linked to a tournament (ownership checked via tournament)
+const TOURNAMENT_TABLES = new Set([
+  "teams", "matches", "participants", "modalities", "groups", "classificacao_grupos",
+]);
+
+async function getOrganizer(supabase: any, organizerId: string) {
+  const { data, error } = await supabase
+    .from("organizers")
+    .select("id, role")
+    .eq("id", organizerId)
+    .single();
+  if (error || !data) return null;
+  return data;
+}
+
+async function getTournamentOwner(supabase: any, tournamentId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from("tournaments")
+    .select("created_by")
+    .eq("id", tournamentId)
+    .single();
+  return data?.created_by ?? null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -24,8 +94,10 @@ Deno.serve(async (req) => {
     const isPublicSelect = operation === "select" && !token && !organizerId;
     const isPublicQuizInsert = operation === "insert" && table === "quiz_scores" && !token && !organizerId;
 
+    let authenticatedOrganizer: { id: string; role: string } | null = null;
+
     if (!isPublicSelect && !isPublicQuizInsert) {
-      // Validate auth for all non-public operations
+      // Require token and organizerId
       if (!token || !organizerId) {
         return new Response(
           JSON.stringify({ error: "Autenticação necessária" }),
@@ -33,33 +105,25 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Validate token format
-      try {
-        const decoded = atob(token);
-        const [tokenOrgId] = decoded.split(":");
-        if (tokenOrgId !== organizerId) {
-          throw new Error("Token inválido");
-        }
-      } catch {
+      // Verify HMAC-signed token
+      const claims = await verifyHmacToken(token, serviceRoleKey);
+      if (!claims || claims.organizerId !== organizerId) {
         return new Response(
-          JSON.stringify({ error: "Token inválido" }),
+          JSON.stringify({ error: "Token inválido ou expirado" }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Verify organizer exists
-      const { data: organizer, error: orgError } = await supabase
-        .from("organizers")
-        .select("id")
-        .eq("id", organizerId)
-        .single();
-
-      if (orgError || !organizer) {
+      // Verify organizer exists in DB
+      const organizer = await getOrganizer(supabase, organizerId);
+      if (!organizer) {
         return new Response(
           JSON.stringify({ error: "Organizador não encontrado" }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+
+      authenticatedOrganizer = { id: organizer.id, role: organizer.role };
 
       // Update last_online_at asynchronously (fire-and-forget, non-blocking)
       supabase
@@ -69,50 +133,56 @@ Deno.serve(async (req) => {
         .then(() => {});
     }
 
+    const isAdmin = authenticatedOrganizer?.role === "admin";
+
     // Custom bulk operations (checked BEFORE table validation)
     if (operation === "undo_bracket") {
+      if (!authenticatedOrganizer) {
+        return new Response(JSON.stringify({ error: "Autenticação necessária" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       const { tournament_id, modality_id } = body;
       if (!tournament_id) {
-        return new Response(
-          JSON.stringify({ error: "tournament_id é obrigatório" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({ error: "tournament_id é obrigatório" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // Ownership check
+      const owner = await getTournamentOwner(supabase, tournament_id);
+      if (!isAdmin && owner !== authenticatedOrganizer.id) {
+        return new Response(JSON.stringify({ error: "Acesso negado" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       let updateQuery = supabase.from("matches").update({ next_win_match_id: null, next_lose_match_id: null }).eq("tournament_id", tournament_id);
       if (modality_id) updateQuery = updateQuery.eq("modality_id", modality_id);
       const { error: updateErr } = await updateQuery;
-      if (updateErr) {
-        return new Response(JSON.stringify({ error: updateErr.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
+      if (updateErr) return new Response(JSON.stringify({ error: updateErr.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
       let deleteQuery = supabase.from("matches").delete().eq("tournament_id", tournament_id);
       if (modality_id) deleteQuery = deleteQuery.eq("modality_id", modality_id);
       const { error: deleteErr } = await deleteQuery;
-      if (deleteErr) {
-        return new Response(JSON.stringify({ error: deleteErr.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
+      if (deleteErr) return new Response(JSON.stringify({ error: deleteErr.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-      // Also clean up groups and classificacao_grupos for this tournament
       const { error: classDelErr } = await supabase.from("classificacao_grupos").delete().eq("tournament_id", tournament_id);
-      if (classDelErr) {
-        return new Response(JSON.stringify({ error: classDelErr.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
+      if (classDelErr) return new Response(JSON.stringify({ error: classDelErr.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
       const { error: groupDelErr } = await supabase.from("groups").delete().eq("tournament_id", tournament_id);
-      if (groupDelErr) {
-        return new Response(JSON.stringify({ error: groupDelErr.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
+      if (groupDelErr) return new Response(JSON.stringify({ error: groupDelErr.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
       return new Response(JSON.stringify({ data: null }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (operation === "reset_results") {
+      if (!authenticatedOrganizer) {
+        return new Response(JSON.stringify({ error: "Autenticação necessária" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       const { tournament_id, modality_id } = body;
       if (!tournament_id) {
-        return new Response(
-          JSON.stringify({ error: "tournament_id é obrigatório" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({ error: "tournament_id é obrigatório" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // Ownership check
+      const owner = await getTournamentOwner(supabase, tournament_id);
+      if (!isAdmin && owner !== authenticatedOrganizer.id) {
+        return new Response(JSON.stringify({ error: "Acesso negado" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       let resetQuery = supabase.from("matches").update({
@@ -120,9 +190,7 @@ Deno.serve(async (req) => {
       }).eq("tournament_id", tournament_id);
       if (modality_id) resetQuery = resetQuery.eq("modality_id", modality_id);
       const { error: resetErr } = await resetQuery;
-      if (resetErr) {
-        return new Response(JSON.stringify({ error: resetErr.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
+      if (resetErr) return new Response(JSON.stringify({ error: resetErr.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
       return new Response(JSON.stringify({ data: null }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -134,6 +202,72 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: `Tabela '${table}' não permitida` }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // ══════════════════════════════════════════════════════
+    // SERVER-SIDE AUTHORIZATION ENFORCEMENT
+    // Prevent cross-tenant data access for non-admin organizers
+    // ══════════════════════════════════════════════════════
+
+    // Admin-only tables: only admins can write
+    if (ADMIN_ONLY_TABLES.has(table) && operation !== "select") {
+      if (!isAdmin) {
+        return new Response(
+          JSON.stringify({ error: "Permissão negada: apenas administradores" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // For write operations on tournament-related tables, enforce ownership
+    if (authenticatedOrganizer && !isAdmin && operation !== "select") {
+      if (table === "tournaments") {
+        // For UPDATE/DELETE on tournaments, verify ownership
+        if ((operation === "update" || operation === "delete") && filters?.id) {
+          const owner = await getTournamentOwner(supabase, filters.id);
+          if (owner !== authenticatedOrganizer.id) {
+            return new Response(
+              JSON.stringify({ error: "Acesso negado: torneio pertence a outro organizador" }),
+              { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        }
+        // For INSERT, force created_by to be this organizer
+        if (operation === "insert" && data) {
+          data.created_by = authenticatedOrganizer.id;
+        }
+      }
+
+      if (TOURNAMENT_TABLES.has(table)) {
+        // Determine tournament_id from filters or data
+        const tournamentId = filters?.tournament_id ?? data?.tournament_id;
+        if (tournamentId) {
+          const owner = await getTournamentOwner(supabase, tournamentId);
+          if (owner !== authenticatedOrganizer.id) {
+            return new Response(
+              JSON.stringify({ error: "Acesso negado: torneio pertence a outro organizador" }),
+              { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        }
+      }
+
+      if (table === "rankings" && operation !== "select") {
+        const tournamentId = filters?.tournament_id ?? data?.tournament_id;
+        if (tournamentId) {
+          const owner = await getTournamentOwner(supabase, tournamentId);
+          if (owner !== authenticatedOrganizer.id) {
+            return new Response(
+              JSON.stringify({ error: "Acesso negado: ranking pertence a outro torneio" }),
+              { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        }
+        // Force created_by on insert
+        if (operation === "insert" && data) {
+          data.created_by = authenticatedOrganizer.id;
+        }
+      }
     }
 
     let query: any;
@@ -176,7 +310,6 @@ Deno.serve(async (req) => {
       case "delete": {
         // For matches: clear FK references before deleting to avoid constraint violations
         if (table === "matches" && filters) {
-          // Build list of match IDs to delete
           let selectQuery = supabase.from("matches").select("id");
           for (const [key, value] of Object.entries(filters)) {
             selectQuery = selectQuery.eq(key, value as any);
@@ -184,7 +317,6 @@ Deno.serve(async (req) => {
           const { data: matchesToDelete } = await selectQuery;
           if (matchesToDelete && matchesToDelete.length > 0) {
             const idsToDelete = matchesToDelete.map((m: any) => m.id);
-            // Clear next_win_match_id and next_lose_match_id that point to these matches
             await supabase.from("matches").update({ next_win_match_id: null }).in("next_win_match_id", idsToDelete);
             await supabase.from("matches").update({ next_lose_match_id: null }).in("next_lose_match_id", idsToDelete);
           }
@@ -219,7 +351,7 @@ Deno.serve(async (req) => {
     );
   } catch (error) {
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: "Erro interno do servidor" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

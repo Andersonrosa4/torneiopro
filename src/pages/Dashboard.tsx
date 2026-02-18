@@ -91,37 +91,44 @@ const Dashboard = () => {
     return () => { supabase.removeChannel(channel); };
   }, [user, isAdmin, organizerId]);
 
-  const deleteTournament = async (tournamentId: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const deleteTournament = async (tournamentId: string) => {
     try {
-      // 1. Delete rankings
-      await organizerQuery({ table: "rankings", operation: "delete", filters: { tournament_id: tournamentId } });
-      // 2. Delete classificacao_grupos (depends on groups & teams)
-      await organizerQuery({ table: "classificacao_grupos", operation: "delete", filters: { tournament_id: tournamentId } });
-      // 3. Nullify match FK refs in bulk via undo_bracket operation
-      // undo_bracket reads tournament_id from top-level body, so we pass it via organizerQuery's filters-like spread
       const token = sessionStorage.getItem("organizer_token");
       const orgId = sessionStorage.getItem("organizer_id");
-      await (await import("@/integrations/supabase/client")).supabase.functions.invoke("organizer-api", {
+
+      if (!token || !orgId) {
+        toast.error("Sessão expirada. Faça login novamente.");
+        return;
+      }
+
+      // 1. Delete rankings
+      await organizerQuery({ table: "rankings", operation: "delete", filters: { tournament_id: tournamentId } });
+
+      // 2. Nullify FK refs + delete matches + classificacao_grupos + groups (undo_bracket handles all)
+      await supabase.functions.invoke("organizer-api", {
         body: { token, organizerId: orgId, table: "matches", operation: "undo_bracket", tournament_id: tournamentId },
       });
-      // 4. Delete participants
+
+      // 3. Delete participants
       await organizerQuery({ table: "participants", operation: "delete", filters: { tournament_id: tournamentId } });
-      // 5. Delete teams
+
+      // 4. Delete teams
       await organizerQuery({ table: "teams", operation: "delete", filters: { tournament_id: tournamentId } });
-      // 6. Delete modalities
+
+      // 5. Delete modalities
       await organizerQuery({ table: "modalities", operation: "delete", filters: { tournament_id: tournamentId } });
-      // 7. Delete the tournament itself
+
+      // 6. Delete the tournament itself
       const { error } = await organizerQuery({ table: "tournaments", operation: "delete", filters: { id: tournamentId } });
       if (error) {
         toast.error("Erro ao excluir torneio: " + error.message);
         return;
       }
+
       setTournaments((prev) => prev.filter((t) => t.id !== tournamentId));
-      toast.success("Torneio excluído!");
+      toast.success("Torneio excluído com sucesso!");
     } catch (err: any) {
-      toast.error("Erro ao excluir torneio.");
+      toast.error("Erro ao excluir torneio. Tente novamente.");
     }
   };
 
@@ -210,7 +217,7 @@ const Dashboard = () => {
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
                                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction onClick={(e) => deleteTournament(t.id, e)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                    <AlertDialogAction onClick={() => deleteTournament(t.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                                       Excluir
                                     </AlertDialogAction>
                                   </AlertDialogFooter>

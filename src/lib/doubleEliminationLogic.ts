@@ -783,16 +783,18 @@ export function generateDoubleEliminationBracket(config: DoubleEliminationConfig
     }
   };
 
-  // ── VALIDAÇÃO 4: Contagem Total ──
+  // ── VALIDAÇÃO 4: Contagem Total — HARD BLOCK ──
   const validateTotalCount = () => {
     const totalMatches = allMatches.length;
     if (totalMatches !== expectedTotal) {
-      console.warn(
-        `[⚠️ Contagem] Geradas ${totalMatches} partidas, esperado ${expectedTotal}.`
+      throw new Error(
+        `[❌ FÓRMULA VIOLADA] Geradas ${totalMatches} partidas, esperado ${expectedTotal} (2×${teams.length}−3). ` +
+        `Winners A=${winnersUpper.length}, Winners B=${winnersLower.length}, ` +
+        `Losers A=${losersUpper.length}, Losers B=${losersLower.length}. ` +
+        `Geração ABORTADA — nunca salvar bracket inválido.`
       );
-    } else {
-      console.log(`[✓ Contagem] Total correto: ${totalMatches} partidas para ${teams.length} equipes`);
     }
+    console.log(`[✓ Contagem] Total correto: ${totalMatches} partidas para ${teams.length} equipes`);
   };
 
   // ── EXECUTAR TODAS AS VALIDAÇÕES ──

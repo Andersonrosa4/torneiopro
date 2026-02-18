@@ -55,13 +55,13 @@ describe("getBaseBracketSize", () => {
 });
 
 describe("Chapéu Bracket Generation", () => {
-  // Verify match count is at least (2N-3) — split-bracket may add losers chapéu overhead
-  it("should have at least (2N-3) matches for standard sizes", () => {
-    for (const n of [8, 16, 32]) {
+  // FÓRMULA BLINDADA: total DEVE ser EXATAMENTE (2N-3) — nunca mais, nunca menos
+  it("deve ter EXATAMENTE (2N-3) partidas para todos os tamanhos", () => {
+    for (const n of [4, 5, 6, 7, 8, 10, 13, 15, 16, 17, 20, 22, 25, 26, 30, 32, 35, 36, 40]) {
       const config = makeConfig(n);
       const { matches } = generateDoubleEliminationBracket(config);
-      const minimum = 2 * n - 3;
-      expect(matches.length, `N=${n}: should have >= ${minimum} matches`).toBeGreaterThanOrEqual(minimum);
+      const expected = 2 * n - 3;
+      expect(matches.length, `N=${n}: deve ter exatamente ${expected} partidas`).toBe(expected);
     }
   });
 

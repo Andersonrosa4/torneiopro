@@ -314,13 +314,10 @@ const BracketColumn = ({
       <div className="relative overflow-x-auto pb-2">
         <div className="flex gap-6 relative" style={{ zIndex: 1 }}>
           {displayRounds.map((round) => {
-            // Sort by global game number when available — so JOGO 9 appears above JOGO 13
-            // within the same round column. Falls back to position if no numberMap.
-            const roundMatches = roundGroups[round].sort((a, b) => {
-              const aNum = matchNumberMap?.get(a.id) ?? a.position;
-              const bNum = matchNumberMap?.get(b.id) ?? b.position;
-              return aNum - bNum;
-            });
+            // Sort by POSITION for correct visual bracket alignment and connector lines.
+            // Game numbers (matchNumberMap) follow scheduler sequence and may not be
+            // in ascending visual order within a round — that is expected in chapéu brackets.
+            const roundMatches = roundGroups[round].sort((a, b) => a.position - b.position);
             return (
               <div key={round} className="flex flex-col items-center shrink-0" style={{ minWidth: 150 }}>
                 <div className="text-[9px] uppercase font-semibold text-muted-foreground/60 mb-2 whitespace-nowrap">
@@ -958,6 +955,7 @@ const NormalKnockout = ({
 
 /* ────────────────────────────────────────────────────
    DE Global Connectors — draws lines across all columns
+   Draws winner routes (blue) and loser drop routes (orange) using L-shaped paths.
    ──────────────────────────────────────────────────── */
 const DEGlobalConnectors = ({
   containerRef,
@@ -966,8 +964,101 @@ const DEGlobalConnectors = ({
   containerRef: React.RefObject<HTMLDivElement>;
   allMatches: Match[];
 }) => {
-  const [paths, setPaths] = useState<string[]>([]);
+  const [paths, setPaths] = useState<{ d: string; type: 'win' | 'lose' }[]>([]);
   const [svgSize, setSvgSize] = useState({ w: 0, h: 0 });
+
+  const computePaths = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const containerRect = container.getBoundingClientRect();
+    setSvgSize({ w: container.scrollWidth, h: container.scrollHeight });
+    const newPaths: { d: string; type: 'win' | 'lose' }[] = [];
+
+    const drawPath = (srcId: string, dstId: string, type: 'win' | 'lose') => {
+      const srcEl = container.querySelector(`[data-match-id="${srcId}"]`);
+      const dstEl = container.querySelector(`[data-match-id="${dstId}"]`);
+      if (!srcEl || !dstEl) return;
+
+      const srcR = srcEl.getBoundingClientRect();
+      const dstR = dstEl.getBoundingClientRect();
+
+      const srcCx = srcR.left + srcR.width / 2;
+      const dstCx = dstR.left + dstR.width / 2;
+      const goingLeft = dstCx < srcCx;
+
+      let x1: number, y1: number, x2: number, y2: number;
+      if (goingLeft) {
+        // Losers bracket flows right-to-left visually
+        x1 = srcR.left - containerRect.left;
+        y1 = srcR.top + srcR.height / 2 - containerRect.top;
+        x2 = dstR.right - containerRect.left;
+        y2 = dstR.top + dstR.height / 2 - containerRect.top;
+      } else {
+        x1 = srcR.right - containerRect.left;
+        y1 = srcR.top + srcR.height / 2 - containerRect.top;
+        x2 = dstR.left - containerRect.left;
+        y2 = dstR.top + dstR.height / 2 - containerRect.top;
+      }
+
+      const midX = (x1 + x2) / 2;
+      newPaths.push({ d: `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`, type });
+    };
+
+    for (const m of allMatches) {
+      // Winner advancement line
+      if (m.next_win_match_id) {
+        drawPath(m.id, m.next_win_match_id, 'win');
+      }
+      // Loser drop line (winners → losers bracket)
+      if (m.next_lose_match_id && m.bracket_type === 'winners') {
+        drawPath(m.id, m.next_lose_match_id, 'lose');
+      }
+    }
+
+    setPaths(newPaths);
+  }, [containerRef, allMatches]);
+
+  useEffect(() => {
+    const timer = setTimeout(computePaths, 300);
+    window.addEventListener("resize", computePaths);
+    return () => { clearTimeout(timer); window.removeEventListener("resize", computePaths); };
+  }, [computePaths]);
+
+  if (paths.length === 0) return null;
+
+  return (
+    <svg
+      className="absolute top-0 left-0 pointer-events-none"
+      style={{ zIndex: 0, overflow: "visible", width: svgSize.w, height: svgSize.h }}
+    >
+      {/* Loser drop lines (orange, behind winner lines) */}
+      {paths.filter(p => p.type === 'lose').map((p, i) => (
+        <path
+          key={`lose-${i}`}
+          d={p.d}
+          fill="none"
+          stroke="hsl(var(--destructive) / 0.35)"
+          strokeWidth="1.5"
+          strokeDasharray="4 3"
+        />
+      ))}
+      {/* Winner advancement lines (muted foreground) */}
+      {paths.filter(p => p.type === 'win').map((p, i) => (
+        <path
+          key={`win-${i}`}
+          d={p.d}
+          fill="none"
+          stroke="hsl(var(--muted-foreground) / 0.3)"
+          strokeWidth="1.5"
+        />
+      ))}
+    </svg>
+  );
+};
+
+/* ────────────────────────────────────────────────────
+
+
 
   const computePaths = useCallback(() => {
     const container = containerRef.current;
@@ -1018,19 +1109,10 @@ const DEGlobalConnectors = ({
   if (paths.length === 0) return null;
 
   return (
-    <svg
-      className="absolute top-0 left-0 pointer-events-none"
-      style={{ zIndex: 0, overflow: "visible", width: svgSize.w, height: svgSize.h }}
-    >
-      {paths.map((d, i) => (
-        <path key={i} d={d} fill="none" stroke="hsl(var(--muted-foreground) / 0.3)" strokeWidth="1.5" />
-      ))}
-    </svg>
-  );
-};
+
+
 
 /* ────────────────────────────────────────────────────
-   DE Bracket Layout — wraps the 3-column grid with global connectors
    ──────────────────────────────────────────────────── */
 const DEBracketLayout = ({
   zoomContainerRef,

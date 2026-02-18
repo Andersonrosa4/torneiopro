@@ -478,7 +478,12 @@ Deno.serve(async (req) => {
         const { data: existingMatches } = await supabase.from('matches').select('id').eq('modality_id', modality.id);
         if (existingMatches && existingMatches.length > 0) {
           const ids = existingMatches.map((m: any) => m.id);
+          // Clear FK references IN these matches first
           await supabase.from('matches').update({ next_win_match_id: null, next_lose_match_id: null }).in('id', ids);
+          // Also clear FK references FROM OTHER matches pointing TO these matches
+          // (prevents FK constraint violations on insert of new bracket)
+          await supabase.from('matches').update({ next_win_match_id: null }).in('next_win_match_id', ids);
+          await supabase.from('matches').update({ next_lose_match_id: null }).in('next_lose_match_id', ids);
           await supabase.from('matches').delete().eq('modality_id', modality.id);
         }
 
@@ -490,15 +495,27 @@ Deno.serve(async (req) => {
         const { matches, error: genError } = generateBracket(tournament.id, modality.id, teams);
         if (genError || matches.length === 0) { summaryResults.push({ tournament: tournament.name, modality: modality.name, error: genError ?? 'Geração falhou' }); continue; }
 
-        // 4. Inserir no banco em chunks de 50
+        // 4. Inserir no banco sem FKs primeiro (evita FK constraint durante insert em chunks)
+        // Depois atualizar as referências next_win/lose_match_id separadamente
+        const matchesWithoutFKs = matches.map(({ next_win_match_id, next_lose_match_id, ...rest }: any) => rest);
         const chunkSize = 50;
         let insertError: string | null = null;
-        for (let i = 0; i < matches.length; i += chunkSize) {
-          const chunk = matches.slice(i, i + chunkSize);
+        for (let i = 0; i < matchesWithoutFKs.length; i += chunkSize) {
+          const chunk = matchesWithoutFKs.slice(i, i + chunkSize);
           const { error: insErr } = await supabase.from('matches').insert(chunk);
           if (insErr) { insertError = insErr.message; break; }
         }
         if (insertError) { summaryResults.push({ tournament: tournament.name, modality: modality.name, error: `Inserção: ${insertError}` }); continue; }
+
+        // Agora atualizar as referências FK (next_win/lose_match_id)
+        for (const m of matches) {
+          if (m.next_win_match_id || m.next_lose_match_id) {
+            const upd: any = {};
+            if (m.next_win_match_id) upd.next_win_match_id = m.next_win_match_id;
+            if (m.next_lose_match_id) upd.next_lose_match_id = m.next_lose_match_id;
+            await supabase.from('matches').update(upd).eq('id', m.id);
+          }
+        }
 
         // 5. Simular todos os resultados em memória
         // finalMatchStates contém o estado CORRETO de cada match após colisões resolvidas

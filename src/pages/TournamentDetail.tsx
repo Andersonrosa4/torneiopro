@@ -1043,11 +1043,23 @@ const TournamentDetail = () => {
         filters: { tournament_id: id },
         order: [{ column: "round" }, { column: "position" }],
       });
-      const freshMatchList = (freshMatches || matches) as typeof matches;
+      const allFreshMatches = (freshMatches || matches) as typeof matches;
+
+      // ══════════════════════════════════════════════════════════════════════
+      // CRITICAL FIX: Filter by SAME modality ONLY before passing to advance logic.
+      // Passing matches from ALL modalities causes slot collision detection to
+      // incorrectly block legitimate placements (e.g., guards see "stale" data
+      // from other modalities' matches that share no relation to current flow).
+      // This was the root cause of teams not advancing in Losers bracket.
+      // ══════════════════════════════════════════════════════════════════════
+      const freshMatchList = match.modality_id
+        ? allFreshMatches.filter(m => m.modality_id === match.modality_id)
+        : allFreshMatches;
+
       // Use the updated match data (winner already set)
       const freshMatch = freshMatchList.find(m => m.id === matchId) || { ...match, winner_team_id: winnerId, status: 'completed' };
       
-      // Use new advancement logic with fresh data
+      // Use new advancement logic with fresh data (scoped to same modality)
       const advancement = processDoubleEliminationAdvance(freshMatchList, freshMatch, winnerId, loserId);
       
       // ── VALIDATION LOG ──

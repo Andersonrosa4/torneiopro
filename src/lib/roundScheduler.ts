@@ -256,8 +256,11 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
       if (r > sortedRounds[0]) {
         const prevR = sortedRounds[sortedRounds.indexOf(r) - 1];
         if (prevR !== undefined) {
+          // Winners R depends on BOTH previous Winners AND previous Losers completing
           if (groups.has(`WA_R${prevR}`)) deps.push(`WA_R${prevR}`);
           if (groups.has(`WB_R${prevR}`)) deps.push(`WB_R${prevR}`);
+          if (groups.has(`LS_R${prevR}`)) deps.push(`LS_R${prevR}`);
+          if (groups.has(`LI_R${prevR}`)) deps.push(`LI_R${prevR}`);
         }
       }
     }
@@ -274,8 +277,8 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
       }
     }
 
-    if (cat === 'WB' && groups.has(`WA_R${r}`)) deps.push(`WA_R${r}`);
-    if (cat === 'LI' && groups.has(`LS_R${r}`)) deps.push(`LS_R${r}`);
+    // WA and WB of same round run in PARALLEL — no intra-round WB→WA dependency
+    // LI also runs in parallel with LS of same round
 
     const isCompleted = catMatches.every(m => m.status === 'completed');
 

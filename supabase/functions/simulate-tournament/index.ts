@@ -323,8 +323,11 @@ function simulateAllResults(matches: any[]): {
   runnerUp: string | null;
   results: Array<{ matchId: string; winner: string; loser: string | null }>;
   errors: string[];
+  finalMatchStates: Map<string, any>; // estado final em memória de TODOS os matches
 } {
-  // Trabalha com cópia mutável
+  // Trabalha com cópia mutável — NUNCA recomputar slot na hora do write no banco!
+  // A resolução de colisão (dois matches ímpares → mesmo next match) é feita aqui
+  // em memória. O estado final do matchMap é a fonte de verdade para DB writes.
   const matchMap = new Map<string, any>();
   for (const m of matches) matchMap.set(m.id, { ...m });
 
@@ -333,9 +336,8 @@ function simulateAllResults(matches: any[]): {
   let champion: string | null = null;
   let runnerUp: string | null = null;
 
-  // Processar em ordem topológica (por round e position)
+  // Processar em ordem topológica (winners → losers → semi → final, depois por round/position)
   const ordered = [...matchMap.values()].sort((a, b) => {
-    // bracket_type order: winners < losers < semi_final < final
     const typeOrder: Record<string, number> = { winners: 0, losers: 1, semi_final: 2, final: 3 };
     const ta = typeOrder[a.bracket_type] ?? 99;
     const tb = typeOrder[b.bracket_type] ?? 99;
@@ -353,98 +355,82 @@ function simulateAllResults(matches: any[]): {
       break;
     }
 
-    // Achar a próxima partida jogável (tem team1 e team2, status pending)
     const playable = ordered.find(m => {
       const current = matchMap.get(m.id);
       return current && current.status === 'pending' && current.team1_id && current.team2_id;
     });
 
     if (!playable) {
-      // Verificar se há partidas pendentes sem equipes (problema)
       const pendingWithoutTeams = ordered.filter(m => {
         const current = matchMap.get(m.id);
         return current && current.status === 'pending' && (!current.team1_id || !current.team2_id);
       });
       if (pendingWithoutTeams.length > 0) {
-        errors.push(`${pendingWithoutTeams.length} partida(s) pendente(s) sem equipes definidas: ${pendingWithoutTeams.map(m => `${m.bracket_type} R${m.round}P${m.position}`).join(', ')}`);
+        errors.push(`${pendingWithoutTeams.length} partida(s) pendente(s) sem equipes: ${pendingWithoutTeams.map(m => `${m.bracket_type} R${m.round}P${m.position}`).join(', ')}`);
       }
       break;
     }
 
     const current = matchMap.get(playable.id)!;
-    const winnerId = current.team1_id; // team1 sempre vence na simulação
+    const winnerId = current.team1_id; // team1 sempre vence
     const loserId = current.team2_id;
 
-    // Marcar como completo
     matchMap.set(current.id, { ...current, status: 'completed', winner_team_id: winnerId });
     results.push({ matchId: current.id, winner: winnerId, loser: loserId });
 
-    // Se é a final, temos campeão e vice
     if (current.bracket_type === 'final') {
       champion = winnerId;
       runnerUp = loserId;
     }
 
-    // Propagar vencedor
+    // ── Propagar VENCEDOR (com fallback de slot para colisão) ──
     if (current.next_win_match_id) {
       const nextWin = matchMap.get(current.next_win_match_id);
       if (nextWin) {
-        // Determinar slot pelo position
         const slot = current.position % 2 === 1 ? 'team1_id' : 'team2_id';
-        const otherSlot = slot === 'team1_id' ? 'team2_id' : 'team1_id';
+        const other = slot === 'team1_id' ? 'team2_id' : 'team1_id';
 
-        // Lógica especial para semi/final
         if (current.bracket_type === 'winners' && nextWin.bracket_type === 'semi_final') {
-          matchMap.set(nextWin.id, { ...nextWin, team1_id: nextWin.team1_id ?? winnerId });
+          if (!nextWin.team1_id) matchMap.set(nextWin.id, { ...matchMap.get(nextWin.id), team1_id: winnerId });
         } else if (current.bracket_type === 'losers' && nextWin.bracket_type === 'semi_final') {
-          matchMap.set(nextWin.id, { ...nextWin, team2_id: nextWin.team2_id ?? winnerId });
+          if (!nextWin.team2_id) matchMap.set(nextWin.id, { ...matchMap.get(nextWin.id), team2_id: winnerId });
         } else if (current.bracket_type === 'semi_final' && nextWin.bracket_type === 'final') {
           const semiSlot = current.position === 1 ? 'team1_id' : 'team2_id';
-          matchMap.set(nextWin.id, { ...nextWin, [semiSlot]: winnerId });
+          matchMap.set(nextWin.id, { ...matchMap.get(nextWin.id), [semiSlot]: winnerId });
         } else {
-          const preferredFilled = nextWin[slot];
-          if (!preferredFilled) {
-            matchMap.set(nextWin.id, { ...nextWin, [slot]: winnerId });
-          } else if (!nextWin[otherSlot]) {
-            matchMap.set(nextWin.id, { ...nextWin, [otherSlot]: winnerId });
+          // ── SLOT COLLISION GUARD: se slot preferido ocupado, usa o outro ──
+          const currentNext = matchMap.get(nextWin.id);
+          if (!currentNext[slot]) {
+            matchMap.set(nextWin.id, { ...currentNext, [slot]: winnerId });
+          } else if (!currentNext[other]) {
+            matchMap.set(nextWin.id, { ...currentNext, [other]: winnerId });
           } else {
-            errors.push(`Ambos slots já preenchidos em ${nextWin.bracket_type} R${nextWin.round}P${nextWin.position}`);
+            errors.push(`[COLLISION] Ambos slots preenchidos: ${nextWin.bracket_type} R${nextWin.round}P${nextWin.position}`);
           }
         }
       }
     }
 
-    // Propagar perdedor (exceto semi_final e final)
+    // ── Propagar PERDEDOR (exceto semi/final) ──
     const isSemiOrFinal = current.bracket_type === 'semi_final' || current.bracket_type === 'final';
     if (!isSemiOrFinal && loserId && current.next_lose_match_id) {
       const nextLose = matchMap.get(current.next_lose_match_id);
       if (nextLose) {
         const slot = current.position % 2 === 1 ? 'team1_id' : 'team2_id';
-        const otherSlot = slot === 'team1_id' ? 'team2_id' : 'team1_id';
-
-        // Se loser vem de winners para losers
-        if (current.bracket_type === 'winners' && nextLose.bracket_type === 'losers') {
-          if (!nextLose[slot]) {
-            matchMap.set(nextLose.id, { ...nextLose, [slot]: loserId });
-          } else if (!nextLose[otherSlot]) {
-            matchMap.set(nextLose.id, { ...nextLose, [otherSlot]: loserId });
-          } else {
-            errors.push(`[Loser drop] Ambos slots já preenchidos em Losers R${nextLose.round}P${nextLose.position}`);
-          }
-        } else if (current.bracket_type === 'losers' && nextLose.bracket_type === 'losers') {
-          if (!nextLose[slot]) {
-            matchMap.set(nextLose.id, { ...nextLose, [slot]: loserId });
-          } else if (!nextLose[otherSlot]) {
-            matchMap.set(nextLose.id, { ...nextLose, [otherSlot]: loserId });
-          } else {
-            errors.push(`[Loser survivor] Ambos slots já preenchidos em Losers R${nextLose.round}P${nextLose.position}`);
-          }
+        const other = slot === 'team1_id' ? 'team2_id' : 'team1_id';
+        const currentNext = matchMap.get(nextLose.id);
+        if (!currentNext[slot]) {
+          matchMap.set(nextLose.id, { ...currentNext, [slot]: loserId });
+        } else if (!currentNext[other]) {
+          matchMap.set(nextLose.id, { ...currentNext, [other]: loserId });
+        } else {
+          errors.push(`[LOSER COLLISION] ${nextLose.bracket_type} R${nextLose.round}P${nextLose.position}`);
         }
       }
     }
   }
 
-  return { champion, runnerUp, results, errors };
+  return { champion, runnerUp, results, errors, finalMatchStates: matchMap };
 }
 
 // ──────────────────────────────────────────────
@@ -514,42 +500,27 @@ Deno.serve(async (req) => {
         }
         if (insertError) { summaryResults.push({ tournament: tournament.name, modality: modality.name, error: `Inserção: ${insertError}` }); continue; }
 
-        // 5. Simular todos os resultados
+        // 5. Simular todos os resultados em memória
+        // finalMatchStates contém o estado CORRETO de cada match após colisões resolvidas
         const sim = simulateAllResults(matches);
 
-        // 6. Salvar resultados no banco
+        // 6. Escrever estado final no banco — direto do finalMatchStates
+        // NÃO recomputar slots aqui: a simulação já resolveu colisões (dois matches
+        // de posição ímpar → mesmo next_match → slot fallback correto em memória).
         let updateErrors = 0;
-        for (const res of sim.results) {
-          const match = matches.find(m => m.id === res.matchId);
-          const { error: updErr } = await supabase.from('matches').update({
-            winner_team_id: res.winner,
-            status: 'completed',
-            score1: 2,
-            score2: 0,
-          }).eq('id', res.matchId);
-          if (updErr) updateErrors++;
-
-          // Propagar slots no banco também (next match)
-          if (match?.next_win_match_id) {
-            const slot = match.position % 2 === 1 ? 'team1_id' : 'team2_id';
-            if (match.bracket_type === 'winners' && matches.find(m => m.id === match.next_win_match_id)?.bracket_type === 'semi_final') {
-              await supabase.from('matches').update({ team1_id: res.winner }).eq('id', match.next_win_match_id).is('team1_id', null);
-            } else if (match.bracket_type === 'losers' && matches.find(m => m.id === match.next_win_match_id)?.bracket_type === 'semi_final') {
-              await supabase.from('matches').update({ team2_id: res.winner }).eq('id', match.next_win_match_id).is('team2_id', null);
-            } else if (match.bracket_type === 'semi_final') {
-              const semiSlot = match.position === 1 ? 'team1_id' : 'team2_id';
-              await supabase.from('matches').update({ [semiSlot]: res.winner }).eq('id', match.next_win_match_id);
-            } else {
-              await supabase.from('matches').update({ [slot]: res.winner }).eq('id', match.next_win_match_id).is(slot, null);
-            }
+        for (const [matchId, finalState] of sim.finalMatchStates.entries()) {
+          const payload: Record<string, any> = {
+            team1_id: finalState.team1_id ?? null,
+            team2_id: finalState.team2_id ?? null,
+          };
+          if (finalState.winner_team_id) {
+            payload.winner_team_id = finalState.winner_team_id;
+            payload.status = 'completed';
+            payload.score1 = 2;
+            payload.score2 = 0;
           }
-
-          // Propagar loser
-          const isSemiOrFinal = match?.bracket_type === 'semi_final' || match?.bracket_type === 'final';
-          if (!isSemiOrFinal && res.loser && match?.next_lose_match_id) {
-            const slot = match.position % 2 === 1 ? 'team1_id' : 'team2_id';
-            await supabase.from('matches').update({ [slot]: res.loser }).eq('id', match.next_lose_match_id).is(slot, null);
-          }
+          const { error: stateErr } = await supabase.from('matches').update(payload).eq('id', matchId);
+          if (stateErr) updateErrors++;
         }
 
         // 7. Atualizar status do torneio para completed

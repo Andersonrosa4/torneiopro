@@ -416,6 +416,13 @@ function buildWinnersBracket(
 // ──────────────────────────────────────────────
 // Losers Bracket — Construção Sequencial Obrigatória
 // ──────────────────────────────────────────────
+//
+// REGRA CRÍTICA — Entradas ímpares:
+// Na chave dos perdedores, quando uma rodada tem número ÍMPAR de entradas,
+// o elemento excedente recebe um BYE (folga real) e é DIFERIDO para a próxima
+// rodada, onde se juntará às novas entradas. NUNCA criar partida chapéu vazia
+// na losers — isso gera partidas fantasma que nunca serão jogadas.
+// ──────────────────────────────────────────────
 
 function buildLosersBracketWithFeeders(
   sourceWinnersMatches: MatchData[],
@@ -424,8 +431,9 @@ function buildLosersBracketWithFeeders(
   half: 'upper' | 'lower',
   bracketNumber: number,
 ): MatchData[] {
-  const totalFeeders = sourceWinnersMatches.length;
-  if (totalFeeders === 0) return [];
+  if (sourceWinnersMatches.length === 0) return [];
+
+  type Entry = { source: MatchData; linkField: 'next_win_match_id' | 'next_lose_match_id' };
 
   // Agrupar winners por rodada
   const byRound = new Map<number, MatchData[]>();
@@ -436,153 +444,114 @@ function buildLosersBracketWithFeeders(
   const winnersRounds = [...byRound.keys()].sort((a, b) => a - b);
 
   const allLosersMatches: MatchData[] = [];
-
-  // "survivors" são os matches de losers cuja saída (winner) ainda não foi pareada
-  let survivors: MatchData[] = [];
   let losersRound = 1;
+
+  // pendingBye: entrada ímpar diferida da rodada anterior (recebe BYE)
+  let pendingBye: Entry | null = null;
+  // survivorEntries: saídas dos matches de losers já criados (prontos para próxima rodada)
+  let survivorEntries: Entry[] = [];
 
   for (let ri = 0; ri < winnersRounds.length; ri++) {
     const wRound = winnersRounds[ri];
     const winnersInRound = byRound.get(wRound)!.sort((a, b) => a.position - b.position);
 
-    // ── PASSO 1: Montar lista de "entradas" para esta rodada dos perdedores ──
-    // Cada entrada é um MatchData que vai alimentar um slot no próximo match.
-    // - survivors: matches de losers anteriores (feeder via next_win_match_id)
-    // - winnersInRound: matches de winners (feeder via next_lose_match_id)
-    //
-    // Para R1 dos perdedores: usar espelhamento reverso (1↔último, 2↔penúltimo)
-    // Para rodadas subsequentes: intercalar survivors com novos perdedores
+    // ── PASSO 1: Montar lista de entradas para esta rodada ──
+    let incoming: Entry[] = [];
 
-    const incoming: { source: MatchData; linkField: 'next_win_match_id' | 'next_lose_match_id' }[] = [];
-
-    if (ri === 0 && survivors.length === 0) {
-      // ── Rodada 1: Pareamento sequencial ──
-      // Perd.9 vs Perd.10, Perd.11 vs Perd.12, etc.
-      // Ordenados por position ascendente (quem jogou antes, joga primeiro).
-      const sources = winnersInRound
-        .map(m => ({ source: m, linkField: 'next_lose_match_id' as const }))
-        .sort((a, b) => a.source.position - b.source.position);
-
-      for (const s of sources) {
-        incoming.push(s);
-      }
-    } else {
-      // ── Rodadas subsequentes: intercalar survivors com novos perdedores ──
-      // REGRA 9 (ANTI-REMATCH): Os novos perdedores que caem da Winners são
-      // intercalados em ordem REVERSA com os sobreviventes da Losers.
-      // Isso garante que o sobrevivente do primeiro jogo da Losers R1
-      // (que tinha Perd.9 vs Perd.10) NÃO enfrente o perdedor da Winners R2
-      // que veio do vencedor de jogo 9 ou 10. A inversão maximiza a distância
-      // entre ex-adversários, evitando rematches nas rodadas 1-2 da Losers.
-      const surv = survivors.map(m => ({
+    if (ri === 0) {
+      // R1: apenas perdedores da Winners R1 (sem survivors ainda)
+      const droppers = winnersInRound.map(m => ({
         source: m,
-        linkField: 'next_win_match_id' as const,
+        linkField: 'next_lose_match_id' as const,
       }));
-      const newLosers = winnersInRound
-        .map(m => ({
-          source: m,
-          linkField: 'next_lose_match_id' as const,
-        }))
+      // Inclui BYE diferido (deve ser vazio na R1, mas por segurança)
+      incoming = pendingBye ? [pendingBye, ...droppers] : droppers;
+    } else {
+      // R2+: intercalar survivors com novos perdedores (REGRA 9 — inversão anti-revanche)
+      const surv: Entry[] = survivorEntries;
+      const newLosers: Entry[] = winnersInRound
+        .map(m => ({ source: m, linkField: 'next_lose_match_id' as const }))
         .sort((a, b) => a.source.position - b.source.position)
-        .reverse(); // REVERSO: últimos droppers com primeiros survivors
+        .reverse(); // REVERSO: anti-rematch
 
-      // Intercalar
       const maxLen = Math.max(surv.length, newLosers.length);
+      const interleaved: Entry[] = [];
       for (let i = 0; i < maxLen; i++) {
-        if (i < surv.length) incoming.push(surv[i]);
-        if (i < newLosers.length) incoming.push(newLosers[i]);
+        if (i < surv.length) interleaved.push(surv[i]);
+        if (i < newLosers.length) interleaved.push(newLosers[i]);
       }
+
+      // BYE diferido da rodada anterior vai na frente
+      incoming = pendingBye ? [pendingBye, ...interleaved] : interleaved;
     }
+
+    pendingBye = null; // consumido
 
     if (incoming.length === 0) continue;
 
-    // ── PASSO 2: Criar todos os jogos da rodada ──
+    // ── PASSO 2: Criar matches pareando entradas 2 a 2 ──
     const numMatches = Math.floor(incoming.length / 2);
-    const roundMatches: MatchData[] = [];
 
+    if (numMatches === 0) {
+      // Só 1 entrada → BYE total desta rodada, diferir para próxima
+      pendingBye = incoming[0];
+      // Não incrementa losersRound (nenhum jogo foi criado)
+      continue;
+    }
+
+    const roundMatches: MatchData[] = [];
     for (let mi = 0; mi < numMatches; mi++) {
       const m = createMatch(
         tournamentId, modalityId, losersRound, mi + 1,
         'losers', half, bracketNumber,
       );
+      // Linkar as duas entradas ao match
+      incoming[mi * 2].source[incoming[mi * 2].linkField] = m._temp_id;
+      incoming[mi * 2 + 1].source[incoming[mi * 2 + 1].linkField] = m._temp_id;
       roundMatches.push(m);
       allLosersMatches.push(m);
     }
 
-    // ── PASSO 3: Atribuir feeders aos jogos criados ──
-    for (let mi = 0; mi < numMatches; mi++) {
-      const entry1 = incoming[mi * 2];
-      const entry2 = incoming[mi * 2 + 1];
-      const targetMatch = roundMatches[mi];
-
-      // Linkar source → target
-      entry1.source[entry1.linkField] = targetMatch._temp_id;
-      entry2.source[entry2.linkField] = targetMatch._temp_id;
+    // ── PASSO 3: Entrada ímpar → BYE (diferida para próxima rodada) ──
+    // NÃO criar partida chapéu vazia. Apenas diferir.
+    if (incoming.length % 2 === 1) {
+      pendingBye = incoming[incoming.length - 1];
+      console.log(
+        `[Losers BYE] ${half} R${losersRound}: entry ímpar diferida para próxima rodada (sem match chapéu)`
+      );
     }
 
-    // ── PASSO 4: Competidor ímpar → Chapéu (slot de espera) ──
-     const newSurvivors: MatchData[] = [...roundMatches];
-     if (incoming.length % 2 === 1) {
-       const oddEntry = incoming[incoming.length - 1];
-       // O competidor ímpar precisa de um match de espera (Chapéu)
-       // Este é um slot vazio aguardando um adversário real
-       const chapeuMatch = createMatch(
-         tournamentId, modalityId, losersRound, numMatches + 1,
-         'losers', half, bracketNumber,
-         null, null, true, // is_chapeu
-       );
-       
-       // Linkar o source ao Chapéu
-       oddEntry.source[oddEntry.linkField] = chapeuMatch._temp_id;
-       
-       // Determinar qual slot recebe o time ímpar
-       // Usar position parity: odd position = team1, even = team2
-       const sourceMatch = oddEntry.source;
-       const slotField = sourceMatch.position % 2 === 1 ? 'team1_id' : 'team2_id';
-       chapeuMatch[slotField] = oddEntry.source.winner_team_id; // Will be set on winner declaration
-       
-       chapeuMatch.status = 'pending';
-       allLosersMatches.push(chapeuMatch);
-       newSurvivors.push(chapeuMatch);
-     }
-
-    survivors = newSurvivors;
+    survivorEntries = roundMatches.map(m => ({ source: m, linkField: 'next_win_match_id' as const }));
     losersRound++;
   }
 
-  // ── Redução final: parear sobreviventes até restar 1 ──
-  while (survivors.length > 1) {
-    const numMatches = Math.floor(survivors.length / 2);
-    const nextSurvivors: MatchData[] = [];
+  // ── Redução final: parear survivors + eventual BYE diferido até restar 1 ──
+  let remaining: Entry[] = pendingBye
+    ? [pendingBye, ...survivorEntries]
+    : [...survivorEntries];
+
+  while (remaining.length > 1) {
+    const numMatches = Math.floor(remaining.length / 2);
+    const nextRemaining: Entry[] = [];
 
     for (let i = 0; i < numMatches; i++) {
       const m = createMatch(
         tournamentId, modalityId, losersRound, i + 1,
         'losers', half, bracketNumber,
       );
-      survivors[i * 2].next_win_match_id = m._temp_id;
-      survivors[i * 2 + 1].next_win_match_id = m._temp_id;
+      remaining[i * 2].source[remaining[i * 2].linkField] = m._temp_id;
+      remaining[i * 2 + 1].source[remaining[i * 2 + 1].linkField] = m._temp_id;
       allLosersMatches.push(m);
-      nextSurvivors.push(m);
+      nextRemaining.push({ source: m, linkField: 'next_win_match_id' });
     }
 
-     // Ímpar na redução → Chapéu (slot de espera)
-     if (survivors.length % 2 === 1) {
-       const chapeuMatch = createMatch(
-         tournamentId, modalityId, losersRound, numMatches + 1,
-         'losers', half, bracketNumber,
-         null, null, true, // is_chapeu
-       );
-       survivors[survivors.length - 1].next_win_match_id = chapeuMatch._temp_id;
-       // Determine slot: odd position = team1, even = team2
-       const slotField = (numMatches + 1) % 2 === 1 ? 'team1_id' : 'team2_id';
-       chapeuMatch[slotField] = null; // Will receive team on winner advancement
-       chapeuMatch.status = 'pending';
-       allLosersMatches.push(chapeuMatch);
-       nextSurvivors.push(chapeuMatch);
-     }
+    // Ímpar na redução → BYE (avança direto, sem match fantasma)
+    if (remaining.length % 2 === 1) {
+      nextRemaining.push(remaining[remaining.length - 1]);
+      console.log(`[Losers BYE Redução] ${half} R${losersRound}: 1 survivor com BYE`);
+    }
 
-    survivors = nextSurvivors;
+    remaining = nextRemaining;
     losersRound++;
   }
 

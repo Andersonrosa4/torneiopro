@@ -74,9 +74,20 @@ const MatchCard = ({
   // Compute feeders from actual feeder mapping with real match numbers
   const feeders = allMatches ? getSlotFeeders(match, allMatches, matchNumberMap) : { team1: null, team2: null };
 
-  // DISPLAY SWAP: If team1 has loser feeder and team2 has winner feeder, swap visually
-  // so the winner feeder (Venc.) always appears on top
-  const shouldSwap = feeders.team1?.type === 'loser' && feeders.team2?.type === 'winner';
+  // DISPLAY SWAP LOGIC:
+  // Rule 1: Both feeders present → winner feeder always on top
+  // Rule 2: Only team2 slot has a winner feeder (team1 slot is empty/awaiting) → swap so winner label/team goes top
+  // Rule 3: Chapéu case — team2 has a pre-placed real team AND team1 is waiting for a winner feeder → no swap needed (feeder already on top)
+  const shouldSwap = (() => {
+    if (feeders.team1 && feeders.team2) {
+      return feeders.team1.type === 'loser' && feeders.team2.type === 'winner';
+    }
+    // team2 has winner feeder but team1 slot is the empty one (i.e. winner will fill team1) → no swap
+    if (feeders.team1?.type === 'winner' && !feeders.team2) return false;
+    // team1 has no feeder but team2 does (winner) → winner is in bottom slot, swap to top
+    if (!feeders.team1 && feeders.team2?.type === 'winner') return true;
+    return false;
+  })();
 
   const topTeamId = shouldSwap ? match.team2_id : match.team1_id;
   const bottomTeamId = shouldSwap ? match.team1_id : match.team2_id;

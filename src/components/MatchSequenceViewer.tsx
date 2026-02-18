@@ -935,7 +935,7 @@ const MatchSequenceViewer = ({
         return (
           <div
             key={blockKey || block.label}
-            className={`rounded-xl border border-primary/25 bg-card/20 backdrop-blur-sm overflow-hidden shadow-[0_0_15px_hsl(var(--primary)/0.08)] ${!isUnlocked && isDoubleElim ? 'opacity-40' : ''}`}
+            className={`rounded-xl border border-primary/25 bg-card/20 backdrop-blur-sm overflow-hidden shadow-[0_0_15px_hsl(var(--primary)/0.08)]`}
           >
             {/* Block header — gradient bar */}
             <div className="px-5 py-3 border-b border-primary/15 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent">

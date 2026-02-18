@@ -205,13 +205,42 @@ export function processDoubleEliminationAdvance(
       // nos dois slots do mesmo jogo. Bloqueia imediatamente.
       // ══════════════════════════════════════════════════════
       const otherSlotL = slot === 'team1_id' ? 'team2_id' : 'team1_id';
+
+      // ── EXTENDED CHECK: detect data corruption (same team in LB R1 AND LB R2+) ──
+      // If we're placing a WB loser into LB, verify they are NOT already in a LATER
+      // LB match (which would indicate stale data from a previous cascade reset bug).
+      if (currentMatch.bracket_type === 'winners' && nextLoseMatch.bracket_type === 'losers') {
+        const alreadyInLaterLB = matches.some(m =>
+          m.bracket_type === 'losers' &&
+          m.round > nextLoseMatch.round &&
+          (m.team1_id === loserId || m.team2_id === loserId)
+        );
+        if (alreadyInLaterLB) {
+          // The team appears in a later LB round — stale data from cascade reset.
+          // Clear that stale placement before proceeding with correct placement.
+          const staleMatches = matches.filter(m =>
+            m.bracket_type === 'losers' &&
+            m.round > nextLoseMatch.round &&
+            (m.team1_id === loserId || m.team2_id === loserId)
+          );
+          for (const staleMatch of staleMatches) {
+            const staleSlot = staleMatch.team1_id === loserId ? 'team1_id' : 'team2_id';
+            console.warn(
+              `[⚠️ STALE DATA CLEANUP] Loser ${loserId} encontrado em LB R${staleMatch.round}P${staleMatch.position} ` +
+              `(posterior ao alvo LB R${nextLoseMatch.round}). Limpando slot ${staleSlot} para evitar duplicata.`
+            );
+            result.loserUpdates.push({ matchId: staleMatch.id, data: { [staleSlot]: null } });
+          }
+        }
+      }
+
       if (nextLoseMatch[otherSlotL] && nextLoseMatch[otherSlotL] === loserId) {
         console.error(
           `[🚫 SELF-MATCH BLOCKED] Loser ${loserId} já ocupa o slot ${otherSlotL} ` +
           `em Match ${nextLoseMatch.id} (${nextLoseMatch.bracket_type} R${nextLoseMatch.round}P${nextLoseMatch.position}). ` +
           `Colocação BLOQUEADA para evitar auto-confronto.`
         );
-        // Skip — this team is already in the correct slot (chapéu pre-placed)
+        // Skip — this team is already in the correct slot (same team, same match)
       } else {
         // Anti-repetition check for losers bracket R1-R2
         if (nextLoseMatch.bracket_type === 'losers' && nextLoseMatch.round <= 2) {

@@ -264,3 +264,104 @@ describe("Regra 11 — Chave Perdedores existe para N >= 4", () => {
     });
   }
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// BLOCO 13: Mirror Crossing — Cada partida Winners tem next_lose_match_id no lado OPOSTO
+// BUG HISTÓRICO: Vencedor do jogo não avançava por stale data no lado errado da Losers
+// ──────────────────────────────────────────────────────────────────────────────
+describe("Regra 12 — Mirror Crossing correto (Winners A → Losers B, Winners B → Losers A)", () => {
+  for (const n of TEAM_COUNTS.filter(n => n >= 8)) {
+    it(`${n} duplas — todo perdedor da Winners cai para o lado oposto da Losers`, () => {
+      const config = makeConfig(n, 'beach_volleyball', 'Masculino');
+      const { matches } = generateDoubleEliminationBracket(config);
+      const any_matches = matches as any[];
+      const matchMap = new Map(any_matches.map(m => [m.id, m]));
+
+      const winnersMatches = any_matches.filter(m =>
+        m.bracket_type === 'winners' &&
+        m.bracket_half &&
+        m.next_lose_match_id
+      );
+
+      for (const wm of winnersMatches) {
+        const loseTarget = matchMap.get(wm.next_lose_match_id);
+        if (loseTarget && loseTarget.bracket_half) {
+          const expectedSide = wm.bracket_half === 'upper' ? 'lower' : 'upper';
+          expect(loseTarget.bracket_half).toBe(expectedSide);
+        }
+      }
+    });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// BLOCO 14: Nenhuma equipe aparece em dois slots do mesmo jogo (auto-confronto na geração)
+// BUG HISTÓRICO: Anti-Self-Match Guard bloqueava avanços legítimos por stale data
+// ──────────────────────────────────────────────────────────────────────────────
+describe("Regra 13 — Nenhuma equipe ocupa os dois slots de um mesmo jogo", () => {
+  for (const n of TEAM_COUNTS) {
+    it(`${n} duplas — team1_id ≠ team2_id em TODAS as partidas`, () => {
+      const config = makeConfig(n, 'beach_volleyball', 'Masculino');
+      const { matches } = generateDoubleEliminationBracket(config);
+      for (const m of matches as any[]) {
+        if (m.team1_id && m.team2_id) {
+          expect(m.team1_id).not.toBe(m.team2_id);
+        }
+      }
+    });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// BLOCO 15: Integridade dos links — next_win/next_lose apontam para partidas existentes
+// BUG HISTÓRICO: Stale data causava links para partidas deletadas por cascade reset
+// ──────────────────────────────────────────────────────────────────────────────
+describe("Regra 14 — Links next_win/next_lose apontam para partidas existentes", () => {
+  for (const n of TEAM_COUNTS) {
+    it(`${n} duplas — todos os links de progressão são válidos`, () => {
+      const config = makeConfig(n, 'beach_volleyball', 'Masculino');
+      const { matches } = generateDoubleEliminationBracket(config);
+      const any_matches = matches as any[];
+      const matchIds = new Set(any_matches.map(m => m.id));
+
+      for (const m of any_matches) {
+        if (m.next_win_match_id) {
+          expect(matchIds.has(m.next_win_match_id)).toBe(true);
+        }
+        if (m.next_lose_match_id) {
+          expect(matchIds.has(m.next_lose_match_id)).toBe(true);
+        }
+      }
+    });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// BLOCO 16: Nenhum time é duplicado em múltiplas partidas da R1 da Losers
+// BUG HISTÓRICO: Stale data pré-colocava um time na Losers R2+ antes de cair da Winners
+// ──────────────────────────────────────────────────────────────────────────────
+describe("Regra 15 — Nenhum time duplicado na Losers R1 (sem stale data)", () => {
+  for (const n of TEAM_COUNTS.filter(n => n >= 8)) {
+    it(`${n} duplas — cada time aparece no máximo 1x nas partidas da Losers R1`, () => {
+      const config = makeConfig(n, 'beach_volleyball', 'Masculino');
+      const { matches } = generateDoubleEliminationBracket(config);
+      const any_matches = matches as any[];
+
+      const losersR1 = any_matches.filter(m => m.bracket_type === 'losers' && m.round === 1);
+      const teamOccurrences = new Map<string, number>();
+
+      for (const m of losersR1) {
+        if (m.team1_id) {
+          teamOccurrences.set(m.team1_id, (teamOccurrences.get(m.team1_id) || 0) + 1);
+        }
+        if (m.team2_id) {
+          teamOccurrences.set(m.team2_id, (teamOccurrences.get(m.team2_id) || 0) + 1);
+        }
+      }
+
+      for (const [teamId, count] of teamOccurrences) {
+        expect(count).toBe(1);
+      }
+    });
+  }
+});

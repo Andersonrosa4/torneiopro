@@ -18,6 +18,7 @@ const QUICK_QUESTIONS = [
 
 export default function AiAssistant() {
   const [open, setOpen] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -118,8 +119,21 @@ export default function AiAssistant() {
     }
   };
 
+  if (dismissed) return null;
+
   return (
     <>
+      {/* Dismiss button (X acima do botão) */}
+      {!open && (
+        <button
+          onClick={() => setDismissed(true)}
+          aria-label="Fechar assistente"
+          className="fixed bottom-[82px] right-7 z-50 w-5 h-5 rounded-full bg-[hsl(220_12%_22%)] border border-[hsl(220_10%_30%)] flex items-center justify-center text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(220_12%_28%)] transition-all duration-200 shadow-md"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      )}
+
       {/* Floating button with glow */}
       <button
         onClick={() => setOpen((o) => !o)}

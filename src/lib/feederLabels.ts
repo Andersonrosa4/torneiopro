@@ -73,7 +73,19 @@ export function getSlotFeeders(
 
     // Fallback when match not yet played: use slot convention rules
     if (!slot) {
-      if (isWinnerFeeder && feeder.bracket_type === 'losers' && targetMatch.bracket_type === 'losers') {
+      // ── CHAPÉU DETECTION: one slot already has a real team, the other is empty ──
+      // The feeder (winner of another match) goes into the EMPTY slot.
+      // This avoids position % 2 divergence when chapéu teams are pre-placed.
+      const team1Empty = !targetMatch.team1_id;
+      const team2Empty = !targetMatch.team2_id;
+
+      if (team1Empty && !team2Empty) {
+        // team2 already has a chapéu/seed team → feeder goes to team1
+        slot = 'team1';
+      } else if (!team1Empty && team2Empty) {
+        // team1 already has a chapéu/seed team → feeder goes to team2
+        slot = 'team2';
+      } else if (isWinnerFeeder && feeder.bracket_type === 'losers' && targetMatch.bracket_type === 'losers') {
         // Position-based: two losers matches may feed the same next match
         slot = feeder.position % 2 === 1 ? 'team1' : 'team2';
       } else if (!isWinnerFeeder && feeder.bracket_type === 'winners' && targetMatch.bracket_type === 'losers') {

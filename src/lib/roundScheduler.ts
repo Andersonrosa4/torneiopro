@@ -147,6 +147,32 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
   }
   const sortedRounds = [...allRounds].sort((a, b) => a - b);
 
+  // ── BUILD REAL FEEDER MAP: for each losers block, which winners blocks actually feed it? ──
+  // This replaces the naive "LS_Rx depends on WA_Rx + WB_Rx" assumption.
+  // With chapéu brackets, WB_R2 can feed into LS_R1 (different round numbers).
+  const losersBlockFeeders = new Map<string, Set<string>>();
+
+  for (const m of matches) {
+    if (m.round === 0) continue;
+    if (!m.next_lose_match_id) continue;
+
+    const srcCat = categorizeMatch(m);
+    if (srcCat !== 'WA' && srcCat !== 'WB') continue;
+
+    // Find the destination losers match
+    const destMatch = matches.find(d => d.id === m.next_lose_match_id);
+    if (!destMatch) continue;
+
+    const destCat = categorizeMatch(destMatch);
+    if (destCat !== 'LS' && destCat !== 'LI') continue;
+
+    const destKey = `${destCat}_R${destMatch.round}`;
+    const srcKey = `${srcCat}_R${m.round}`;
+
+    if (!losersBlockFeeders.has(destKey)) losersBlockFeeders.set(destKey, new Set());
+    losersBlockFeeders.get(destKey)!.add(srcKey);
+  }
+
   const blocks: SchedulerBlock[] = [];
   let order = 0;
 
@@ -170,9 +196,17 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
     }
 
     if (cat === 'LS' || cat === 'LI') {
-      // Losers R depends only on Winners A R + Winners B R being complete
-      if (groups.has(`WA_R${r}`)) deps.push(`WA_R${r}`);
-      if (groups.has(`WB_R${r}`)) deps.push(`WB_R${r}`);
+      // Use REAL feeder map from next_lose_match_id graph instead of assuming same round number
+      const realFeeders = losersBlockFeeders.get(key);
+      if (realFeeders && realFeeders.size > 0) {
+        for (const feederKey of realFeeders) {
+          if (groups.has(feederKey)) deps.push(feederKey);
+        }
+      } else {
+        // Fallback: use same-round winners if no real feeder data
+        if (groups.has(`WA_R${r}`)) deps.push(`WA_R${r}`);
+        if (groups.has(`WB_R${r}`)) deps.push(`WB_R${r}`);
+      }
     }
 
     // Within same category pair: WB depends on WA, LI depends on LS
@@ -193,14 +227,135 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
     });
   }
 
-  // Emit blocks in strict sequential order:
-  // WA R1, WB R1, LS R1, LI R1, WA R2, WB R2, LS R2, LI R2, ... → Semis → Final
-  // This ensures match numbering is always sequential without jumps.
+  // ── COMPUTE CORRECT EMISSION ORDER ──
+  // Instead of naively emitting WA_R1→WB_R1→LS_R1→LI_R1 per round,
+  // we use topological sort so blocks only appear after ALL their real feeders.
+  // This fixes the bug where LS_R1 got number 3/4 but depended on WB_R2.
+
+  // First, collect all block keys that exist
+  const allBlockKeys: string[] = [];
   for (const r of sortedRounds) {
-    createBlock('WA', r);
-    createBlock('WB', r);
-    createBlock('LS', r);
-    createBlock('LI', r);
+    for (const cat of ['WA', 'WB', 'LS', 'LI'] as BlockCategory[]) {
+      const key = `${cat}_R${r}`;
+      if (groups.has(key)) allBlockKeys.push(key);
+    }
+  }
+
+  // Build all blocks first (without order)
+  const tempBlocks = new Map<string, SchedulerBlock>();
+  for (const key of allBlockKeys) {
+    const [catStr, rStr] = key.split('_R');
+    const cat = catStr as BlockCategory;
+    const r = parseInt(rStr);
+    const catMatches = groups.get(key) || [];
+    if (catMatches.length === 0) continue;
+
+    const deps: string[] = [];
+
+    if (cat === 'WA' || cat === 'WB') {
+      if (r > sortedRounds[0]) {
+        const prevR = sortedRounds[sortedRounds.indexOf(r) - 1];
+        if (prevR !== undefined) {
+          if (groups.has(`WA_R${prevR}`)) deps.push(`WA_R${prevR}`);
+          if (groups.has(`WB_R${prevR}`)) deps.push(`WB_R${prevR}`);
+        }
+      }
+    }
+
+    if (cat === 'LS' || cat === 'LI') {
+      const realFeeders = losersBlockFeeders.get(key);
+      if (realFeeders && realFeeders.size > 0) {
+        for (const feederKey of realFeeders) {
+          if (groups.has(feederKey)) deps.push(feederKey);
+        }
+      } else {
+        if (groups.has(`WA_R${r}`)) deps.push(`WA_R${r}`);
+        if (groups.has(`WB_R${r}`)) deps.push(`WB_R${r}`);
+      }
+    }
+
+    if (cat === 'WB' && groups.has(`WA_R${r}`)) deps.push(`WA_R${r}`);
+    if (cat === 'LI' && groups.has(`LS_R${r}`)) deps.push(`LS_R${r}`);
+
+    const isCompleted = catMatches.every(m => m.status === 'completed');
+
+    tempBlocks.set(key, {
+      key,
+      label: blockLabel(cat, r),
+      round: r,
+      blockOrder: -1,
+      matches: catMatches.sort((a, b) => a.position - b.position),
+      isCompleted,
+      isUnlocked: false,
+      dependencies: [...new Set(deps)],
+    });
+  }
+
+  // Topological sort (Kahn's algorithm) to determine correct emission order
+  const inDegree = new Map<string, number>();
+  const adjList = new Map<string, string[]>(); // key → keys that depend on it
+
+  for (const [key, block] of tempBlocks) {
+    if (!inDegree.has(key)) inDegree.set(key, 0);
+    for (const dep of block.dependencies) {
+      if (!tempBlocks.has(dep)) continue;
+      if (!adjList.has(dep)) adjList.set(dep, []);
+      adjList.get(dep)!.push(key);
+      inDegree.set(key, (inDegree.get(key) || 0) + 1);
+    }
+  }
+
+  // Priority queue: process blocks with no remaining deps
+  // Tie-break: prefer WA > WB > LS > LI (winners before losers), then lower round
+  const catPriority = (k: string) => {
+    if (k.startsWith('WA')) return 0;
+    if (k.startsWith('WB')) return 1;
+    if (k.startsWith('LS')) return 2;
+    if (k.startsWith('LI')) return 3;
+    return 4;
+  };
+
+  const queue: string[] = [];
+  for (const [key, deg] of inDegree) {
+    if (deg === 0) queue.push(key);
+  }
+  queue.sort((a, b) => {
+    const aBlock = tempBlocks.get(a)!;
+    const bBlock = tempBlocks.get(b)!;
+    if (aBlock.round !== bBlock.round) return aBlock.round - bBlock.round;
+    return catPriority(a) - catPriority(b);
+  });
+
+  const emitted = new Set<string>();
+  while (queue.length > 0) {
+    queue.sort((a, b) => {
+      const aBlock = tempBlocks.get(a)!;
+      const bBlock = tempBlocks.get(b)!;
+      if (aBlock.round !== bBlock.round) return aBlock.round - bBlock.round;
+      return catPriority(a) - catPriority(b);
+    });
+
+    const key = queue.shift()!;
+    if (emitted.has(key)) continue;
+    emitted.add(key);
+
+    const block = tempBlocks.get(key)!;
+    block.blockOrder = order++;
+    blocks.push(block);
+
+    for (const neighbor of adjList.get(key) || []) {
+      const newDeg = (inDegree.get(neighbor) || 0) - 1;
+      inDegree.set(neighbor, newDeg);
+      if (newDeg === 0) queue.push(neighbor);
+    }
+  }
+
+  // Any remaining (should not happen in valid graph)
+  for (const [key, block] of tempBlocks) {
+    if (!emitted.has(key)) {
+      block.blockOrder = order++;
+      blocks.push(block);
+    }
   }
 
   // Semifinals

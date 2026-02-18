@@ -46,7 +46,129 @@ interface BracketTreeViewProps {
    Helper: Convert number to letter (1→A, 2→B, etc)
    ──────────────────────────────────────────────────── */
 const numberToLetter = (num: number): string => {
-  return String.fromCharCode(64 + num); // A=65, so 64+1=65
+  return String.fromCharCode(64 + num);
+};
+
+/* ════════════════════════════════════════════════════
+   SISTEMA DE CONECTORES SVG UNIFICADO
+   Baseado 100% em coordenadas reais de tela via getBoundingClientRect()
+   ════════════════════════════════════════════════════ */
+
+/**
+ * Calcula o mapa de slots: para cada match, determina se o vencedor
+ * vai para o slot "A" (top, 25%) ou "B" (bottom, 75%) do próximo match.
+ * Determinado pela ordem de posição dos feeders.
+ */
+function buildSlotMap(matches: Match[]): Map<string, "A" | "B"> {
+  const map = new Map<string, "A" | "B">();
+  const destGroups = new Map<string, Match[]>();
+
+  for (const m of matches) {
+    if (!m.next_win_match_id) continue;
+    if (!destGroups.has(m.next_win_match_id)) destGroups.set(m.next_win_match_id, []);
+    destGroups.get(m.next_win_match_id)!.push(m);
+  }
+
+  for (const [, feeders] of destGroups) {
+    // Ordena por posição para determinar qual vai para slot A (top) e B (bottom)
+    feeders.sort((a, b) => a.position - b.position);
+    feeders.forEach((f, i) => map.set(f.id, i === 0 ? "A" : "B"));
+  }
+
+  return map;
+}
+
+/**
+ * Componente SVG unificado de conectores.
+ * Usa getBoundingClientRect() real para calcular coordenadas.
+ * Redesenha ao redimensionar, ao zoom mudar, e quando matches mudam.
+ */
+const SVGConnectors = ({
+  containerRef,
+  matches,
+  slotMap,
+}: {
+  containerRef: React.RefObject<HTMLDivElement>;
+  matches: Match[];
+  slotMap: Map<string, "A" | "B">;
+}) => {
+  const [lines, setLines] = useState<{ x1: number; y1: number; x2: number; y2: number }[]>([]);
+  const [svgDims, setSvgDims] = useState({ w: 0, h: 0 });
+
+  const compute = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const cr = container.getBoundingClientRect();
+    const scrollLeft = container.scrollLeft;
+    const scrollTop = container.scrollTop;
+
+    const newLines: { x1: number; y1: number; x2: number; y2: number }[] = [];
+
+    for (const m of matches) {
+      if (!m.next_win_match_id) continue;
+
+      // Busca os elementos pelo id real do match
+      const srcEl = document.getElementById(m.id);
+      const dstEl = document.getElementById(m.next_win_match_id);
+      if (!srcEl || !dstEl) continue;
+
+      const srcRect = srcEl.getBoundingClientRect();
+      const dstRect = dstEl.getBoundingClientRect();
+
+      // Ponto de saída: centro vertical da borda direita do match de origem
+      const x1 = srcRect.right - cr.left + scrollLeft;
+      const y1 = srcRect.top - cr.top + scrollTop + srcRect.height / 2;
+
+      // Ponto de entrada: borda esquerda do match de destino, no slot correto
+      const slot = slotMap.get(m.id) ?? "A";
+      const x2 = dstRect.left - cr.left + scrollLeft;
+      const y2 = dstRect.top - cr.top + scrollTop + (slot === "A" ? dstRect.height * 0.25 : dstRect.height * 0.75);
+
+      newLines.push({ x1, y1, x2, y2 });
+    }
+
+    setLines(newLines);
+    setSvgDims({ w: container.scrollWidth, h: container.scrollHeight });
+  }, [containerRef, matches, slotMap]);
+
+  useEffect(() => {
+    // Aguarda render antes de calcular
+    const t1 = setTimeout(compute, 80);
+    const t2 = setTimeout(compute, 300);
+    window.addEventListener("resize", compute);
+    // Observa mudanças de tamanho no container
+    const ro = new ResizeObserver(compute);
+    if (containerRef.current) ro.observe(containerRef.current);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      window.removeEventListener("resize", compute);
+      ro.disconnect();
+    };
+  }, [compute]);
+
+  if (lines.length === 0) return null;
+
+  return (
+    <svg
+      className="absolute top-0 left-0 pointer-events-none"
+      style={{ zIndex: 0, overflow: "visible", width: svgDims.w, height: svgDims.h }}
+    >
+      {lines.map((l, i) => (
+        <line
+          key={i}
+          x1={l.x1}
+          y1={l.y1}
+          x2={l.x2}
+          y2={l.y2}
+          stroke="hsl(var(--muted-foreground) / 0.35)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+      ))}
+    </svg>
+  );
 };
 
 /* ────────────────────────────────────────────────────
@@ -71,20 +193,13 @@ const MatchCard = ({
   const hasBothTeams = match.team1_id && match.team2_id;
   const isWaiting = !hasBothTeams;
 
-  // Compute feeders from actual feeder mapping with real match numbers
   const feeders = allMatches ? getSlotFeeders(match, allMatches, matchNumberMap) : { team1: null, team2: null };
 
-  // DISPLAY SWAP LOGIC:
-  // Rule 1: Both feeders present → winner feeder always on top
-  // Rule 2: Only team2 slot has a winner feeder (team1 slot is empty/awaiting) → swap so winner label/team goes top
-  // Rule 3: Chapéu case — team2 has a pre-placed real team AND team1 is waiting for a winner feeder → no swap needed (feeder already on top)
   const shouldSwap = (() => {
     if (feeders.team1 && feeders.team2) {
       return feeders.team1.type === 'loser' && feeders.team2.type === 'winner';
     }
-    // team2 has winner feeder but team1 slot is the empty one (i.e. winner will fill team1) → no swap
     if (feeders.team1?.type === 'winner' && !feeders.team2) return false;
-    // team1 has no feeder but team2 does (winner) → winner is in bottom slot, swap to top
     if (!feeders.team1 && feeders.team2?.type === 'winner') return true;
     return false;
   })();
@@ -122,10 +237,10 @@ const MatchCard = ({
 
   return (
     <div
+      id={match.id}
       data-match-id={match.id}
       className={`rounded-lg border bg-card/90 backdrop-blur-sm shrink-0 transition-all ${sizeClasses[scale]} ${borderClasses}`}
     >
-      {/* Match number label */}
       {matchNumber != null && (
         <div className="px-2 pt-2 pb-0.5 flex items-center justify-between">
           <span className="inline-flex items-center rounded-sm bg-primary/15 border border-primary/20 px-1.5 py-0.5 text-[10px] font-black text-primary uppercase tracking-tighter leading-none shadow-sm">
@@ -144,7 +259,6 @@ const MatchCard = ({
         </div>
       )}
 
-      {/* Top Team (always winner feeder when mixed) */}
       <div className="space-y-0.5">
         <div className={`flex items-center justify-between px-2 py-1.5 ${topWin ? "bg-success/10" : ""}`}>
           <span className={`truncate flex-1 ${topWin ? "font-bold text-success" : isWaiting && !topTeamId ? "text-muted-foreground/50 italic" : "team-name"}`}>
@@ -165,7 +279,6 @@ const MatchCard = ({
 
       <div className="border-t border-border/30" />
 
-      {/* Bottom Team (always loser feeder when mixed) */}
       <div className="space-y-0.5">
         <div className={`flex items-center justify-between px-2 py-1.5 ${bottomWin ? "bg-success/10" : ""}`}>
           <span className={`truncate flex-1 ${bottomWin ? "font-bold text-success" : isWaiting && !bottomTeamId ? "text-muted-foreground/50 italic" : "team-name"}`}>
@@ -184,85 +297,10 @@ const MatchCard = ({
         )}
       </div>
 
-      {/* Status */}
       <div className="flex justify-center border-t border-border/20 px-2 py-1">
         {statusBadge}
       </div>
     </div>
-  );
-};
-
-/* ────────────────────────────────────────────────────
-    SVG Connectors between rounds
-    ──────────────────────────────────────────────────── */
-const BracketConnectors = ({
-  containerRef,
-  matches,
-  reversed,
-}: {
-  containerRef: React.RefObject<HTMLDivElement>;
-  matches: Match[];
-  reversed?: boolean;
-}) => {
-  const [paths, setPaths] = useState<string[]>([]);
-
-  const computePaths = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const containerRect = container.getBoundingClientRect();
-    const newPaths: string[] = [];
-
-    for (const m of matches) {
-      if (!m.next_win_match_id) continue;
-      const nextMatch = matches.find(n => n.id === m.next_win_match_id);
-      if (!nextMatch) continue;
-
-      const srcEl = container.querySelector(`[data-match-id="${m.id}"]`);
-      const dstEl = container.querySelector(`[data-match-id="${nextMatch.id}"]`);
-      if (!srcEl || !dstEl) continue;
-
-      const srcR = srcEl.getBoundingClientRect();
-      const dstR = dstEl.getBoundingClientRect();
-
-      let x1: number, y1: number, x2: number, y2: number;
-
-      if (reversed) {
-        x1 = srcR.left - containerRect.left;
-        y1 = srcR.top + srcR.height / 2 - containerRect.top;
-        x2 = dstR.right - containerRect.left;
-        y2 = dstR.top + dstR.height / 2 - containerRect.top;
-      } else {
-        x1 = srcR.right - containerRect.left;
-        y1 = srcR.top + srcR.height / 2 - containerRect.top;
-        x2 = dstR.left - containerRect.left;
-        y2 = dstR.top + dstR.height / 2 - containerRect.top;
-      }
-
-      const midX = (x1 + x2) / 2;
-      newPaths.push(`M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`);
-    }
-
-    setPaths(newPaths);
-  }, [containerRef, matches, reversed]);
-
-  useEffect(() => {
-    const timer = setTimeout(computePaths, 250);
-    window.addEventListener("resize", computePaths);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener("resize", computePaths);
-    };
-  }, [computePaths]);
-
-  if (paths.length === 0) return null;
-
-  return (
-    <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 0 }}>
-      {paths.map((d, i) => (
-        <path key={i} d={d} fill="none" stroke="hsl(var(--muted-foreground) / 0.25)" strokeWidth="1.5" />
-      ))}
-    </svg>
   );
 };
 
@@ -314,9 +352,6 @@ const BracketColumn = ({
       <div className="relative overflow-x-auto pb-2">
         <div className="flex gap-6 relative" style={{ zIndex: 1 }}>
           {displayRounds.map((round) => {
-            // Sort by POSITION for correct visual bracket alignment and connector lines.
-            // Game numbers (matchNumberMap) follow scheduler sequence and may not be
-            // in ascending visual order within a round — that is expected in chapéu brackets.
             const roundMatches = roundGroups[round].sort((a, b) => a.position - b.position);
             return (
               <div key={round} className="flex flex-col items-center shrink-0" style={{ minWidth: 150 }}>
@@ -324,10 +359,18 @@ const BracketColumn = ({
                   Rodada {round}
                 </div>
                 <div className="flex flex-col justify-around gap-3 flex-1">
-                   {roundMatches.map((match) => (
-                     <MatchCard key={match.id} match={match} getName={getName} scale={getScale(round)} allMatches={allMatches} matchNumber={matchNumberMap?.get(match.id)} matchNumberMap={matchNumberMap} />
-                   ))}
-                 </div>
+                  {roundMatches.map((match) => (
+                    <MatchCard
+                      key={match.id}
+                      match={match}
+                      getName={getName}
+                      scale={getScale(round)}
+                      allMatches={allMatches}
+                      matchNumber={matchNumberMap?.get(match.id)}
+                      matchNumberMap={matchNumberMap}
+                    />
+                  ))}
+                </div>
               </div>
             );
           })}
@@ -357,7 +400,6 @@ const CenterColumn = ({
 
   return (
     <div className="flex flex-col items-center justify-center gap-6 px-2">
-      {/* Semifinals */}
       {crossSemis.length > 0 && (
         <div className="space-y-4">
           <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-center text-primary/80">
@@ -376,12 +418,10 @@ const CenterColumn = ({
         </div>
       )}
 
-      {/* Connector between semis and final */}
       {crossSemis.length > 0 && finalMatches.length > 0 && (
         <div className="w-px h-6 bg-gradient-to-b from-primary/30 to-primary/10" />
       )}
 
-      {/* Final */}
       {finalMatches.map((m) => (
         <MatchCard key={m.id} match={m} getName={getName} scale="final" allMatches={allMatches} matchNumber={matchNumberMap?.get(m.id)} matchNumberMap={matchNumberMap} />
       ))}
@@ -390,18 +430,16 @@ const CenterColumn = ({
 };
 
 /* ────────────────────────────────────────────────────
-   Group Stage + Knockout Preview — full bracket tree
+   Group Stage View
    ──────────────────────────────────────────────────── */
 const GROUP_CARD_H = 76;
 const GROUP_CARD_GAP = 8;
 
-/** Placeholder card for knockout slots not yet generated */
 const PlaceholderMatchCard = ({
   id,
   label1,
   label2,
   scale = "normal",
-  roundLabel,
 }: {
   id: string;
   label1: string;
@@ -422,6 +460,7 @@ const PlaceholderMatchCard = ({
 
   return (
     <div
+      id={id}
       data-match-id={id}
       className={`rounded-lg border bg-card/60 backdrop-blur-sm shrink-0 ${sizeClasses[scale]} ${borderClasses[scale]}`}
     >
@@ -449,117 +488,48 @@ const PlaceholderMatchCard = ({
   );
 };
 
-/** SVG connectors for the full bracket tree (groups → knockout) */
-const FullBracketConnectors = ({
-  containerRef,
-  connections,
-}: {
-  containerRef: React.RefObject<HTMLDivElement>;
-  connections: { srcId: string; dstId: string }[];
-}) => {
-  const [paths, setPaths] = useState<string[]>([]);
-
-  const computePaths = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const containerRect = container.getBoundingClientRect();
-    const newPaths: string[] = [];
-
-    for (const { srcId, dstId } of connections) {
-      const srcEl = container.querySelector(`[data-match-id="${srcId}"]`);
-      const dstEl = container.querySelector(`[data-match-id="${dstId}"]`);
-      if (!srcEl || !dstEl) continue;
-
-      const srcR = srcEl.getBoundingClientRect();
-      const dstR = dstEl.getBoundingClientRect();
-
-      const x1 = srcR.right - containerRect.left;
-      const y1 = srcR.top + srcR.height / 2 - containerRect.top;
-      const x2 = dstR.left - containerRect.left;
-      const y2 = dstR.top + dstR.height / 2 - containerRect.top;
-
-      // Simple straight line from source to destination
-      newPaths.push(`M ${x1} ${y1} L ${x2} ${y2}`);
-    }
-
-    setPaths(newPaths);
-  }, [containerRef, connections]);
-
-  useEffect(() => {
-    const timer = setTimeout(computePaths, 350);
-    window.addEventListener("resize", computePaths);
-    return () => { clearTimeout(timer); window.removeEventListener("resize", computePaths); };
-  }, [computePaths]);
-
-  if (paths.length === 0) return null;
-
-  return (
-    <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 0, overflow: "visible" }}>
-      {paths.map((d, i) => (
-        <path key={i} d={d} fill="none" stroke="hsl(var(--primary) / 0.3)" strokeWidth="1.5" />
-      ))}
-    </svg>
-  );
-};
-
-/** Build knockout bracket structure from groups */
 function buildGroupKnockoutPreview(groupNumbers: number[]) {
   const numGroups = groupNumbers.length;
-  // Standard: top 2 from each group advance
   const advancingPerGroup = 2;
   const totalAdvancing = numGroups * advancingPerGroup;
 
-  // Determine knockout rounds needed
   const rounds: { label: string; matchCount: number; scale: "normal" | "semi" | "final" }[] = [];
   let remaining = totalAdvancing;
 
   while (remaining > 1) {
     const matchCount = Math.floor(remaining / 2);
     remaining = matchCount;
-    
     if (remaining === 1) {
       rounds.push({ label: "Final", matchCount, scale: "final" });
-    } else if (remaining === 1 || matchCount <= 2) {
-      rounds.push({ label: matchCount === 2 ? "Semifinais" : `Rodada`, matchCount, scale: matchCount <= 2 ? "semi" : "normal" });
+    } else if (matchCount <= 2) {
+      rounds.push({ label: matchCount === 2 ? "Semifinais" : "Rodada", matchCount, scale: "semi" });
     } else {
       const labels: Record<number, string> = { 4: "Quartas de Final", 8: "Oitavas", 2: "Semifinais" };
       rounds.push({ label: labels[matchCount] || `Rodada (${matchCount} jogos)`, matchCount, scale: "normal" });
     }
   }
 
-  // Build placeholder matches with feeder labels
   type PlaceholderMatch = { id: string; label1: string; label2: string; scale: "normal" | "semi" | "final" };
   const knockoutRounds: PlaceholderMatch[][] = [];
   const connections: { srcId: string; dstId: string }[] = [];
 
-  // First knockout round: fed by group standings
-  // Cross-pairing: 1st of group A always vs 2nd of last group (Z)
-  //                2nd of group A always vs 1st of last group (Z)
-  //                Then 1st B vs 2nd (penultimate), etc.
   if (rounds.length > 0) {
     const firstRound: PlaceholderMatch[] = [];
     const firstRoundCount = rounds[0].matchCount;
-    
-    // Build cross-pairings using extremo-oposto pattern
     const pairings: { g1: number; seed1: number; g2: number; seed2: number }[] = [];
-    
+
     for (let i = 0; i < numGroups; i++) {
       const rightIdx = numGroups - 1 - i;
-      if (rightIdx < i) break; // avoid duplicates
-      
-      // 1st of group[i] vs 2nd of group[rightIdx]
+      if (rightIdx < i) break;
       pairings.push({ g1: groupNumbers[i], seed1: 1, g2: groupNumbers[rightIdx], seed2: 2 });
-      // 2nd of group[i] vs 1st of group[rightIdx]
       pairings.push({ g1: groupNumbers[i], seed1: 2, g2: groupNumbers[rightIdx], seed2: 1 });
     }
-    
-    // If odd number of groups, handle middle group
+
     if (numGroups % 2 === 1) {
       const midIdx = Math.floor(numGroups / 2);
       pairings.push({ g1: groupNumbers[midIdx], seed1: 1, g2: groupNumbers[midIdx], seed2: 2 });
     }
 
-    // Fill first round from pairings (up to firstRoundCount)
     for (let i = 0; i < firstRoundCount; i++) {
       if (i < pairings.length) {
         const p = pairings[i];
@@ -570,17 +540,11 @@ function buildGroupKnockoutPreview(groupNumbers: number[]) {
           scale: rounds[0].scale,
         });
       } else {
-        firstRound.push({
-          id: `knockout-0-${i}`,
-          label1: "A definir",
-          label2: "A definir",
-          scale: rounds[0].scale,
-        });
+        firstRound.push({ id: `knockout-0-${i}`, label1: "A definir", label2: "A definir", scale: rounds[0].scale });
       }
     }
     knockoutRounds.push(firstRound);
 
-    // Subsequent rounds
     for (let ri = 1; ri < rounds.length; ri++) {
       const prevRound = knockoutRounds[ri - 1];
       const currentRound: PlaceholderMatch[] = [];
@@ -590,13 +554,9 @@ function buildGroupKnockoutPreview(groupNumbers: number[]) {
         const id = `knockout-${ri}-${i}`;
         const src1Idx = i * 2;
         const src2Idx = i * 2 + 1;
-        
         const label1 = src1Idx < prevRound.length ? `V Jogo ${src1Idx + 1}` : "A definir";
         const label2 = src2Idx < prevRound.length ? `V Jogo ${src2Idx + 1}` : "A definir";
-
         currentRound.push({ id, label1, label2, scale: rounds[ri].scale });
-
-        // Connect previous round to this
         if (src1Idx < prevRound.length) connections.push({ srcId: prevRound[src1Idx].id, dstId: id });
         if (src2Idx < prevRound.length) connections.push({ srcId: prevRound[src2Idx].id, dstId: id });
       }
@@ -618,18 +578,14 @@ const GroupStageView = ({
   allMatches: Match[];
   matchNumberMap?: Map<string, number>;
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
   const groupNumbers = Array.from(new Set(groupMatches.map((m) => m.bracket_number || 1))).sort();
   const hasKnockout = allMatches.some(m => m.round > 0);
-  const knockoutMatches = allMatches.filter(m => m.round > 0);
 
-  // Build preview knockout structure when no knockout exists yet
-  const { knockoutRounds, rounds: knockoutRoundLabels, connections: knockoutConnections } = useMemo(
-    () => hasKnockout ? { knockoutRounds: [], rounds: [], connections: [] } : buildGroupKnockoutPreview(groupNumbers),
+  const { knockoutRounds, rounds: knockoutRoundLabels } = useMemo(
+    () => hasKnockout ? { knockoutRounds: [], rounds: [] } : buildGroupKnockoutPreview(groupNumbers),
     [groupNumbers, hasKnockout]
   );
 
-  // Organize group matches by group
   const groupMatchesByGroup = useMemo(() => {
     const map: Record<number, Match[]> = {};
     groupNumbers.forEach(gNum => {
@@ -640,26 +596,6 @@ const GroupStageView = ({
     return map;
   }, [groupMatches, groupNumbers]);
 
-  // Build connections from last group match to first knockout round
-  const groupToKnockoutConnections = useMemo(() => {
-    if (hasKnockout || knockoutRounds.length === 0) return [];
-    const conns: { srcId: string; dstId: string }[] = [];
-    for (let i = 0; i < knockoutRounds[0].length; i++) {
-      const g1 = groupNumbers[i % groupNumbers.length];
-      const g2 = groupNumbers[(i + 1) % groupNumbers.length];
-      const g1M = groupMatchesByGroup[g1];
-      const g2M = groupMatchesByGroup[g2];
-      if (g1M?.length) conns.push({ srcId: g1M[g1M.length - 1].id, dstId: knockoutRounds[0][i].id });
-      if (g2 !== g1 && g2M?.length) conns.push({ srcId: g2M[g2M.length - 1].id, dstId: knockoutRounds[0][i].id });
-    }
-    const unique = new Map<string, { srcId: string; dstId: string }>();
-    conns.forEach(c => unique.set(`${c.srcId}-${c.dstId}`, c));
-    return Array.from(unique.values());
-  }, [groupNumbers, groupMatchesByGroup, knockoutRounds, hasKnockout]);
-
-  const previewConnections = [...groupToKnockoutConnections, ...knockoutConnections];
-
-  // Extract unique teams per group from group matches
   const teamsByGroup = useMemo(() => {
     const map: Record<number, string[]> = {};
     groupNumbers.forEach(gNum => {
@@ -676,7 +612,6 @@ const GroupStageView = ({
 
   return (
     <div className="space-y-4">
-      {/* ── Group stage: show team roster per group ── */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {groupNumbers.map((gNum) => {
           const teamIds = teamsByGroup[gNum] || [];
@@ -702,12 +637,8 @@ const GroupStageView = ({
         })}
       </div>
 
-      {/* ── Knockout stage (real matches or preview placeholders) ── */}
-      {/* Knockout is rendered by the parent BracketTreeView, not here */}
-
       {!hasKnockout && knockoutRounds.length > 0 && (
-        <div ref={containerRef} className="relative overflow-x-auto pb-4 rounded-xl border border-border bg-card/50 p-4" style={{ WebkitOverflowScrolling: "touch" }}>
-          {/* Connectors removed */}
+        <div className="relative overflow-x-auto pb-4 rounded-xl border border-border bg-card/50 p-4">
           <div className="flex gap-10 relative" style={{ zIndex: 1 }}>
             {knockoutRounds.map((roundMatches, ri) => {
               const roundLabel = knockoutRoundLabels[ri]?.label || `Rodada ${ri + 1}`;
@@ -722,13 +653,7 @@ const GroupStageView = ({
                   </div>
                   <div className="flex flex-col justify-around gap-4 flex-1">
                     {roundMatches.map((pm) => (
-                      <PlaceholderMatchCard
-                        key={pm.id}
-                        id={pm.id}
-                        label1={pm.label1}
-                        label2={pm.label2}
-                        scale={pm.scale}
-                      />
+                      <PlaceholderMatchCard key={pm.id} id={pm.id} label1={pm.label1} label2={pm.label2} scale={pm.scale} />
                     ))}
                   </div>
                 </div>
@@ -742,99 +667,10 @@ const GroupStageView = ({
 };
 
 /* ────────────────────────────────────────────────────
-   Normal Knockout — proper tree bracket with connectors
+   Normal Knockout — bracket tree com conectores SVG reais
    ──────────────────────────────────────────────────── */
 const KNOCKOUT_CARD_H = 94;
 const KNOCKOUT_CARD_GAP = 16;
-
-const NormalKnockoutConnectors = ({
-  containerRef,
-  knockoutMatches,
-}: {
-  containerRef: React.RefObject<HTMLDivElement>;
-  knockoutMatches: Match[];
-}) => {
-  const [paths, setPaths] = useState<{ d: string; completed: boolean }[]>([]);
-
-  const computePaths = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const containerRect = container.getBoundingClientRect();
-    const newPaths: { d: string; completed: boolean }[] = [];
-
-    const hasExplicitLinks = knockoutMatches.some(m => m.next_win_match_id);
-
-    const roundGroups: Record<number, Match[]> = {};
-    knockoutMatches.forEach(m => {
-      if (!roundGroups[m.round]) roundGroups[m.round] = [];
-      roundGroups[m.round].push(m);
-    });
-    Object.values(roundGroups).forEach(arr => arr.sort((a, b) => a.position - b.position));
-    const rounds = Object.keys(roundGroups).map(Number).sort((a, b) => a - b);
-
-    const drawLine = (srcId: string, dstId: string, completed: boolean) => {
-      const srcEl = container.querySelector(`[data-match-id="${srcId}"]`);
-      const dstEl = container.querySelector(`[data-match-id="${dstId}"]`);
-      if (!srcEl || !dstEl) return;
-
-      const srcR = srcEl.getBoundingClientRect();
-      const dstR = dstEl.getBoundingClientRect();
-
-      const x1 = srcR.right - containerRect.left;
-      const y1 = srcR.top + srcR.height / 2 - containerRect.top;
-      const x2 = dstR.left - containerRect.left;
-      const y2 = dstR.top + dstR.height / 2 - containerRect.top;
-
-      const midX = (x1 + x2) / 2;
-      // L-shaped: horizontal to midpoint, vertical to destination Y, horizontal to destination
-      newPaths.push({ d: `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`, completed });
-    };
-
-    if (hasExplicitLinks) {
-      for (const m of knockoutMatches) {
-        if (!m.next_win_match_id) continue;
-        const next = knockoutMatches.find(n => n.id === m.next_win_match_id);
-        if (next) drawLine(m.id, next.id, m.status === "completed");
-      }
-    } else {
-      for (let ri = 0; ri < rounds.length - 1; ri++) {
-        const currentRound = roundGroups[rounds[ri]];
-        const nextRound = roundGroups[rounds[ri + 1]];
-        if (!nextRound) continue;
-        for (let i = 0; i < currentRound.length; i++) {
-          const targetIdx = Math.floor(i / 2);
-          if (targetIdx < nextRound.length) {
-            drawLine(currentRound[i].id, nextRound[targetIdx].id, currentRound[i].status === "completed");
-          }
-        }
-      }
-    }
-
-    setPaths(newPaths);
-  }, [containerRef, knockoutMatches]);
-
-  useEffect(() => {
-    const timer = setTimeout(computePaths, 300);
-    window.addEventListener("resize", computePaths);
-    return () => { clearTimeout(timer); window.removeEventListener("resize", computePaths); };
-  }, [computePaths]);
-
-  if (paths.length === 0) return null;
-
-  return (
-    <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 0, overflow: "visible" }}>
-      {paths.map((p, i) => (
-        <path
-          key={i}
-          d={p.d}
-          fill="none"
-          stroke="hsl(var(--muted-foreground) / 0.25)"
-          strokeWidth="1.5"
-        />
-      ))}
-    </svg>
-  );
-};
 
 function buildKnockoutTreePositions(knockoutMatches: Match[]) {
   const roundGroups: Record<number, Match[]> = {};
@@ -889,10 +725,12 @@ const NormalKnockout = ({
   matches,
   getName,
   matchNumberMap,
+  slotMap,
 }: {
   matches: Match[];
   getName: (id: string | null) => string;
   matchNumberMap?: Map<string, number>;
+  slotMap: Map<string, "A" | "B">;
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const knockoutMatches = matches.filter((m) => m.round > 0);
@@ -910,7 +748,8 @@ const NormalKnockout = ({
   return (
     <div className="rounded-xl border border-border bg-card/50 p-4">
       <div ref={containerRef} className="relative overflow-x-auto overflow-y-hidden pb-6" style={{ WebkitOverflowScrolling: "touch" }}>
-        <NormalKnockoutConnectors containerRef={containerRef} knockoutMatches={knockoutMatches} />
+        {/* SVG Conectores — coordenadas reais de tela */}
+        <SVGConnectors containerRef={containerRef} matches={knockoutMatches} slotMap={slotMap} />
         <div className="flex gap-10 relative" style={{ zIndex: 1, minHeight: totalHeight }}>
           {rounds.map((round) => {
             const roundMatches = roundGroups[round];
@@ -954,112 +793,7 @@ const NormalKnockout = ({
 };
 
 /* ────────────────────────────────────────────────────
-   DE Global Connectors — draws lines across all columns
-   Draws winner routes (blue) and loser drop routes (orange) using L-shaped paths.
-   ──────────────────────────────────────────────────── */
-const DEGlobalConnectors = ({
-  containerRef,
-  allMatches,
-}: {
-  containerRef: React.RefObject<HTMLDivElement>;
-  allMatches: Match[];
-}) => {
-  const [paths, setPaths] = useState<{ d: string; type: 'win' | 'lose' }[]>([]);
-  const [svgSize, setSvgSize] = useState({ w: 0, h: 0 });
-
-  const computePaths = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const containerRect = container.getBoundingClientRect();
-    setSvgSize({ w: container.scrollWidth, h: container.scrollHeight });
-    const newPaths: { d: string; type: 'win' | 'lose' }[] = [];
-
-    const drawPath = (srcId: string, dstId: string, type: 'win' | 'lose') => {
-      const srcEl = container.querySelector(`[data-match-id="${srcId}"]`);
-      const dstEl = container.querySelector(`[data-match-id="${dstId}"]`);
-      if (!srcEl || !dstEl) return;
-
-      const srcR = srcEl.getBoundingClientRect();
-      const dstR = dstEl.getBoundingClientRect();
-
-      const srcCx = srcR.left + srcR.width / 2;
-      const dstCx = dstR.left + dstR.width / 2;
-      const goingLeft = dstCx < srcCx;
-
-      let x1: number, y1: number, x2: number, y2: number;
-      if (goingLeft) {
-        // Losers bracket flows right-to-left visually
-        x1 = srcR.left - containerRect.left;
-        y1 = srcR.top + srcR.height / 2 - containerRect.top;
-        x2 = dstR.right - containerRect.left;
-        y2 = dstR.top + dstR.height / 2 - containerRect.top;
-      } else {
-        x1 = srcR.right - containerRect.left;
-        y1 = srcR.top + srcR.height / 2 - containerRect.top;
-        x2 = dstR.left - containerRect.left;
-        y2 = dstR.top + dstR.height / 2 - containerRect.top;
-      }
-
-      const midX = (x1 + x2) / 2;
-      newPaths.push({ d: `M ${x1} ${y1} H ${midX} V ${y2} H ${x2}`, type });
-    };
-
-    for (const m of allMatches) {
-      // Winner advancement line
-      if (m.next_win_match_id) {
-        drawPath(m.id, m.next_win_match_id, 'win');
-      }
-      // Loser drop line (winners → losers bracket)
-      if (m.next_lose_match_id && m.bracket_type === 'winners') {
-        drawPath(m.id, m.next_lose_match_id, 'lose');
-      }
-    }
-
-    setPaths(newPaths);
-  }, [containerRef, allMatches]);
-
-  useEffect(() => {
-    const timer = setTimeout(computePaths, 300);
-    window.addEventListener("resize", computePaths);
-    return () => { clearTimeout(timer); window.removeEventListener("resize", computePaths); };
-  }, [computePaths]);
-
-  if (paths.length === 0) return null;
-
-  return (
-    <svg
-      className="absolute top-0 left-0 pointer-events-none"
-      style={{ zIndex: 0, overflow: "visible", width: svgSize.w, height: svgSize.h }}
-    >
-      {/* Loser drop lines (orange, behind winner lines) */}
-      {paths.filter(p => p.type === 'lose').map((p, i) => (
-        <path
-          key={`lose-${i}`}
-          d={p.d}
-          fill="none"
-          stroke="hsl(var(--destructive) / 0.35)"
-          strokeWidth="1.5"
-          strokeDasharray="4 3"
-        />
-      ))}
-      {/* Winner advancement lines (muted foreground) */}
-      {paths.filter(p => p.type === 'win').map((p, i) => (
-        <path
-          key={`win-${i}`}
-          d={p.d}
-          fill="none"
-          stroke="hsl(var(--muted-foreground) / 0.3)"
-          strokeWidth="1.5"
-        />
-      ))}
-    </svg>
-  );
-};
-
-
-
-/* ────────────────────────────────────────────────────
-   DE Bracket Layout — 3-column layout with global connectors
+   DE Bracket Layout — 3-column layout com SVG conectores reais
    ──────────────────────────────────────────────────── */
 const DEBracketLayout = ({
   zoomContainerRef,
@@ -1074,6 +808,7 @@ const DEBracketLayout = ({
   getName,
   allMatches,
   matchNumberMap,
+  slotMap,
 }: {
   zoomContainerRef: React.RefObject<HTMLDivElement>;
   isMobile: boolean;
@@ -1087,8 +822,11 @@ const DEBracketLayout = ({
   getName: (id: string | null) => string;
   allMatches: Match[];
   matchNumberMap?: Map<string, number>;
+  slotMap: Map<string, "A" | "B">;
 }) => {
+  // Ref interno que envolve todo o layout DE para o SVG de conectores globais
   const globalRef = useRef<HTMLDivElement>(null);
+  const eliminationMatches = allMatches.filter(m => m.round > 0);
 
   return (
     <div
@@ -1100,7 +838,9 @@ const DEBracketLayout = ({
         style={isMobile ? { transform: `scale(${mobileZoom})`, transformOrigin: 'top left', width: `${100 / mobileZoom}%` } : undefined}
       >
         <div ref={globalRef} className="relative min-w-[900px]">
-          <DEGlobalConnectors containerRef={globalRef} allMatches={allMatches.filter(m => m.round > 0)} />
+          {/* SVG Conectores globais — coordenadas reais de tela */}
+          <SVGConnectors containerRef={globalRef} matches={eliminationMatches} slotMap={slotMap} />
+
           <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-start relative" style={{ zIndex: 1 }}>
             {/* ── LEFT: Winners (L → R) ── */}
             <div className="space-y-4">
@@ -1156,7 +896,6 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
   const isMobile = useIsMobile();
   const zoomContainerRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to center on mobile
   useEffect(() => {
     if (isMobile && zoomContainerRef.current) {
       const el = zoomContainerRef.current;
@@ -1171,12 +910,11 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
     return participants.find((p) => p.id === id)?.name || "A definir";
   };
 
-  // Build global match numbering from scheduler sequence
+  // Numeração global dos jogos pela sequência do scheduler
   const matchNumberMap = useMemo(() => {
     const seq = schedulerSequence(matches);
     const map = new Map<string, number>();
     seq.forEach((m, i) => map.set(m.id, i + 1));
-    // Also number group stage matches not in scheduler
     let next = map.size + 1;
     for (const m of matches) {
       if (!map.has(m.id)) map.set(m.id, next++);
@@ -1184,16 +922,16 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
     return map;
   }, [matches]);
 
+  // Mapa de slots: determina se cada match vai para slot A (top) ou B (bottom) do próximo
+  const slotMap = useMemo(() => buildSlotMap(matches), [matches]);
+
   const groupMatches = useMemo(() => matches.filter((m) => m.round === 0), [matches]);
   const hasGroupStage = groupMatches.length > 0;
   const hasElimination = useMemo(() => matches.some((m) => m.round > 0), [matches]);
 
-  // Categorize matches for DE layout
   const { winnersA, winnersB, losersA, losersB, semiFinals, finalMatches, isDoubleElimination } = useMemo(() => {
     const wA = matches.filter((m) => m.bracket_type === "winners" && m.bracket_half === "upper");
     const wB = matches.filter((m) => m.bracket_type === "winners" && m.bracket_half === "lower");
-    // Perdedores Superiores = losers upper (recebe de Winners B)
-    // Perdedores Inferiores = losers lower (recebe de Winners A)
     const losersSuperiores = matches.filter((m) => m.bracket_type === "losers" && m.bracket_half === "upper");
     const losersInferiores = matches.filter((m) => m.bracket_type === "losers" && m.bracket_half === "lower");
     const sf = matches.filter((m) => m.bracket_type === "semi_final");
@@ -1215,11 +953,11 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
 
   return (
     <div className="w-full space-y-4">
-      {/* Group Stage */}
-      {hasGroupStage && <GroupStageView groupMatches={groupMatches} getName={getName} allMatches={matches} matchNumberMap={matchNumberMap} />}
+      {hasGroupStage && (
+        <GroupStageView groupMatches={groupMatches} getName={getName} allMatches={matches} matchNumberMap={matchNumberMap} />
+      )}
 
-
-      {/* Double Elimination — 3-column layout with global connectors */}
+      {/* Double Elimination */}
       {isDoubleElimination && (
         <DEBracketLayout
           zoomContainerRef={zoomContainerRef}
@@ -1234,17 +972,18 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
           getName={getName}
           allMatches={matches}
           matchNumberMap={matchNumberMap}
+          slotMap={slotMap}
         />
       )}
 
-      {/* Normal Knockout (non-DE, original mode) */}
+      {/* Normal Knockout */}
       {!isDoubleElimination && hasElimination && (
         <div
-          ref={!isDoubleElimination ? zoomContainerRef : undefined}
+          ref={zoomContainerRef}
           className="overflow-x-auto"
           style={{ touchAction: "pan-x pinch-zoom", WebkitOverflowScrolling: "touch" }}
         >
-          <NormalKnockout matches={matches} getName={getName} matchNumberMap={matchNumberMap} />
+          <NormalKnockout matches={matches} getName={getName} matchNumberMap={matchNumberMap} slotMap={slotMap} />
         </div>
       )}
     </div>

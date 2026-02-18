@@ -306,28 +306,42 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
   }
 
   // Priority queue: process blocks with no remaining deps
-  // Sort rule: WINNERS always before LOSERS, then lower round, then WA>WB / LS>LI
-  const isWinnersBlock = (k: string) => k.startsWith('WA') || k.startsWith('WB');
-  const catPriority = (k: string) => {
-    if (k.startsWith('WA')) return 0;
-    if (k.startsWith('WB')) return 1;
-    if (k.startsWith('LS')) return 2;
-    if (k.startsWith('LI')) return 3;
-    return 4;
+  // ── SEQUÊNCIA CORRETA COMBINADA ──
+  // Ordem: WA_R1 → WB_R1 → WA_R2 → WB_R2 → LS_R1 → LI_R1 → WA_R3 → WB_R3 → LS_R2 → LI_R2 → WA_R4 → ...
+  //
+  // Fórmula de prioridade por bloco (menor = mais cedo):
+  //   WA_Rn: n=1→10, n=2→20, n≥3→(2n-2)*10   (R3=40, R4=60, ...)
+  //   WB_Rn: mesmo que WA + 1
+  //   LS_Rn: n=1→30, n≥2→(2n+1)*10           (R2=50, R3=70, ...)
+  //   LI_Rn: mesmo que LS + 1
+  //
+  // Isso garante: W_R1, W_R2, L_R1, W_R3, L_R2, W_R4, L_R3, ...
+  const effectiveBlockOrder = (key: string): number => {
+    const block = tempBlocks.get(key)!;
+    const n = block.round;
+    const isWA = key.startsWith('WA');
+    const isWB = key.startsWith('WB');
+    const isLS = key.startsWith('LS');
+    const isLI = key.startsWith('LI');
+
+    if (isWA || isWB) {
+      let base: number;
+      if (n === 1) base = 10;
+      else if (n === 2) base = 20;
+      else base = (2 * n - 2) * 10; // R3=40, R4=60, R5=80
+      return base + (isWB ? 1 : 0);
+    }
+    if (isLS || isLI) {
+      let base: number;
+      if (n === 1) base = 30;
+      else base = (2 * n + 1) * 10; // R2=50, R3=70, R4=90
+      return base + (isLI ? 1 : 0);
+    }
+    return 9999; // fallback (SEMI/FINAL tratados separadamente)
   };
 
-  const blockSortFn = (a: string, b: string) => {
-    const aIsW = isWinnersBlock(a);
-    const bIsW = isWinnersBlock(b);
-    // Winners always before losers
-    if (aIsW !== bIsW) return aIsW ? -1 : 1;
-    // Within same group: lower round first
-    const aBlock = tempBlocks.get(a)!;
-    const bBlock = tempBlocks.get(b)!;
-    if (aBlock.round !== bBlock.round) return aBlock.round - bBlock.round;
-    // Same round: WA>WB or LS>LI
-    return catPriority(a) - catPriority(b);
-  };
+  const blockSortFn = (a: string, b: string) => effectiveBlockOrder(a) - effectiveBlockOrder(b);
+
 
   const queue: string[] = [];
   for (const [key, deg] of inDegree) {

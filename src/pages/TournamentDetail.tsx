@@ -1018,7 +1018,8 @@ const TournamentDetail = () => {
     // Optimistic UI update FIRST for instant feedback
     setMatches(prev => prev.map(m => m.id === matchId ? { ...m, winner_team_id: winnerId, status: 'completed' as any } : m));
 
-    organizerQuery({
+    // AWAIT the winner save — critical to avoid race condition on fresh fetch
+    await organizerQuery({
       table: "matches",
       operation: "update",
       data: {
@@ -1035,8 +1036,7 @@ const TournamentDetail = () => {
     const isDoubleElimination = modalityMatchesForDE.some(m => m.bracket_type === 'losers' || m.bracket_type === 'final' || m.bracket_type === 'semi_final');
 
     if (isDoubleElimination) {
-      // CRITICAL: Fetch fresh matches from DB to avoid stale state issues
-      // (e.g., when multiple matches in same round are completed quickly)
+      // CRITICAL: Fetch fresh matches from DB AFTER saving winner to avoid stale state
       const { data: freshMatches } = await organizerQuery({
         table: "matches",
         operation: "select",
@@ -1044,7 +1044,8 @@ const TournamentDetail = () => {
         order: [{ column: "round" }, { column: "position" }],
       });
       const freshMatchList = (freshMatches || matches) as typeof matches;
-      const freshMatch = freshMatchList.find(m => m.id === matchId) || match;
+      // Use the updated match data (winner already set)
+      const freshMatch = freshMatchList.find(m => m.id === matchId) || { ...match, winner_team_id: winnerId, status: 'completed' };
       
       // Use new advancement logic with fresh data
       const advancement = processDoubleEliminationAdvance(freshMatchList, freshMatch, winnerId, loserId);
@@ -1096,25 +1097,22 @@ const TournamentDetail = () => {
       );
       feederFailed = results.some(r => !r);
 
-      // ── HARD BLOCK IF FEEDER FAILS ──
+      // ── LOG FEEDER FAILURE — do NOT block, still try BYE completion ──
       if (feederFailed) {
-        toast.error("❌ Falha na propagação de feeders. Progressão bloqueada.");
-        fetchData();
-        return;
+        console.error("[DE:FeederFail] Some feeder updates failed — continuing to attempt BYE completion and UI refresh");
+        toast.warning("⚠️ Alguma propagação falhou. Verifique o chaveamento e use o Override se necessário.");
       }
 
-      // ── VALIDATE: If match has outgoing feeders, they must have been injected ──
-      if (match.next_win_match_id && advancement.winnerUpdates.length === 0) {
-        console.error(`[DE:FeederMissing] Match ${matchId} has next_win_match_id=${match.next_win_match_id} but no winner update was generated`);
-        toast.error("❌ Falha na propagação de feeders. Vencedor não injetado no destino.");
-        fetchData();
-        return;
+      // ── LOG: If match has outgoing feeders but no update was generated (warn only, don't block) ──
+      if (freshMatch.next_win_match_id && advancement.winnerUpdates.length === 0) {
+        console.warn(`[DE:FeederMissing] Match ${matchId} has next_win_match_id=${freshMatch.next_win_match_id} but no winner update generated — may be final or slot already correct`);
       }
-      if (match.next_lose_match_id && loserId && advancement.loserUpdates.length === 0) {
-        console.error(`[DE:FeederMissing] Match ${matchId} has next_lose_match_id=${match.next_lose_match_id} but no loser update was generated`);
-        toast.error("❌ Falha na propagação de feeders. Perdedor não injetado no destino.");
-        fetchData();
-        return;
+      if (freshMatch.next_lose_match_id && loserId && advancement.loserUpdates.length === 0) {
+        // Check if this is semi_final/final where losers are eliminated (no next_lose expected to have updates)
+        const isElimination = freshMatch.bracket_type === 'semi_final' || freshMatch.bracket_type === 'final';
+        if (!isElimination) {
+          console.warn(`[DE:FeederMissing] Match ${matchId} has next_lose_match_id=${freshMatch.next_lose_match_id} but no loser update generated`);
+        }
       }
 
       // ── BYE AUTO-COMPLETION ──
@@ -1189,6 +1187,8 @@ const TournamentDetail = () => {
         }
       }
 
+      // Always refresh UI after DE advancement
+      fetchData();
       toast.success("Avanço automático realizado!");
     } else {
       // Normal bracket: IMMEDIATE propagation via next_win_match_id
@@ -1396,9 +1396,10 @@ const TournamentDetail = () => {
       }
     }
 
-    // Realtime subscription handles UI refresh automatically — no need for fetchData() here
+    // Always refresh UI state — ensures consistency regardless of realtime subscription status
     } finally {
       declareWinnerMutex.current.delete(matchId);
+      fetchData();
     }
   };
 

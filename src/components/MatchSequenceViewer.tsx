@@ -944,11 +944,6 @@ const MatchSequenceViewer = ({
                   <h3 className="text-sm font-black uppercase tracking-[0.15em] text-primary" style={{ textShadow: '0 0 20px rgba(255,255,255,1), 0 0 40px rgba(255,255,255,0.9), 0 0 60px rgba(255,255,255,0.6), 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000' }}>
                     {block.label}
                   </h3>
-                  {isDoubleElim && !isUnlocked && (
-                    <Badge variant="outline" className="text-[9px] gap-0.5 text-muted-foreground border-border/50 px-1.5 py-0">
-                      <Lock className="h-2.5 w-2.5" /> Bloqueado
-                    </Badge>
-                  )}
                   {isBlockCompleted && (
                     <Badge className="bg-success/15 text-success border-0 text-[9px] px-1.5 py-0">
                       <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" /> Concluído

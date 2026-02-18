@@ -793,6 +793,7 @@ const MatchSequenceViewer = ({
             existing.matches.push(...mappedMatches);
             existing.matches.sort((a, b) => a.globalIndex - b.globalIndex);
             if (!sb.isCompleted) existing.isCompleted = false;
+            if (!sb.isUnlocked) existing.isUnlocked = false;
           } else {
             mergedGroups.push({ key: mergeKey, label: mergeLabel, matches: [...mappedMatches], isCompleted: sb.isCompleted, isUnlocked: sb.isUnlocked });
           }

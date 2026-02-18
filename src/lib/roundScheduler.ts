@@ -176,57 +176,6 @@ export function buildSchedulerBlocks(matches: SchedulerMatch[]): SchedulerBlock[
   const blocks: SchedulerBlock[] = [];
   let order = 0;
 
-  // Helper to create a block with dependency calculation
-  function createBlock(cat: BlockCategory, r: number) {
-    const key = `${cat}_R${r}`;
-    const catMatches = groups.get(key) || [];
-    if (catMatches.length === 0) return;
-
-    const deps: string[] = [];
-
-    if (cat === 'WA' || cat === 'WB') {
-      if (r > sortedRounds[0]) {
-        const prevR = sortedRounds[sortedRounds.indexOf(r) - 1];
-        if (prevR !== undefined) {
-          // Winners R depends on previous round of WINNERS being complete (no circular dep)
-          if (groups.has(`WA_R${prevR}`)) deps.push(`WA_R${prevR}`);
-          if (groups.has(`WB_R${prevR}`)) deps.push(`WB_R${prevR}`);
-        }
-      }
-    }
-
-    if (cat === 'LS' || cat === 'LI') {
-      // Use REAL feeder map from next_lose_match_id graph instead of assuming same round number
-      const realFeeders = losersBlockFeeders.get(key);
-      if (realFeeders && realFeeders.size > 0) {
-        for (const feederKey of realFeeders) {
-          if (groups.has(feederKey)) deps.push(feederKey);
-        }
-      } else {
-        // Fallback: use same-round winners if no real feeder data
-        if (groups.has(`WA_R${r}`)) deps.push(`WA_R${r}`);
-        if (groups.has(`WB_R${r}`)) deps.push(`WB_R${r}`);
-      }
-    }
-
-    // Within same category pair: WB depends on WA, LI depends on LS
-    if (cat === 'WB' && groups.has(`WA_R${r}`)) deps.push(`WA_R${r}`);
-    if (cat === 'LI' && groups.has(`LS_R${r}`)) deps.push(`LS_R${r}`);
-
-    const isCompleted = catMatches.every(m => m.status === 'completed');
-
-    blocks.push({
-      key,
-      label: blockLabel(cat, r),
-      round: r,
-      blockOrder: order++,
-      matches: catMatches.sort((a, b) => a.position - b.position),
-      isCompleted,
-      isUnlocked: false,
-      dependencies: [...new Set(deps)],
-    });
-  }
-
   // ── COMPUTE CORRECT EMISSION ORDER ──
   // Instead of naively emitting WA_R1→WB_R1→LS_R1→LI_R1 per round,
   // we use topological sort so blocks only appear after ALL their real feeders.

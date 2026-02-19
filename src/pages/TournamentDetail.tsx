@@ -1957,8 +1957,8 @@ const TournamentDetail = () => {
                   </div>
                   <div className="space-y-2">
                     {filteredTeams.map((t, i) => (
-                      <div key={t.id} className="flex items-center justify-between rounded-lg border border-border bg-secondary/50 px-4 py-2">
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div key={t.id} className="flex items-start sm:items-center justify-between rounded-lg border border-border bg-secondary/50 px-4 py-2.5 gap-2">
+                        <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
                           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground shrink-0">
                             {i + 1}
                           </span>
@@ -1974,10 +1974,14 @@ const TournamentDetail = () => {
                               </Button>
                             </div>
                           ) : (
-                            <span className="truncate team-name">
-                              {t.player1_name} / {t.player2_name}
-                              {t.is_fictitious && <span className="ml-2 text-xs text-muted-foreground">(fictícia)</span>}
-                            </span>
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-1 min-w-0">
+                              <span className="team-name text-sm leading-snug break-words">
+                                <span className="font-semibold">{t.player1_name}</span>
+                                <span className="text-muted-foreground mx-1">/</span>
+                                <span className="font-semibold">{t.player2_name}</span>
+                              </span>
+                              {t.is_fictitious && <span className="text-xs text-muted-foreground">(fictícia)</span>}
+                            </div>
                           )}
                         </div>
                         {isOwner && editingTeamId !== t.id && (

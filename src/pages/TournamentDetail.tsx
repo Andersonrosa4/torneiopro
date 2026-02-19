@@ -109,10 +109,11 @@ const TournamentDetail = () => {
   const [fictitiousDialogOpen, setFictitiousDialogOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState("");
+  const [isAssociatedOrganizer, setIsAssociatedOrganizer] = useState(false);
 
   const { modalities, selectedModality, setSelectedModality, updateModality } = useModalities(id);
 
-  const isOwner = tournament?.created_by === organizerId || isAdmin;
+  const isOwner = tournament?.created_by === organizerId || isAdmin || isAssociatedOrganizer;
 
   // Filtered data by selected modality — STRICT isolation, no fallback (MEMOIZED)
   const filteredTeams = useMemo(() => 
@@ -148,6 +149,19 @@ const TournamentDetail = () => {
   }, [id, setSelectedSport]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Check if current organizer is associated with this tournament
+  useEffect(() => {
+    if (!id || !organizerId || isAdmin) return;
+    organizerQuery<{ id: string }[]>({
+      table: "tournament_organizers",
+      operation: "select",
+      select: "id",
+      filters: { tournament_id: id, organizer_id: organizerId },
+    }).then(({ data }) => {
+      setIsAssociatedOrganizer(!!(data && data.length > 0));
+    });
+  }, [id, organizerId, isAdmin]);
 
   // Real-time subscriptions with debounce to avoid excessive re-fetches
   useEffect(() => {

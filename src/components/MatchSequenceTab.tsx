@@ -138,6 +138,23 @@ const MatchRow = ({
   );
 };
 
+/* ─── Draw Banner ─── */
+const DrawBanner = ({ itemCount }: { itemCount: number }) => (
+  <div className="rounded-xl border border-primary/30 bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 px-4 py-3 flex items-center gap-3">
+    <span className="text-2xl">🎲</span>
+    <div className="flex-1">
+      <p className="text-sm font-black text-primary tracking-wide uppercase">Resultado do Sorteio</p>
+      <p className="text-xs text-muted-foreground mt-0.5">
+        {itemCount} confronto{itemCount !== 1 ? "s" : ""} definido{itemCount !== 1 ? "s" : ""} aleatoriamente — 1ª rodada
+      </p>
+    </div>
+    <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-background/60 border border-border/50 rounded-lg px-2.5 py-1.5">
+      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse inline-block" />
+      Sorteio concluído
+    </div>
+  </div>
+);
+
 /* ─── Block Section ─── */
 const BlockSection = ({
   label,
@@ -358,18 +375,20 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
       <ProgressSummary total={displayMatches.length} completed={completedCount} pending={pendingCount} />
 
       {/* Blocks */}
-      {groupedRounds.map((group) => (
-        <BlockSection
-          key={group.label}
-          label={group.label}
-          items={group.items}
-          blockKey={group.blockKey}
-          isUnlocked={group.isUnlocked}
-          isCompleted={group.isCompleted}
-          isDE={isDE}
-          getTeamName={getTeamName}
-          getRoundLabel={getRoundLabel}
-        />
+      {groupedRounds.map((group, groupIdx) => (
+        <div key={group.label} className="space-y-2">
+          {groupIdx === 0 && <DrawBanner itemCount={group.items.length} />}
+          <BlockSection
+            label={group.label}
+            items={group.items}
+            blockKey={group.blockKey}
+            isUnlocked={group.isUnlocked}
+            isCompleted={group.isCompleted}
+            isDE={isDE}
+            getTeamName={getTeamName}
+            getRoundLabel={getRoundLabel}
+          />
+        </div>
       ))}
     </section>
   );

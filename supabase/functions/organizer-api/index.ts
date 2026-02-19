@@ -57,13 +57,17 @@ const TOURNAMENT_TABLES = new Set([
 ]);
 
 async function getOrganizer(supabase: any, organizerId: string) {
-  const { data, error } = await supabase
-    .from("organizers")
-    .select("id, role")
-    .eq("id", organizerId)
-    .single();
-  if (error || !data) return null;
-  return data;
+  // Retry up to 2 times to handle transient DB issues under concurrent load
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { data, error } = await supabase
+      .from("organizers")
+      .select("id, role")
+      .eq("id", organizerId)
+      .single();
+    if (data) return data;
+    if (attempt < 2) await new Promise((r) => setTimeout(r, 100 * (attempt + 1)));
+  }
+  return null;
 }
 
 async function getTournamentOwner(supabase: any, tournamentId: string): Promise<string | null> {

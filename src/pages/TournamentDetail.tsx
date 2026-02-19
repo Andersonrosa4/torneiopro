@@ -1872,19 +1872,27 @@ const TournamentDetail = () => {
                                   return;
                                 }
                                 let added = 0;
-                                for (let i = 0; i < pairs.length; i++) {
-                                  const { error } = await organizerQuery({
-                                    table: "teams",
-                                    operation: "insert",
-                                    data: {
-                                      tournament_id: id,
-                                      player1_name: pairs[i][0].toString().trim(),
-                                      player2_name: pairs[i][1].toString().trim(),
-                                      seed: filteredTeams.length + added + 1,
-                                      modality_id: selectedModality?.id || null,
-                                    },
-                                  });
-                                  if (!error) added++;
+                                const baseIndex = filteredTeams.length;
+                                // Process in batches of 4 to avoid concurrent auth issues
+                                const BATCH_SIZE = 4;
+                                for (let batch = 0; batch < pairs.length; batch += BATCH_SIZE) {
+                                  const batchPairs = pairs.slice(batch, batch + BATCH_SIZE);
+                                  const results = await Promise.all(
+                                    batchPairs.map((pair, j) =>
+                                      organizerQuery({
+                                        table: "teams",
+                                        operation: "insert",
+                                        data: {
+                                          tournament_id: id,
+                                          player1_name: pair[0].toString().trim(),
+                                          player2_name: pair[1].toString().trim(),
+                                          seed: baseIndex + batch + j + 1,
+                                          modality_id: selectedModality?.id || null,
+                                        },
+                                      })
+                                    )
+                                  );
+                                  added += results.filter(r => !r.error).length;
                                 }
                                 fetchData();
                                 toast.success(`✅ ${added} dupla(s) importada(s) com sucesso!`);

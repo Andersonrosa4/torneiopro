@@ -20,6 +20,7 @@ import { rankTeamsInGroup, selectIndexTeams } from "@/lib/tiebreakLogic";
 import { organizerQuery, publicQuery } from "@/lib/organizerApi";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
 import ModalityTabs from "@/components/ModalityTabs";
+import TournamentOrganizersManager from "@/components/TournamentOrganizersManager";
 import { useModalities } from "@/hooks/useModalities";
 import { generateDoubleEliminationBracket } from "@/lib/doubleEliminationLogic";
 import { processDoubleEliminationAdvance, handleResetFinal } from "@/lib/doubleEliminationAdvance";
@@ -1609,6 +1610,16 @@ const TournamentDetail = () => {
               )}
             </div>
           </div>
+
+          {/* Organizers Manager - admin only */}
+          {isAdmin && tournament && (
+            <div className="mb-4">
+              <TournamentOrganizersManager
+                tournamentId={tournament.id}
+                createdBy={tournament.created_by}
+              />
+            </div>
+          )}
 
           {/* Modality Tabs */}
           <ModalityTabs

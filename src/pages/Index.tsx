@@ -47,17 +47,17 @@ const sports = [
   },
 ];
 
-const SportCard = ({ sport, i, navigate }: { sport: typeof sports[number]; i: number; navigate: ReturnType<typeof useNavigate> }) => (
+const SportCard = ({ sport, i, navigate, size = "default" }: { sport: typeof sports[number]; i: number; navigate: ReturnType<typeof useNavigate>; size?: "default" | "large" }) => (
   <motion.button
     key={sport.id}
     initial={{ opacity: 0, y: 30 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ delay: 0.15 + i * 0.12, type: "spring", stiffness: 120 }}
     onClick={() => navigate("/auth", { state: { sport: sport.id } })}
-    className="group relative overflow-hidden rounded-2xl border border-[hsl(0_0%_100%/0.12)] sport-card-glow cursor-pointer"
+    className="group relative overflow-hidden rounded-2xl border border-[hsl(0_0%_100%/0.12)] sport-card-glow cursor-pointer w-full"
     style={{ boxShadow: `0 4px 20px ${sport.glowColor}` }}
   >
-    <div className="relative h-32 sm:h-44 md:h-48 overflow-hidden">
+    <div className={`relative overflow-hidden ${size === "large" ? "h-48 sm:h-64 lg:h-full lg:min-h-[320px]" : "h-32 sm:h-44 md:h-48"}`}>
       <video
         src={sport.video}
         autoPlay
@@ -115,11 +115,24 @@ const Index = () => {
           </p>
         </motion.div>
 
-        {/* Cards: row of 5 on desktop, 2+2+1 on mobile */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-          {sports.map((sport, i) => (
-            <SportCard key={sport.id} sport={sport} i={i} navigate={navigate} />
-          ))}
+        {/* Layout: 2 left | 1 center | 2 right */}
+        <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 items-stretch">
+          {/* Left: Vôlei + Futevôlei */}
+          <div className="grid grid-cols-2 lg:grid-cols-1 gap-3 sm:gap-4 lg:w-[27%]">
+            {sports.slice(0, 2).map((sport, i) => (
+              <SportCard key={sport.id} sport={sport} i={i} navigate={navigate} />
+            ))}
+          </div>
+          {/* Center: Beach Tennis (hero) */}
+          <div className="lg:w-[46%] flex">
+            <SportCard sport={sports[2]} i={2} navigate={navigate} size="large" />
+          </div>
+          {/* Right: Tênis + Padel */}
+          <div className="grid grid-cols-2 lg:grid-cols-1 gap-3 sm:gap-4 lg:w-[27%]">
+            {sports.slice(3, 5).map((sport, i) => (
+              <SportCard key={sport.id} sport={sport} i={i + 3} navigate={navigate} />
+            ))}
+          </div>
         </div>
 
         <motion.div

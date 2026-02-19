@@ -1791,7 +1791,47 @@ const TournamentDetail = () => {
                 <p className="text-sm text-muted-foreground mt-4">Nenhuma dupla cadastrada nesta modalidade.</p>
               ) : (
                 <section className="mt-4 rounded-xl border border-border bg-card p-6 shadow-card">
-                  <h2 className="mb-4 text-xl font-semibold">Duplas ({filteredTeams.length})</h2>
+                  <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-xl font-semibold">Duplas ({filteredTeams.length})</h2>
+                    {isOwner && filteredTeams.length > 0 && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" size="sm" className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive">
+                            <Trash2 className="h-3.5 w-3.5" /> Excluir Todas
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir todas as duplas?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta ação removerá todas as {filteredTeams.length} dupla(s) da modalidade <strong>{selectedModality?.name}</strong>. Esta ação não pode ser desfeita.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={async () => {
+                                let deleted = 0;
+                                for (const t of filteredTeams) {
+                                  const { error } = await organizerQuery({
+                                    table: "teams",
+                                    operation: "delete",
+                                    filters: { id: t.id },
+                                  });
+                                  if (!error) deleted++;
+                                }
+                                fetchData();
+                                toast.success(`${deleted} dupla(s) excluída(s) com sucesso!`);
+                              }}
+                            >
+                              Excluir Todas
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+                  </div>
                   <div className="space-y-2">
                     {filteredTeams.map((t, i) => (
                       <div key={t.id} className="flex items-center justify-between rounded-lg border border-border bg-secondary/50 px-4 py-2">

@@ -405,6 +405,20 @@ Deno.serve(async (req) => {
         break;
       }
       case "delete": {
+        // For teams: clear FK references in matches before deleting to avoid constraint violations
+        if (table === "teams" && filters) {
+          let selectQuery = supabase.from("teams").select("id");
+          for (const [key, value] of Object.entries(filters)) {
+            selectQuery = selectQuery.eq(key, value as any);
+          }
+          const { data: teamsToDelete } = await selectQuery;
+          if (teamsToDelete && teamsToDelete.length > 0) {
+            const idsToDelete = teamsToDelete.map((t: any) => t.id);
+            await supabase.from("matches").update({ team1_id: null, winner_team_id: null }).in("team1_id", idsToDelete);
+            await supabase.from("matches").update({ team2_id: null, winner_team_id: null }).in("team2_id", idsToDelete);
+          }
+        }
+
         // For matches: clear FK references before deleting to avoid constraint violations
         if (table === "matches" && filters) {
           let selectQuery = supabase.from("matches").select("id");

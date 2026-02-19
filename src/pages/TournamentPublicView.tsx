@@ -1,7 +1,13 @@
-import { useEffect, useState, useCallback, useMemo, lazy, Suspense } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef, lazy, Suspense } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { publicQuery } from "@/lib/organizerApi";
+
+// ─── Module-level cache (shared across renders, survives tab switches) ───────
+const CACHE_TTL_MS = 5_000; // 5 seconds stale threshold
+interface CacheEntry { tournament: any; teams: any[]; matches: any[]; fetchedAt: number; }
+const dataCache = new Map<string, CacheEntry>();
+// ─────────────────────────────────────────────────────────────────────────────
 import { useSportTheme } from "@/contexts/SportContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,7 +48,8 @@ const TournamentPublicView = () => {
   const [tournament, setTournament] = useState<any>(null);
   const [teams, setTeams] = useState<any[]>([]);
   const [matches, setMatches] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!dataCache.has(id ?? ""));
+  const revalidatingRef = useRef(false);
 
   const { modalities, selectedModality, setSelectedModality } = useModalities(id);
 
@@ -56,31 +63,79 @@ const TournamentPublicView = () => {
     [matches, selectedModality]
   );
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (background = false) => {
     if (!id) return;
-    const [tRes, teamsRes, mRes] = await Promise.all([
-      publicQuery({ table: "tournaments", filters: { id }, single: true }),
-      publicQuery({ table: "teams", filters: { tournament_id: id }, order: { column: "seed", ascending: true } }),
-      publicQuery({ table: "matches", filters: { tournament_id: id }, order: [{ column: "round", ascending: true }, { column: "position", ascending: true }] }),
-    ]);
-    if (tRes.data) {
-      setTournament(tRes.data);
-      setSelectedSport(tRes.data.sport);
+
+    // Stale-while-revalidate: serve cache instantly if fresh enough
+    const cached = dataCache.get(id);
+    const now = Date.now();
+    if (cached && now - cached.fetchedAt < CACHE_TTL_MS) {
+      // Cache is still fresh — apply and skip network request
+      setTournament(cached.tournament);
+      setSelectedSport(cached.tournament?.sport);
+      setTeams(cached.teams);
+      setMatches(cached.matches);
+      setLoading(false);
+      return;
     }
-    if (teamsRes.data) setTeams(teamsRes.data);
-    if (mRes.data) setMatches(mRes.data);
-    setLoading(false);
+
+    // Cache is stale or missing — if serving stale data first, show it instantly
+    if (cached && !background) {
+      setTournament(cached.tournament);
+      setSelectedSport(cached.tournament?.sport);
+      setTeams(cached.teams);
+      setMatches(cached.matches);
+      setLoading(false);
+    }
+
+    // Prevent concurrent background revalidations
+    if (background && revalidatingRef.current) return;
+    if (background) revalidatingRef.current = true;
+
+    try {
+      const [tRes, teamsRes, mRes] = await Promise.all([
+        publicQuery({ table: "tournaments", filters: { id }, single: true }),
+        publicQuery({ table: "teams", filters: { tournament_id: id }, order: { column: "seed", ascending: true } }),
+        publicQuery({ table: "matches", filters: { tournament_id: id }, order: [{ column: "round", ascending: true }, { column: "position", ascending: true }] }),
+      ]);
+
+      const tournament = tRes.data ?? cached?.tournament ?? null;
+      const teams = teamsRes.data ?? cached?.teams ?? [];
+      const matches = mRes.data ?? cached?.matches ?? [];
+
+      // Update cache
+      if (tournament) dataCache.set(id, { tournament, teams, matches, fetchedAt: Date.now() });
+
+      if (tournament) { setTournament(tournament); setSelectedSport(tournament.sport); }
+      setTeams(teams);
+      setMatches(matches);
+      setLoading(false);
+    } finally {
+      if (background) revalidatingRef.current = false;
+    }
   }, [id, setSelectedSport]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    const cached = dataCache.get(id ?? "");
+    if (cached) {
+      // Instantly paint stale data, revalidate in background
+      fetchData(true);
+    } else {
+      fetchData(false);
+    }
+  }, [fetchData, id]);
 
-  // Real-time updates — debounced to avoid excessive re-fetches on bulk changes
+  // Real-time updates — debounced + invalidates cache so next fetch is fresh
   useEffect(() => {
     if (!id) return;
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const debouncedFetch = () => {
       if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => fetchData(), 300);
+      debounceTimer = setTimeout(() => {
+        // Invalidate cache so Realtime always fetches fresh data
+        dataCache.delete(id);
+        fetchData(false);
+      }, 300);
     };
     const channel = supabase
       .channel(`public-rt-${id}`)

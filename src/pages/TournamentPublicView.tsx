@@ -74,19 +74,27 @@ const TournamentPublicView = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Real-time updates
+  // Real-time updates — debounced to avoid excessive re-fetches on bulk changes
   useEffect(() => {
     if (!id) return;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedFetch = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => fetchData(), 300);
+    };
     const channel = supabase
       .channel(`public-rt-${id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `tournament_id=eq.${id}` }, () => fetchData())
-      .on("postgres_changes", { event: "*", schema: "public", table: "teams", filter: `tournament_id=eq.${id}` }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `tournament_id=eq.${id}` }, debouncedFetch)
+      .on("postgres_changes", { event: "*", schema: "public", table: "teams", filter: `tournament_id=eq.${id}` }, debouncedFetch)
       .on("postgres_changes", { event: "*", schema: "public", table: "tournaments" }, (payload) => {
-        if ((payload.new as any)?.id === id) fetchData();
+        if ((payload.new as any)?.id === id) debouncedFetch();
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "rankings", filter: `tournament_id=eq.${id}` }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "rankings", filter: `tournament_id=eq.${id}` }, debouncedFetch)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      supabase.removeChannel(channel);
+    };
   }, [id, fetchData]);
 
   if (loading) {

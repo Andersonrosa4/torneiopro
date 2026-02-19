@@ -1812,17 +1812,18 @@ const TournamentDetail = () => {
                             <AlertDialogAction
                               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                               onClick={async () => {
-                                let deleted = 0;
-                                for (const t of filteredTeams) {
-                                  const { error } = await organizerQuery({
-                                    table: "teams",
-                                    operation: "delete",
-                                    filters: { id: t.id },
-                                  });
-                                  if (!error) deleted++;
-                                }
+                                const count = filteredTeams.length;
+                                // Single bulk delete by modality_id — 1 request instead of N
+                                const filters: Record<string, any> = { tournament_id: id };
+                                if (selectedModality?.id) filters.modality_id = selectedModality.id;
+                                const { error } = await organizerQuery({
+                                  table: "teams",
+                                  operation: "delete",
+                                  filters,
+                                });
+                                if (error) { toast.error(error.message); return; }
                                 fetchData();
-                                toast.success(`${deleted} dupla(s) excluída(s) com sucesso!`);
+                                toast.success(`${count} dupla(s) excluída(s) com sucesso!`);
                               }}
                             >
                               Excluir Todas

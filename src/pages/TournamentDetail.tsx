@@ -1854,11 +1854,15 @@ const TournamentDetail = () => {
                               e.target.value = "";
                               try {
                                 const data = await file.arrayBuffer();
-                                const wb = XLSX.read(data);
+                                const wb = XLSX.read(data, { type: "array", raw: false, cellText: true });
                                 const ws = wb.Sheets[wb.SheetNames[0]];
-                                const rows: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
-                                // Skip header row, filter valid pairs
-                                const pairs = rows.slice(1).filter(r => r[0]?.toString().trim() && r[1]?.toString().trim());
+                                const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: false });
+                                // Skip header row (first row), filter rows that have at least 2 non-empty values
+                                const pairs = rows.slice(1).filter(r => {
+                                  const p1 = r[0]?.toString().trim();
+                                  const p2 = r[1]?.toString().trim();
+                                  return p1 && p2;
+                                });
                                 if (pairs.length === 0) {
                                   toast.error("Nenhuma dupla encontrada na planilha.");
                                   return;

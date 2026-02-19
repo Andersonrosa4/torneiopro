@@ -14,6 +14,9 @@ import { ArrowLeft } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import ThemedBackground from "@/components/ThemedBackground";
 import { organizerQuery, publicQuery } from "@/lib/organizerApi";
+import TournamentRulesForm, { TournamentRulesState, getDefaultRules } from "@/components/TournamentRulesForm";
+
+const SPORTS_WITH_RULES = ["tennis", "padel"];
 
 const CreateTournament = () => {
   const { organizerId, user } = useAuth();
@@ -30,6 +33,17 @@ const CreateTournament = () => {
     location: "",
     tournament_code: "",
   });
+
+  const [rules, setRules] = useState<TournamentRulesState>(getDefaultRules("tennis"));
+
+  const showRules = SPORTS_WITH_RULES.includes(form.sport);
+
+  const handleSportChange = (sport: string) => {
+    setForm({ ...form, sport });
+    if (SPORTS_WITH_RULES.includes(sport)) {
+      setRules(getDefaultRules(sport));
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,10 +93,28 @@ const CreateTournament = () => {
 
     if (error) {
       toast.error(error.message);
-    } else {
-      toast.success(`Torneio criado! Código: ${normalizedCode}`);
-      navigate(`/tournaments/${data.id}`);
+      setLoading(false);
+      return;
     }
+
+    // Save tournament rules for tennis/padel
+    if (showRules && data?.id) {
+      const { error: rulesError } = await organizerQuery({
+        table: "tournament_rules",
+        operation: "insert",
+        data: {
+          tournament_id: data.id,
+          ...rules,
+        },
+      });
+      if (rulesError) {
+        console.error("Error saving rules:", rulesError);
+        // Non-blocking: tournament was created, rules can be set later
+      }
+    }
+
+    toast.success(`Torneio criado! Código: ${normalizedCode}`);
+    navigate(`/tournaments/${data.id}`);
     setLoading(false);
   };
 
@@ -135,12 +167,14 @@ const CreateTournament = () => {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Esporte</Label>
-                <Select value={form.sport} onValueChange={(v) => setForm({ ...form, sport: v })}>
+                <Select value={form.sport} onValueChange={handleSportChange}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="beach_volleyball">🏐 Vôlei de Praia</SelectItem>
                     <SelectItem value="futevolei">⚽ Futevôlei</SelectItem>
                     <SelectItem value="beach_tennis">🎾 Beach Tennis</SelectItem>
+                    <SelectItem value="tennis">🎾 Tênis</SelectItem>
+                    <SelectItem value="padel">🏓 Padel</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -154,6 +188,14 @@ const CreateTournament = () => {
                 />
               </div>
             </div>
+
+            {/* Rules configuration for tennis/padel */}
+            {showRules && (
+              <div className="space-y-2">
+                <Label className="text-base font-semibold">⚙️ Configurações de Regras</Label>
+                <TournamentRulesForm sport={form.sport} rules={rules} onChange={setRules} />
+              </div>
+            )}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">

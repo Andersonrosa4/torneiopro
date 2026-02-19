@@ -598,6 +598,92 @@ export type Database = {
           },
         ]
       }
+      tournament_rules: {
+        Row: {
+          created_at: string
+          final_set_tiebreak_mode: string
+          first_server: string
+          games_to_win_set: number
+          golden_point: boolean
+          id: string
+          min_difference: number
+          mode: string
+          no_ad: boolean
+          points_sequence: string
+          ranking_criteria_order: string
+          retirement_keep_score: boolean
+          server_rotation: string
+          sets_format: string
+          super_tiebreak_enabled: boolean
+          super_tiebreak_points: number
+          super_tiebreak_replaces_third_set: boolean
+          tiebreak_at: string
+          tiebreak_enabled: boolean
+          tiebreak_points: number
+          tournament_id: string
+          updated_at: string
+          walkover_enabled: boolean
+        }
+        Insert: {
+          created_at?: string
+          final_set_tiebreak_mode?: string
+          first_server?: string
+          games_to_win_set?: number
+          golden_point?: boolean
+          id?: string
+          min_difference?: number
+          mode?: string
+          no_ad?: boolean
+          points_sequence?: string
+          ranking_criteria_order?: string
+          retirement_keep_score?: boolean
+          server_rotation?: string
+          sets_format?: string
+          super_tiebreak_enabled?: boolean
+          super_tiebreak_points?: number
+          super_tiebreak_replaces_third_set?: boolean
+          tiebreak_at?: string
+          tiebreak_enabled?: boolean
+          tiebreak_points?: number
+          tournament_id: string
+          updated_at?: string
+          walkover_enabled?: boolean
+        }
+        Update: {
+          created_at?: string
+          final_set_tiebreak_mode?: string
+          first_server?: string
+          games_to_win_set?: number
+          golden_point?: boolean
+          id?: string
+          min_difference?: number
+          mode?: string
+          no_ad?: boolean
+          points_sequence?: string
+          ranking_criteria_order?: string
+          retirement_keep_score?: boolean
+          server_rotation?: string
+          sets_format?: string
+          super_tiebreak_enabled?: boolean
+          super_tiebreak_points?: number
+          super_tiebreak_replaces_third_set?: boolean
+          tiebreak_at?: string
+          tiebreak_enabled?: boolean
+          tiebreak_points?: number
+          tournament_id?: string
+          updated_at?: string
+          walkover_enabled?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tournament_rules_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: true
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tournaments: {
         Row: {
           category: string | null
@@ -702,7 +788,12 @@ export type Database = {
     Enums: {
       app_role: "admin" | "organizer" | "athlete"
       match_status: "pending" | "in_progress" | "completed"
-      sport_type: "beach_volleyball" | "futevolei" | "beach_tennis"
+      sport_type:
+        | "beach_volleyball"
+        | "futevolei"
+        | "beach_tennis"
+        | "tennis"
+        | "padel"
       tournament_status:
         | "draft"
         | "registration"
@@ -838,7 +929,13 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "organizer", "athlete"],
       match_status: ["pending", "in_progress", "completed"],
-      sport_type: ["beach_volleyball", "futevolei", "beach_tennis"],
+      sport_type: [
+        "beach_volleyball",
+        "futevolei",
+        "beach_tennis",
+        "tennis",
+        "padel",
+      ],
       tournament_status: [
         "draft",
         "registration",

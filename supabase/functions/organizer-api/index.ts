@@ -46,6 +46,7 @@ async function verifyHmacToken(
 const PUBLIC_READ_TABLES = new Set([
   "tournaments", "teams", "matches", "participants", "modalities",
   "groups", "classificacao_grupos", "quiz_questions", "quiz_scores", "rankings",
+  "tournament_rules",
 ]);
 
 // Tables that require admin role for any write
@@ -54,6 +55,7 @@ const ADMIN_ONLY_TABLES = new Set(["organizers", "user_roles"]);
 // Tables that are linked to a tournament (ownership checked via tournament)
 const TOURNAMENT_TABLES = new Set([
   "teams", "matches", "participants", "modalities", "groups", "classificacao_grupos",
+  "tournament_rules",
 ]);
 
 async function getOrganizer(supabase: any, organizerId: string) {
@@ -290,7 +292,7 @@ Deno.serve(async (req) => {
     }
 
     // Allowed tables
-    const allowedTables = ["tournaments", "teams", "matches", "participants", "rankings", "organizers", "user_roles", "modalities", "groups", "classificacao_grupos", "quiz_questions", "quiz_scores", "tournament_organizers"];
+    const allowedTables = ["tournaments", "teams", "matches", "participants", "rankings", "organizers", "user_roles", "modalities", "groups", "classificacao_grupos", "quiz_questions", "quiz_scores", "tournament_organizers", "tournament_rules"];
     if (!allowedTables.includes(table)) {
       return new Response(
         JSON.stringify({ error: `Tabela '${table}' não permitida` }),

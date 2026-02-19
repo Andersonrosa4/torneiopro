@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo, useRef, lazy, Suspense } fro
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { publicQuery } from "@/lib/organizerApi";
+import { formatDateBR } from "@/lib/utils";
 
 // ─── Module-level cache (shared across renders, survives tab switches) ───────
 const CACHE_TTL_MS = 5_000; // 5 seconds stale threshold
@@ -200,7 +201,7 @@ const TournamentPublicView = () => {
                   <span className="flex items-center gap-1"><MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5" />{tournament.location}</span>
                 )}
                 {tournament.event_date && (
-                  <span className="flex items-center gap-1"><Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5" />{new Date(tournament.event_date).toLocaleDateString("pt-BR")}</span>
+                  <span className="flex items-center gap-1"><Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5" />{formatDateBR(tournament.event_date)}</span>
                 )}
               </div>
             </div>
@@ -297,7 +298,7 @@ const TournamentPublicView = () => {
                       numSets={tournament?.num_sets || 3}
                       tournamentName={tournament?.name || ""}
                       sport={tournament?.sport || ""}
-                      eventDate={tournament?.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
+                      eventDate={tournament?.event_date ? formatDateBR(tournament.event_date) : undefined}
                       tournamentFormat={tournament?.format === 'double_elimination' ? 'double_elimination' : (selectedModality?.game_system || tournament?.format)}
                       onDeclareWinner={() => {}}
                       onUpdateScore={() => {}}
@@ -335,7 +336,7 @@ const TournamentPublicView = () => {
                   isOwner={false}
                   sport={tournament.sport}
                   tournamentName={tournament.name}
-                  eventDate={tournament.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
+                  eventDate={tournament.event_date ? formatDateBR(tournament.event_date) : undefined}
                 />
               </Suspense>
             </TabsContent>

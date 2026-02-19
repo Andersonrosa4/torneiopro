@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import { Plus, Trophy, Users, Calendar, ArrowRight, MapPin, ArrowLeft, Trash2, Stethoscope } from "lucide-react";
+import { formatDateBR } from "@/lib/utils";
 import { toast } from "sonner";
 import { organizerQuery } from "@/lib/organizerApi";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -283,7 +284,7 @@ const Dashboard = () => {
                           {t.event_date && (
                             <span className="flex items-center gap-1">
                               <Calendar className="h-3.5 w-3.5" />
-                              {new Date(t.event_date).toLocaleDateString("pt-BR")}
+                              {formatDateBR(t.event_date)}
                             </span>
                           )}
                           {t.location && (

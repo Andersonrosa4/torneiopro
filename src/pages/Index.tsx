@@ -85,88 +85,48 @@ const Index = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 pt-8">
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 py-10">
       {/* Beach arena background */}
       <div className="absolute inset-0 bg-gradient-to-b from-[hsl(220_15%_8%)] via-[hsl(220_12%_12%)] to-[hsl(25_15%_14%)]" />
 
       {/* Sand texture at bottom */}
-      <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-[hsl(35_35%_65%/0.3)] to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-[hsl(35_35%_65%/0.15)] to-transparent" />
 
       {/* Animated light beams */}
       <div className="absolute top-0 left-1/4 w-32 h-full bg-gradient-to-b from-[hsl(195_80%_60%/0.08)] to-transparent rotate-12 animate-light-beam" />
       <div className="absolute top-0 right-1/3 w-24 h-full bg-gradient-to-b from-[hsl(35_80%_60%/0.06)] to-transparent -rotate-6 animate-light-beam" style={{ animationDelay: "2s" }} />
-      <div className="absolute top-0 left-1/2 w-20 h-full bg-gradient-to-b from-[hsl(180_60%_50%/0.05)] to-transparent rotate-3 animate-light-beam" style={{ animationDelay: "4s" }} />
 
       {/* Stadium light spots */}
-      <div className="absolute top-0 left-0 w-96 h-96 bg-[radial-gradient(ellipse_at_center,hsl(195_80%_60%/0.12),transparent_70%)]" />
-      <div className="absolute top-0 right-0 w-96 h-96 bg-[radial-gradient(ellipse_at_center,hsl(22_80%_55%/0.1),transparent_70%)]" />
-
-      {/* Net texture line */}
-      <div className="absolute top-[40%] left-0 right-0 h-px bg-gradient-to-r from-transparent via-[hsl(0_0%_100%/0.1)] to-transparent" />
+      <div className="absolute top-0 left-0 w-96 h-96 bg-[radial-gradient(ellipse_at_center,hsl(195_80%_60%/0.1),transparent_70%)]" />
+      <div className="absolute top-0 right-0 w-96 h-96 bg-[radial-gradient(ellipse_at_center,hsl(22_80%_55%/0.08),transparent_70%)]" />
 
       {/* Content */}
-      <div className="relative z-10 w-full max-w-4xl">
+      <div className="relative z-10 w-full max-w-5xl">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-12 text-center"
+          className="mb-8 text-center"
         >
-          <div className="mx-auto mb-5 flex h-56 w-56 items-center justify-center">
-            <LogoImage className="h-56 w-56" />
+          <div className="mx-auto mb-4 flex h-44 w-44 items-center justify-center">
+            <LogoImage className="h-44 w-44" />
           </div>
-          <p className="mt-3 text-lg text-[hsl(35_30%_80%)]">
+          <p className="text-base text-[hsl(35_30%_80%)]">
             Sistema profissional de gestão de torneios
           </p>
         </motion.div>
 
-        {/* Court container */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.1, duration: 0.5 }}
-          className="relative w-full rounded-3xl border-2 border-[hsl(0_0%_100%/0.15)] p-3 sm:p-5 bg-[hsl(140_35%_22%/0.35)] backdrop-blur-sm"
-          style={{
-            boxShadow: "inset 0 0 60px hsl(140 30% 20% / 0.2), 0 0 40px hsl(140 30% 20% / 0.1)",
-          }}
-        >
-          {/* Court lines */}
-          {/* Center line horizontal */}
-          <div className="absolute top-1/2 left-[5%] right-[5%] h-px bg-[hsl(0_0%_100%/0.2)]" />
-          {/* Center line vertical */}
-          <div className="absolute left-1/2 top-[5%] bottom-[5%] w-px bg-[hsl(0_0%_100%/0.2)]" />
-          {/* Service boxes - top left */}
-          <div className="absolute top-[5%] left-[5%] w-[45%] h-[45%] border-b border-r border-[hsl(0_0%_100%/0.08)] rounded-br-lg" />
-          {/* Service boxes - top right */}
-          <div className="absolute top-[5%] right-[5%] w-[45%] h-[45%] border-b border-l border-[hsl(0_0%_100%/0.08)] rounded-bl-lg" />
-          {/* Service boxes - bottom left */}
-          <div className="absolute bottom-[5%] left-[5%] w-[45%] h-[45%] border-t border-r border-[hsl(0_0%_100%/0.08)] rounded-tr-lg" />
-          {/* Service boxes - bottom right */}
-          <div className="absolute bottom-[5%] right-[5%] w-[45%] h-[45%] border-t border-l border-[hsl(0_0%_100%/0.08)] rounded-tl-lg" />
-          {/* Net glow */}
-          <div className="absolute top-1/2 -translate-y-1/2 left-[3%] right-[3%] h-1 bg-gradient-to-r from-transparent via-[hsl(0_0%_100%/0.12)] to-transparent rounded-full" />
-
-          {/* Cards grid: 3 top + 2 bottom centered */}
-          <div className="relative z-10 space-y-3 sm:space-y-5">
-            {/* Top row: 3 cards */}
-            <div className="grid grid-cols-3 gap-3 sm:gap-5">
-              {sports.slice(0, 3).map((sport, i) => (
-                <SportCard key={sport.id} sport={sport} i={i} navigate={navigate} />
-              ))}
-            </div>
-            {/* Bottom row: 2 cards centered */}
-            <div className="grid grid-cols-2 gap-3 sm:gap-5 max-w-[66.666%] mx-auto">
-              {sports.slice(3, 5).map((sport, i) => (
-                <SportCard key={sport.id} sport={sport} i={i + 3} navigate={navigate} />
-              ))}
-            </div>
-          </div>
-        </motion.div>
+        {/* Cards: row of 5 on desktop, 2+2+1 on mobile */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+          {sports.map((sport, i) => (
+            <SportCard key={sport.id} sport={sport} i={i} navigate={navigate} />
+          ))}
+        </div>
 
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.7 }}
-          className="mt-10 text-center"
+          className="mt-8 flex flex-col items-center gap-3"
         >
           <button
             onClick={() => navigate("/athlete-login")}
@@ -176,7 +136,7 @@ const Index = () => {
           </button>
           <button
             onClick={() => navigate("/qrcode")}
-            className="mt-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-5 py-2 text-sm font-medium text-primary hover:bg-primary/20 transition-all backdrop-blur-sm"
+            className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-5 py-2 text-sm font-medium text-primary hover:bg-primary/20 transition-all backdrop-blur-sm"
           >
             <QrCode className="h-4 w-4" />
             QR Code do App

@@ -61,18 +61,61 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
 
   const fetchTournaments = async () => {
-    const filters: Record<string, any> = {};
-    if (!isAdmin) {
-      filters.created_by = organizerId || "";
-    }
+    if (isAdmin) {
+      // Admin: fetch all tournaments
+      const { data, error } = await organizerQuery<Tournament[]>({
+        table: "tournaments",
+        operation: "select",
+        order: { column: "created_at", ascending: false },
+      });
+      if (!error && data) setTournaments(data);
+    } else {
+      // Non-admin: fetch tournaments created by this organizer
+      const { data: ownedData } = await organizerQuery<Tournament[]>({
+        table: "tournaments",
+        operation: "select",
+        filters: { created_by: organizerId || "" },
+        order: { column: "created_at", ascending: false },
+      });
 
-    const { data, error } = await organizerQuery<Tournament[]>({
-      table: "tournaments",
-      operation: "select",
-      filters: Object.keys(filters).length > 0 ? filters : undefined,
-      order: { column: "created_at", ascending: false },
-    });
-    if (!error && data) setTournaments(data);
+      // Also fetch tournaments associated via tournament_organizers
+      const { data: assocData } = await organizerQuery<{ tournament_id: string }[]>({
+        table: "tournament_organizers",
+        operation: "select",
+        select: "tournament_id",
+        filters: { organizer_id: organizerId || "" },
+      });
+
+      const associatedIds = (assocData ?? []).map((a) => a.tournament_id);
+      let associatedTournaments: Tournament[] = [];
+
+      if (associatedIds.length > 0) {
+        // Fetch each associated tournament
+        const fetches = await Promise.all(
+          associatedIds.map((tid) =>
+            organizerQuery<Tournament>({
+              table: "tournaments",
+              operation: "select",
+              filters: { id: tid },
+              single: true,
+            })
+          )
+        );
+        associatedTournaments = fetches
+          .filter((r) => !r.error && r.data)
+          .map((r) => r.data as Tournament);
+      }
+
+      // Merge, deduplicate
+      const owned = ownedData ?? [];
+      const allIds = new Set(owned.map((t) => t.id));
+      const merged = [
+        ...owned,
+        ...associatedTournaments.filter((t) => !allIds.has(t.id)),
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      setTournaments(merged);
+    }
     setLoading(false);
   };
 

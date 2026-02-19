@@ -138,9 +138,6 @@ const ClassificationTab = ({ matches, teams }: ClassificationTabProps) => {
               </div>
 
               <div className="flex items-center gap-2 shrink-0 ml-2">
-                <Badge variant="outline" className="text-xs">
-                  {team.wins}V / {team.played}J
-                </Badge>
                 {idx === 0 && <Trophy className="h-4 w-4 text-primary" />}
               </div>
             </motion.div>

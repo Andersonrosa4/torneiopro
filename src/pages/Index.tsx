@@ -47,6 +47,40 @@ const sports = [
   },
 ];
 
+const SportCard = ({ sport, i, navigate }: { sport: typeof sports[number]; i: number; navigate: ReturnType<typeof useNavigate> }) => (
+  <motion.button
+    key={sport.id}
+    initial={{ opacity: 0, y: 30 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay: 0.15 + i * 0.12, type: "spring", stiffness: 120 }}
+    onClick={() => navigate("/auth", { state: { sport: sport.id } })}
+    className="group relative overflow-hidden rounded-2xl border border-[hsl(0_0%_100%/0.12)] sport-card-glow cursor-pointer"
+    style={{ boxShadow: `0 4px 20px ${sport.glowColor}` }}
+  >
+    <div className="relative h-32 sm:h-44 md:h-48 overflow-hidden">
+      <video
+        src={sport.video}
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload={i === 0 ? "auto" : "metadata"}
+        className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+      />
+      <div className={`absolute inset-0 bg-gradient-to-t ${sport.accent}`} />
+      <div className="absolute inset-0 rounded-2xl border-2 border-transparent group-hover:border-[hsl(0_0%_100%/0.3)] transition-colors duration-300" />
+    </div>
+    <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
+      <h2 className="text-lg sm:text-xl font-bold text-white font-display drop-shadow-lg">
+        {sport.name}
+      </h2>
+      <p className="mt-0.5 text-[11px] sm:text-xs text-[hsl(0_0%_100%/0.85)] leading-tight">
+        {sport.description}
+      </p>
+    </div>
+  </motion.button>
+);
+
 const Index = () => {
   const navigate = useNavigate();
 
@@ -85,47 +119,48 @@ const Index = () => {
           </p>
         </motion.div>
 
-        <div className="grid w-full gap-4 sm:gap-6 grid-cols-2 sm:grid-cols-4">
-          {sports.map((sport, i) => (
-            <motion.button
-              key={sport.id}
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 + i * 0.12, type: "spring", stiffness: 120 }}
-              onClick={() => navigate("/auth", { state: { sport: sport.id } })}
-              className="group relative overflow-hidden rounded-2xl border border-[hsl(0_0%_100%/0.12)] sport-card-glow cursor-pointer"
-              style={{ boxShadow: `0 4px 20px ${sport.glowColor}` }}
-            >
-              {/* Sport video */}
-               <div className="relative h-40 sm:h-52 md:h-56 overflow-hidden">
-                <video
-                  src={sport.video}
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  preload={i === 0 ? "auto" : "metadata"}
-                  className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-                />
-                {/* Gradient overlay */}
-                <div className={`absolute inset-0 bg-gradient-to-t ${sport.accent}`} />
+        {/* Court container */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.1, duration: 0.5 }}
+          className="relative w-full rounded-3xl border-2 border-[hsl(0_0%_100%/0.15)] p-3 sm:p-5 bg-[hsl(140_35%_22%/0.35)] backdrop-blur-sm"
+          style={{
+            boxShadow: "inset 0 0 60px hsl(140 30% 20% / 0.2), 0 0 40px hsl(140 30% 20% / 0.1)",
+          }}
+        >
+          {/* Court lines */}
+          {/* Center line horizontal */}
+          <div className="absolute top-1/2 left-[5%] right-[5%] h-px bg-[hsl(0_0%_100%/0.2)]" />
+          {/* Center line vertical */}
+          <div className="absolute left-1/2 top-[5%] bottom-[5%] w-px bg-[hsl(0_0%_100%/0.2)]" />
+          {/* Service boxes - top left */}
+          <div className="absolute top-[5%] left-[5%] w-[45%] h-[45%] border-b border-r border-[hsl(0_0%_100%/0.08)] rounded-br-lg" />
+          {/* Service boxes - top right */}
+          <div className="absolute top-[5%] right-[5%] w-[45%] h-[45%] border-b border-l border-[hsl(0_0%_100%/0.08)] rounded-bl-lg" />
+          {/* Service boxes - bottom left */}
+          <div className="absolute bottom-[5%] left-[5%] w-[45%] h-[45%] border-t border-r border-[hsl(0_0%_100%/0.08)] rounded-tr-lg" />
+          {/* Service boxes - bottom right */}
+          <div className="absolute bottom-[5%] right-[5%] w-[45%] h-[45%] border-t border-l border-[hsl(0_0%_100%/0.08)] rounded-tl-lg" />
+          {/* Net glow */}
+          <div className="absolute top-1/2 -translate-y-1/2 left-[3%] right-[3%] h-1 bg-gradient-to-r from-transparent via-[hsl(0_0%_100%/0.12)] to-transparent rounded-full" />
 
-                {/* Glow border on hover */}
-                <div className="absolute inset-0 rounded-2xl border-2 border-transparent group-hover:border-[hsl(0_0%_100%/0.3)] transition-colors duration-300" />
-              </div>
-
-              {/* Text overlay */}
-              <div className="absolute bottom-0 left-0 right-0 p-5">
-                <h2 className="text-2xl font-bold text-white font-display drop-shadow-lg">
-                  {sport.name}
-                </h2>
-                <p className="mt-1 text-sm text-[hsl(0_0%_100%/0.85)]">
-                  {sport.description}
-                </p>
-              </div>
-            </motion.button>
-          ))}
-        </div>
+          {/* Cards grid: 3 top + 2 bottom centered */}
+          <div className="relative z-10 space-y-3 sm:space-y-5">
+            {/* Top row: 3 cards */}
+            <div className="grid grid-cols-3 gap-3 sm:gap-5">
+              {sports.slice(0, 3).map((sport, i) => (
+                <SportCard key={sport.id} sport={sport} i={i} navigate={navigate} />
+              ))}
+            </div>
+            {/* Bottom row: 2 cards centered */}
+            <div className="grid grid-cols-2 gap-3 sm:gap-5 max-w-[66.666%] mx-auto">
+              {sports.slice(3, 5).map((sport, i) => (
+                <SportCard key={sport.id} sport={sport} i={i + 3} navigate={navigate} />
+              ))}
+            </div>
+          </div>
+        </motion.div>
 
         <motion.div
           initial={{ opacity: 0 }}

@@ -82,9 +82,6 @@ const SportCard = ({ sport, i, navigate, size = "default" }: { sport: typeof spo
       <h2 className="text-lg sm:text-xl font-bold text-white font-display drop-shadow-lg">
         {sport.name}
       </h2>
-      <p className="mt-0.5 text-[11px] sm:text-xs text-[hsl(0_0%_100%/0.85)] leading-tight">
-        {sport.description}
-      </p>
     </div>
   </motion.button>
 );

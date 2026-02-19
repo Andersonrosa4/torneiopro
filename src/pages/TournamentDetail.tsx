@@ -18,6 +18,7 @@ import ThemedBackground from "@/components/ThemedBackground";
 import { GenerateBracketDialog } from "@/components/GenerateBracketDialog";
 import { rankTeamsInGroup, selectIndexTeams } from "@/lib/tiebreakLogic";
 import { organizerQuery, publicQuery } from "@/lib/organizerApi";
+import { formatDateBR } from "@/lib/utils";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
 import ModalityTabs from "@/components/ModalityTabs";
 import TournamentOrganizersManager from "@/components/TournamentOrganizersManager";
@@ -2083,7 +2084,7 @@ const TournamentDetail = () => {
                       numSets={tournament?.num_sets || 3}
                       tournamentName={tournament?.name || ""}
                       sport={tournament?.sport || ""}
-                      eventDate={tournament?.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
+                      eventDate={tournament?.event_date ? formatDateBR(tournament.event_date) : undefined}
                       onUpdateScore={updateScore}
                       onDeclareWinner={declareWinner}
                       tournamentFormat={tournament?.format === 'double_elimination' ? 'double_elimination' : (selectedModality?.game_system || tournament?.format)}
@@ -2125,7 +2126,7 @@ const TournamentDetail = () => {
                   isOwner={isOwner}
                   sport={tournament.sport}
                   tournamentName={tournament.name}
-                  eventDate={tournament.event_date ? new Date(tournament.event_date).toLocaleDateString("pt-BR") : undefined}
+                  eventDate={tournament.event_date ? formatDateBR(tournament.event_date) : undefined}
                   modalityId={selectedModality?.id || null}
                 />
               </Suspense>

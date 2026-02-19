@@ -29,6 +29,14 @@ const sports = [
     accent: "from-sky-500/80 to-blue-600/80",
     glowColor: "hsl(195 85% 45% / 0.3)",
   },
+  {
+    id: "tennis",
+    name: "Tênis",
+    video: "/videos/sport-tennis.mp4",
+    description: "Organize torneios de tênis",
+    accent: "from-lime-500/80 to-green-600/80",
+    glowColor: "hsl(120 50% 40% / 0.3)",
+  },
 ];
 
 const Index = () => {
@@ -69,7 +77,7 @@ const Index = () => {
           </p>
         </motion.div>
 
-        <div className="grid w-full gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-3">
+        <div className="grid w-full gap-4 sm:gap-6 grid-cols-2 sm:grid-cols-4">
           {sports.map((sport, i) => (
             <motion.button
               key={sport.id}

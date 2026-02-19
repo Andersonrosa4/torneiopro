@@ -118,6 +118,7 @@ export type Database = {
           created_at: string
           id: string
           is_chapeu: boolean | null
+          live_score: Json | null
           modality_id: string | null
           next_lose_match_id: string | null
           next_win_match_id: string | null
@@ -141,6 +142,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_chapeu?: boolean | null
+          live_score?: Json | null
           modality_id?: string | null
           next_lose_match_id?: string | null
           next_win_match_id?: string | null
@@ -164,6 +166,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_chapeu?: boolean | null
+          live_score?: Json | null
           modality_id?: string | null
           next_lose_match_id?: string | null
           next_win_match_id?: string | null

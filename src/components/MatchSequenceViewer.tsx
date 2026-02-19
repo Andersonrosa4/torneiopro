@@ -2,12 +2,14 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Save, Download, FileText, Sheet, Pencil, Lock, CheckCircle2, Clock, AlertCircle, ListOrdered } from "lucide-react";
+import { Trophy, Save, Download, FileText, Sheet, Pencil, Lock, CheckCircle2, Clock, AlertCircle, ListOrdered, Zap } from "lucide-react";
 import { exportMatchSequence } from "@/lib/exportUtils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getEliminationRoundLabel, getEliminationRoundShortLabel } from "@/lib/roundLabels";
 import { buildSchedulerBlocks, schedulerSequence, getSchedulerBlockColor, getSchedulerBadgeColor, type SchedulerBlock } from "@/lib/roundScheduler";
 import { ManualMatchOverride } from "@/components/ManualMatchOverride";
+import LiveScoreBoard from "@/components/LiveScoreBoard";
+import type { ScoringRules } from "@/lib/scoringEngine";
 
 /* Helper: Convert number to letter (1→A, 2→B, etc) */
 const numberToLetter = (num: number): string => {
@@ -29,6 +31,7 @@ interface Match {
   bracket_half?: string | null;
   next_win_match_id?: string | null;
   is_chapeu?: boolean | null;
+  live_score?: any;
 }
 
 interface Team {
@@ -46,10 +49,13 @@ interface MatchSequenceViewerProps {
   sport?: string;
   eventDate?: string;
   tournamentFormat?: string;
+  tournamentRules?: ScoringRules | null;
+  tournamentId?: string;
   onDeclareWinner: (matchId: string, winnerId: string) => void;
   onUpdateScore: (matchId: string, score1: number, score2: number) => void;
   onAutoResult?: (matchId: string, score1: number, score2: number, winnerId: string) => void;
   onOverrideSaved?: () => void;
+  structuralOnly?: boolean;
 }
 
 // ─── Sequence Generation Logic ───────────────────────────────
@@ -354,6 +360,8 @@ interface MatchCardProps {
   matchNumberMap: Map<string, number>;
   isBlockUnlocked?: boolean;
   teams: Team[];
+  tournamentRules?: ScoringRules | null;
+  tournamentId?: string;
   onDeclareWinner: (matchId: string, winnerId: string) => void;
   onUpdateScore: (matchId: string, score1: number, score2: number) => void;
   onAutoResult?: (matchId: string, score1: number, score2: number, winnerId: string) => void;
@@ -373,6 +381,8 @@ const MatchCard = ({
   matchNumberMap,
   isBlockUnlocked = true,
   teams,
+  tournamentRules,
+  tournamentId,
   onDeclareWinner,
   onUpdateScore,
   onAutoResult,
@@ -386,6 +396,9 @@ const MatchCard = ({
 
   const [setScores, setSetScores] = useState(initSets);
   const [isEditing, setIsEditing] = useState(false);
+  const [liveScoreOpen, setLiveScoreOpen] = useState(false);
+
+  const isLiveScorable = (sport === "tennis" || sport === "padel") && !!tournamentRules;
 
   useEffect(() => {
     setSetScores(initSets());
@@ -571,8 +584,45 @@ const MatchCard = ({
         </div>
       </div>
 
+      {/* Live Score button for tennis/padel */}
+      {isLiveScorable && hasTeams && isOwner && !isCompleted && (
+        <div className="px-2.5 pb-1.5 pt-0.5 border-t border-border/15">
+          <Button
+            size="sm"
+            className="w-full h-7 text-[10px] gap-1 bg-primary/90 hover:bg-primary text-primary-foreground font-bold"
+            onClick={() => setLiveScoreOpen(true)}
+          >
+            <Zap className="h-3 w-3" /> Placar ao Vivo
+          </Button>
+        </div>
+      )}
+
+      {/* LiveScoreBoard dialog */}
+      {isLiveScorable && hasTeams && match.team1_id && match.team2_id && tournamentId && (
+        <LiveScoreBoard
+          matchId={match.id}
+          tournamentId={tournamentId}
+          team1Name={team1Name}
+          team2Name={team2Name}
+          team1Id={match.team1_id}
+          team2Id={match.team2_id}
+          open={liveScoreOpen}
+          onClose={() => setLiveScoreOpen(false)}
+          onMatchComplete={(mId, s1, s2, wId) => {
+            setLiveScoreOpen(false);
+            if (onAutoResult) onAutoResult(mId, s1, s2, wId);
+            else {
+              onUpdateScore(mId, s1, s2);
+              onDeclareWinner(mId, wId);
+            }
+          }}
+          initialLiveScore={(match as any).live_score || null}
+          rules={tournamentRules!}
+        />
+      )}
+
       {/* Score editing with sets — compact */}
-      {hasTeams && canScore && (
+      {hasTeams && canScore && !isLiveScorable && (
         <div className="px-2.5 pb-2 pt-0.5 space-y-1 border-t border-border/15">
           <div className="flex items-center gap-1.5 flex-wrap">
             {setScores.map((s, idx) => (
@@ -689,6 +739,8 @@ const MatchSequenceViewer = ({
   sport = "",
   eventDate,
   tournamentFormat = 'single_elimination',
+  tournamentRules,
+  tournamentId,
   onDeclareWinner,
   onUpdateScore,
   onAutoResult,
@@ -1022,6 +1074,8 @@ const MatchSequenceViewer = ({
                   matchNumberMap={matchNumberMap}
                   isBlockUnlocked={isUnlocked}
                   teams={teams}
+                  tournamentRules={tournamentRules}
+                  tournamentId={tournamentId}
                   onDeclareWinner={onDeclareWinner}
                   onUpdateScore={onUpdateScore}
                   onAutoResult={onAutoResult}

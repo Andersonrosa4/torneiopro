@@ -3,7 +3,8 @@ import { publicQuery } from "@/lib/organizerApi";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, CheckCircle, XCircle, Gamepad2, RotateCcw, Medal, Star, Flame, Crown } from "lucide-react";
+import { Trophy, CheckCircle, XCircle, Gamepad2, RotateCcw, Medal, Star, Flame, Crown, Trash2 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 interface QuizQuestion {
   id: string;
@@ -31,7 +32,7 @@ const sportLabels: Record<string, string> = {
 
 const QUIZ_SIZE = 10;
 
-const SportQuiz = ({ tournamentId, sport }: { tournamentId: string; sport: string }) => {
+const SportQuiz = ({ tournamentId, sport, isAdmin = false }: { tournamentId: string; sport: string; isAdmin?: boolean }) => {
   const [phase, setPhase] = useState<"start" | "playing" | "result">("start");
   const [playerName, setPlayerName] = useState("");
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -43,6 +44,24 @@ const SportQuiz = ({ tournamentId, sport }: { tournamentId: string; sport: strin
   const [ranking, setRanking] = useState<QuizScore[]>([]);
   const [loadingRanking, setLoadingRanking] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const deleteScore = async (scoreId: string, playerName: string) => {
+    if (!confirm(`Excluir a pontuação de "${playerName}" do ranking?`)) return;
+    setDeletingId(scoreId);
+    const token = sessionStorage.getItem("organizer_token");
+    const organizerId = sessionStorage.getItem("organizer_id");
+    const { error } = await supabase.functions.invoke("organizer-api", {
+      body: { token, organizerId, table: "quiz_scores", operation: "delete", filters: { id: scoreId } },
+    });
+    if (error) {
+      toast({ title: "Erro ao excluir", description: "Não foi possível excluir a pontuação.", variant: "destructive" });
+    } else {
+      toast({ title: "Excluído", description: `Pontuação de "${playerName}" removida.` });
+      await fetchRanking();
+    }
+    setDeletingId(null);
+  };
 
   const fetchRanking = useCallback(async () => {
     setLoadingRanking(true);
@@ -172,6 +191,16 @@ const SportQuiz = ({ tournamentId, sport }: { tournamentId: string; sport: strin
                 <span className="font-mono font-bold text-primary">
                   {r.score}/{r.total_questions}
                 </span>
+                {isAdmin && (
+                  <button
+                    onClick={() => deleteScore(r.id, r.player_name)}
+                    disabled={deletingId === r.id}
+                    className="ml-1 p-1 rounded hover:bg-destructive/15 text-muted-foreground hover:text-destructive transition-colors shrink-0 disabled:opacity-50"
+                    title={`Excluir ${r.player_name}`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
             ))}
           </div>

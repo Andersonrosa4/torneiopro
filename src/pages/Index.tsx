@@ -115,24 +115,19 @@ const Index = () => {
           </p>
         </motion.div>
 
-        {/* Layout: 2 left | 1 center | 2 right */}
-        <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 items-stretch">
-          {/* Left: Vôlei + Futevôlei */}
-          <div className="grid grid-cols-2 lg:grid-cols-1 gap-3 sm:gap-4 lg:w-[27%]">
-            {sports.slice(0, 2).map((sport, i) => (
-              <SportCard key={sport.id} sport={sport} i={i} navigate={navigate} />
-            ))}
-          </div>
-          {/* Center: Beach Tennis (hero) */}
-          <div className="lg:w-[46%] flex">
-            <SportCard sport={sports[2]} i={2} navigate={navigate} size="large" />
-          </div>
-          {/* Right: Tênis + Padel */}
-          <div className="grid grid-cols-2 lg:grid-cols-1 gap-3 sm:gap-4 lg:w-[27%]">
-            {sports.slice(3, 5).map((sport, i) => (
-              <SportCard key={sport.id} sport={sport} i={i + 3} navigate={navigate} />
-            ))}
-          </div>
+        {/* Row 1: 3 cards */}
+        <div className="grid grid-cols-3 gap-3 sm:gap-4">
+          {sports.slice(0, 3).map((sport, i) => (
+            <SportCard key={sport.id} sport={sport} i={i} navigate={navigate} />
+          ))}
+        </div>
+        {/* Row 2: 2 cards centered */}
+        <div className="flex justify-center gap-3 sm:gap-4 mt-3 sm:mt-4">
+          {sports.slice(3, 5).map((sport, i) => (
+            <div key={sport.id} className="w-[calc(33.333%-0.33rem)] sm:w-[calc(33.333%-0.55rem)]">
+              <SportCard sport={sport} i={i + 3} navigate={navigate} />
+            </div>
+          ))}
         </div>
 
         <motion.div

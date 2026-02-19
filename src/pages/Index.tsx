@@ -45,6 +45,14 @@ const sports = [
     accent: "from-violet-500/80 to-purple-600/80",
     glowColor: "hsl(270 60% 50% / 0.3)",
   },
+  {
+    id: "futsal",
+    name: "Futsal",
+    video: "/videos/sport-futsal.mp4",
+    description: "Organize torneios de futsal",
+    accent: "from-red-500/80 to-rose-600/80",
+    glowColor: "hsl(0 70% 50% / 0.3)",
+  },
 ];
 
 const SportCard = ({ sport, i, navigate, size = "default" }: { sport: typeof sports[number]; i: number; navigate: ReturnType<typeof useNavigate>; size?: "default" | "large" }) => (
@@ -121,12 +129,10 @@ const Index = () => {
             <SportCard key={sport.id} sport={sport} i={i} navigate={navigate} />
           ))}
         </div>
-        {/* Row 2: 2 cards centered */}
-        <div className="flex justify-center gap-3 sm:gap-4 mt-3 sm:mt-4">
-          {sports.slice(3, 5).map((sport, i) => (
-            <div key={sport.id} className="w-[calc(33.333%-0.33rem)] sm:w-[calc(33.333%-0.55rem)]">
-              <SportCard sport={sport} i={i + 3} navigate={navigate} />
-            </div>
+        {/* Row 2: 3 cards */}
+        <div className="grid grid-cols-3 gap-3 sm:gap-4 mt-3 sm:mt-4">
+          {sports.slice(3, 6).map((sport, i) => (
+            <SportCard key={sport.id} sport={sport} i={i + 3} navigate={navigate} />
           ))}
         </div>
 

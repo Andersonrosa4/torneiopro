@@ -346,6 +346,16 @@ Deno.serve(async (req) => {
         }
       }
 
+      // quiz_scores: only admins can delete
+      if (table === "quiz_scores" && operation === "delete") {
+        if (!isAdmin) {
+          return new Response(
+            JSON.stringify({ error: "Permissão negada: apenas administradores podem excluir pontuações do quiz" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+
       if (table === "rankings" && operation !== "select") {
         const tournamentId = filters?.tournament_id ?? data?.tournament_id;
         if (tournamentId) {

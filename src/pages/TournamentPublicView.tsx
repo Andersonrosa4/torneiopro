@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef, lazy, Suspense } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { publicQuery } from "@/lib/organizerApi";
@@ -44,6 +45,7 @@ const statusLabels: Record<string, string> = {
 
 const TournamentPublicView = () => {
   const { id } = useParams<{ id: string }>();
+  const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const { setSelectedSport } = useSportTheme();
   const [tournament, setTournament] = useState<any>(null);
@@ -343,7 +345,7 @@ const TournamentPublicView = () => {
 
             <TabsContent value="quiz">
               <Suspense fallback={<div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
-                <SportQuiz tournamentId={id || ""} sport={tournament.sport} />
+                <SportQuiz tournamentId={id || ""} sport={tournament.sport} isAdmin={isAdmin} />
               </Suspense>
             </TabsContent>
           </Tabs>

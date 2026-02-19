@@ -167,7 +167,7 @@ Deno.serve(async (req) => {
       }
 
       if (operation === "select") {
-        let q = supabase.from("tournament_organizers").select(select || "*, organizers(id, username, display_name, role)");
+        let q = supabase.from("tournament_organizers").select(select || "*, organizers!organizer_id(id, username, display_name, role)");
         if (filters) {
           for (const [key, value] of Object.entries(filters)) {
             q = q.eq(key, value as any);
@@ -189,7 +189,7 @@ Deno.serve(async (req) => {
         }
 
         const insertData = { ...data, granted_by: authenticatedOrganizer!.id };
-        const { data: result, error } = await supabase.from("tournament_organizers").insert(insertData).select("*, organizers(id, username, display_name, role)").single();
+        const { data: result, error } = await supabase.from("tournament_organizers").insert(insertData).select("*, organizers!organizer_id(id, username, display_name, role)").single();
         if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         return new Response(JSON.stringify({ data: result }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }

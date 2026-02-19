@@ -37,6 +37,14 @@ const sports = [
     accent: "from-lime-500/80 to-green-600/80",
     glowColor: "hsl(120 50% 40% / 0.3)",
   },
+  {
+    id: "padel",
+    name: "Padel",
+    video: "/videos/sport-padel.mp4",
+    description: "Organize torneios de padel",
+    accent: "from-violet-500/80 to-purple-600/80",
+    glowColor: "hsl(270 60% 50% / 0.3)",
+  },
 ];
 
 const Index = () => {

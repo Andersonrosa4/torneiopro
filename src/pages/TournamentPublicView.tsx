@@ -233,7 +233,7 @@ const TournamentPublicView = () => {
             </TabsList>
             {/* Quiz tab — full width, highlighted */}
             <TabsList className="flex mb-4 sm:mb-5 h-auto bg-transparent p-0 w-full">
-              <TabsTrigger value="quiz" className="w-full text-sm sm:text-base font-extrabold h-10 sm:h-11 rounded-[12px] border-2 border-[#ffd700] bg-gradient-to-r from-[#ffd700]/20 via-primary/15 to-[#ffd700]/20 text-[#ffd700] shadow-lg shadow-[#ffd700]/15 data-[state=active]:from-[#ffd700]/30 data-[state=active]:via-primary/25 data-[state=active]:to-[#ffd700]/30 data-[state=active]:border-[#ffd700] data-[state=active]:text-[#ffd700] data-[state=active]:shadow-xl data-[state=active]:shadow-[#ffd700]/25 transition-all duration-300">🎮 Quiz — Teste seus conhecimentos!</TabsTrigger>
+              <TabsTrigger value="quiz" className="w-full text-sm sm:text-base font-extrabold h-10 sm:h-11 rounded-[12px] border-2 border-[#ffd700] bg-gradient-to-r from-[#ffd700]/20 via-primary/15 to-[#ffd700]/20 text-[#ffd700] shadow-lg shadow-[#ffd700]/15 data-[state=active]:from-[#ffd700]/30 data-[state=active]:via-primary/25 data-[state=active]:to-[#ffd700]/30 data-[state=active]:border-[#ffd700] data-[state=active]:text-[#ffd700] data-[state=active]:shadow-xl data-[state=active]:shadow-[#ffd700]/25 transition-all duration-300 animate-[quiz-pulse_2.5s_ease-in-out_infinite] data-[state=active]:animate-none">🎮 Quiz — Teste seus conhecimentos!</TabsTrigger>
             </TabsList>
 
             <TabsContent value="teams">

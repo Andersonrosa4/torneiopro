@@ -38,6 +38,8 @@ const sportLabels: Record<string, string> = {
   beach_volleyball: "🏐 Vôlei de Praia",
   futevolei: "⚽ Futevôlei",
   beach_tennis: "🎾 Beach Tennis",
+  tennis: "🎾 Tênis",
+  padel: "🏓 Padel",
 };
 
 const statusLabels: Record<string, string> = {
@@ -88,6 +90,7 @@ interface Match {
   next_win_match_id: string | null;
   next_lose_match_id: string | null;
   is_chapeu?: boolean | null;
+  live_score?: any;
 }
 
 const TournamentDetail = () => {
@@ -98,6 +101,7 @@ const TournamentDetail = () => {
   const [tournament, setTournament] = useState<any>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
+  const [tournamentRules, setTournamentRules] = useState<any>(null);
   const [player1, setPlayer1] = useState("");
   const [player2, setPlayer2] = useState("");
   const [loading, setLoading] = useState(true);
@@ -138,10 +142,11 @@ const TournamentDetail = () => {
   // Reads use direct supabase (SELECT policies are true)
   const fetchData = useCallback(async () => {
     if (!id) return;
-    const [tRes, teamsRes, mRes] = await Promise.all([
+    const [tRes, teamsRes, mRes, rulesRes] = await Promise.all([
       publicQuery({ table: "tournaments", filters: { id }, single: true }),
       publicQuery({ table: "teams", filters: { tournament_id: id }, order: { column: "seed", ascending: true } }),
       publicQuery({ table: "matches", filters: { tournament_id: id }, order: [{ column: "round", ascending: true }, { column: "position", ascending: true }] }),
+      publicQuery({ table: "tournament_rules", filters: { tournament_id: id }, maybeSingle: true }),
     ]);
     if (tRes.data) {
       setTournament(tRes.data);
@@ -149,6 +154,7 @@ const TournamentDetail = () => {
     }
     if (teamsRes.data) setTeams(teamsRes.data);
     if (mRes.data) setMatches(mRes.data);
+    if (rulesRes.data) setTournamentRules(rulesRes.data);
     setLoading(false);
   }, [id, setSelectedSport]);
 
@@ -2106,6 +2112,8 @@ const TournamentDetail = () => {
                       tournamentFormat={tournament?.format === 'double_elimination' ? 'double_elimination' : (selectedModality?.game_system || tournament?.format)}
                       onAutoResult={handleAutoResult}
                       onOverrideSaved={fetchData}
+                      tournamentRules={tournamentRules}
+                      tournamentId={id || ""}
                     />
                   </Suspense>
                 </section>

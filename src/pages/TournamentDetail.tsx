@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Plus, Trash2, Trophy, Users, Shuffle, Copy, Pencil, Check, X, ArrowLeft, Undo2, Download, Upload } from "lucide-react";
+import { Plus, Trash2, Trophy, Users, Shuffle, Copy, Pencil, Check, X, ArrowLeft, Undo2, Download, Upload, Settings2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -109,6 +109,9 @@ const TournamentDetail = () => {
   const [fictitiousDialogOpen, setFictitiousDialogOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState("");
+  const [editTournamentOpen, setEditTournamentOpen] = useState(false);
+  const [editForm, setEditForm] = useState({ name: "", description: "", location: "", event_date: "", category: "", status: "", registration_value: "" });
+  const [savingTournament, setSavingTournament] = useState(false);
   const [isAssociatedOrganizer, setIsAssociatedOrganizer] = useState(false);
 
   const { modalities, selectedModality, setSelectedModality, updateModality } = useModalities(id);
@@ -206,6 +209,43 @@ const TournamentDetail = () => {
     if (error) { toast.error(error.message); return; }
     setPlayer1("");
     setPlayer2("");
+    fetchData();
+  };
+
+  const openEditTournament = () => {
+    setEditForm({
+      name: tournament?.name || "",
+      description: tournament?.description || "",
+      location: tournament?.location || "",
+      event_date: tournament?.event_date || "",
+      category: tournament?.category || "",
+      status: tournament?.status || "",
+      registration_value: tournament?.registration_value != null ? String(tournament.registration_value) : "",
+    });
+    setEditTournamentOpen(true);
+  };
+
+  const saveTournament = async () => {
+    if (!editForm.name.trim()) { toast.error("Nome é obrigatório"); return; }
+    setSavingTournament(true);
+    const { error } = await organizerQuery({
+      table: "tournaments",
+      operation: "update",
+      data: {
+        name: editForm.name.trim(),
+        description: editForm.description.trim() || null,
+        location: editForm.location.trim() || null,
+        event_date: editForm.event_date || null,
+        category: editForm.category.trim() || null,
+        status: editForm.status,
+        registration_value: editForm.registration_value ? Number(editForm.registration_value) : null,
+      },
+      filters: { id },
+    });
+    setSavingTournament(false);
+    if (error) { toast.error("Erro ao salvar: " + error.message); return; }
+    toast.success("Torneio atualizado com sucesso!");
+    setEditTournamentOpen(false);
     fetchData();
   };
 
@@ -1591,27 +1631,32 @@ const TournamentDetail = () => {
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:gap-2 self-start">
               {isOwner && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm" className="gap-1">
-                      <Trash2 className="h-4 w-4" /> Excluir Torneio
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Tem certeza que deseja excluir este torneio?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Esta ação não pode ser desfeita. Todos os dados relacionados (duplas, chaveamento, partidas, classificação e ranking) serão removidos permanentemente.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={deleteTournament} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                        Excluir
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                <>
+                  <Button variant="outline" size="sm" className="gap-1" onClick={openEditTournament}>
+                    <Settings2 className="h-4 w-4" /> Editar Torneio
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm" className="gap-1">
+                        <Trash2 className="h-4 w-4" /> Excluir Torneio
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Tem certeza que deseja excluir este torneio?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta ação não pode ser desfeita. Todos os dados relacionados (duplas, chaveamento, partidas, classificação e ranking) serão removidos permanentemente.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={deleteTournament} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                          Excluir
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </>
               )}
               {tournament.tournament_code && (
                 <button
@@ -1623,6 +1668,70 @@ const TournamentDetail = () => {
                 </button>
               )}
             </div>
+
+            {/* Edit Tournament Dialog */}
+            <Dialog open={editTournamentOpen} onOpenChange={setEditTournamentOpen}>
+              <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Settings2 className="h-5 w-5 text-primary" />
+                    Editar Dados do Torneio
+                  </DialogTitle>
+                  <DialogDescription>Corrija as informações do torneio conforme necessário.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-semibold">Nome *</label>
+                    <Input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} placeholder="Nome do torneio" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-semibold">Descrição</label>
+                    <Input value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} placeholder="Descrição opcional" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-semibold">Data do Evento</label>
+                      <Input type="date" value={editForm.event_date} onChange={e => setEditForm(f => ({ ...f, event_date: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-semibold">Categoria</label>
+                      <Input value={editForm.category} onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))} placeholder="Ex: Masculino A" />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-semibold">Local</label>
+                    <Input value={editForm.location} onChange={e => setEditForm(f => ({ ...f, location: e.target.value }))} placeholder="Ex: Arena Central, São Paulo" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-semibold">Valor de Inscrição (R$)</label>
+                      <Input type="number" min="0" step="0.01" value={editForm.registration_value} onChange={e => setEditForm(f => ({ ...f, registration_value: e.target.value }))} placeholder="0,00" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-semibold">Status</label>
+                      <select
+                        value={editForm.status}
+                        onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}
+                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      >
+                        <option value="draft">Rascunho</option>
+                        <option value="registration">Inscrições</option>
+                        <option value="in_progress">Em andamento</option>
+                        <option value="completed">Finalizado</option>
+                        <option value="cancelled">Cancelado</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter className="gap-2">
+                  <Button variant="outline" onClick={() => setEditTournamentOpen(false)}>Cancelar</Button>
+                  <Button onClick={saveTournament} disabled={savingTournament} className="gap-2 bg-gradient-primary text-primary-foreground hover:opacity-90">
+                    {savingTournament ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Check className="h-4 w-4" />}
+                    Salvar Alterações
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
 
           {/* Organizers Manager - admin only */}

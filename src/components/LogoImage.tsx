@@ -13,7 +13,7 @@ const LogoImage = ({ className = "h-32 w-32" }: LogoImageProps) => (
     fetchPriority="high"
     loading="eager"
     className={`${className} object-contain`}
-    style={{ filter: "brightness(1.35) contrast(1.15) saturate(1.3)" }}
+    style={{ filter: "brightness(1.35) contrast(1.15) saturate(1.3)", clipPath: "inset(2%)" }}
   />
 );
 

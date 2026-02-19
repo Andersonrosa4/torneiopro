@@ -80,7 +80,7 @@ const Index = () => {
               className="group relative overflow-hidden rounded-2xl border border-[hsl(0_0%_100%/0.12)] sport-card-glow cursor-pointer"
               style={{ boxShadow: `0 4px 20px ${sport.glowColor}` }}
             >
-              {/* Sport image */}
+              {/* Sport video */}
                <div className="relative h-40 sm:h-52 md:h-56 overflow-hidden">
                 <video
                   src={sport.video}
@@ -88,6 +88,7 @@ const Index = () => {
                   muted
                   loop
                   playsInline
+                  preload={i === 0 ? "auto" : "metadata"}
                   className="absolute inset-0 w-full h-full object-cover pointer-events-none"
                 />
                 {/* Gradient overlay */}

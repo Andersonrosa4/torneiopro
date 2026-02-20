@@ -46,9 +46,28 @@ const Auth = () => {
         ? { email: email.trim(), password }
         : { username: username.trim(), password };
 
-      const { data, error } = await supabase.functions.invoke("organizer-login", {
-        body,
-      });
+      // Timeout de 15s para evitar travamento infinito
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Tempo esgotado. Tente novamente.")), 15000)
+      );
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+
+      const fetchPromise = fetch(`${supabaseUrl}/functions/v1/organizer-login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": supabaseKey,
+          "Authorization": `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify(body),
+      }).then(async (res) => {
+        const data = await res.json();
+        return { data, error: null };
+      }).catch((err) => ({ data: null, error: err }));
+
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 
       if (error || !data?.success) {
         throw new Error(data?.error || "Falha na autenticação");

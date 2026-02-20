@@ -47,12 +47,12 @@ const FutsalLiveScoreBoard = ({
   rules,
 }: FutsalLiveScoreBoardProps) => {
   const [score, setScore] = useState<FutsalLiveScore>(() =>
-    initialLiveScore || createInitialFutsalScore()
+    initialLiveScore || createInitialFutsalScore(rules)
   );
 
   useEffect(() => {
     if (open) {
-      setScore(initialLiveScore || createInitialFutsalScore());
+      setScore(initialLiveScore || createInitialFutsalScore(rules));
     }
   }, [open, initialLiveScore]);
 
@@ -125,7 +125,7 @@ const FutsalLiveScoreBoard = ({
   }, [score, rules, persistScore]);
 
   const handleReset = useCallback(async () => {
-    const newScore = createInitialFutsalScore();
+    const newScore = createInitialFutsalScore(rules);
     setScore(newScore);
     await persistScore(newScore);
     toast.info("Placar resetado");

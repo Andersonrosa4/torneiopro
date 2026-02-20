@@ -224,20 +224,20 @@
 
   @keyframes float-slow {
     0%, 100% { transform: translate(0, 0) scale(1); }
-    33% { transform: translate(30px, -20px) scale(1.05); }
-    66% { transform: translate(-20px, 15px) scale(0.95); }
+    33% { transform: translate(25px, -15px) scale(1.04); }
+    66% { transform: translate(-15px, 10px) scale(0.96); }
   }
   .animate-float-slow {
-    animation: float-slow 12s ease-in-out infinite;
+    animation: float-slow 14s ease-in-out infinite;
   }
 
-  @keyframes particle {
-    0% { opacity: 0; transform: translateY(0) scale(0.5); }
-    20% { opacity: 1; transform: translateY(-10px) scale(1); }
-    80% { opacity: 0.6; transform: translateY(-40px) scale(0.8); }
-    100% { opacity: 0; transform: translateY(-60px) scale(0.3); }
+  @keyframes cosmic-particle {
+    0% { opacity: 0; transform: translateY(0) scale(0.3); }
+    15% { opacity: 1; }
+    70% { opacity: 0.7; transform: translateY(-30px) scale(1); }
+    100% { opacity: 0; transform: translateY(-50px) scale(0.2); }
   }
-  .animate-particle {
-    animation: particle 5s ease-in-out infinite;
+  .animate-cosmic-particle {
+    animation: cosmic-particle 5s ease-in-out infinite;
   }
 }

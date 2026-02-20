@@ -1,6 +1,7 @@
 /**
  * Tennis/Padel Scoring Engine
  * Pure logic — no side effects, no database calls.
+ * 100% driven by ScoringRules from tournament_rules.
  */
 
 export interface ScoringRules {
@@ -28,6 +29,7 @@ export interface LiveScore {
   isSuperTiebreak: boolean;
   superTiebreakPoints: [number, number];
   server: 1 | 2;
+  initialServer: 1 | 2;
   completed: boolean;
   winner: 1 | 2 | null;
   pointHistory: string[]; // "P1" or "P2" for each point
@@ -43,6 +45,7 @@ export function createInitialLiveScore(server: 1 | 2 = 1): LiveScore {
     isSuperTiebreak: false,
     superTiebreakPoints: [0, 0],
     server,
+    initialServer: server,
     completed: false,
     winner: null,
     pointHistory: [],
@@ -64,6 +67,7 @@ function getPointsSeq(rules: ScoringRules): string[] {
 
 /**
  * Format current point display for a player.
+ * ADV is NEVER shown when no_ad or golden_point is true.
  */
 export function formatPoints(score: LiveScore, rules: ScoringRules): [string, string] {
   if (score.isSuperTiebreak) {
@@ -77,11 +81,13 @@ export function formatPoints(score: LiveScore, rules: ScoringRules): [string, st
   const p1 = score.currentPoints[0];
   const p2 = score.currentPoints[1];
 
-  // Both at 40 (deuce territory)
+  // Both at 40+ (deuce territory)
   if (p1 >= 3 && p2 >= 3) {
+    // No-Ad or Golden Point: always show "40" - "40", never ADV
     if (rules.no_ad || rules.golden_point) {
       return ["40", "40"];
     }
+    // Traditional deuce/advantage
     if (p1 === p2) return ["40", "40"]; // Deuce
     if (p1 > p2) return ["AD", "40"];
     return ["40", "AD"];
@@ -122,13 +128,13 @@ export function applyPoint(score: LiveScore, player: 1 | 2, rules: ScoringRules)
     const p = s.superTiebreakPoints;
     const target = rules.super_tiebreak_points;
     if (p[idx] >= target && (p[idx] - p[otherIdx]) >= 2) {
-      // Super tiebreak won
+      // Super tiebreak won — record as a set
       s.sets.push([...s.superTiebreakPoints] as [number, number]);
-      finishMatch(s, player, rules);
+      finishMatch(s, player);
     } else {
-      // Server change every 2 points in super tiebreak
+      // Server change: after 1st point, then every 2 points (same as regular tiebreak)
       const totalPts = p[0] + p[1];
-      if (totalPts > 0 && totalPts % 2 === 0) {
+      if (totalPts === 1 || (totalPts > 1 && (totalPts - 1) % 2 === 0)) {
         s.server = s.server === 1 ? 2 : 1;
       }
     }
@@ -151,7 +157,7 @@ export function applyPoint(score: LiveScore, player: 1 | 2, rules: ScoringRules)
       s.currentPoints = [0, 0];
       checkMatchEnd(s, rules);
     } else {
-      // Server change: after first point, then every 2
+      // Server change: after 1st point, then every 2
       const totalPts = p[0] + p[1];
       if (totalPts === 1 || (totalPts > 1 && (totalPts - 1) % 2 === 0)) {
         s.server = s.server === 1 ? 2 : 1;
@@ -168,15 +174,13 @@ export function applyPoint(score: LiveScore, player: 1 | 2, rules: ScoringRules)
   let gameWon = false;
 
   if (rules.no_ad || rules.golden_point) {
-    // No-ad: at deuce (both ≥3), next point wins
-    if (p1 >= 3 && p2 >= 3) {
-      // Whoever scored this point wins
-      gameWon = true;
-    } else if (s.currentPoints[idx] >= 4) {
+    // No-Ad / Golden Point: need 4 points to win. At deuce (40-40),
+    // next point wins — no advantage exists.
+    if (s.currentPoints[idx] >= 4) {
       gameWon = true;
     }
   } else {
-    // Standard scoring with advantage
+    // Standard scoring with advantage: need 4+ points AND 2 point lead
     if (s.currentPoints[idx] >= 4 && (s.currentPoints[idx] - s.currentPoints[otherIdx]) >= 2) {
       gameWon = true;
     }
@@ -199,14 +203,13 @@ export function applyPoint(score: LiveScore, player: 1 | 2, rules: ScoringRules)
       s.currentGames = [0, 0];
       checkMatchEnd(s, rules);
     } else if (rules.tiebreak_enabled && g[0] === tbAt1 && g[1] === tbAt2) {
-      // Enter tiebreak
+      // Enter tiebreak — check final set mode
       const setsToWin = getTotalSetsToWin(rules);
-      const isFinalSet = s.sets.length === (setsToWin * 2 - 2); // e.g. 2 sets played in best_of_3
+      const isFinalSet = s.sets.length === (setsToWin * 2 - 2);
 
       if (isFinalSet && rules.final_set_tiebreak_mode === "advantage") {
         // No tiebreak in final set — keep playing with advantage
       } else if (isFinalSet && rules.final_set_tiebreak_mode === "super_tiebreak" && rules.super_tiebreak_enabled) {
-        // Enter super tiebreak instead
         s.isSuperTiebreak = true;
         s.superTiebreakPoints = [0, 0];
       } else {
@@ -237,29 +240,25 @@ function checkMatchEnd(s: LiveScore, rules: ScoringRules) {
     }
   }
 
-  if (s1 >= setsToWin) finishMatch(s, 1, rules);
-  else if (s2 >= setsToWin) finishMatch(s, 2, rules);
+  if (s1 >= setsToWin) finishMatch(s, 1);
+  else if (s2 >= setsToWin) finishMatch(s, 2);
 }
 
-function finishMatch(s: LiveScore, winner: 1 | 2, _rules: ScoringRules) {
+function finishMatch(s: LiveScore, winner: 1 | 2) {
   s.completed = true;
   s.winner = winner;
 }
 
 /**
  * Undo the last point. Returns a NEW LiveScore.
+ * Replays the entire history minus the last event from scratch.
  */
 export function undoLastPoint(score: LiveScore, rules: ScoringRules): LiveScore {
   if (score.pointHistory.length === 0) return score;
 
-  // Replay all points except the last one
+  // Replay all points except the last one, using the original initial server
   const history = score.pointHistory.slice(0, -1);
-  let s = createInitialLiveScore(score.server);
-  // We need original server — it may have changed. Use the initial server from before any points.
-  // Actually we should store initial server, but for simplicity let's just replay.
-  // Reset server to what it was initially (we can't know for sure, default to 1)
-  // Better approach: store initialServer
-  s.server = 1; // Default; could be improved
+  let s = createInitialLiveScore(score.initialServer);
 
   for (const p of history) {
     const player = p === "P1" ? 1 : 2;
@@ -282,7 +281,7 @@ export function getSetsWon(score: LiveScore): [number, number] {
 }
 
 /**
- * Calculate total games for match summary (score1 / score2 for the matches table).
+ * Calculate total games for match summary.
  */
 export function getTotalGames(score: LiveScore): [number, number] {
   let g1 = 0, g2 = 0;

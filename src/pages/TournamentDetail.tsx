@@ -529,6 +529,19 @@ const TournamentDetail = () => {
           }
         }
         
+        // Also create a 3rd place match shell
+        koShells.push({
+          tournament_id: id,
+          round: totalKORounds, // same round as the final
+          position: 1,
+          team1_id: null,
+          team2_id: null,
+          status: "pending",
+          bracket_number: 1,
+          bracket_type: "third_place",
+          modality_id: currentModalityId,
+        });
+
         const { error: koErr } = await organizerQuery({ table: "matches", operation: "insert", data: koShells });
         if (!koErr) {
           // Fetch inserted to get IDs, then link next_win_match_id between rounds
@@ -541,16 +554,28 @@ const TournamentDetail = () => {
           if (koInserted) {
             const koOnly = (koInserted as any[]).filter(m => m.round >= 1 && m.modality_id === currentModalityId);
             const linkUpdates = [];
+            // Find the 3rd place match and final match
+            const thirdPlaceMatch = koOnly.find((m: any) => m.bracket_type === 'third_place');
+            const finalMatch = koOnly.find((m: any) => m.round === totalKORounds && m.bracket_type !== 'third_place');
+            // Semi round = totalKORounds - 1
+            const semiRound = totalKORounds - 1;
+            
             for (const m of koOnly) {
+              if (m.bracket_type === 'third_place') continue; // skip 3rd place from normal linking
               if (m.round < totalKORounds) {
                 const nextPos = Math.ceil(m.position / 2);
-                const nextMatch = koOnly.find((nm: any) => nm.round === m.round + 1 && nm.position === nextPos);
+                const nextMatch = koOnly.find((nm: any) => nm.round === m.round + 1 && nm.position === nextPos && nm.bracket_type !== 'third_place');
                 if (nextMatch) {
+                  const linkData: any = { next_win_match_id: nextMatch.id };
+                  // If this is a semifinal match, also link losers to 3rd place
+                  if (m.round === semiRound && thirdPlaceMatch) {
+                    linkData.next_lose_match_id = thirdPlaceMatch.id;
+                  }
                   linkUpdates.push(
                     organizerQuery({
                       table: "matches",
                       operation: "update",
-                      data: { next_win_match_id: nextMatch.id },
+                      data: linkData,
                       filters: { id: m.id },
                     })
                   );
@@ -1403,7 +1428,66 @@ const TournamentDetail = () => {
                     });
                   }
 
+                  // If this is a semifinal (exactly 2 matches, generating 1 final),
+                  // also create a 3rd place match with the losers
+                  if (pairCount === 1 && freshRoundMatches.length === 2) {
+                    const losers = freshRoundMatches
+                      .filter((m: any) => m.winner_team_id && m.team1_id && m.team2_id)
+                      .map((m: any) => ({
+                        loserId: m.team1_id === m.winner_team_id ? m.team2_id : m.team1_id,
+                        position: m.position,
+                      }));
+
+                    if (losers.length === 2) {
+                      nextMatches.push({
+                        tournament_id: id,
+                        round: nextRound,
+                        position: 1,
+                        team1_id: losers.find((l: any) => l.position % 2 === 1)?.loserId || losers[0].loserId,
+                        team2_id: losers.find((l: any) => l.position % 2 === 0)?.loserId || losers[1].loserId,
+                        status: "pending",
+                        bracket_number: match.bracket_number || 1,
+                        bracket_type: "third_place",
+                        modality_id: modalityId,
+                      });
+                    }
+                  }
+
                   await organizerQuery({ table: "matches", operation: "insert", data: nextMatches });
+                  
+                  // After insert, link semifinal matches to 3rd place match via next_lose_match_id
+                  if (pairCount === 1 && freshRoundMatches.length === 2) {
+                    const { data: justInserted } = await organizerQuery({
+                      table: "matches",
+                      operation: "select",
+                      filters: { tournament_id: id },
+                      order: [{ column: "round" }, { column: "position" }],
+                    });
+                    if (justInserted) {
+                      const modalityInserted = modalityId
+                        ? (justInserted as any[]).filter((m: any) => m.modality_id === modalityId)
+                        : (justInserted as any[]);
+                      const thirdPlaceMatch = modalityInserted.find((m: any) => m.bracket_type === 'third_place' && m.round === nextRound);
+                      const finalMatch = modalityInserted.find((m: any) => m.bracket_type !== 'third_place' && m.round === nextRound);
+                      if (thirdPlaceMatch) {
+                        // Link each semifinal match: winner → final, loser → 3rd place
+                        const semiLinkUpdates = freshRoundMatches.map((sm: any) =>
+                          organizerQuery({
+                            table: "matches",
+                            operation: "update",
+                            data: {
+                              next_win_match_id: finalMatch?.id || null,
+                              next_lose_match_id: thirdPlaceMatch.id,
+                            },
+                            filters: { id: sm.id },
+                          })
+                        );
+                        await Promise.all(semiLinkUpdates);
+                        console.log(`[SE:3rdPlace] Linked ${freshRoundMatches.length} semifinal matches to 3rd place match ${thirdPlaceMatch.id}`);
+                      }
+                    }
+                  }
+                  
                   toast.success(`Próxima fase gerada! ${nextMatches.length} partida(s) criada(s).`);
                 } else if (winners.length === 1) {
                   toast.success("🏆 Torneio finalizado! Campeão definido!");

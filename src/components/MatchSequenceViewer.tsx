@@ -35,6 +35,7 @@ interface Match {
   next_lose_match_id?: string | null;
   is_chapeu?: boolean | null;
   live_score?: any;
+  court_number?: number | null;
 }
 
 interface Team {
@@ -557,6 +558,11 @@ const MatchCard = ({
           <span className={`text-[10px] font-black uppercase tracking-wider ${isCompleted ? "text-success" : hasTeams ? "text-primary" : "text-muted-foreground"}`}>
             Jogo {index}
           </span>
+          {match.court_number != null && (
+            <Badge className="bg-accent/20 text-accent-foreground border-accent/30 text-[8px] px-1 py-0 leading-tight font-semibold">
+              Quadra {match.court_number}
+            </Badge>
+          )}
           <Badge variant="outline" className="text-[8px] font-semibold px-1 py-0 border-border/30 bg-transparent leading-none">
             {tournamentFormat === 'double_elimination' ? getDERoundBadgeLabel(match) : getRoundLabel(match.round)}
           </Badge>

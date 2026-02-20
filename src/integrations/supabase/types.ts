@@ -516,6 +516,7 @@ export type Database = {
           bracket_half: string | null
           bracket_number: number | null
           bracket_type: string | null
+          court_number: number | null
           created_at: string
           id: string
           is_chapeu: boolean | null
@@ -540,6 +541,7 @@ export type Database = {
           bracket_half?: string | null
           bracket_number?: number | null
           bracket_type?: string | null
+          court_number?: number | null
           created_at?: string
           id?: string
           is_chapeu?: boolean | null
@@ -564,6 +566,7 @@ export type Database = {
           bracket_half?: string | null
           bracket_number?: number | null
           bracket_type?: string | null
+          court_number?: number | null
           created_at?: string
           id?: string
           is_chapeu?: boolean | null

@@ -25,7 +25,7 @@ import ArenaDashboard from "./pages/ArenaDashboard";
 import ScrollToTop from "@/components/ScrollToTop";
 import AiAssistant from "@/components/AiAssistant";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient(); // force rebuild
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

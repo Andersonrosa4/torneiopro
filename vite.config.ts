@@ -13,6 +13,9 @@ export default defineConfig(({ mode }) => ({
     },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  optimizeDeps: {
+    include: ["react", "react-dom", "react/jsx-runtime", "@radix-ui/react-tooltip"],
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

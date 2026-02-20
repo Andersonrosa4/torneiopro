@@ -1,4 +1,4 @@
-const CACHE_NAME = "torneio-pro-v1";
+const CACHE_NAME = "torneio-pro-v3";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
@@ -45,6 +45,11 @@ self.addEventListener("fetch", (event) => {
 
   // Skip Supabase API calls
   if (request.url.includes("supabase")) {
+    return;
+  }
+
+  // NEVER cache Vite dep chunks — they contain React and must always be fresh
+  if (request.url.includes("/node_modules/.vite/deps/")) {
     return;
   }
 

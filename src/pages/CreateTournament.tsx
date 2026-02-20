@@ -175,6 +175,7 @@ const CreateTournament = () => {
                     <SelectItem value="beach_tennis">🎾 Beach Tennis</SelectItem>
                     <SelectItem value="tennis">🎾 Tênis</SelectItem>
                     <SelectItem value="padel">🏓 Padel</SelectItem>
+                    <SelectItem value="futsal">⚽ Futsal</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

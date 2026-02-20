@@ -58,14 +58,16 @@ const TournamentPublicView = () => {
 
   const { modalities, selectedModality, setSelectedModality } = useModalities(id);
 
-  // Filtered data by selected modality — same as organizer
+  // Filtered data by selected modality — STRICT isolation, no fallback
   const filteredTeams = useMemo(() =>
-    selectedModality ? teams.filter(t => t.modality_id === selectedModality.id) : teams,
-    [teams, selectedModality]
+    selectedModality ? teams.filter(t => t.modality_id === selectedModality.id) 
+      : modalities.length > 0 ? [] : teams,
+    [teams, selectedModality, modalities.length]
   );
   const filteredMatches = useMemo(() =>
-    selectedModality ? matches.filter(m => m.modality_id === selectedModality.id) : matches,
-    [matches, selectedModality]
+    selectedModality ? matches.filter(m => m.modality_id === selectedModality.id) 
+      : modalities.length > 0 ? [] : matches,
+    [matches, selectedModality, modalities.length]
   );
 
   const fetchData = useCallback(async (background = false) => {

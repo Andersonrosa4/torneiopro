@@ -125,13 +125,16 @@ const TournamentDetail = () => {
   const isOwner = tournament?.created_by === organizerId || isAdmin || isAssociatedOrganizer;
 
   // Filtered data by selected modality — STRICT isolation, no fallback (MEMOIZED)
+  // When modalities exist but none is selected yet (loading), return empty to avoid mixing
   const filteredTeams = useMemo(() => 
-    selectedModality ? teams.filter(t => t.modality_id === selectedModality.id) : teams,
-    [teams, selectedModality]
+    selectedModality ? teams.filter(t => t.modality_id === selectedModality.id) 
+      : modalities.length > 0 ? [] : teams,
+    [teams, selectedModality, modalities.length]
   );
   const filteredMatches = useMemo(() => 
-    selectedModality ? matches.filter(m => m.modality_id === selectedModality.id) : matches,
-    [matches, selectedModality]
+    selectedModality ? matches.filter(m => m.modality_id === selectedModality.id) 
+      : modalities.length > 0 ? [] : matches,
+    [matches, selectedModality, modalities.length]
   );
 
   // Detect if group stage exists for current modality (round=0 matches)

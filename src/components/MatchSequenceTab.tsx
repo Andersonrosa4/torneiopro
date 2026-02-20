@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Lock, CheckCircle2, Clock, AlertCircle, ListOrdered } from "lucide-react";
+import { Trophy, Lock, CheckCircle2, Clock, AlertCircle, ListOrdered, Filter } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getEliminationRoundLabel } from "@/lib/roundLabels";
 import { buildSchedulerBlocks, getSchedulerBlockColor, getSchedulerBadgeColor } from "@/lib/roundScheduler";
 
@@ -244,17 +245,32 @@ const BlockSection = ({
    MAIN COMPONENT
    ═══════════════════════════════════════════ */
 const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_elimination' }: MatchSequenceTabProps) => {
+  const [selectedBracket, setSelectedBracket] = useState<string>("all");
+
   const getTeamName = (teamId: string | null) => {
     if (!teamId) return "A definir";
     const team = teams.find((t) => t.id === teamId);
     return team ? `${team.player1_name} / ${team.player2_name}` : "A definir";
   };
 
+  // Available brackets for filter
+  const availableBrackets = useMemo(() => {
+    const brackets = [...new Set(matches.map(m => m.bracket_number).filter(Boolean))].sort((a, b) => (a || 0) - (b || 0));
+    return brackets as number[];
+  }, [matches]);
+
+  // Filter matches by selected bracket
+  const filteredMatches = useMemo(() => {
+    if (selectedBracket === "all") return matches;
+    const bracketNum = parseInt(selectedBracket);
+    return matches.filter(m => m.bracket_number === bracketNum);
+  }, [matches, selectedBracket]);
+
   const matchCountByRound = useMemo(() => {
     const counts: Record<number, number> = {};
-    matches.filter(m => (m as any).bracket_type !== 'third_place').forEach(m => { counts[m.round] = (counts[m.round] || 0) + 1; });
+    filteredMatches.filter(m => (m as any).bracket_type !== 'third_place').forEach(m => { counts[m.round] = (counts[m.round] || 0) + 1; });
     return counts;
-  }, [matches]);
+  }, [filteredMatches]);
 
   const getRoundLabel = (round: number) => {
     return getEliminationRoundLabel(round, matchCountByRound[round] || 0);
@@ -262,12 +278,12 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
 
   // Build grouped blocks
   const groupedRounds = useMemo(() => {
-    if (matches.length === 0) return [];
+    if (filteredMatches.length === 0) return [];
 
     // Pass ALL matches to the scheduler (including chapéu with only 1 team)
     // so it can correctly compute isUnlocked based on full match status
-    const allEliminationMatches = matches.filter(m => m.round > 0);
-    const displayMatches = matches.filter(m => m.team1_id && m.team2_id);
+    const allEliminationMatches = filteredMatches.filter(m => m.round > 0);
+    const displayMatches = filteredMatches.filter(m => m.team1_id && m.team2_id);
     if (displayMatches.length === 0) return [];
 
     const groups: { label: string; items: { match: Match; idx: number }[]; blockKey?: string; isUnlocked?: boolean; isCompleted?: boolean }[] = [];
@@ -377,10 +393,10 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
       }
     }
     return groups;
-  }, [matches, tournamentFormat, matchCountByRound]);
+  }, [filteredMatches, tournamentFormat, matchCountByRound]);
 
   // Stats
-  const displayMatches = useMemo(() => matches.filter(m => m.team1_id && m.team2_id), [matches]);
+  const displayMatches = useMemo(() => filteredMatches.filter(m => m.team1_id && m.team2_id), [filteredMatches]);
   const completedCount = useMemo(() => displayMatches.filter(m => m.status === "completed").length, [displayMatches]);
   const pendingCount = useMemo(() => displayMatches.filter(m => m.status !== "completed" && m.team1_id && m.team2_id).length, [displayMatches]);
 
@@ -396,6 +412,35 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
 
   return (
     <section className="space-y-4">
+      {/* Bracket Filter */}
+      {availableBrackets.length > 1 && (
+        <div className="flex items-center gap-3 rounded-xl border border-border bg-card backdrop-blur-sm p-3">
+          <Filter className="h-4 w-4 text-primary shrink-0" />
+          <span className="text-sm font-bold text-foreground shrink-0">Filtrar por Chave:</span>
+          <Select value={selectedBracket} onValueChange={setSelectedBracket}>
+            <SelectTrigger className="w-[180px] h-9 text-sm">
+              <SelectValue placeholder="Todas as chaves" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as chaves</SelectItem>
+              {availableBrackets.map(b => (
+                <SelectItem key={b} value={String(b)}>
+                  Chave {String.fromCharCode(64 + b)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {selectedBracket !== "all" && (
+            <button
+              onClick={() => setSelectedBracket("all")}
+              className="text-xs text-muted-foreground hover:text-foreground underline"
+            >
+              Limpar filtro
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Progress */}
       <ProgressSummary total={displayMatches.length} completed={completedCount} pending={pendingCount} />
 

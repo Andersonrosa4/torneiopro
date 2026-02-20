@@ -130,6 +130,11 @@ const HTreeMatchCard = ({
           <span className={`truncate flex-1 ${topWin ? "font-bold text-success" : isWaiting && !topTeamId ? "text-muted-foreground/50 italic" : "team-name"}`}>
             {getName(topTeamId)}
           </span>
+          {topTeamId && match.bracket_number && (
+            <span className="ml-1 text-[7px] font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 rounded px-1 py-0 leading-tight shrink-0">
+              {match.round === 0 ? `G${String.fromCharCode(64 + (match.bracket_number || 1))}` : `C${String.fromCharCode(64 + (match.bracket_number || 1))}`}
+            </span>
+          )}
           {topScore !== null && isCompleted && (
             <span className={`font-mono ml-1 font-bold ${topWin ? "text-success" : "text-muted-foreground"}`}>
               {topScore}
@@ -150,6 +155,11 @@ const HTreeMatchCard = ({
           <span className={`truncate flex-1 ${bottomWin ? "font-bold text-success" : isWaiting && !bottomTeamId ? "text-muted-foreground/50 italic" : "team-name"}`}>
             {getName(bottomTeamId)}
           </span>
+          {bottomTeamId && match.bracket_number && (
+            <span className="ml-1 text-[7px] font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 rounded px-1 py-0 leading-tight shrink-0">
+              {match.round === 0 ? `G${String.fromCharCode(64 + (match.bracket_number || 1))}` : `C${String.fromCharCode(64 + (match.bracket_number || 1))}`}
+            </span>
+          )}
           {bottomScore !== null && isCompleted && (
             <span className={`font-mono ml-1 font-bold ${bottomWin ? "text-success" : "text-muted-foreground"}`}>
               {bottomScore}

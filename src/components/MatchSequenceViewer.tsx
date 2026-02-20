@@ -2,7 +2,8 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Save, Download, FileText, Sheet, Pencil, Lock, CheckCircle2, Clock, AlertCircle, ListOrdered, Zap } from "lucide-react";
+import { Trophy, Save, Download, FileText, Sheet, Pencil, Lock, CheckCircle2, Clock, AlertCircle, ListOrdered, Zap, Filter } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { exportMatchSequence } from "@/lib/exportUtils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getEliminationRoundLabel, getEliminationRoundShortLabel } from "@/lib/roundLabels";
@@ -807,11 +808,19 @@ const MatchSequenceViewer = ({
   onAutoResult,
   onOverrideSaved,
 }: MatchSequenceViewerProps) => {
+  const [selectedBracket, setSelectedBracket] = useState<string>("all");
+
   const getTeamName = (teamId: string | null) => {
     if (!teamId) return "A definir";
     const team = teams.find((t) => t.id === teamId);
     return team ? `${team.player1_name} / ${team.player2_name}` : "A definir";
   };
+
+  // Available brackets for filter
+  const availableBrackets = useMemo(() => {
+    const brackets = [...new Set(matches.map(m => m.bracket_number).filter(Boolean))].sort((a, b) => (a || 0) - (b || 0));
+    return brackets as number[];
+  }, [matches]);
 
   const sequence = useMemo(() => generateSequence(matches, tournamentFormat), [matches, tournamentFormat]);
   const displaySequence = useMemo(() => sequence, [sequence]);
@@ -1102,15 +1111,52 @@ const MatchSequenceViewer = ({
         </DropdownMenu>
       </div>
 
+      {/* Bracket Filter */}
+      {availableBrackets.length > 1 && (
+        <div className="flex items-center gap-3 rounded-xl border border-border bg-card backdrop-blur-sm p-3">
+          <Filter className="h-4 w-4 text-primary shrink-0" />
+          <span className="text-sm font-bold text-foreground shrink-0">Filtrar por Chave:</span>
+          <Select value={selectedBracket} onValueChange={setSelectedBracket}>
+            <SelectTrigger className="w-[180px] h-9 text-sm">
+              <SelectValue placeholder="Todas as chaves" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as chaves</SelectItem>
+              {availableBrackets.map(b => (
+                <SelectItem key={b} value={String(b)}>
+                  Chave {String.fromCharCode(64 + b)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {selectedBracket !== "all" && (
+            <button
+              onClick={() => setSelectedBracket("all")}
+              className="text-xs text-muted-foreground hover:text-foreground underline"
+            >
+              Limpar filtro
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Blocks */}
       {bracketBlocks.map((block) => {
         const blockKey = (block as any).blockKey || '';
         const isUnlocked = (block as any).isUnlocked ?? true;
         const isBlockCompleted = (block as any).isCompleted ?? false;
+
+        // Filter matches within block by selected bracket
+        const filteredBlockMatches = selectedBracket === "all"
+          ? block.matches
+          : block.matches.filter(({ match }) => match.bracket_number === parseInt(selectedBracket));
+        
+        if (filteredBlockMatches.length === 0) return null;
+
         const borderColor = getSchedulerBlockColor(blockKey);
         const badgeColor = getSchedulerBadgeColor(blockKey);
-        const completedInBlock = block.matches.filter(e => e.match.status === "completed").length;
-        const totalInBlock = block.matches.length;
+        const completedInBlock = filteredBlockMatches.filter(e => e.match.status === "completed").length;
+        const totalInBlock = filteredBlockMatches.length;
         const blockPct = totalInBlock > 0 ? Math.round((completedInBlock / totalInBlock) * 100) : 0;
 
         return (
@@ -1142,7 +1188,7 @@ const MatchSequenceViewer = ({
 
             {/* Match cards — 2 col grid */}
             <div className="p-2 sm:p-2.5 grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {block.matches.map(({ match, globalIndex }) => (
+              {filteredBlockMatches.map(({ match, globalIndex }) => (
                 <MatchCard
                   key={match.id}
                   match={match}

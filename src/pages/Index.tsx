@@ -1,9 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { QrCode, Smartphone } from "lucide-react";
+import { QrCode, Smartphone, Download } from "lucide-react";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
 import LogoImage from "@/components/LogoImage";
 import qrCodeImg from "@/assets/qrcode-torneiopro.png";
+import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 
 const sports = [
   {
@@ -110,7 +111,7 @@ const SportCard = ({ sport, i, navigate }: { sport: typeof sports[number]; i: nu
 
 const Index = () => {
   const navigate = useNavigate();
-
+  const { canInstall, promptInstall } = useInstallPrompt();
   return (
     <div className="relative flex min-h-screen flex-col items-center overflow-hidden px-4 py-10">
       {/* ── Deep space background ── */}
@@ -236,6 +237,28 @@ const Index = () => {
             QR Code
           </button>
         </motion.div>
+
+        {/* Install App button — only shows when available */}
+        {canInstall && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 1 }}
+            className="mt-6"
+          >
+            <button
+              onClick={promptInstall}
+              className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-display font-semibold text-white transition-all hover:scale-105"
+              style={{
+                background: "linear-gradient(135deg, hsl(45 90% 50%), hsl(35 85% 45%))",
+                boxShadow: "0 0 20px hsl(45 90% 50% / 0.3)",
+              }}
+            >
+              <Download className="h-4 w-4" />
+              Instalar App
+            </button>
+          </motion.div>
+        )}
 
         <FlowAppsBranding variant="home-footer" />
       </div>

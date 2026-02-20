@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo, useRef, lazy, Suspense } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,12 +22,11 @@ import PromoPopup from "@/components/PromoPopup";
 import ModalityTabs from "@/components/ModalityTabs";
 import { useModalities } from "@/hooks/useModalities";
 
-// Lazy load heavy components — same as organizer
-const BracketTreeView = lazy(() => import("@/components/BracketTreeView"));
-const MatchSequenceViewer = lazy(() => import("@/components/MatchSequenceViewer"));
-const ClassificationTab = lazy(() => import("@/components/ClassificationTab"));
-const RankingsTab = lazy(() => import("@/components/RankingsTab"));
-const SportQuiz = lazy(() => import("@/components/SportQuiz"));
+import BracketTreeView from "@/components/BracketTreeView";
+import MatchSequenceViewer from "@/components/MatchSequenceViewer";
+import ClassificationTab from "@/components/ClassificationTab";
+import RankingsTab from "@/components/RankingsTab";
+import SportQuiz from "@/components/SportQuiz";
 
 const sportLabels: Record<string, string> = {
   beach_volleyball: "Vôlei de Praia",
@@ -270,8 +269,7 @@ const TournamentPublicView = () => {
                   <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
                     <Trophy className="h-5 w-5" /> Chaveamento
                   </h2>
-                  <Suspense fallback={<div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
-                    <BracketTreeView
+                  <BracketTreeView
                       matches={filteredMatches}
                       participants={participants}
                       isOwner={false}
@@ -279,7 +277,6 @@ const TournamentPublicView = () => {
                       onUpdateScore={() => {}}
                       tournamentFormat={tournament?.format === 'double_elimination' ? 'double_elimination' : (selectedModality?.game_system || tournament?.format)}
                     />
-                  </Suspense>
                 </section>
               ) : (
                 <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
@@ -295,8 +292,7 @@ const TournamentPublicView = () => {
                   <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
                     <Trophy className="h-5 w-5" /> Sequência de Partidas
                   </h2>
-                  <Suspense fallback={<div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
-                    <MatchSequenceViewer
+                  <MatchSequenceViewer
                       matches={filteredMatches}
                       teams={filteredTeams}
                       isOwner={false}
@@ -308,7 +304,6 @@ const TournamentPublicView = () => {
                       onDeclareWinner={() => {}}
                       onUpdateScore={() => {}}
                     />
-                  </Suspense>
                 </section>
               ) : (
                 <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
@@ -323,9 +318,7 @@ const TournamentPublicView = () => {
                   <h2 className="mb-3 text-xl font-semibold flex items-center gap-2">
                     <Trophy className="h-5 w-5" /> Classificação
                   </h2>
-                  <Suspense fallback={<div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
-                    <ClassificationTab matches={filteredMatches} teams={filteredTeams} />
-                  </Suspense>
+                  <ClassificationTab matches={filteredMatches} teams={filteredTeams} />
                 </section>
               ) : (
                 <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">
@@ -335,21 +328,17 @@ const TournamentPublicView = () => {
             </TabsContent>
 
             <TabsContent value="rankings">
-              <Suspense fallback={<div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
-                <RankingsTab
+              <RankingsTab
                   tournamentId={id || ""}
                   isOwner={false}
                   sport={tournament.sport}
                   tournamentName={tournament.name}
                   eventDate={tournament.event_date ? formatDateBR(tournament.event_date) : undefined}
                 />
-              </Suspense>
             </TabsContent>
 
             <TabsContent value="quiz">
-              <Suspense fallback={<div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>}>
-                <SportQuiz tournamentId={id || ""} sport={tournament.sport} isAdmin={isAdmin} />
-              </Suspense>
+              <SportQuiz tournamentId={id || ""} sport={tournament.sport} isAdmin={isAdmin} />
             </TabsContent>
           </Tabs>
           <FlowAppsBranding variant="tournament-cta" />

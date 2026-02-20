@@ -65,6 +65,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
+    // Safety timeout: ensure loading ALWAYS becomes false within 5s
+    const safetyTimer = setTimeout(() => {
+      setLoading(prev => {
+        if (prev) console.warn("Auth loading safety timeout triggered");
+        return false;
+      });
+    }, 5000);
+
     // On mount: restore existing Supabase session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (loginDone.current) {
@@ -76,12 +84,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         _accessToken = session.access_token;
         setAccessToken(session.access_token);
         setUser({ id: session.user.id });
-        const org = await fetchOrganizer(session.user.id, session.access_token);
-        if (org) {
-          setOrganizerId(org.id);
-          setUserRole(org.role);
+        try {
+          const org = await fetchOrganizer(session.user.id, session.access_token);
+          if (org) {
+            setOrganizerId(org.id);
+            setUserRole(org.role);
+          }
+        } catch (e) {
+          console.error("Error fetching organizer on init:", e);
         }
       }
+      setLoading(false);
+    }).catch((e) => {
+      console.error("getSession failed:", e);
       setLoading(false);
     });
 
@@ -111,7 +126,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(safetyTimer);
+      subscription.unsubscribe();
+    };
   }, [fetchOrganizer]);
 
   const login = useCallback(async (

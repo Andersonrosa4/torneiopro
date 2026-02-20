@@ -1342,6 +1342,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_organizer_id: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1349,7 +1350,12 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_tournament_access: {
+        Args: { _tournament_id: string }
+        Returns: boolean
+      }
       is_arena_admin: { Args: { _arena_id: string }; Returns: boolean }
+      is_organizer_admin: { Args: never; Returns: boolean }
       is_tournament_creator: {
         Args: { _tournament_id: string }
         Returns: boolean

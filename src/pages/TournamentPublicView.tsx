@@ -56,18 +56,21 @@ const TournamentPublicView = () => {
   const [loading, setLoading] = useState(!dataCache.has(id ?? ""));
   const revalidatingRef = useRef(false);
 
-  const { modalities, selectedModality, setSelectedModality } = useModalities(id);
+  const { modalities, selectedModality, setSelectedModality, loading: modalitiesLoading } = useModalities(id);
 
   // Filtered data by selected modality — STRICT isolation, no fallback
+  // While modalities are loading, return empty to prevent unfiltered data flash
   const filteredTeams = useMemo(() =>
+    modalitiesLoading ? [] :
     selectedModality ? teams.filter(t => t.modality_id === selectedModality.id) 
       : modalities.length > 0 ? [] : teams,
-    [teams, selectedModality, modalities.length]
+    [teams, selectedModality, modalities.length, modalitiesLoading]
   );
   const filteredMatches = useMemo(() =>
+    modalitiesLoading ? [] :
     selectedModality ? matches.filter(m => m.modality_id === selectedModality.id) 
       : modalities.length > 0 ? [] : matches,
-    [matches, selectedModality, modalities.length]
+    [matches, selectedModality, modalities.length, modalitiesLoading]
   );
 
   const fetchData = useCallback(async (background = false) => {

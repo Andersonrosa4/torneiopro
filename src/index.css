@@ -221,4 +221,23 @@
     0%, 100% { opacity: 1; box-shadow: 0 0 8px hsl(51 100% 50% / 0.15); }
     50% { opacity: 0.75; box-shadow: 0 0 16px hsl(51 100% 50% / 0.3); }
   }
+
+  @keyframes float-slow {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(30px, -20px) scale(1.05); }
+    66% { transform: translate(-20px, 15px) scale(0.95); }
+  }
+  .animate-float-slow {
+    animation: float-slow 12s ease-in-out infinite;
+  }
+
+  @keyframes particle {
+    0% { opacity: 0; transform: translateY(0) scale(0.5); }
+    20% { opacity: 1; transform: translateY(-10px) scale(1); }
+    80% { opacity: 0.6; transform: translateY(-40px) scale(0.8); }
+    100% { opacity: 0; transform: translateY(-60px) scale(0.3); }
+  }
+  .animate-particle {
+    animation: particle 5s ease-in-out infinite;
+  }
 }

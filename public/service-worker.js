@@ -1,4 +1,4 @@
-const CACHE_NAME = "torneio-pro-v3";
+const CACHE_NAME = "torneio-pro-v4";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
@@ -48,8 +48,12 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // NEVER cache Vite dep chunks — they contain React and must always be fresh
-  if (request.url.includes("/node_modules/.vite/deps/")) {
+  // NEVER cache Vite dev server files — they must always be fresh
+  if (request.url.includes("/node_modules/.vite/") || 
+      request.url.includes("/src/") || 
+      request.url.includes("/@vite/") ||
+      request.url.includes("?v=") ||
+      request.url.includes("?t=")) {
     return;
   }
 

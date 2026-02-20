@@ -958,25 +958,26 @@ const MatchSequenceViewer = ({
     }
     if (knockoutStage.length > 0) {
       const knockoutNormal = knockoutStage.filter(m => (m as any).bracket_type !== 'third_place');
+      const thirdPlaceMatches = knockoutStage.filter(m => (m as any).bracket_type === 'third_place');
       const knockoutRounds = [...new Set(knockoutNormal.map(m => m.round))].sort((a, b) => a - b);
+      const finalRound = knockoutRounds.length > 0 ? knockoutRounds[knockoutRounds.length - 1] : -1;
+
       for (const r of knockoutRounds) {
+        // Insert 3rd place block right before the final round
+        if (r === finalRound && thirdPlaceMatches.length > 0) {
+          groups.push({
+            label: "🥉 Disputa de 3º Lugar",
+            matches: thirdPlaceMatches.map(m => ({ match: m, globalIndex: matchNumberMap.get(m.id) ?? 0 })),
+            blockKey: "THIRD_PLACE",
+            isCompleted: thirdPlaceMatches.every(m => m.status === 'completed'),
+          });
+        }
         const roundMatches = knockoutNormal.filter(m => m.round === r);
         groups.push({
           label: getRoundLabel(r),
           matches: roundMatches.map(m => ({ match: m, globalIndex: matchNumberMap.get(m.id) ?? 0 })),
           blockKey: `KO_R${r}`,
           isCompleted: roundMatches.every(m => m.status === 'completed'),
-        });
-      }
-
-      // 3rd place matches
-      const thirdPlaceMatches = knockoutStage.filter(m => (m as any).bracket_type === 'third_place');
-      if (thirdPlaceMatches.length > 0) {
-        groups.push({
-          label: "🥉 Disputa de 3º Lugar",
-          matches: thirdPlaceMatches.map(m => ({ match: m, globalIndex: matchNumberMap.get(m.id) ?? 0 })),
-          blockKey: "THIRD_PLACE",
-          isCompleted: thirdPlaceMatches.every(m => m.status === 'completed'),
         });
       }
     }

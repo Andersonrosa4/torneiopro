@@ -104,9 +104,6 @@ const SportCard = ({ sport, i, navigate }: { sport: typeof sports[number]; i: nu
       <h2 className="text-base sm:text-xl font-bold text-white font-display drop-shadow-lg">
         {sport.name}
       </h2>
-      <p className="text-[10px] sm:text-xs text-white/70 mt-0.5 tracking-wide">
-        {sport.subtitle}
-      </p>
     </div>
   </motion.button>
 );

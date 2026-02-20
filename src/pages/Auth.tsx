@@ -17,12 +17,11 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [redirecting, setRedirecting] = useState(false);
   const [loginType, setLoginType] = useState<"admin" | "organizer">("admin");
   const navigate = useNavigate();
   const location = useLocation();
   const { setSelectedSport } = useSportTheme();
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, loading: authLoading } = useAuth();
   const sport = (location.state as any)?.sport || null;
 
   useEffect(() => {
@@ -31,14 +30,16 @@ const Auth = () => {
     }
   }, [sport, setSelectedSport]);
 
+  // Redirect if already authenticated (e.g. page refresh with valid session)
   useEffect(() => {
-    if (isAuthenticated) {
+    if (!authLoading && isAuthenticated) {
       navigate("/dashboard", { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
 
     try {
@@ -46,40 +47,48 @@ const Auth = () => {
         ? { email: email.trim(), password }
         : { username: username.trim(), password };
 
-      // Timeout de 15s para evitar travamento infinito
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Tempo esgotado. Tente novamente.")), 15000)
-      );
-
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
       const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
-      const fetchPromise = fetch(`${supabaseUrl}/functions/v1/organizer-login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "apikey": supabaseKey,
-          "Authorization": `Bearer ${supabaseKey}`,
-        },
-        body: JSON.stringify(body),
-      }).then(async (res) => {
-        const data = await res.json();
-        return { data, error: null };
-      }).catch((err) => ({ data: null, error: err }));
+      // Timeout de 15s para evitar travamento infinito
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
-
-      if (error || !data?.success) {
-        throw new Error(data?.error || "Falha na autenticação");
+      let res: Response;
+      try {
+        res = await fetch(`${supabaseUrl}/functions/v1/organizer-login`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": supabaseKey,
+            "Authorization": `Bearer ${supabaseKey}`,
+          },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
       }
 
-      // Set Supabase Auth session and organizer context
+      const data = await res.json();
+
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Credenciais incorretas");
+      }
+
+      // Set auth state
       await login(data.session, data.organizerId, data.role);
-      setRedirecting(true);
+
       toast.success("Bem-vindo!");
+      // Navigate after login state is set
       navigate("/dashboard", { replace: true });
+
     } catch (error: any) {
-      toast.error(error.message || "Credenciais incorretas");
+      if (error.name === "AbortError") {
+        toast.error("Tempo esgotado. Verifique sua conexão e tente novamente.");
+      } else {
+        toast.error(error.message || "Credenciais incorretas");
+      }
     } finally {
       setLoading(false);
     }
@@ -93,16 +102,14 @@ const Auth = () => {
 
   const sportBg = sport ? sportBgMap[sport] : "from-[hsl(220_15%_10%)] via-[hsl(220_12%_14%)] to-[hsl(25_15%_12%)]";
 
-  if (redirecting) {
+  if (loading && !email && !username) {
     return (
       <div className={`flex min-h-screen items-center justify-center bg-gradient-to-b ${sportBg}`}>
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto mb-4" />
-          <p className="text-muted-foreground">Redirecionando...</p>
-        </div>
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     );
   }
+
 
   return (
     <div className={`flex min-h-screen items-center justify-center bg-gradient-to-b ${sportBg} px-4 py-8 relative overflow-hidden`}>

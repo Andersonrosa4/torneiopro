@@ -316,8 +316,9 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
       }
     }
 
-    // Knockout
+    // Knockout (excluding third_place)
     if (knockoutStage.length > 0) {
+      const knockoutNormal = knockoutStage.filter(m => (m as any).bracket_type !== 'third_place');
       const hasDoubleElimStructure = matches.some(m => m.round > 0 && (m as any).bracket_half);
       if (tournamentFormat === "double_elimination" && hasDoubleElimStructure) {
         const schedulerBlocks = buildSchedulerBlocks(allEliminationMatches as any);
@@ -333,14 +334,26 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
           });
         }
       } else {
-        const rounds = [...new Set(knockoutStage.map(m => m.round))].sort((a, b) => a - b);
+        const rounds = [...new Set(knockoutNormal.map(m => m.round))].sort((a, b) => a - b);
         for (const r of rounds) {
-          const rMatches = knockoutStage.filter(m => m.round === r);
+          const rMatches = knockoutNormal.filter(m => m.round === r);
           groups.push({
             label: getRoundLabel(r),
             items: rMatches.map(m => ({ match: m, idx: 0 })),
           });
         }
+      }
+
+      // 3rd place matches
+      const thirdPlaceMatches = knockoutStage.filter(m => (m as any).bracket_type === 'third_place');
+      if (thirdPlaceMatches.length > 0) {
+        groups.push({
+          label: "🥉 Disputa de 3º Lugar",
+          items: thirdPlaceMatches.map(m => ({ match: m, idx: 0 })),
+          blockKey: "THIRD_PLACE",
+          isUnlocked: true,
+          isCompleted: thirdPlaceMatches.every(m => m.status === "completed"),
+        });
       }
     }
 

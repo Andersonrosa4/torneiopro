@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
-// vite config — cache-bust-v6
+// https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
@@ -21,17 +21,15 @@ export default defineConfig(({ mode }) => ({
       "react/jsx-runtime": path.resolve(__dirname, "node_modules/react/jsx-runtime"),
       "react/jsx-dev-runtime": path.resolve(__dirname, "node_modules/react/jsx-dev-runtime"),
     },
-    dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],
+    dedupe: ["react", "react-dom"],
   },
   optimizeDeps: {
     force: true,
     include: [
       "react",
       "react-dom",
-      "react-dom/client",
       "react/jsx-runtime",
       "react/jsx-dev-runtime",
-      "@tanstack/react-query",
       "@radix-ui/react-tooltip",
     ],
     esbuildOptions: {

@@ -120,21 +120,23 @@ const TournamentDetail = () => {
   const [savingTournament, setSavingTournament] = useState(false);
   const [isAssociatedOrganizer, setIsAssociatedOrganizer] = useState(false);
 
-  const { modalities, selectedModality, setSelectedModality, updateModality } = useModalities(id);
+  const { modalities, selectedModality, setSelectedModality, updateModality, loading: modalitiesLoading } = useModalities(id);
 
   const isOwner = tournament?.created_by === organizerId || isAdmin || isAssociatedOrganizer;
 
   // Filtered data by selected modality — STRICT isolation, no fallback (MEMOIZED)
-  // When modalities exist but none is selected yet (loading), return empty to avoid mixing
+  // While modalities are still loading, return empty to prevent unfiltered data flash
   const filteredTeams = useMemo(() => 
+    modalitiesLoading ? [] :
     selectedModality ? teams.filter(t => t.modality_id === selectedModality.id) 
       : modalities.length > 0 ? [] : teams,
-    [teams, selectedModality, modalities.length]
+    [teams, selectedModality, modalities.length, modalitiesLoading]
   );
   const filteredMatches = useMemo(() => 
+    modalitiesLoading ? [] :
     selectedModality ? matches.filter(m => m.modality_id === selectedModality.id) 
       : modalities.length > 0 ? [] : matches,
-    [matches, selectedModality, modalities.length]
+    [matches, selectedModality, modalities.length, modalitiesLoading]
   );
 
   // Detect if group stage exists for current modality (round=0 matches)

@@ -567,6 +567,162 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ═══════════════════════════════════════
+    // ARENA CRUD (admin only)
+    // ═══════════════════════════════════════
+
+    if (action === "create_arena") {
+      if (!admin) return errorResponse("Autenticação necessária", 401);
+      // Check if user is app admin
+      const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: admin.authUserId, _role: "admin" });
+      const isArenaAdmin = !!admin.arena_id;
+      if (!isAdmin && !isArenaAdmin) return errorResponse("Sem permissão", 403);
+
+      const { name, address, phone, whatsapp, state_id, city_id, opening_time, closing_time, working_days, cancel_policy_hours, description } = body;
+      if (!name || !state_id || !city_id) return errorResponse("name, state_id e city_id são obrigatórios");
+
+      const { data: newArena, error: createErr } = await supabase
+        .from("arenas")
+        .insert({
+          name: name.trim(),
+          address: address || null,
+          phone: phone || null,
+          whatsapp: whatsapp || null,
+          state_id,
+          city_id,
+          opening_time: opening_time || "08:00",
+          closing_time: closing_time || "22:00",
+          working_days: working_days || "mon,tue,wed,thu,fri,sat,sun",
+          cancel_policy_hours: cancel_policy_hours || 2,
+          description: description || null,
+        })
+        .select()
+        .single();
+
+      if (createErr) return errorResponse(createErr.message);
+      return jsonResponse({ data: newArena });
+    }
+
+    if (action === "update_arena") {
+      if (!admin) return errorResponse("Autenticação necessária", 401);
+      const { arena_id: targetArenaId, ...updates } = body;
+      const arenaIdToUpdate = targetArenaId || admin.arena_id;
+      if (!arenaIdToUpdate) return errorResponse("arena_id é obrigatório");
+
+      // Only allow updating own arena or if app admin
+      const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: admin.authUserId, _role: "admin" });
+      if (arenaIdToUpdate !== admin.arena_id && !isAdmin) {
+        return errorResponse("Sem permissão", 403);
+      }
+
+      const allowedFields = ["name", "address", "phone", "whatsapp", "opening_time", "closing_time", "working_days", "cancel_policy_hours", "description", "active", "logo_url"];
+      const updateData: Record<string, any> = {};
+      for (const key of allowedFields) {
+        if (updates[key] !== undefined) updateData[key] = updates[key];
+      }
+
+      const { data, error } = await supabase
+        .from("arenas")
+        .update(updateData)
+        .eq("id", arenaIdToUpdate)
+        .select()
+        .single();
+
+      if (error) return errorResponse(error.message);
+      return jsonResponse({ data });
+    }
+
+    if (action === "list_admin_arenas") {
+      if (!admin) return errorResponse("Autenticação necessária", 401);
+      const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: admin.authUserId, _role: "admin" });
+
+      let q = supabase
+        .from("arenas")
+        .select("*, states(name, uf), cities(name)")
+        .order("name");
+
+      if (!isAdmin) {
+        q = q.eq("id", admin.arena_id);
+      }
+
+      const { data, error } = await q;
+      if (error) return errorResponse(error.message);
+      return jsonResponse({ data });
+    }
+
+    if (action === "create_arena_admin") {
+      if (!admin) return errorResponse("Autenticação necessária", 401);
+      const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: admin.authUserId, _role: "admin" });
+      if (!isAdmin) return errorResponse("Apenas admins do app podem vincular admins de arena", 403);
+
+      const { user_id: targetUserId, arena_id: targetArenaId } = body;
+      if (!targetUserId || !targetArenaId) return errorResponse("user_id e arena_id são obrigatórios");
+
+      const { data, error } = await supabase
+        .from("arena_admins")
+        .insert({ user_id: targetUserId, arena_id: targetArenaId })
+        .select()
+        .single();
+
+      if (error) return errorResponse(error.message);
+      return jsonResponse({ data });
+    }
+
+    if (action === "create_court") {
+      if (!admin) return errorResponse("Autenticação necessária", 401);
+      const { arena_id: targetArenaId, name, sport_type, surface_type, slot_duration_minutes, price_per_slot } = body;
+      const arenaId = targetArenaId || admin.arena_id;
+
+      const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: admin.authUserId, _role: "admin" });
+      if (arenaId !== admin.arena_id && !isAdmin) return errorResponse("Sem permissão", 403);
+
+      if (!name) return errorResponse("name é obrigatório");
+
+      const { data, error } = await supabase
+        .from("courts")
+        .insert({
+          arena_id: arenaId,
+          name: name.trim(),
+          sport_type: sport_type || "beach_tennis",
+          surface_type: surface_type || "sand",
+          slot_duration_minutes: slot_duration_minutes || 60,
+          price_per_slot: price_per_slot || 0,
+        })
+        .select()
+        .single();
+
+      if (error) return errorResponse(error.message);
+      return jsonResponse({ data });
+    }
+
+    if (action === "update_court") {
+      if (!admin) return errorResponse("Autenticação necessária", 401);
+      const { court_id, ...updates } = body;
+      if (!court_id) return errorResponse("court_id é obrigatório");
+
+      const { data: court } = await supabase.from("courts").select("arena_id").eq("id", court_id).single();
+      if (!court) return errorResponse("Quadra não encontrada", 404);
+
+      const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: admin.authUserId, _role: "admin" });
+      if (court.arena_id !== admin.arena_id && !isAdmin) return errorResponse("Sem permissão", 403);
+
+      const allowedFields = ["name", "sport_type", "surface_type", "slot_duration_minutes", "price_per_slot", "active"];
+      const updateData: Record<string, any> = {};
+      for (const key of allowedFields) {
+        if (updates[key] !== undefined) updateData[key] = updates[key];
+      }
+
+      const { data, error } = await supabase
+        .from("courts")
+        .update(updateData)
+        .eq("id", court_id)
+        .select()
+        .single();
+
+      if (error) return errorResponse(error.message);
+      return jsonResponse({ data });
+    }
+
     return errorResponse("Ação não reconhecida: " + action);
   } catch (err) {
     return jsonResponse({ error: "Erro interno: " + (err as Error).message }, 500);

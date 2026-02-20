@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { Calendar, Clock, Users, DollarSign, AlertTriangle, CheckCircle, XCircle, LogOut, Plus } from "lucide-react";
+import { Calendar, Clock, Users, DollarSign, AlertTriangle, CheckCircle, XCircle, LogOut, Plus, Building2 } from "lucide-react";
+import ArenaManagement from "@/components/ArenaManagement";
 import LogoImage from "@/components/LogoImage";
 import { useNavigate } from "react-router-dom";
 
@@ -178,10 +179,11 @@ const ArenaDashboard = () => {
 
       <main className="container max-w-4xl mx-auto px-4 py-6">
         <Tabs defaultValue="bookings">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="bookings"><Users className="h-4 w-4 mr-1" /> Reservas</TabsTrigger>
             <TabsTrigger value="slots"><Clock className="h-4 w-4 mr-1" /> Horários</TabsTrigger>
             <TabsTrigger value="wallet"><DollarSign className="h-4 w-4 mr-1" /> Financeiro</TabsTrigger>
+            <TabsTrigger value="arenas"><Building2 className="h-4 w-4 mr-1" /> Arenas</TabsTrigger>
           </TabsList>
 
           {/* ─── Tab: Reservas ─── */}
@@ -298,6 +300,11 @@ const ArenaDashboard = () => {
           {/* ─── Tab: Financeiro ─── */}
           <TabsContent value="wallet" className="space-y-4">
             <WalletLookup />
+          </TabsContent>
+
+          {/* ─── Tab: Arenas ─── */}
+          <TabsContent value="arenas" className="space-y-4">
+            <ArenaManagement />
           </TabsContent>
         </Tabs>
       </main>

@@ -24,5 +24,8 @@ export default defineConfig(({ mode }) => ({
   optimizeDeps: {
     force: true,
     include: ["react", "react-dom", "@radix-ui/react-tooltip"],
+    esbuildOptions: {
+      // cache-bust: 20260220
+    },
   },
 }));

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Trophy, Undo2, RotateCcw, Goal, AlertTriangle, ChevronRight, CircleDot, X as XIcon } from "lucide-react";
+import { Trophy, Undo2, RotateCcw, Goal, AlertTriangle, ChevronRight, CircleDot, X as XIcon, Square } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FutsalLiveScore,
@@ -10,6 +10,7 @@ import {
   createInitialFutsalScore,
   addGoal,
   addFoul,
+  addCard,
   endPeriod,
   addPenaltyKick,
   undoLastEvent,
@@ -86,6 +87,12 @@ const FutsalLiveScoreBoard = ({
     await persistScore(newScore);
   }, [score, persistScore]);
 
+  const handleCard = useCallback(async (team: "A" | "B", cardType: "yellow" | "red") => {
+    const newScore = addCard(score, team, cardType);
+    setScore(newScore);
+    await persistScore(newScore);
+  }, [score, persistScore]);
+
   const handleEndPeriod = useCallback(async () => {
     const newScore = endPeriod(score, rules);
     setScore(newScore);
@@ -136,6 +143,9 @@ const FutsalLiveScoreBoard = ({
   const isExtraTime = score.period === "ET1" || score.period === "ET2";
   const winner = getWinner(score);
 
+  const t1Short = team1Name.split(" / ")[0];
+  const t2Short = team2Name.split(" / ")[0];
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-lg p-0 overflow-hidden bg-background border-border">
@@ -165,7 +175,7 @@ const FutsalLiveScoreBoard = ({
               <div className="text-center space-y-1">
                 <div className={`text-sm font-bold truncate ${winner === "A" ? "text-success" : "text-foreground"}`}>
                   {winner === "A" && <Trophy className="h-3 w-3 inline mr-1" />}
-                  {team1Name.split(" / ")[0]}
+                  {t1Short}
                 </div>
                 <div className="text-xs text-muted-foreground">{team1Name.includes("/") ? team1Name.split(" / ")[1] : ""}</div>
               </div>
@@ -186,17 +196,45 @@ const FutsalLiveScoreBoard = ({
               <div className="text-center space-y-1">
                 <div className={`text-sm font-bold truncate ${winner === "B" ? "text-success" : "text-foreground"}`}>
                   {winner === "B" && <Trophy className="h-3 w-3 inline mr-1" />}
-                  {team2Name.split(" / ")[0]}
+                  {t2Short}
                 </div>
                 <div className="text-xs text-muted-foreground">{team2Name.includes("/") ? team2Name.split(" / ")[1] : ""}</div>
               </div>
             </div>
 
-            {/* Fouls bar */}
-            {!isCompleted && !isPenalties && (
+            {/* Stats bar: fouls + cards */}
+            {!isCompleted && (
               <div className="border-t border-border/30 px-4 py-1.5 flex justify-between text-[10px] text-muted-foreground">
-                <span>Faltas: <span className="font-bold text-foreground">{score.fouls.teamA}</span></span>
-                <span>Faltas: <span className="font-bold text-foreground">{score.fouls.teamB}</span></span>
+                <div className="flex items-center gap-2">
+                  <span>Faltas: <span className="font-bold text-foreground">{score.fouls.teamA}</span></span>
+                  {score.cards.teamA_yellow > 0 && (
+                    <span className="inline-flex items-center gap-0.5">
+                      <Square className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                      <span className="font-bold">{score.cards.teamA_yellow}</span>
+                    </span>
+                  )}
+                  {score.cards.teamA_red > 0 && (
+                    <span className="inline-flex items-center gap-0.5">
+                      <Square className="h-2.5 w-2.5 fill-red-500 text-red-500" />
+                      <span className="font-bold">{score.cards.teamA_red}</span>
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {score.cards.teamB_yellow > 0 && (
+                    <span className="inline-flex items-center gap-0.5">
+                      <Square className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                      <span className="font-bold">{score.cards.teamB_yellow}</span>
+                    </span>
+                  )}
+                  {score.cards.teamB_red > 0 && (
+                    <span className="inline-flex items-center gap-0.5">
+                      <Square className="h-2.5 w-2.5 fill-red-500 text-red-500" />
+                      <span className="font-bold">{score.cards.teamB_red}</span>
+                    </span>
+                  )}
+                  <span>Faltas: <span className="font-bold text-foreground">{score.fouls.teamB}</span></span>
+                </div>
               </div>
             )}
           </div>
@@ -212,7 +250,7 @@ const FutsalLiveScoreBoard = ({
                   onClick={() => handleGoal("A")}
                 >
                   <Goal className="h-4 w-4" />
-                  <span className="truncate max-w-full">Gol {team1Name.split(" / ")[0]}</span>
+                  <span className="truncate max-w-full">Gol {t1Short}</span>
                 </Button>
                 <Button
                   size="lg"
@@ -220,7 +258,7 @@ const FutsalLiveScoreBoard = ({
                   onClick={() => handleGoal("B")}
                 >
                   <Goal className="h-4 w-4" />
-                  <span className="truncate max-w-full">Gol {team2Name.split(" / ")[0]}</span>
+                  <span className="truncate max-w-full">Gol {t2Short}</span>
                 </Button>
               </div>
 
@@ -232,7 +270,7 @@ const FutsalLiveScoreBoard = ({
                   className="gap-1 text-xs border-warning/30 text-warning hover:bg-warning/10"
                   onClick={() => handleFoul("A")}
                 >
-                  <AlertTriangle className="h-3 w-3" /> Falta {team1Name.split(" / ")[0]}
+                  <AlertTriangle className="h-3 w-3" /> Falta {t1Short}
                 </Button>
                 <Button
                   variant="outline"
@@ -240,7 +278,43 @@ const FutsalLiveScoreBoard = ({
                   className="gap-1 text-xs border-warning/30 text-warning hover:bg-warning/10"
                   onClick={() => handleFoul("B")}
                 >
-                  <AlertTriangle className="h-3 w-3" /> Falta {team2Name.split(" / ")[0]}
+                  <AlertTriangle className="h-3 w-3" /> Falta {t2Short}
+                </Button>
+              </div>
+
+              {/* Card buttons */}
+              <div className="grid grid-cols-4 gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1 text-[10px] h-8 border-yellow-400/40 text-yellow-600 hover:bg-yellow-400/10"
+                  onClick={() => handleCard("A", "yellow")}
+                >
+                  <Square className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" /> {t1Short}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1 text-[10px] h-8 border-red-500/40 text-red-500 hover:bg-red-500/10"
+                  onClick={() => handleCard("A", "red")}
+                >
+                  <Square className="h-2.5 w-2.5 fill-red-500 text-red-500" /> {t1Short}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1 text-[10px] h-8 border-yellow-400/40 text-yellow-600 hover:bg-yellow-400/10"
+                  onClick={() => handleCard("B", "yellow")}
+                >
+                  <Square className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" /> {t2Short}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1 text-[10px] h-8 border-red-500/40 text-red-500 hover:bg-red-500/10"
+                  onClick={() => handleCard("B", "red")}
+                >
+                  <Square className="h-2.5 w-2.5 fill-red-500 text-red-500" /> {t2Short}
                 </Button>
               </div>
 
@@ -283,7 +357,7 @@ const FutsalLiveScoreBoard = ({
               <div className="grid grid-cols-2 gap-2">
                 {/* Team A penalty */}
                 <div className="space-y-1.5">
-                  <div className="text-xs font-bold text-center truncate">{team1Name.split(" / ")[0]}</div>
+                  <div className="text-xs font-bold text-center truncate">{t1Short}</div>
                   <div className="flex gap-1">
                     <Button size="sm" className="flex-1 h-10 text-xs bg-success/80 hover:bg-success gap-1" onClick={() => handlePenaltyKick("A", true)}>
                       <CircleDot className="h-3 w-3" /> Gol
@@ -298,7 +372,7 @@ const FutsalLiveScoreBoard = ({
                 </div>
                 {/* Team B penalty */}
                 <div className="space-y-1.5">
-                  <div className="text-xs font-bold text-center truncate">{team2Name.split(" / ")[0]}</div>
+                  <div className="text-xs font-bold text-center truncate">{t2Short}</div>
                   <div className="flex gap-1">
                     <Button size="sm" className="flex-1 h-10 text-xs bg-success/80 hover:bg-success gap-1" onClick={() => handlePenaltyKick("B", true)}>
                       <CircleDot className="h-3 w-3" /> Gol

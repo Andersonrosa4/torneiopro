@@ -23,7 +23,7 @@ export interface FutsalRules {
 export type FutsalPeriod = "H1" | "H2" | "ET1" | "ET2" | "PENALTIES" | "COMPLETED";
 
 export interface FutsalHistoryEvent {
-  type: "GOAL" | "FOUL" | "PERIOD_START" | "PERIOD_END" | "PENALTY_SCORED" | "PENALTY_MISSED";
+  type: "GOAL" | "FOUL" | "PERIOD_START" | "PERIOD_END" | "PENALTY_SCORED" | "PENALTY_MISSED" | "YELLOW_CARD" | "RED_CARD";
   team: "A" | "B";
   period: FutsalPeriod;
 }
@@ -37,6 +37,12 @@ export interface FutsalLiveScore {
   fouls: {
     teamA: number;
     teamB: number;
+  };
+  cards: {
+    teamA_yellow: number;
+    teamA_red: number;
+    teamB_yellow: number;
+    teamB_red: number;
   };
   penalties: {
     active: boolean;
@@ -95,6 +101,7 @@ export function createInitialFutsalScore(rules: FutsalRules): FutsalLiveScore {
     teamA_goals: 0,
     teamB_goals: 0,
     fouls: { teamA: 0, teamB: 0 },
+    cards: { teamA_yellow: 0, teamA_red: 0, teamB_yellow: 0, teamB_red: 0 },
     penalties: {
       active: false,
       teamA_goals: 0,
@@ -133,6 +140,12 @@ export function replayHistory(history: FutsalHistoryEvent[], rules: FutsalRules)
       case "PENALTY_MISSED":
         s = applyPenaltyInternal(s, event.team, false, rules);
         break;
+      case "YELLOW_CARD":
+        s = applyCardInternal(s, event.team, "yellow");
+        break;
+      case "RED_CARD":
+        s = applyCardInternal(s, event.team, "red");
+        break;
       case "PERIOD_START":
         break;
     }
@@ -157,6 +170,17 @@ function applyGoalInternal(s: FutsalLiveScore, team: "A" | "B", period: FutsalPe
 function applyFoulInternal(s: FutsalLiveScore, team: "A" | "B", _period: FutsalPeriod): FutsalLiveScore {
   if (team === "A") s.fouls.teamA++;
   else s.fouls.teamB++;
+  return s;
+}
+
+function applyCardInternal(s: FutsalLiveScore, team: "A" | "B", cardType: "yellow" | "red"): FutsalLiveScore {
+  if (team === "A") {
+    if (cardType === "yellow") s.cards.teamA_yellow++;
+    else s.cards.teamA_red++;
+  } else {
+    if (cardType === "yellow") s.cards.teamB_yellow++;
+    else s.cards.teamB_red++;
+  }
   return s;
 }
 
@@ -256,6 +280,17 @@ export function addFoul(score: FutsalLiveScore, team: "A" | "B"): FutsalLiveScor
   else s.fouls.teamB++;
 
   return s;
+}
+
+/**
+ * Register a card (yellow or red). Returns a NEW FutsalLiveScore.
+ */
+export function addCard(score: FutsalLiveScore, team: "A" | "B", cardType: "yellow" | "red"): FutsalLiveScore {
+  if (score.period === "COMPLETED") return score;
+
+  const s = clone(score);
+  s.history.push({ type: cardType === "yellow" ? "YELLOW_CARD" : "RED_CARD", team, period: s.period });
+  return applyCardInternal(s, team, cardType);
 }
 
 /**

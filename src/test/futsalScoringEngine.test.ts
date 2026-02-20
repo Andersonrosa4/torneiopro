@@ -4,6 +4,7 @@ import {
   validateFutsalRules,
   addGoal,
   addFoul,
+  addCard,
   endPeriod,
   addPenaltyKick,
   undoLastEvent,
@@ -341,5 +342,74 @@ describe("Futsal Engine — No goals allowed after completion", () => {
     expect(s.period).toBe("COMPLETED");
     s = addGoal(s, "A", rules);
     expect(s.teamA_goals).toBe(1);
+  });
+});
+
+describe("Futsal Engine — Cards", () => {
+  const rules = defaultRules();
+
+  it("should track yellow cards per team", () => {
+    let s = createInitialFutsalScore(rules);
+    s = addCard(s, "A", "yellow");
+    s = addCard(s, "A", "yellow");
+    s = addCard(s, "B", "yellow");
+    expect(s.cards.teamA_yellow).toBe(2);
+    expect(s.cards.teamB_yellow).toBe(1);
+    expect(s.cards.teamA_red).toBe(0);
+  });
+
+  it("should track red cards per team", () => {
+    let s = createInitialFutsalScore(rules);
+    s = addCard(s, "B", "red");
+    expect(s.cards.teamB_red).toBe(1);
+    expect(s.cards.teamB_yellow).toBe(0);
+  });
+
+  it("should track mixed cards", () => {
+    let s = createInitialFutsalScore(rules);
+    s = addCard(s, "A", "yellow");
+    s = addCard(s, "A", "red");
+    s = addCard(s, "B", "yellow");
+    s = addCard(s, "B", "yellow");
+    s = addCard(s, "B", "red");
+    expect(s.cards.teamA_yellow).toBe(1);
+    expect(s.cards.teamA_red).toBe(1);
+    expect(s.cards.teamB_yellow).toBe(2);
+    expect(s.cards.teamB_red).toBe(1);
+  });
+
+  it("should not add cards after match completed", () => {
+    let s = createInitialFutsalScore(rules);
+    s = addGoal(s, "A", rules);
+    s = endPeriod(s, rules);
+    s = endPeriod(s, rules);
+    expect(s.period).toBe("COMPLETED");
+    s = addCard(s, "A", "yellow");
+    expect(s.cards.teamA_yellow).toBe(0);
+  });
+
+  it("should record cards in history", () => {
+    let s = createInitialFutsalScore(rules);
+    s = addCard(s, "A", "yellow");
+    s = addCard(s, "B", "red");
+    expect(s.history).toHaveLength(2);
+    expect(s.history[0].type).toBe("YELLOW_CARD");
+    expect(s.history[1].type).toBe("RED_CARD");
+  });
+
+  it("should undo yellow card", () => {
+    let s = createInitialFutsalScore(rules);
+    s = addCard(s, "A", "yellow");
+    expect(s.cards.teamA_yellow).toBe(1);
+    s = undoLastEvent(s, rules);
+    expect(s.cards.teamA_yellow).toBe(0);
+  });
+
+  it("should undo red card", () => {
+    let s = createInitialFutsalScore(rules);
+    s = addCard(s, "B", "red");
+    expect(s.cards.teamB_red).toBe(1);
+    s = undoLastEvent(s, rules);
+    expect(s.cards.teamB_red).toBe(0);
   });
 });

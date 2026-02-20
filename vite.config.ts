@@ -3,8 +3,9 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
-// Cache-bust: v3 — force Vite to rebuild all dep chunks
+// Cache-bust: v4 — force fresh dep optimization
 export default defineConfig(({ mode }) => ({
+  cacheDir: "node_modules/.vite_v4",
   server: {
     host: "::",
     port: 8080,

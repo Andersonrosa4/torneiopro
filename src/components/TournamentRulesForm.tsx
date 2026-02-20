@@ -25,9 +25,57 @@ export interface TournamentRulesState {
   walkover_enabled: boolean;
   retirement_keep_score: boolean;
   ranking_criteria_order: string;
+  // Futsal-specific
+  halves_count?: number;
+  half_duration_minutes?: number;
+  halftime_interval_minutes?: number;
+  allow_draw?: boolean;
+  use_extra_time?: boolean;
+  extra_time_halves?: number;
+  extra_time_minutes?: number;
+  use_penalties?: boolean;
+  penalties_kicks?: number;
+  golden_goal_extra_time?: boolean;
+  stop_clock_last_minutes?: number;
+  wo_enabled?: boolean;
 }
 
 export function getDefaultRules(sport: string): TournamentRulesState {
+  if (sport === "futsal") {
+    return {
+      mode: "team",
+      sets_format: "best_of_3",
+      games_to_win_set: 6,
+      min_difference: 2,
+      tiebreak_enabled: false,
+      tiebreak_at: "6-6",
+      tiebreak_points: 7,
+      final_set_tiebreak_mode: "normal",
+      super_tiebreak_enabled: false,
+      super_tiebreak_points: 10,
+      super_tiebreak_replaces_third_set: false,
+      no_ad: false,
+      golden_point: false,
+      points_sequence: "0,15,30,40,ADV",
+      first_server: "coin_toss",
+      server_rotation: "fixed_order",
+      walkover_enabled: true,
+      retirement_keep_score: true,
+      ranking_criteria_order: "WINS,HEAD_TO_HEAD,SETS_DIFF,GAMES_DIFF,POINTS_DIFF,RANDOM",
+      halves_count: 2,
+      half_duration_minutes: 20,
+      halftime_interval_minutes: 10,
+      allow_draw: false,
+      use_extra_time: false,
+      extra_time_halves: 2,
+      extra_time_minutes: 5,
+      use_penalties: true,
+      penalties_kicks: 5,
+      golden_goal_extra_time: false,
+      stop_clock_last_minutes: 5,
+      wo_enabled: true,
+    };
+  }
   if (sport === "padel") {
     return {
       mode: "doubles",
@@ -90,6 +138,86 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
 
 const TournamentRulesForm = ({ sport, rules, onChange }: Props) => {
   const update = (partial: Partial<TournamentRulesState>) => onChange({ ...rules, ...partial });
+  const isFutsal = sport === "futsal";
+
+  if (isFutsal) {
+    return (
+      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="space-y-4">
+        <Section title="Tempo de Jogo">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Tempos</Label>
+              <Input type="number" min={1} max={4} value={rules.halves_count ?? 2} onChange={(e) => update({ halves_count: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Duração (min)</Label>
+              <Input type="number" min={5} max={45} value={rules.half_duration_minutes ?? 20} onChange={(e) => update({ half_duration_minutes: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Intervalo (min)</Label>
+              <Input type="number" min={1} max={20} value={rules.halftime_interval_minutes ?? 10} onChange={(e) => update({ halftime_interval_minutes: Number(e.target.value) })} />
+            </div>
+          </div>
+        </Section>
+
+        <Section title="Empate e Desempate">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Permitir empate</Label>
+              <Switch checked={rules.allow_draw ?? false} onCheckedChange={(v) => update({ allow_draw: v })} />
+            </div>
+            {!rules.allow_draw && (
+              <>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Prorrogação</Label>
+                  <Switch checked={rules.use_extra_time ?? false} onCheckedChange={(v) => update({ use_extra_time: v })} />
+                </div>
+                {rules.use_extra_time && (
+                  <>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Tempos extra</Label>
+                      <Input type="number" min={1} max={4} value={rules.extra_time_halves ?? 2} onChange={(e) => update({ extra_time_halves: Number(e.target.value) })} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Duração extra (min)</Label>
+                      <Input type="number" min={3} max={15} value={rules.extra_time_minutes ?? 5} onChange={(e) => update({ extra_time_minutes: Number(e.target.value) })} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Gol de ouro na prorrogação</Label>
+                      <Switch checked={rules.golden_goal_extra_time ?? false} onCheckedChange={(v) => update({ golden_goal_extra_time: v })} />
+                    </div>
+                  </>
+                )}
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Pênaltis</Label>
+                  <Switch checked={rules.use_penalties ?? true} onCheckedChange={(v) => update({ use_penalties: v })} />
+                </div>
+                {rules.use_penalties && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Cobranças por equipe</Label>
+                    <Input type="number" min={3} max={10} value={rules.penalties_kicks ?? 5} onChange={(e) => update({ penalties_kicks: Number(e.target.value) })} />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </Section>
+
+        <Section title="Regras de Partida">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Parar relógio nos últimos (min)</Label>
+              <Input type="number" min={0} max={10} value={rules.stop_clock_last_minutes ?? 5} onChange={(e) => update({ stop_clock_last_minutes: Number(e.target.value) })} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">W.O. habilitado</Label>
+              <Switch checked={rules.wo_enabled ?? true} onCheckedChange={(v) => update({ wo_enabled: v })} />
+            </div>
+          </div>
+        </Section>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="space-y-4">

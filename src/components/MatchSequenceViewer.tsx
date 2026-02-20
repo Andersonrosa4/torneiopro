@@ -9,7 +9,9 @@ import { getEliminationRoundLabel, getEliminationRoundShortLabel } from "@/lib/r
 import { buildSchedulerBlocks, schedulerSequence, getSchedulerBlockColor, getSchedulerBadgeColor, type SchedulerBlock } from "@/lib/roundScheduler";
 import { ManualMatchOverride } from "@/components/ManualMatchOverride";
 import LiveScoreBoard from "@/components/LiveScoreBoard";
+import FutsalLiveScoreBoard from "@/components/FutsalLiveScoreBoard";
 import type { ScoringRules } from "@/lib/scoringEngine";
+import type { FutsalRules } from "@/lib/futsalScoringEngine";
 
 /* Helper: Convert number to letter (1→A, 2→B, etc) */
 const numberToLetter = (num: number): string => {
@@ -398,7 +400,8 @@ const MatchCard = ({
   const [isEditing, setIsEditing] = useState(false);
   const [liveScoreOpen, setLiveScoreOpen] = useState(false);
 
-  const isLiveScorable = (sport === "tennis" || sport === "padel") && !!tournamentRules;
+  const isLiveScorable = (sport === "tennis" || sport === "padel" || sport === "futsal") && !!tournamentRules;
+  const isFutsal = sport === "futsal";
 
   useEffect(() => {
     setSetScores(initSets());
@@ -598,7 +601,7 @@ const MatchCard = ({
       )}
 
       {/* LiveScoreBoard dialog */}
-      {isLiveScorable && hasTeams && match.team1_id && match.team2_id && tournamentId && (
+      {isLiveScorable && hasTeams && match.team1_id && match.team2_id && tournamentId && !isFutsal && (
         <LiveScoreBoard
           matchId={match.id}
           tournamentId={tournamentId}
@@ -618,6 +621,30 @@ const MatchCard = ({
           }}
           initialLiveScore={(match as any).live_score || null}
           rules={tournamentRules!}
+        />
+      )}
+
+      {/* Futsal LiveScoreBoard dialog */}
+      {isLiveScorable && hasTeams && match.team1_id && match.team2_id && tournamentId && isFutsal && (
+        <FutsalLiveScoreBoard
+          matchId={match.id}
+          tournamentId={tournamentId}
+          team1Name={team1Name}
+          team2Name={team2Name}
+          team1Id={match.team1_id}
+          team2Id={match.team2_id}
+          open={liveScoreOpen}
+          onClose={() => setLiveScoreOpen(false)}
+          onMatchComplete={(mId, s1, s2, wId) => {
+            setLiveScoreOpen(false);
+            if (onAutoResult) onAutoResult(mId, s1, s2, wId);
+            else {
+              onUpdateScore(mId, s1, s2);
+              onDeclareWinner(mId, wId);
+            }
+          }}
+          initialLiveScore={(match as any).live_score || null}
+          rules={tournamentRules as unknown as FutsalRules}
         />
       )}
 

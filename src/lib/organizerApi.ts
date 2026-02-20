@@ -1,4 +1,24 @@
-import { supabase } from "@/integrations/supabase/client";
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
+import { getAccessToken } from "@/contexts/AuthContext";
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+
+/** Retorna um cliente Supabase com o token atual injetado no header */
+function getClient() {
+  const token = getAccessToken();
+  if (token) {
+    return createClient<Database>(SUPABASE_URL, SUPABASE_KEY, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+  // Fallback: cliente padrão (usará sessão do localStorage)
+  return createClient<Database>(SUPABASE_URL, SUPABASE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
 
 interface QueryOptions {
   table: string;
@@ -27,11 +47,12 @@ export async function organizerQuery<T = any>(options: QueryOptions): Promise<{ 
       return await resetResults(options.tournament_id || options.filters?.tournament_id, options.modality_id || options.filters?.modality_id) as any;
     }
 
+    const db = getClient();
     let query: any;
 
     switch (operation) {
       case "select": {
-        query = (supabase.from as any)(table).select(selectStr || "*");
+        query = (db.from as any)(table).select(selectStr || "*");
         if (filters) {
           for (const [key, value] of Object.entries(filters)) {
             query = query.eq(key, value);
@@ -48,13 +69,13 @@ export async function organizerQuery<T = any>(options: QueryOptions): Promise<{ 
         break;
       }
       case "insert": {
-        query = (supabase.from as any)(table).insert(data);
+        query = (db.from as any)(table).insert(data);
         if (selectStr) query = query.select(selectStr);
         if (single) query = query.single();
         break;
       }
       case "update": {
-        query = (supabase.from as any)(table).update(data);
+        query = (db.from as any)(table).update(data);
         if (filters) {
           for (const [key, value] of Object.entries(filters)) {
             query = query.eq(key, value);
@@ -65,7 +86,7 @@ export async function organizerQuery<T = any>(options: QueryOptions): Promise<{ 
         break;
       }
       case "delete": {
-        query = (supabase.from as any)(table).delete();
+        query = (db.from as any)(table).delete();
         if (filters) {
           for (const [key, value] of Object.entries(filters)) {
             query = query.eq(key, value);
@@ -86,13 +107,14 @@ export async function organizerQuery<T = any>(options: QueryOptions): Promise<{ 
 }
 
 /**
- * Public query — no authentication required. Uses Supabase client with anon key.
+ * Public query — no authentication required.
  */
 export async function publicQuery<T = any>(options: Omit<QueryOptions, "operation" | "data"> & { operation?: "select" }): Promise<{ data: T | null; error: any }> {
   const { table, filters, select: selectStr, order, single, maybeSingle } = options;
 
   try {
-    let query: any = (supabase.from as any)(table).select(selectStr || "*");
+    const db = getClient();
+    let query: any = (db.from as any)(table).select(selectStr || "*");
 
     if (filters) {
       for (const [key, value] of Object.entries(filters)) {
@@ -119,20 +141,21 @@ export async function publicQuery<T = any>(options: Omit<QueryOptions, "operatio
 async function undoBracket(tournamentId?: string, modalityId?: string): Promise<{ data: any; error: any }> {
   if (!tournamentId) return { data: null, error: { message: "tournament_id é obrigatório" } };
 
-  let updateQuery: any = supabase.from("matches").update({ next_win_match_id: null, next_lose_match_id: null }).eq("tournament_id", tournamentId);
+  const db = getClient();
+  let updateQuery: any = db.from("matches").update({ next_win_match_id: null, next_lose_match_id: null }).eq("tournament_id", tournamentId);
   if (modalityId) updateQuery = updateQuery.eq("modality_id", modalityId);
   const { error: updateErr } = await updateQuery;
   if (updateErr) return { data: null, error: { message: updateErr.message } };
 
-  let deleteQuery: any = supabase.from("matches").delete().eq("tournament_id", tournamentId);
+  let deleteQuery: any = db.from("matches").delete().eq("tournament_id", tournamentId);
   if (modalityId) deleteQuery = deleteQuery.eq("modality_id", modalityId);
   const { error: deleteErr } = await deleteQuery;
   if (deleteErr) return { data: null, error: { message: deleteErr.message } };
 
-  const { error: classErr } = await supabase.from("classificacao_grupos").delete().eq("tournament_id", tournamentId);
+  const { error: classErr } = await db.from("classificacao_grupos").delete().eq("tournament_id", tournamentId);
   if (classErr) return { data: null, error: { message: classErr.message } };
 
-  const { error: groupErr } = await supabase.from("groups").delete().eq("tournament_id", tournamentId);
+  const { error: groupErr } = await db.from("groups").delete().eq("tournament_id", tournamentId);
   if (groupErr) return { data: null, error: { message: groupErr.message } };
 
   return { data: null, error: null };
@@ -141,7 +164,8 @@ async function undoBracket(tournamentId?: string, modalityId?: string): Promise<
 async function resetResults(tournamentId?: string, modalityId?: string): Promise<{ data: any; error: any }> {
   if (!tournamentId) return { data: null, error: { message: "tournament_id é obrigatório" } };
 
-  let query: any = supabase.from("matches").update({
+  const db = getClient();
+  let query: any = db.from("matches").update({
     score1: 0, score2: 0, winner_team_id: null, winner_id: null, status: "pending" as const,
   }).eq("tournament_id", tournamentId);
   if (modalityId) query = query.eq("modality_id", modalityId);

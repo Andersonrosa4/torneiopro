@@ -12,6 +12,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   loading: boolean;
+  accessToken: string | null;
   login: (session: { access_token: string; refresh_token: string }, organizerId: string, role?: string) => Promise<void>;
   logout: () => void;
   signOut: () => Promise<void>;
@@ -24,6 +25,7 @@ const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   isAdmin: false,
   loading: true,
+  accessToken: null,
   login: async () => {},
   logout: () => {},
   signOut: async () => {},
@@ -31,10 +33,15 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
+// Módulo-level token store para acesso síncrono fora do React
+let _accessToken: string | null = null;
+export const getAccessToken = () => _accessToken;
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [organizerId, setOrganizerId] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const loginInProgress = useRef(false);
 
@@ -59,6 +66,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user && !loginInProgress.current) {
         setUser({ id: session.user.id });
+        _accessToken = session.access_token;
+        setAccessToken(session.access_token);
         await fetchOrganizer(session.user.id);
       }
       setLoading(false);
@@ -66,11 +75,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Listen to future auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Skip if login() is handling session setup
       if (loginInProgress.current) return;
 
       if (session?.user) {
         setUser({ id: session.user.id });
+        _accessToken = session.access_token;
+        setAccessToken(session.access_token);
         if (event === "SIGNED_IN") {
           await fetchOrganizer(session.user.id);
         }
@@ -78,6 +88,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
         setOrganizerId(null);
         setUserRole(null);
+        _accessToken = null;
+        setAccessToken(null);
       }
       setLoading(false);
     });
@@ -85,39 +97,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => subscription.unsubscribe();
   }, [fetchOrganizer]);
 
-  const login = useCallback(async (session: { access_token: string; refresh_token: string }, newOrganizerId: string, role?: string) => {
-    // Prevent onAuthStateChange from running duplicate queries
+  const login = useCallback(async (
+    session: { access_token: string; refresh_token: string },
+    newOrganizerId: string,
+    role?: string
+  ) => {
     loginInProgress.current = true;
-    
+
     try {
-      // Decode user id from access_token directly (no network call needed)
+      // Decode user id from JWT directly (synchronous, no network)
       const payload = JSON.parse(atob(session.access_token.split('.')[1]));
       const userId = payload.sub as string;
-      
-      // Set state BEFORE setSession to avoid any race with onAuthStateChange
+
+      // Store token at module level for immediate access in queries
+      _accessToken = session.access_token;
+
+      // Update React state
       setUser({ id: userId });
       setOrganizerId(newOrganizerId);
       setUserRole(role || null);
-      setLoading(false);
+      setAccessToken(session.access_token);
 
-      // setSession in background — onAuthStateChange will be blocked by loginInProgress flag
-      await supabase.auth.setSession({
+      // Persist session in Supabase client (non-blocking)
+      supabase.auth.setSession({
         access_token: session.access_token,
         refresh_token: session.refresh_token,
-      });
+      }).catch((e) => console.error("setSession error:", e));
+
     } catch (e) {
       console.error("Login error:", e);
-      setLoading(false);
     } finally {
-      // Delay releasing the flag so onAuthStateChange events fired by setSession are ignored
-      setTimeout(() => {
-        loginInProgress.current = false;
-      }, 500);
+      setLoading(false);
+      setTimeout(() => { loginInProgress.current = false; }, 1000);
     }
   }, []);
 
   const logout = useCallback(() => {
     supabase.auth.signOut();
+    _accessToken = null;
+    setAccessToken(null);
     setOrganizerId(null);
     setUserRole(null);
     setUser(null);
@@ -125,6 +143,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
+    _accessToken = null;
+    setAccessToken(null);
     setOrganizerId(null);
     setUserRole(null);
     setUser(null);
@@ -134,13 +154,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     user,
     organizerId,
     userRole,
+    accessToken,
     isAuthenticated: !!user && !!organizerId,
     isAdmin: userRole === "admin",
     loading,
     login,
     logout,
     signOut,
-  }), [user, organizerId, userRole, loading, login, logout, signOut]);
+  }), [user, organizerId, userRole, accessToken, loading, login, logout, signOut]);
 
   return (
     <AuthContext.Provider value={value}>

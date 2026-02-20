@@ -14,6 +14,187 @@ export type Database = {
   }
   public: {
     Tables: {
+      arena_admins: {
+        Row: {
+          arena_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          arena_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          arena_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arena_admins_arena_id_fkey"
+            columns: ["arena_id"]
+            isOneToOne: false
+            referencedRelation: "arenas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      arenas: {
+        Row: {
+          active: boolean
+          address: string | null
+          cancel_policy_hours: number
+          city_id: string
+          closing_time: string
+          created_at: string
+          description: string | null
+          id: string
+          logo_url: string | null
+          name: string
+          opening_time: string
+          phone: string | null
+          state_id: string
+          whatsapp: string | null
+          working_days: string
+        }
+        Insert: {
+          active?: boolean
+          address?: string | null
+          cancel_policy_hours?: number
+          city_id: string
+          closing_time?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          name: string
+          opening_time?: string
+          phone?: string | null
+          state_id: string
+          whatsapp?: string | null
+          working_days?: string
+        }
+        Update: {
+          active?: boolean
+          address?: string | null
+          cancel_policy_hours?: number
+          city_id?: string
+          closing_time?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          name?: string
+          opening_time?: string
+          phone?: string | null
+          state_id?: string
+          whatsapp?: string | null
+          working_days?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "arenas_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "arenas_state_id_fkey"
+            columns: ["state_id"]
+            isOneToOne: false
+            referencedRelation: "states"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bookings: {
+        Row: {
+          arena_id: string
+          booking_date: string
+          court_id: string
+          created_at: string
+          end_time: string
+          id: string
+          payment_method: string | null
+          payment_status: string
+          start_time: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          arena_id: string
+          booking_date: string
+          court_id: string
+          created_at?: string
+          end_time: string
+          id?: string
+          payment_method?: string | null
+          payment_status?: string
+          start_time: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          arena_id?: string
+          booking_date?: string
+          court_id?: string
+          created_at?: string
+          end_time?: string
+          id?: string
+          payment_method?: string | null
+          payment_status?: string
+          start_time?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_arena_id_fkey"
+            columns: ["arena_id"]
+            isOneToOne: false
+            referencedRelation: "arenas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_court_id_fkey"
+            columns: ["court_id"]
+            isOneToOne: false
+            referencedRelation: "courts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cities: {
+        Row: {
+          id: string
+          name: string
+          state_id: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          state_id: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          state_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cities_state_id_fkey"
+            columns: ["state_id"]
+            isOneToOne: false
+            referencedRelation: "states"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       classificacao_grupos: {
         Row: {
           created_at: string
@@ -77,6 +258,50 @@ export type Database = {
             columns: ["tournament_id"]
             isOneToOne: false
             referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      courts: {
+        Row: {
+          active: boolean
+          arena_id: string
+          created_at: string
+          id: string
+          name: string
+          price_per_slot: number
+          slot_duration_minutes: number
+          sport_type: string
+          surface_type: string | null
+        }
+        Insert: {
+          active?: boolean
+          arena_id: string
+          created_at?: string
+          id?: string
+          name: string
+          price_per_slot?: number
+          slot_duration_minutes?: number
+          sport_type?: string
+          surface_type?: string | null
+        }
+        Update: {
+          active?: boolean
+          arena_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          price_per_slot?: number
+          slot_duration_minutes?: number
+          sport_type?: string
+          surface_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "courts_arena_id_fkey"
+            columns: ["arena_id"]
+            isOneToOne: false
+            referencedRelation: "arenas"
             referencedColumns: ["id"]
           },
         ]
@@ -504,6 +729,24 @@ export type Database = {
           },
         ]
       }
+      states: {
+        Row: {
+          id: string
+          name: string
+          uf: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          uf: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          uf?: string
+        }
+        Relationships: []
+      }
       teams: {
         Row: {
           created_at: string
@@ -786,6 +1029,44 @@ export type Database = {
         }
         Relationships: []
       }
+      user_debts: {
+        Row: {
+          amount: number
+          booking_id: string | null
+          created_at: string
+          id: string
+          reason: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          booking_id?: string | null
+          created_at?: string
+          id?: string
+          reason?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          booking_id?: string | null
+          created_at?: string
+          id?: string
+          reason?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_debts_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -819,6 +1100,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_arena_admin: { Args: { _arena_id: string }; Returns: boolean }
       is_tournament_creator: {
         Args: { _tournament_id: string }
         Returns: boolean

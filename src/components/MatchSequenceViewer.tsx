@@ -32,6 +32,7 @@ interface Match {
   bracket_type?: string;
   bracket_half?: string | null;
   next_win_match_id?: string | null;
+  next_lose_match_id?: string | null;
   is_chapeu?: boolean | null;
   live_score?: any;
 }
@@ -427,18 +428,19 @@ const MatchCard = ({
       return { team1: null, team2: null };
     }
     
-    // Method 1: Find feeders via next_win_match_id
-    let feeders = allMatches.filter(m => m.next_win_match_id === match.id);
+    // Method 1: Find feeders via next_win_match_id and next_lose_match_id
+    let winFeeders = allMatches.filter(m => m.next_win_match_id === match.id);
+    let loseFeeders = allMatches.filter(m => m.next_lose_match_id === match.id);
     
-    // Method 2: Structural fallback — if no feeders found via next_win_match_id,
+    // Method 2: Structural fallback — if no feeders found via links,
     // use positional logic: round R, pos P ← round R-1, pos (2P-1) and (2P)
-    if (feeders.length === 0 && match.round > 0) {
+    if (winFeeders.length === 0 && loseFeeders.length === 0 && match.round > 0 && (match as any).bracket_type !== 'third_place') {
       const prevRound = match.round - 1;
       // Only use structural fallback if previous round is knockout (not groups)
       if (prevRound > 0) {
         const pos1 = match.position * 2 - 1;
         const pos2 = match.position * 2;
-        feeders = allMatches.filter(m => 
+        winFeeders = allMatches.filter(m => 
           m.round === prevRound && 
           (m.bracket_number || 1) === (match.bracket_number || 1) &&
           (m.position === pos1 || m.position === pos2)
@@ -448,7 +450,9 @@ const MatchCard = ({
     
     let team1Label: string | null = null;
     let team2Label: string | null = null;
-    for (const f of feeders) {
+
+    // Winner feeders
+    for (const f of winFeeders) {
       const fNum = matchNumberMap.get(f.id);
       if (!fNum) continue;
       if (f.position % 2 === 1) {
@@ -457,6 +461,20 @@ const MatchCard = ({
         team2Label = `Venc. Jogo ${fNum}`;
       }
     }
+
+    // Loser feeders (for 3rd place matches)
+    for (const f of loseFeeders) {
+      const fNum = matchNumberMap.get(f.id);
+      if (!fNum) continue;
+      if (f.position % 2 === 1) {
+        if (!team1Label) team1Label = `Perd. Jogo ${fNum}`;
+        else if (!team2Label) team2Label = `Perd. Jogo ${fNum}`;
+      } else {
+        if (!team2Label) team2Label = `Perd. Jogo ${fNum}`;
+        else if (!team1Label) team1Label = `Perd. Jogo ${fNum}`;
+      }
+    }
+
     return { team1: team1Label, team2: team2Label };
   }, [match.id, match.round, match.position, match.bracket_number, allMatches, matchNumberMap, tournamentFormat]);
 
@@ -805,6 +823,23 @@ const MatchSequenceViewer = ({
     if (tournamentFormat !== 'double_elimination') {
       // Chaveamento Normal: use the conflict-resolved displaySequence for numbering
       // This ensures no team plays back-to-back between group stage and knockout
+      // First: all non-third_place matches from displaySequence
+      for (const m of displaySequence) {
+        if (!map.has(m.id) && (m as any).bracket_type !== 'third_place') {
+          // Skip final matches for now — 3rd place comes before final
+          const isInFinalRound = displaySequence.filter(x => (x as any).bracket_type !== 'third_place' && x.round > 0);
+          const maxRound = isInFinalRound.length > 0 ? Math.max(...isInFinalRound.map(x => x.round)) : -1;
+          if (m.round === maxRound && m.round > 0) continue; // defer final
+          map.set(m.id, num++);
+        }
+      }
+      // Then: 3rd place matches
+      for (const m of matches) {
+        if (!map.has(m.id) && (m as any).bracket_type === 'third_place') {
+          map.set(m.id, num++);
+        }
+      }
+      // Then: final matches
       for (const m of displaySequence) {
         if (!map.has(m.id)) {
           map.set(m.id, num++);
@@ -1098,6 +1133,7 @@ const MatchSequenceViewer = ({
                   index={globalIndex}
                   getTeamName={getTeamName}
                   getRoundLabel={(r) => {
+                    if ((match as any).bracket_type === 'third_place') return '3º Lugar';
                     if (isDoubleElim) {
                       const m = match;
                       if (m.bracket_type === 'semi_final') return 'Semifinal';

@@ -114,7 +114,7 @@ const MatchCard = ({
         </span>
         <div className="flex items-center gap-1.5">
           {match.court_number != null && (
-            <span className="text-[9px] font-black text-white bg-blue-600 border border-blue-400 rounded px-1.5 py-0.5 shadow-[0_0_6px_hsl(217,91%,60%/0.5)]">
+            <span className="text-[9px] font-bold text-accent-foreground bg-accent/15 border border-accent/20 rounded px-1.5 py-0.5">
               Quadra {match.court_number}
             </span>
           )}

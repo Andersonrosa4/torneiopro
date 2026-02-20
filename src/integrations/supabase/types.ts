@@ -262,6 +262,111 @@ export type Database = {
           },
         ]
       }
+      court_bookings: {
+        Row: {
+          arena_id: string
+          court_id: string
+          created_at: string
+          customer_id: string
+          date: string
+          end_time: string
+          id: string
+          payment_status: string
+          penalty_value: number
+          price: number
+          start_time: string
+          status: string
+        }
+        Insert: {
+          arena_id: string
+          court_id: string
+          created_at?: string
+          customer_id: string
+          date: string
+          end_time: string
+          id?: string
+          payment_status?: string
+          penalty_value?: number
+          price?: number
+          start_time: string
+          status?: string
+        }
+        Update: {
+          arena_id?: string
+          court_id?: string
+          created_at?: string
+          customer_id?: string
+          date?: string
+          end_time?: string
+          id?: string
+          payment_status?: string
+          penalty_value?: number
+          price?: number
+          start_time?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "court_bookings_arena_id_fkey"
+            columns: ["arena_id"]
+            isOneToOne: false
+            referencedRelation: "arenas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "court_bookings_court_id_fkey"
+            columns: ["court_id"]
+            isOneToOne: false
+            referencedRelation: "courts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "court_bookings_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      court_time_slots: {
+        Row: {
+          court_id: string
+          created_at: string
+          date: string
+          end_time: string
+          id: string
+          start_time: string
+          status: string
+        }
+        Insert: {
+          court_id: string
+          created_at?: string
+          date: string
+          end_time: string
+          id?: string
+          start_time: string
+          status?: string
+        }
+        Update: {
+          court_id?: string
+          created_at?: string
+          date?: string
+          end_time?: string
+          id?: string
+          start_time?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "court_time_slots_court_id_fkey"
+            columns: ["court_id"]
+            isOneToOne: false
+            referencedRelation: "courts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       courts: {
         Row: {
           active: boolean
@@ -302,6 +407,77 @@ export type Database = {
             columns: ["arena_id"]
             isOneToOne: false
             referencedRelation: "arenas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_wallet: {
+        Row: {
+          balance: number
+          customer_id: string
+          updated_at: string
+        }
+        Insert: {
+          balance?: number
+          customer_id: string
+          updated_at?: string
+        }
+        Update: {
+          balance?: number
+          customer_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_wallet_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customers: {
+        Row: {
+          city_id: string | null
+          cpf: string
+          created_at: string
+          id: string
+          name: string
+          phone: string
+          state_id: string | null
+        }
+        Insert: {
+          city_id?: string | null
+          cpf: string
+          created_at?: string
+          id?: string
+          name: string
+          phone: string
+          state_id?: string | null
+        }
+        Update: {
+          city_id?: string | null
+          cpf?: string
+          created_at?: string
+          id?: string
+          name?: string
+          phone?: string
+          state_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_state_id_fkey"
+            columns: ["state_id"]
+            isOneToOne: false
+            referencedRelation: "states"
             referencedColumns: ["id"]
           },
         ]
@@ -586,6 +762,41 @@ export type Database = {
             columns: ["tournament_id"]
             isOneToOne: false
             referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          booking_id: string
+          created_at: string
+          id: string
+          method: string
+          status: string
+        }
+        Insert: {
+          amount?: number
+          booking_id: string
+          created_at?: string
+          id?: string
+          method?: string
+          status?: string
+        }
+        Update: {
+          amount?: number
+          booking_id?: string
+          created_at?: string
+          id?: string
+          method?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "court_bookings"
             referencedColumns: ["id"]
           },
         ]
@@ -1087,6 +1298,41 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      wallet_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          customer_id: string
+          description: string | null
+          id: string
+          type: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          customer_id: string
+          description?: string | null
+          id?: string
+          type: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          customer_id?: string
+          description?: string | null
+          id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wallet_transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

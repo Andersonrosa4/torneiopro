@@ -2,3 +2,6 @@ project_id = "yhfzxfsetiznvkwoiwkc"
 
 [functions.ai-chat]
 verify_jwt = false
+
+[functions.court-booking-api]
+verify_jwt = false

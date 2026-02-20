@@ -90,23 +90,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     loginInProgress.current = true;
     
     try {
-      await supabase.auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-      });
-      
       // Decode user id from access_token directly (no network call needed)
       const payload = JSON.parse(atob(session.access_token.split('.')[1]));
       const userId = payload.sub as string;
       
+      // Set state BEFORE setSession to avoid any race with onAuthStateChange
       setUser({ id: userId });
       setOrganizerId(newOrganizerId);
       setUserRole(role || null);
+      setLoading(false);
+
+      // setSession in background — onAuthStateChange will be blocked by loginInProgress flag
+      await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      });
     } catch (e) {
       console.error("Login error:", e);
-    } finally {
       setLoading(false);
-      loginInProgress.current = false;
+    } finally {
+      // Delay releasing the flag so onAuthStateChange events fired by setSession are ignored
+      setTimeout(() => {
+        loginInProgress.current = false;
+      }, 500);
     }
   }, []);
 

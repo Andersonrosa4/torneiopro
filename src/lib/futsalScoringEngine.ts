@@ -48,7 +48,46 @@ export interface FutsalLiveScore {
   history: FutsalHistoryEvent[];
 }
 
-export function createInitialFutsalScore(): FutsalLiveScore {
+const REQUIRED_FUTSAL_KEYS: (keyof FutsalRules)[] = [
+  "halves_count",
+  "half_duration_minutes",
+  "halftime_interval_minutes",
+  "allow_draw",
+  "use_extra_time",
+  "extra_time_halves",
+  "extra_time_minutes",
+  "use_penalties",
+  "penalties_kicks",
+  "golden_goal_extra_time",
+  "stop_clock_last_minutes",
+  "wo_enabled",
+];
+
+/**
+ * Validates that ALL required futsal rule fields are present and non-null.
+ * Throws if any field is missing — no internal defaults are ever used.
+ */
+export function validateFutsalRules(rules: unknown): asserts rules is FutsalRules {
+  if (!rules || typeof rules !== "object") {
+    throw new Error("FutsalRules inválidas: objeto de regras ausente ou nulo.");
+  }
+  const missing: string[] = [];
+  for (const key of REQUIRED_FUTSAL_KEYS) {
+    if ((rules as Record<string, unknown>)[key] === undefined || (rules as Record<string, unknown>)[key] === null) {
+      missing.push(key);
+    }
+  }
+  if (missing.length > 0) {
+    throw new Error(`FutsalRules inválidas: campos obrigatórios ausentes — ${missing.join(", ")}`);
+  }
+}
+
+/**
+ * Create initial score. Rules MUST be validated first — this function
+ * does NOT apply any defaults.
+ */
+export function createInitialFutsalScore(rules: FutsalRules): FutsalLiveScore {
+  validateFutsalRules(rules);
   return {
     period: "H1",
     clock_minutes: 0,
@@ -76,7 +115,7 @@ function clone(s: FutsalLiveScore): FutsalLiveScore {
  * This is the ONLY way to rebuild state — manual editing is forbidden.
  */
 export function replayHistory(history: FutsalHistoryEvent[], rules: FutsalRules): FutsalLiveScore {
-  let s = createInitialFutsalScore();
+  let s = createInitialFutsalScore(rules);
   for (const event of history) {
     switch (event.type) {
       case "GOAL":

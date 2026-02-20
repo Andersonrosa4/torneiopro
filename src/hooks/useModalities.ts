@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { organizerQuery } from "@/lib/organizerApi";
+import { organizerQuery, publicQuery } from "@/lib/organizerApi";
 
 export interface Modality {
   id: string;
@@ -21,17 +21,16 @@ export function useModalities(tournamentId: string | undefined) {
       setLoading(false);
       return;
     }
-    const { data, error } = await supabase
-      .from("modalities")
-      .select("*")
-      .eq("tournament_id", tournamentId)
-      .order("created_at");
+    const { data, error } = await publicQuery<Modality[]>({
+      table: "modalities",
+      filters: { tournament_id: tournamentId },
+      order: { column: "created_at", ascending: true },
+    });
 
     if (!error && data && data.length > 0) {
-      const mods = data as unknown as Modality[];
-      setModalities(mods);
-      if (!selectedModality || !mods.find(m => m.id === selectedModality.id)) {
-        setSelectedModality(mods[0]);
+      setModalities(data);
+      if (!selectedModality || !data.find(m => m.id === selectedModality.id)) {
+        setSelectedModality(data[0]);
       }
     }
     setLoading(false);

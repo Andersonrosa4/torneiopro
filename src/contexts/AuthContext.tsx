@@ -89,21 +89,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Prevent onAuthStateChange from running duplicate queries
     loginInProgress.current = true;
     
-    await supabase.auth.setSession({
-      access_token: session.access_token,
-      refresh_token: session.refresh_token,
-    });
-    
-    // Set organizer data directly (we already have it from the login response)
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    if (authUser) {
-      setUser({ id: authUser.id });
+    try {
+      await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      });
+      
+      // Decode user id from access_token directly (no network call needed)
+      const payload = JSON.parse(atob(session.access_token.split('.')[1]));
+      const userId = payload.sub as string;
+      
+      setUser({ id: userId });
+      setOrganizerId(newOrganizerId);
+      setUserRole(role || null);
+    } catch (e) {
+      console.error("Login error:", e);
+    } finally {
+      setLoading(false);
+      loginInProgress.current = false;
     }
-    setOrganizerId(newOrganizerId);
-    setUserRole(role || null);
-    setLoading(false);
-    
-    loginInProgress.current = false;
   }, []);
 
   const logout = useCallback(() => {

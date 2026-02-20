@@ -22,10 +22,21 @@ export interface FutsalRules {
 
 export type FutsalPeriod = "H1" | "H2" | "ET1" | "ET2" | "PENALTIES" | "COMPLETED";
 
+export interface FutsalCardDetail {
+  jerseyNumber: number;
+  cardType: "yellow" | "red";
+  /** true when this red was auto-generated from a 2nd yellow */
+  autoRed?: boolean;
+}
+
 export interface FutsalHistoryEvent {
   type: "GOAL" | "FOUL" | "PERIOD_START" | "PERIOD_END" | "PENALTY_SCORED" | "PENALTY_MISSED" | "YELLOW_CARD" | "RED_CARD";
   team: "A" | "B";
   period: FutsalPeriod;
+  /** Present only for YELLOW_CARD / RED_CARD events */
+  jerseyNumber?: number;
+  /** true when this RED_CARD was auto-generated from 2nd yellow */
+  autoRed?: boolean;
 }
 
 export interface FutsalLiveScore {
@@ -44,6 +55,8 @@ export interface FutsalLiveScore {
     teamB_yellow: number;
     teamB_red: number;
   };
+  /** Per-player card log: jerseyNumber → list of cards received */
+  playerCards: FutsalCardDetail[];
   penalties: {
     active: boolean;
     teamA_goals: number;
@@ -102,6 +115,7 @@ export function createInitialFutsalScore(rules: FutsalRules): FutsalLiveScore {
     teamB_goals: 0,
     fouls: { teamA: 0, teamB: 0 },
     cards: { teamA_yellow: 0, teamA_red: 0, teamB_yellow: 0, teamB_red: 0 },
+    playerCards: [],
     penalties: {
       active: false,
       teamA_goals: 0,
@@ -124,6 +138,7 @@ function clone(s: FutsalLiveScore): FutsalLiveScore {
 export function replayHistory(history: FutsalHistoryEvent[], rules: FutsalRules): FutsalLiveScore {
   let s = createInitialFutsalScore(rules);
   for (const event of history) {
+    s.history.push(event);
     switch (event.type) {
       case "GOAL":
         s = applyGoalInternal(s, event.team, event.period, rules);
@@ -141,10 +156,10 @@ export function replayHistory(history: FutsalHistoryEvent[], rules: FutsalRules)
         s = applyPenaltyInternal(s, event.team, false, rules);
         break;
       case "YELLOW_CARD":
-        s = applyCardInternal(s, event.team, "yellow");
+        s = applyCardInternal(s, event.team, "yellow", event.jerseyNumber);
         break;
       case "RED_CARD":
-        s = applyCardInternal(s, event.team, "red");
+        s = applyCardInternal(s, event.team, "red", event.jerseyNumber);
         break;
       case "PERIOD_START":
         break;
@@ -173,13 +188,16 @@ function applyFoulInternal(s: FutsalLiveScore, team: "A" | "B", _period: FutsalP
   return s;
 }
 
-function applyCardInternal(s: FutsalLiveScore, team: "A" | "B", cardType: "yellow" | "red"): FutsalLiveScore {
+function applyCardInternal(s: FutsalLiveScore, team: "A" | "B", cardType: "yellow" | "red", jerseyNumber?: number): FutsalLiveScore {
   if (team === "A") {
     if (cardType === "yellow") s.cards.teamA_yellow++;
     else s.cards.teamA_red++;
   } else {
     if (cardType === "yellow") s.cards.teamB_yellow++;
     else s.cards.teamB_red++;
+  }
+  if (jerseyNumber !== undefined) {
+    s.playerCards.push({ jerseyNumber, cardType, autoRed: false });
   }
   return s;
 }
@@ -283,14 +301,29 @@ export function addFoul(score: FutsalLiveScore, team: "A" | "B"): FutsalLiveScor
 }
 
 /**
- * Register a card (yellow or red). Returns a NEW FutsalLiveScore.
+ * Register a card (yellow or red) for a player by jersey number.
+ * If a player receives a 2nd yellow, it automatically generates a red card.
+ * Returns a NEW FutsalLiveScore.
  */
-export function addCard(score: FutsalLiveScore, team: "A" | "B", cardType: "yellow" | "red"): FutsalLiveScore {
+export function addCard(score: FutsalLiveScore, team: "A" | "B", cardType: "yellow" | "red", jerseyNumber: number): FutsalLiveScore {
   if (score.period === "COMPLETED") return score;
 
   const s = clone(score);
-  s.history.push({ type: cardType === "yellow" ? "YELLOW_CARD" : "RED_CARD", team, period: s.period });
-  return applyCardInternal(s, team, cardType);
+  s.history.push({ type: cardType === "yellow" ? "YELLOW_CARD" : "RED_CARD", team, period: s.period, jerseyNumber });
+  applyCardInternal(s, team, cardType, jerseyNumber);
+
+  // Auto 2nd yellow → red
+  if (cardType === "yellow") {
+    const yellowCount = s.history.filter(
+      (e) => e.type === "YELLOW_CARD" && e.team === team && e.jerseyNumber === jerseyNumber
+    ).length;
+    if (yellowCount >= 2) {
+      s.history.push({ type: "RED_CARD", team, period: s.period, jerseyNumber, autoRed: true });
+      applyCardInternal(s, team, "red", jerseyNumber);
+    }
+  }
+
+  return s;
 }
 
 /**

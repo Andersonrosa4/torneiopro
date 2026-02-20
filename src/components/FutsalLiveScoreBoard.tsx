@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Trophy, Undo2, RotateCcw, Goal, AlertTriangle, ChevronRight, CircleDot, X as XIcon, Square } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -87,10 +88,20 @@ const FutsalLiveScoreBoard = ({
     await persistScore(newScore);
   }, [score, persistScore]);
 
-  const handleCard = useCallback(async (team: "A" | "B", cardType: "yellow" | "red") => {
-    const newScore = addCard(score, team, cardType);
+  const [cardPrompt, setCardPrompt] = useState<{ team: "A" | "B"; cardType: "yellow" | "red" } | null>(null);
+  const [jerseyInput, setJerseyInput] = useState("");
+
+  const handleCard = useCallback(async (team: "A" | "B", cardType: "yellow" | "red", jerseyNumber: number) => {
+    const newScore = addCard(score, team, cardType, jerseyNumber);
     setScore(newScore);
     await persistScore(newScore);
+    // Check if auto-red was triggered (2nd yellow)
+    const autoRedEvent = newScore.history.find(
+      (e) => e.autoRed && e.jerseyNumber === jerseyNumber && e.team === team
+    );
+    if (autoRedEvent) {
+      toast.warning(`🟥 Jogador #${jerseyNumber} expulso! (2º amarelo)`);
+    }
   }, [score, persistScore]);
 
   const handleEndPeriod = useCallback(async () => {
@@ -282,13 +293,13 @@ const FutsalLiveScoreBoard = ({
                 </Button>
               </div>
 
-              {/* Card buttons */}
+              {/* Card buttons — prompt for jersey number */}
               <div className="grid grid-cols-4 gap-1.5">
                 <Button
                   variant="outline"
                   size="sm"
                   className="gap-1 text-[10px] h-8 border-yellow-400/40 text-yellow-600 hover:bg-yellow-400/10"
-                  onClick={() => handleCard("A", "yellow")}
+                  onClick={() => { setCardPrompt({ team: "A", cardType: "yellow" }); setJerseyInput(""); }}
                 >
                   <Square className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" /> {t1Short}
                 </Button>
@@ -296,7 +307,7 @@ const FutsalLiveScoreBoard = ({
                   variant="outline"
                   size="sm"
                   className="gap-1 text-[10px] h-8 border-red-500/40 text-red-500 hover:bg-red-500/10"
-                  onClick={() => handleCard("A", "red")}
+                  onClick={() => { setCardPrompt({ team: "A", cardType: "red" }); setJerseyInput(""); }}
                 >
                   <Square className="h-2.5 w-2.5 fill-red-500 text-red-500" /> {t1Short}
                 </Button>
@@ -304,7 +315,7 @@ const FutsalLiveScoreBoard = ({
                   variant="outline"
                   size="sm"
                   className="gap-1 text-[10px] h-8 border-yellow-400/40 text-yellow-600 hover:bg-yellow-400/10"
-                  onClick={() => handleCard("B", "yellow")}
+                  onClick={() => { setCardPrompt({ team: "B", cardType: "yellow" }); setJerseyInput(""); }}
                 >
                   <Square className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" /> {t2Short}
                 </Button>
@@ -312,11 +323,57 @@ const FutsalLiveScoreBoard = ({
                   variant="outline"
                   size="sm"
                   className="gap-1 text-[10px] h-8 border-red-500/40 text-red-500 hover:bg-red-500/10"
-                  onClick={() => handleCard("B", "red")}
+                  onClick={() => { setCardPrompt({ team: "B", cardType: "red" }); setJerseyInput(""); }}
                 >
                   <Square className="h-2.5 w-2.5 fill-red-500 text-red-500" /> {t2Short}
                 </Button>
               </div>
+
+              {/* Jersey number prompt */}
+              {cardPrompt && (
+                <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 p-2">
+                  <span className="text-xs font-bold whitespace-nowrap">
+                    {cardPrompt.cardType === "yellow" ? "🟨" : "🟥"} Nº camisa ({cardPrompt.team === "A" ? t1Short : t2Short}):
+                  </span>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={99}
+                    className="h-8 w-20 text-center text-sm font-bold"
+                    placeholder="Nº"
+                    value={jerseyInput}
+                    onChange={(e) => setJerseyInput(e.target.value)}
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && jerseyInput) {
+                        handleCard(cardPrompt.team, cardPrompt.cardType, Number(jerseyInput));
+                        setCardPrompt(null);
+                      } else if (e.key === "Escape") {
+                        setCardPrompt(null);
+                      }
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    className="h-8 text-xs"
+                    disabled={!jerseyInput}
+                    onClick={() => {
+                      handleCard(cardPrompt.team, cardPrompt.cardType, Number(jerseyInput));
+                      setCardPrompt(null);
+                    }}
+                  >
+                    OK
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => setCardPrompt(null)}
+                  >
+                    <XIcon className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
 
               {/* Period & control buttons */}
               <div className="flex gap-2">

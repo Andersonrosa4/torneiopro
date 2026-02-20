@@ -587,6 +587,11 @@ const MatchCard = ({
           <span className={`text-xs truncate font-bold leading-tight ${t1Win ? "text-success" : !match.team1_id ? "text-muted-foreground/50 italic font-normal" : "text-foreground"}`}>
             {team1Name}
           </span>
+          {match.team1_id && match.bracket_number && (
+            <span className="text-[8px] font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 rounded px-1 py-0 leading-tight shrink-0 ml-1">
+              {match.round === 0 ? `Grp ${String.fromCharCode(64 + (match.bracket_number || 1))}` : `Chave ${String.fromCharCode(64 + (match.bracket_number || 1))}`}
+            </span>
+          )}
           {isOwner && hasTeams && !isCompleted && !isEditing && match.team1_id && (
             <Button size="sm" variant="ghost" className="h-5 w-5 p-0 ml-auto shrink-0 text-primary/60 hover:text-primary hover:bg-primary/10"
               onClick={() => handleDeclareTeamWinner(match.team1_id!)}>
@@ -601,6 +606,11 @@ const MatchCard = ({
           <span className={`text-xs truncate font-bold leading-tight ${t2Win ? "text-success" : !match.team2_id ? "text-muted-foreground/50 italic font-normal" : "text-foreground"}`}>
             {team2Name}
           </span>
+          {match.team2_id && match.bracket_number && (
+            <span className="text-[8px] font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 rounded px-1 py-0 leading-tight shrink-0 ml-1">
+              {match.round === 0 ? `Grp ${String.fromCharCode(64 + (match.bracket_number || 1))}` : `Chave ${String.fromCharCode(64 + (match.bracket_number || 1))}`}
+            </span>
+          )}
           {isOwner && hasTeams && !isCompleted && !isEditing && match.team2_id && (
             <Button size="sm" variant="ghost" className="h-5 w-5 p-0 ml-auto shrink-0 text-primary/60 hover:text-primary hover:bg-primary/10"
               onClick={() => handleDeclareTeamWinner(match.team2_id!)}>

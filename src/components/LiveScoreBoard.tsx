@@ -100,7 +100,8 @@ const LiveScoreBoard = ({
   const [setsWon1, setsWon2] = getSetsWon(score);
   const isDeuce = !score.isTiebreak && !score.isSuperTiebreak &&
     score.currentPoints[0] >= 3 && score.currentPoints[1] >= 3 &&
-    score.currentPoints[0] === score.currentPoints[1];
+    score.currentPoints[0] === score.currentPoints[1] &&
+    !rules.no_ad && !rules.golden_point;
 
   const currentMode = score.isSuperTiebreak
     ? "Super Tiebreak"

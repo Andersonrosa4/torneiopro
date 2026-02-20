@@ -345,37 +345,50 @@ describe("Futsal Engine — No goals allowed after completion", () => {
   });
 });
 
-describe("Futsal Engine — Cards", () => {
+describe("Futsal Engine — Cards with jersey number", () => {
   const rules = defaultRules();
 
-  it("should track yellow cards per team", () => {
+  it("should track yellow cards per team with jersey number", () => {
     let s = createInitialFutsalScore(rules);
-    s = addCard(s, "A", "yellow");
-    s = addCard(s, "A", "yellow");
-    s = addCard(s, "B", "yellow");
+    s = addCard(s, "A", "yellow", 10);
+    s = addCard(s, "A", "yellow", 7);
+    s = addCard(s, "B", "yellow", 5);
     expect(s.cards.teamA_yellow).toBe(2);
     expect(s.cards.teamB_yellow).toBe(1);
     expect(s.cards.teamA_red).toBe(0);
+    expect(s.playerCards).toHaveLength(3); // all 3 cards tracked with jersey
   });
 
-  it("should track red cards per team", () => {
+  it("should track red cards per team with jersey number", () => {
     let s = createInitialFutsalScore(rules);
-    s = addCard(s, "B", "red");
+    s = addCard(s, "B", "red", 9);
     expect(s.cards.teamB_red).toBe(1);
     expect(s.cards.teamB_yellow).toBe(0);
+    expect(s.playerCards).toHaveLength(1);
+    expect(s.playerCards[0].jerseyNumber).toBe(9);
   });
 
-  it("should track mixed cards", () => {
+  it("should auto-generate red on 2nd yellow for same player", () => {
     let s = createInitialFutsalScore(rules);
-    s = addCard(s, "A", "yellow");
-    s = addCard(s, "A", "red");
-    s = addCard(s, "B", "yellow");
-    s = addCard(s, "B", "yellow");
-    s = addCard(s, "B", "red");
+    s = addCard(s, "A", "yellow", 10); // 1st yellow
     expect(s.cards.teamA_yellow).toBe(1);
+    expect(s.cards.teamA_red).toBe(0);
+
+    s = addCard(s, "A", "yellow", 10); // 2nd yellow → auto red
+    expect(s.cards.teamA_yellow).toBe(2);
     expect(s.cards.teamA_red).toBe(1);
-    expect(s.cards.teamB_yellow).toBe(2);
-    expect(s.cards.teamB_red).toBe(1);
+    // History should have: YELLOW, YELLOW, RED(auto)
+    const redEvents = s.history.filter((e) => e.type === "RED_CARD" && e.autoRed);
+    expect(redEvents).toHaveLength(1);
+    expect(redEvents[0].jerseyNumber).toBe(10);
+  });
+
+  it("should NOT auto-red when 2 yellows are for different players", () => {
+    let s = createInitialFutsalScore(rules);
+    s = addCard(s, "A", "yellow", 10);
+    s = addCard(s, "A", "yellow", 7);
+    expect(s.cards.teamA_yellow).toBe(2);
+    expect(s.cards.teamA_red).toBe(0);
   });
 
   it("should not add cards after match completed", () => {
@@ -384,32 +397,39 @@ describe("Futsal Engine — Cards", () => {
     s = endPeriod(s, rules);
     s = endPeriod(s, rules);
     expect(s.period).toBe("COMPLETED");
-    s = addCard(s, "A", "yellow");
+    s = addCard(s, "A", "yellow", 10);
     expect(s.cards.teamA_yellow).toBe(0);
   });
 
-  it("should record cards in history", () => {
+  it("should record cards with jersey in history", () => {
     let s = createInitialFutsalScore(rules);
-    s = addCard(s, "A", "yellow");
-    s = addCard(s, "B", "red");
-    expect(s.history).toHaveLength(2);
+    s = addCard(s, "A", "yellow", 10);
+    s = addCard(s, "B", "red", 3);
     expect(s.history[0].type).toBe("YELLOW_CARD");
+    expect(s.history[0].jerseyNumber).toBe(10);
     expect(s.history[1].type).toBe("RED_CARD");
+    expect(s.history[1].jerseyNumber).toBe(3);
   });
 
-  it("should undo yellow card", () => {
+  it("should undo yellow card with jersey", () => {
     let s = createInitialFutsalScore(rules);
-    s = addCard(s, "A", "yellow");
+    s = addCard(s, "A", "yellow", 10);
     expect(s.cards.teamA_yellow).toBe(1);
     s = undoLastEvent(s, rules);
     expect(s.cards.teamA_yellow).toBe(0);
+    expect(s.playerCards).toHaveLength(0);
   });
 
-  it("should undo red card", () => {
+  it("should undo auto-red from 2nd yellow correctly", () => {
     let s = createInitialFutsalScore(rules);
-    s = addCard(s, "B", "red");
-    expect(s.cards.teamB_red).toBe(1);
-    s = undoLastEvent(s, rules);
-    expect(s.cards.teamB_red).toBe(0);
+    s = addCard(s, "A", "yellow", 10);
+    s = addCard(s, "A", "yellow", 10); // triggers auto red
+    expect(s.cards.teamA_red).toBe(1);
+    // History: YELLOW(10), YELLOW(10), RED(10,auto)
+    // 3 undos to get back to just the 1st yellow
+    s = undoLastEvent(s, rules); // removes auto RED
+    s = undoLastEvent(s, rules); // removes 2nd YELLOW
+    expect(s.cards.teamA_yellow).toBe(1);
+    expect(s.cards.teamA_red).toBe(0);
   });
 });

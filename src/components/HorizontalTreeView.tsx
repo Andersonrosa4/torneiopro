@@ -102,7 +102,7 @@ const HTreeMatchCard = ({
           </span>
           <div className="flex items-center gap-1">
             {match.court_number != null && (
-              <span className="inline-flex items-center rounded-sm bg-accent/15 border border-accent/20 px-1.5 py-0.5 text-[8px] font-bold text-accent-foreground leading-none">
+              <span className="inline-flex items-center rounded-sm bg-cyan-500/20 border border-cyan-400/40 px-1.5 py-0.5 text-[8px] font-bold text-cyan-300 leading-none">
                 Q{match.court_number}
               </span>
             )}

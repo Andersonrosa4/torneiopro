@@ -559,7 +559,7 @@ const MatchCard = ({
             Jogo {index}
           </span>
           {match.court_number != null && (
-            <Badge className="bg-accent/20 text-accent-foreground border-accent/30 text-[8px] px-1 py-0 leading-tight font-semibold">
+             <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-400/40 text-[8px] px-1 py-0 leading-tight font-semibold">
               Quadra {match.court_number}
             </Badge>
           )}

@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -68,8 +69,23 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify password (direct comparison)
-    const passwordMatch = password === organizer.password_hash;
+    // Verify password using bcrypt
+    let passwordMatch = false;
+    try {
+      // Check if hash looks like bcrypt (starts with $2)
+      if (organizer.password_hash.startsWith("$2")) {
+        passwordMatch = await bcrypt.compare(password, organizer.password_hash);
+      } else {
+        // Legacy plain text comparison — migrate to bcrypt on successful match
+        passwordMatch = password === organizer.password_hash;
+        if (passwordMatch) {
+          const hashed = await bcrypt.hash(password);
+          await supabase.from("organizers").update({ password_hash: hashed }).eq("id", organizer.id);
+        }
+      }
+    } catch {
+      passwordMatch = false;
+    }
 
     if (!passwordMatch) {
       return new Response(

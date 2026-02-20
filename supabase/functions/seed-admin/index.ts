@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -109,9 +110,10 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!existingOrganizer) {
+      const hashedPassword = await bcrypt.hash(adminPassword);
       await supabase.from("organizers").insert({
         username: "admin",
-        password_hash: adminPassword,
+        password_hash: hashedPassword,
         display_name: "Admin",
         created_by: userId,
       });

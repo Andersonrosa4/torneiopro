@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -404,12 +405,20 @@ Deno.serve(async (req) => {
         break;
       }
       case "insert": {
+        // Hash password if inserting into organizers table
+        if (table === "organizers" && data?.password_hash) {
+          data.password_hash = await bcrypt.hash(data.password_hash);
+        }
         query = supabase.from(table).insert(data);
         if (select) query = query.select(select);
         if (single) query = query.single();
         break;
       }
       case "update": {
+        // Hash password if updating organizers table
+        if (table === "organizers" && data?.password_hash) {
+          data.password_hash = await bcrypt.hash(data.password_hash);
+        }
         query = supabase.from(table).update(data);
         if (filters) {
           for (const [key, value] of Object.entries(filters)) {

@@ -54,7 +54,8 @@ const Auth = () => {
         throw new Error(data?.error || "Falha na autenticação");
       }
 
-      login(data.token, data.organizerId, data.role);
+      // Set Supabase Auth session and organizer context
+      await login(data.session, data.organizerId, data.role);
       setRedirecting(true);
       toast.success("Bem-vindo!");
       navigate("/dashboard", { replace: true });

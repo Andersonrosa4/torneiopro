@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, ReactNode, useMemo, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface User {
   id: string;
@@ -11,7 +12,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   loading: boolean;
-  login: (token: string, organizerId: string, role?: string) => void;
+  login: (session: { access_token: string; refresh_token: string }, organizerId: string, role?: string) => Promise<void>;
   logout: () => void;
   signOut: () => Promise<void>;
 }
@@ -22,8 +23,8 @@ const AuthContext = createContext<AuthContextType>({
   userRole: null,
   isAuthenticated: false,
   isAdmin: false,
-  loading: false,
-  login: () => {},
+  loading: true,
+  login: async () => {},
   logout: () => {},
   signOut: async () => {},
 });
@@ -31,50 +32,88 @@ const AuthContext = createContext<AuthContextType>({
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const storedOrganizerId = sessionStorage.getItem("organizer_id");
-  const storedToken = sessionStorage.getItem("organizer_token");
-  const storedRole = sessionStorage.getItem("organizer_role");
+  const [user, setUser] = useState<User | null>(null);
+  const [organizerId, setOrganizerId] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const [organizerId, setOrganizerId] = useState<string | null>(storedOrganizerId);
-  const [userRole, setUserRole] = useState<string | null>(storedRole);
-  const [user, setUser] = useState<User | null>(
-    storedOrganizerId ? { id: storedOrganizerId } : null
-  );
-  const [loading] = useState(false);
+  useEffect(() => {
+    // Listen to auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        setUser({ id: session.user.id });
+        // Fetch organizer details from DB
+        const { data: org } = await supabase
+          .from("organizers")
+          .select("id, role")
+          .eq("user_id", session.user.id)
+          .maybeSingle();
+        if (org) {
+          setOrganizerId(org.id);
+          setUserRole(org.role);
+        }
+      } else {
+        setUser(null);
+        setOrganizerId(null);
+        setUserRole(null);
+      }
+      setLoading(false);
+    });
 
-  const login = useCallback((newToken: string, newOrganizerId: string, role?: string) => {
-    sessionStorage.setItem("organizer_token", newToken);
-    sessionStorage.setItem("organizer_id", newOrganizerId);
-    if (role) sessionStorage.setItem("organizer_role", role);
+    // Check existing session
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        setUser({ id: session.user.id });
+        const { data: org } = await supabase
+          .from("organizers")
+          .select("id, role")
+          .eq("user_id", session.user.id)
+          .maybeSingle();
+        if (org) {
+          setOrganizerId(org.id);
+          setUserRole(org.role);
+        }
+      }
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const login = useCallback(async (session: { access_token: string; refresh_token: string }, newOrganizerId: string, role?: string) => {
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
     setOrganizerId(newOrganizerId);
     setUserRole(role || null);
-    setUser({ id: newOrganizerId });
   }, []);
 
   const logout = useCallback(() => {
-    sessionStorage.removeItem("organizer_token");
-    sessionStorage.removeItem("organizer_id");
-    sessionStorage.removeItem("organizer_role");
+    supabase.auth.signOut();
     setOrganizerId(null);
     setUserRole(null);
     setUser(null);
   }, []);
 
   const signOut = useCallback(async () => {
-    logout();
-  }, [logout]);
+    await supabase.auth.signOut();
+    setOrganizerId(null);
+    setUserRole(null);
+    setUser(null);
+  }, []);
 
   const value = useMemo(() => ({
     user,
     organizerId,
     userRole,
-    isAuthenticated: !!storedToken && !!organizerId,
+    isAuthenticated: !!user && !!organizerId,
     isAdmin: userRole === "admin",
     loading,
     login,
     logout,
     signOut,
-  }), [user, organizerId, userRole, storedToken, loading, login, logout, signOut]);
+  }), [user, organizerId, userRole, loading, login, logout, signOut]);
 
   return (
     <AuthContext.Provider value={value}>

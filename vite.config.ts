@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
-// https://vitejs.dev/config/
+// Cache-bust: v2 — force Vite to rebuild all dep chunks
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => ({
       "react/jsx-runtime": path.resolve(__dirname, "node_modules/react/jsx-runtime"),
       "react/jsx-dev-runtime": path.resolve(__dirname, "node_modules/react/jsx-dev-runtime"),
     },
-    dedupe: ["react", "react-dom", "@radix-ui/react-tooltip"],
+    dedupe: ["react", "react-dom"],
   },
   optimizeDeps: {
     force: true,
@@ -30,7 +30,6 @@ export default defineConfig(({ mode }) => ({
       "react-dom",
       "react/jsx-runtime",
       "react/jsx-dev-runtime",
-      "@radix-ui/react-tooltip",
     ],
     esbuildOptions: {
       resolveExtensions: [".mjs", ".js", ".mts", ".ts", ".jsx", ".tsx", ".json"],

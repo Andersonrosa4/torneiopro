@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { QrCode, Smartphone, Download } from "lucide-react";
+import { QrCode, Smartphone, Download, Menu, CalendarDays, LogIn, X } from "lucide-react";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
 import LogoImage from "@/components/LogoImage";
 import qrCodeImg from "@/assets/qrcode-torneiopro.png";
@@ -112,8 +113,59 @@ const SportCard = ({ sport, i, navigate }: { sport: typeof sports[number]; i: nu
 const Index = () => {
   const navigate = useNavigate();
   const { canInstall, promptInstall } = useInstallPrompt();
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <div className="relative flex min-h-screen flex-col items-center overflow-hidden px-4 py-10">
+      {/* ── Hamburger menu button ── */}
+      <button
+        onClick={() => setMenuOpen(true)}
+        className="fixed top-4 left-4 z-50 flex h-10 w-10 items-center justify-center rounded-xl border border-[hsl(0_0%_100%/0.15)] bg-[hsl(220_15%_10%/0.8)] backdrop-blur-md text-foreground hover:bg-[hsl(220_15%_15%/0.9)] transition-colors"
+        aria-label="Menu"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
+
+      {/* ── Slide-out menu overlay ── */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-[100]">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMenuOpen(false)} />
+          <motion.div
+            initial={{ x: "-100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "-100%" }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="absolute left-0 top-0 bottom-0 w-72 border-r border-[hsl(0_0%_100%/0.1)] bg-[hsl(220_20%_8%)] p-6 flex flex-col"
+          >
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-2">
+                <LogoImage className="h-8 w-8" />
+                <span className="font-display font-bold text-foreground">Torneio Pro</span>
+              </div>
+              <button onClick={() => setMenuOpen(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <nav className="flex flex-col gap-2">
+              <button
+                onClick={() => { setMenuOpen(false); navigate("/agendamentos"); }}
+                className="flex items-center gap-3 rounded-xl px-4 py-3 text-left font-medium text-foreground hover:bg-[hsl(0_0%_100%/0.08)] transition-colors"
+              >
+                <CalendarDays className="h-5 w-5 text-primary" />
+                Agendamento de Quadras
+              </button>
+              <button
+                onClick={() => { setMenuOpen(false); navigate("/arena-login"); }}
+                className="flex items-center gap-3 rounded-xl px-4 py-3 text-left font-medium text-foreground hover:bg-[hsl(0_0%_100%/0.08)] transition-colors"
+              >
+                <LogIn className="h-5 w-5 text-muted-foreground" />
+                Painel da Arena
+              </button>
+            </nav>
+          </motion.div>
+        </div>
+      )}
       {/* ── Deep space background ── */}
       <div className="absolute inset-0 bg-gradient-to-b from-[hsl(220_25%_4%)] via-[hsl(15_15%_7%)] to-[hsl(20_20%_6%)]" />
 

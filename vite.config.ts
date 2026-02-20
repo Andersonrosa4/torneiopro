@@ -3,7 +3,6 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
-// https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
@@ -21,10 +20,21 @@ export default defineConfig(({ mode }) => ({
       "react/jsx-runtime": path.resolve(__dirname, "node_modules/react/jsx-runtime"),
       "react/jsx-dev-runtime": path.resolve(__dirname, "node_modules/react/jsx-dev-runtime"),
     },
-    dedupe: ["react", "react-dom", "@radix-ui/react-tooltip", "@radix-ui/react-primitive"],
+    dedupe: [
+      "react",
+      "react-dom",
+      "react/jsx-runtime",
+      "react/jsx-dev-runtime",
+      "@radix-ui/react-tooltip",
+      "@radix-ui/react-primitive",
+      "@radix-ui/react-context",
+      "@radix-ui/react-dismissable-layer",
+      "@radix-ui/react-popper",
+      "@radix-ui/react-portal",
+      "@radix-ui/react-presence",
+    ],
   },
   optimizeDeps: {
-    force: true,
     include: [
       "react",
       "react-dom",
@@ -32,5 +42,6 @@ export default defineConfig(({ mode }) => ({
       "react/jsx-dev-runtime",
       "@radix-ui/react-tooltip",
     ],
+    force: true,
   },
 }));

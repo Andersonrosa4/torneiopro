@@ -2,7 +2,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { user, loading } = useAuth();
 
   if (loading) {
     return (
@@ -12,7 +12,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  if (!isAuthenticated) return <Navigate to="/auth" replace />;
+  // Only require user (not organizerId) to avoid redirect loop while organizer loads
+  if (!user) return <Navigate to="/auth" replace />;
   return <>{children}</>;
 };
 

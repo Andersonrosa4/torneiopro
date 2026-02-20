@@ -92,6 +92,7 @@ interface Match {
   next_lose_match_id: string | null;
   is_chapeu?: boolean | null;
   live_score?: any;
+  court_number?: number | null;
 }
 
 const TournamentDetail = () => {

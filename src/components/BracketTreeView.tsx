@@ -30,6 +30,7 @@ interface Match {
   modality_id?: string;
   next_win_match_id?: string | null;
   next_lose_match_id?: string | null;
+  court_number?: number | null;
 }
 
 interface BracketTreeViewProps {
@@ -242,10 +243,15 @@ const MatchCard = ({
       className={`rounded-lg border bg-card/90 backdrop-blur-sm shrink-0 transition-all ${sizeClasses[scale]} ${borderClasses}`}
     >
       {matchNumber != null && (
-        <div className="px-2 pt-2 pb-0.5 flex items-center justify-between">
+        <div className="px-2 pt-2 pb-0.5 flex items-center justify-between gap-1">
           <span className="inline-flex items-center rounded-sm bg-primary/15 border border-primary/20 px-1.5 py-0.5 text-[10px] font-black text-primary uppercase tracking-tighter leading-none shadow-sm">
             JOGO {matchNumber}
           </span>
+          {match.court_number != null && (
+            <span className="inline-flex items-center rounded-sm bg-accent/15 border border-accent/20 px-1.5 py-0.5 text-[8px] font-bold text-accent-foreground leading-none">
+              Q{match.court_number}
+            </span>
+          )}
         </div>
       )}
       {scale === "final" && (

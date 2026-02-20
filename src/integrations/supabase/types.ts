@@ -603,20 +603,29 @@ export type Database = {
       }
       tournament_rules: {
         Row: {
+          allow_draw: boolean
           created_at: string
+          extra_time_halves: number
+          extra_time_minutes: number
           final_set_tiebreak_mode: string
           first_server: string
           games_to_win_set: number
+          golden_goal_extra_time: boolean
           golden_point: boolean
+          half_duration_minutes: number
+          halftime_interval_minutes: number
+          halves_count: number
           id: string
           min_difference: number
           mode: string
           no_ad: boolean
+          penalties_kicks: number
           points_sequence: string
           ranking_criteria_order: string
           retirement_keep_score: boolean
           server_rotation: string
           sets_format: string
+          stop_clock_last_minutes: number
           super_tiebreak_enabled: boolean
           super_tiebreak_points: number
           super_tiebreak_replaces_third_set: boolean
@@ -625,23 +634,35 @@ export type Database = {
           tiebreak_points: number
           tournament_id: string
           updated_at: string
+          use_extra_time: boolean
+          use_penalties: boolean
           walkover_enabled: boolean
+          wo_enabled: boolean
         }
         Insert: {
+          allow_draw?: boolean
           created_at?: string
+          extra_time_halves?: number
+          extra_time_minutes?: number
           final_set_tiebreak_mode?: string
           first_server?: string
           games_to_win_set?: number
+          golden_goal_extra_time?: boolean
           golden_point?: boolean
+          half_duration_minutes?: number
+          halftime_interval_minutes?: number
+          halves_count?: number
           id?: string
           min_difference?: number
           mode?: string
           no_ad?: boolean
+          penalties_kicks?: number
           points_sequence?: string
           ranking_criteria_order?: string
           retirement_keep_score?: boolean
           server_rotation?: string
           sets_format?: string
+          stop_clock_last_minutes?: number
           super_tiebreak_enabled?: boolean
           super_tiebreak_points?: number
           super_tiebreak_replaces_third_set?: boolean
@@ -650,23 +671,35 @@ export type Database = {
           tiebreak_points?: number
           tournament_id: string
           updated_at?: string
+          use_extra_time?: boolean
+          use_penalties?: boolean
           walkover_enabled?: boolean
+          wo_enabled?: boolean
         }
         Update: {
+          allow_draw?: boolean
           created_at?: string
+          extra_time_halves?: number
+          extra_time_minutes?: number
           final_set_tiebreak_mode?: string
           first_server?: string
           games_to_win_set?: number
+          golden_goal_extra_time?: boolean
           golden_point?: boolean
+          half_duration_minutes?: number
+          halftime_interval_minutes?: number
+          halves_count?: number
           id?: string
           min_difference?: number
           mode?: string
           no_ad?: boolean
+          penalties_kicks?: number
           points_sequence?: string
           ranking_criteria_order?: string
           retirement_keep_score?: boolean
           server_rotation?: string
           sets_format?: string
+          stop_clock_last_minutes?: number
           super_tiebreak_enabled?: boolean
           super_tiebreak_points?: number
           super_tiebreak_replaces_third_set?: boolean
@@ -675,7 +708,10 @@ export type Database = {
           tiebreak_points?: number
           tournament_id?: string
           updated_at?: string
+          use_extra_time?: boolean
+          use_penalties?: boolean
           walkover_enabled?: boolean
+          wo_enabled?: boolean
         }
         Relationships: [
           {

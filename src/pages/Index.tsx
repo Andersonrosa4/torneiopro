@@ -73,7 +73,7 @@ const SportCard = ({ sport, i, navigate, size = "default" }: { sport: typeof spo
         loop
         playsInline
         preload={i === 0 ? "auto" : "metadata"}
-        className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+        className="absolute inset-0 w-full h-full object-cover scale-[1.15] pointer-events-none"
       />
       <div className={`absolute inset-0 bg-gradient-to-t ${sport.accent}`} />
       <div className="absolute inset-0 rounded-2xl border-2 border-transparent group-hover:border-[hsl(0_0%_100%/0.3)] transition-colors duration-300" />

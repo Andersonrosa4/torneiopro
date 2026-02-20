@@ -40,6 +40,7 @@ const sportLabels: Record<string, string> = {
   beach_tennis: "🎾 Beach Tennis",
   tennis: "🎾 Tênis",
   padel: "🏓 Padel",
+  futsal: "⚽ Futsal",
 };
 
 const statusLabels: Record<string, string> = {

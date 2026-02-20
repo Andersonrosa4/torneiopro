@@ -100,6 +100,48 @@
     --gradient-accent: linear-gradient(135deg, hsl(22 90% 55%), hsl(180 70% 45%));
     --shadow-glow: 0 0 20px hsl(180 70% 45% / 0.25);
   }
+
+  /* Tennis Theme */
+  :root[data-sport="tennis"] {
+    --primary: 120 50% 40%;
+    --primary-foreground: 220 15% 10%;
+    --accent: 80 60% 45%;
+    --secondary: 120 15% 18%;
+    --ring: 120 50% 40%;
+    --sidebar-primary: 120 50% 40%;
+    --sidebar-ring: 120 50% 40%;
+    --gradient-primary: linear-gradient(135deg, hsl(120 50% 40%), hsl(80 60% 45%));
+    --gradient-accent: linear-gradient(135deg, hsl(80 60% 45%), hsl(120 50% 40%));
+    --shadow-glow: 0 0 20px hsl(120 50% 40% / 0.25);
+  }
+
+  /* Padel Theme */
+  :root[data-sport="padel"] {
+    --primary: 270 60% 50%;
+    --primary-foreground: 220 15% 10%;
+    --accent: 290 50% 55%;
+    --secondary: 270 15% 18%;
+    --ring: 270 60% 50%;
+    --sidebar-primary: 270 60% 50%;
+    --sidebar-ring: 270 60% 50%;
+    --gradient-primary: linear-gradient(135deg, hsl(270 60% 50%), hsl(290 50% 55%));
+    --gradient-accent: linear-gradient(135deg, hsl(290 50% 55%), hsl(270 60% 50%));
+    --shadow-glow: 0 0 20px hsl(270 60% 50% / 0.25);
+  }
+
+  /* Futsal Theme */
+  :root[data-sport="futsal"] {
+    --primary: 0 70% 50%;
+    --primary-foreground: 0 0% 100%;
+    --accent: 30 90% 50%;
+    --secondary: 0 15% 18%;
+    --ring: 0 70% 50%;
+    --sidebar-primary: 0 70% 50%;
+    --sidebar-ring: 0 70% 50%;
+    --gradient-primary: linear-gradient(135deg, hsl(0 70% 50%), hsl(30 90% 50%));
+    --gradient-accent: linear-gradient(135deg, hsl(30 90% 50%), hsl(0 70% 50%));
+    --shadow-glow: 0 0 20px hsl(0 70% 50% / 0.25);
+  }
 }
 
 @layer base {

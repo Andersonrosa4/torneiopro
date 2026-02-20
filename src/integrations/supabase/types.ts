@@ -797,6 +797,7 @@ export type Database = {
         | "beach_tennis"
         | "tennis"
         | "padel"
+        | "futsal"
       tournament_status:
         | "draft"
         | "registration"
@@ -938,6 +939,7 @@ export const Constants = {
         "beach_tennis",
         "tennis",
         "padel",
+        "futsal",
       ],
       tournament_status: [
         "draft",

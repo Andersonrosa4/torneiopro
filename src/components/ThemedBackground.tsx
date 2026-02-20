@@ -16,6 +16,21 @@ const sportDecorations: Record<string, { pattern: string; icons: string[]; court
     icons: ["🎾"],
     courtColor: "hsl(180 70% 45% / 0.06)",
   },
+  tennis: {
+    pattern: "radial-gradient(circle at 30% 70%, hsl(120 30% 18% / 0.4) 0%, transparent 50%), radial-gradient(circle at 70% 30%, hsl(80 30% 22% / 0.2) 0%, transparent 50%)",
+    icons: ["🎾"],
+    courtColor: "hsl(120 50% 40% / 0.06)",
+  },
+  padel: {
+    pattern: "radial-gradient(circle at 30% 70%, hsl(270 30% 18% / 0.4) 0%, transparent 50%), radial-gradient(circle at 70% 30%, hsl(290 30% 22% / 0.2) 0%, transparent 50%)",
+    icons: ["🏓"],
+    courtColor: "hsl(270 60% 50% / 0.06)",
+  },
+  futsal: {
+    pattern: "radial-gradient(circle at 30% 70%, hsl(0 30% 18% / 0.4) 0%, transparent 50%), radial-gradient(circle at 70% 30%, hsl(30 40% 22% / 0.2) 0%, transparent 50%)",
+    icons: ["⚽"],
+    courtColor: "hsl(0 70% 50% / 0.06)",
+  },
 };
 
 const ThemedBackground = ({ children }: { children: React.ReactNode }) => {

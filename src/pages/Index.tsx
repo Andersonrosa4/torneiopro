@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { QrCode, Smartphone, Download, CalendarDays } from "lucide-react";
+import { QrCode, Smartphone, Download } from "lucide-react";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
 import LogoImage from "@/components/LogoImage";
 import qrCodeImg from "@/assets/qrcode-torneiopro.png";
@@ -208,29 +208,6 @@ const Index = () => {
             Entrar como Atleta
             <span className="block text-xs sm:text-sm font-body font-normal tracking-normal normal-case opacity-70 mt-0.5">
               Código do torneio
-            </span>
-          </button>
-        </motion.div>
-
-        {/* Arena Booking CTA */}
-        <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
-          className="mt-4 w-full max-w-md"
-        >
-          <button
-            onClick={() => navigate("/agendamentos")}
-            className="w-full rounded-2xl py-4 text-center font-display font-bold text-lg sm:text-xl tracking-wide text-white uppercase transition-all hover:scale-[1.02] flex items-center justify-center gap-2"
-            style={{
-              background: "linear-gradient(135deg, hsl(155 60% 35%), hsl(170 55% 30%))",
-              boxShadow: "0 0 30px hsl(155 60% 45% / 0.25), inset 0 1px 0 hsl(0 0% 100% / 0.1)",
-            }}
-          >
-            <CalendarDays className="h-5 w-5" />
-            Agendamento de Quadras
-            <span className="block text-xs sm:text-sm font-body font-normal tracking-normal normal-case opacity-70 mt-0.5">
-              Reserve seu horário
             </span>
           </button>
         </motion.div>

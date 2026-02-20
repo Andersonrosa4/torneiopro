@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,7 +19,6 @@ import NotFound from "./pages/NotFound";
 import SimulationTest from "./pages/SimulationTest";
 import SystemDiagnostics from "./pages/SystemDiagnostics";
 import QRCodePage from "./pages/QRCodePage";
-import ArenaBooking from "./pages/ArenaBooking";
 
 import ScrollToTop from "@/components/ScrollToTop";
 import AiAssistant from "@/components/AiAssistant";
@@ -45,7 +45,6 @@ const App = () => (
               <Route path="/tournaments/new" element={<ProtectedRoute><CreateTournament /></ProtectedRoute>} />
               <Route path="/tournaments/:id" element={<ProtectedRoute><TournamentDetail /></ProtectedRoute>} />
                <Route path="/qrcode" element={<QRCodePage />} />
-               <Route path="/agendamentos" element={<ArenaBooking />} />
                <Route path="/simulation-test" element={<SimulationTest />} />
                <Route path="/diagnostics" element={<ProtectedRoute><SystemDiagnostics /></ProtectedRoute>} />
                <Route path="*" element={<NotFound />} />

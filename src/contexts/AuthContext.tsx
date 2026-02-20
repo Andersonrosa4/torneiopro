@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface User {
@@ -36,21 +36,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [organizerId, setOrganizerId] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const loginInProgress = useRef(false);
+
+  const fetchOrganizer = useCallback(async (userId: string) => {
+    try {
+      const { data: org } = await supabase
+        .from("organizers")
+        .select("id, role")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (org) {
+        setOrganizerId(org.id);
+        setUserRole(org.role);
+      }
+    } catch (e) {
+      console.error("Failed to fetch organizer:", e);
+    }
+  }, []);
 
   useEffect(() => {
-    // Listen to auth state changes
+    // Check existing session first
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user && !loginInProgress.current) {
+        setUser({ id: session.user.id });
+        await fetchOrganizer(session.user.id);
+      }
+      setLoading(false);
+    });
+
+    // Listen to future auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Skip if login() is handling session setup
+      if (loginInProgress.current) return;
+
       if (session?.user) {
         setUser({ id: session.user.id });
-        // Fetch organizer details from DB
-        const { data: org } = await supabase
-          .from("organizers")
-          .select("id, role")
-          .eq("user_id", session.user.id)
-          .maybeSingle();
-        if (org) {
-          setOrganizerId(org.id);
-          setUserRole(org.role);
+        if (event === "SIGNED_IN") {
+          await fetchOrganizer(session.user.id);
         }
       } else {
         setUser(null);
@@ -60,33 +82,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     });
 
-    // Check existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        setUser({ id: session.user.id });
-        const { data: org } = await supabase
-          .from("organizers")
-          .select("id, role")
-          .eq("user_id", session.user.id)
-          .maybeSingle();
-        if (org) {
-          setOrganizerId(org.id);
-          setUserRole(org.role);
-        }
-      }
-      setLoading(false);
-    });
-
     return () => subscription.unsubscribe();
-  }, []);
+  }, [fetchOrganizer]);
 
   const login = useCallback(async (session: { access_token: string; refresh_token: string }, newOrganizerId: string, role?: string) => {
+    // Prevent onAuthStateChange from running duplicate queries
+    loginInProgress.current = true;
+    
     await supabase.auth.setSession({
       access_token: session.access_token,
       refresh_token: session.refresh_token,
     });
+    
+    // Set organizer data directly (we already have it from the login response)
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (authUser) {
+      setUser({ id: authUser.id });
+    }
     setOrganizerId(newOrganizerId);
     setUserRole(role || null);
+    setLoading(false);
+    
+    loginInProgress.current = false;
   }, []);
 
   const logout = useCallback(() => {

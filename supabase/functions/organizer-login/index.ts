@@ -51,19 +51,22 @@ Deno.serve(async (req) => {
 
     // Verify password using bcrypt
     let passwordMatch = false;
-    try {
-      if (organizer.password_hash.startsWith("$2")) {
+    if (organizer.password_hash.startsWith("$2")) {
+      try {
         passwordMatch = await bcrypt.compare(password, organizer.password_hash);
-      } else {
-        // Legacy plain text — migrate to bcrypt on match
-        passwordMatch = password === organizer.password_hash;
-        if (passwordMatch) {
-          const hashed = await bcrypt.hash(password);
-          await adminClient.from("organizers").update({ password_hash: hashed }).eq("id", organizer.id);
-        }
+      } catch {
+        passwordMatch = false;
       }
-    } catch {
-      passwordMatch = false;
+    } else {
+      // Legacy plain text comparison
+      passwordMatch = password === organizer.password_hash;
+    }
+
+    // Migrate plain text password to bcrypt (fire-and-forget, outside main flow)
+    if (passwordMatch && !organizer.password_hash.startsWith("$2")) {
+      bcrypt.hash(password).then((hashed) => {
+        adminClient.from("organizers").update({ password_hash: hashed }).eq("id", organizer.id).then(() => {});
+      }).catch(() => {});
     }
 
     if (!passwordMatch) {
@@ -73,14 +76,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ═══════════════════════════════════════════════════════
     // ON-DEMAND MIGRATION: Create Supabase Auth account
-    // ═══════════════════════════════════════════════════════
     const authEmail = organizer.email || `${organizer.username.toLowerCase().replace(/[^a-z0-9]/g, "")}@organizer.torneiopro.local`;
     let authUserId = organizer.user_id;
 
     if (!authUserId) {
-      // Create new Supabase Auth user
       const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
         email: authEmail,
         password,
@@ -89,7 +89,6 @@ Deno.serve(async (req) => {
       });
 
       if (createError) {
-        // If email already registered, try to sign in to get the user ID
         const anonTry = createClient(supabaseUrl, anonKey, {
           auth: { autoRefreshToken: false, persistSession: false },
         });
@@ -97,8 +96,6 @@ Deno.serve(async (req) => {
         if (trySign?.session) {
           authUserId = trySign.session.user.id;
         } else {
-          // Update existing auth user password and try again
-          // We need to find the user — list approach
           const { data: listData } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
           const existing = listData?.users?.find((u: any) => u.email === authEmail);
           if (existing) {
@@ -115,7 +112,6 @@ Deno.serve(async (req) => {
         authUserId = newUser.user.id;
       }
 
-      // Link organizer to auth user
       const updateData: any = { user_id: authUserId };
       if (!organizer.email) updateData.email = authEmail;
       await adminClient.from("organizers").update(updateData).eq("id", organizer.id);
@@ -134,7 +130,6 @@ Deno.serve(async (req) => {
     });
 
     if (signInError || !signInData?.session) {
-      // Password may be out of sync — update auth password and retry
       await adminClient.auth.admin.updateUserById(authUserId!, { password });
       const { data: retryData, error: retryError } = await anonClient.auth.signInWithPassword({
         email: authEmail,
@@ -172,7 +167,7 @@ Deno.serve(async (req) => {
     );
   } catch (error) {
     return new Response(
-      JSON.stringify({ success: false, error: "Erro interno do servidor" }),
+      JSON.stringify({ success: false, error: "Erro interno: " + (error as Error).message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

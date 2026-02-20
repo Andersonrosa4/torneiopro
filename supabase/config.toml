@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.court-booking-api]
 verify_jwt = false
+
+[functions.organizer-login]
+verify_jwt = false

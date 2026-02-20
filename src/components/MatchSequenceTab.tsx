@@ -240,7 +240,7 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
 
   const matchCountByRound = useMemo(() => {
     const counts: Record<number, number> = {};
-    matches.forEach(m => { counts[m.round] = (counts[m.round] || 0) + 1; });
+    matches.filter(m => (m as any).bracket_type !== 'third_place').forEach(m => { counts[m.round] = (counts[m.round] || 0) + 1; });
     return counts;
   }, [matches]);
 

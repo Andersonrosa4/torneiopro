@@ -841,7 +841,8 @@ const MatchSequenceViewer = ({
 
   const matchCountByRound = useMemo(() => {
     const counts: Record<number, number> = {};
-    matches.forEach(m => { counts[m.round] = (counts[m.round] || 0) + 1; });
+    // Exclude third_place matches from round count so labels remain correct (e.g. "Final" not "Semifinal")
+    matches.filter(m => (m as any).bracket_type !== 'third_place').forEach(m => { counts[m.round] = (counts[m.round] || 0) + 1; });
     return counts;
   }, [matches]);
 
@@ -956,14 +957,26 @@ const MatchSequenceViewer = ({
       }
     }
     if (knockoutStage.length > 0) {
-      const knockoutRounds = [...new Set(knockoutStage.map(m => m.round))].sort((a, b) => a - b);
+      const knockoutNormal = knockoutStage.filter(m => (m as any).bracket_type !== 'third_place');
+      const knockoutRounds = [...new Set(knockoutNormal.map(m => m.round))].sort((a, b) => a - b);
       for (const r of knockoutRounds) {
-        const roundMatches = knockoutStage.filter(m => m.round === r);
+        const roundMatches = knockoutNormal.filter(m => m.round === r);
         groups.push({
           label: getRoundLabel(r),
           matches: roundMatches.map(m => ({ match: m, globalIndex: matchNumberMap.get(m.id) ?? 0 })),
           blockKey: `KO_R${r}`,
           isCompleted: roundMatches.every(m => m.status === 'completed'),
+        });
+      }
+
+      // 3rd place matches
+      const thirdPlaceMatches = knockoutStage.filter(m => (m as any).bracket_type === 'third_place');
+      if (thirdPlaceMatches.length > 0) {
+        groups.push({
+          label: "🥉 Disputa de 3º Lugar",
+          matches: thirdPlaceMatches.map(m => ({ match: m, globalIndex: matchNumberMap.get(m.id) ?? 0 })),
+          blockKey: "THIRD_PLACE",
+          isCompleted: thirdPlaceMatches.every(m => m.status === 'completed'),
         });
       }
     }

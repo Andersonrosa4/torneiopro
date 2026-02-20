@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
-// Cache-bust: v2 — force Vite to rebuild all dep chunks
+// Cache-bust: v3 — force Vite to rebuild all dep chunks
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
@@ -20,8 +20,10 @@ export default defineConfig(({ mode }) => ({
       "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
       "react/jsx-runtime": path.resolve(__dirname, "node_modules/react/jsx-runtime"),
       "react/jsx-dev-runtime": path.resolve(__dirname, "node_modules/react/jsx-dev-runtime"),
+      "react-router-dom": path.resolve(__dirname, "node_modules/react-router-dom"),
+      "react-router": path.resolve(__dirname, "node_modules/react-router"),
     },
-    dedupe: ["react", "react-dom"],
+    dedupe: ["react", "react-dom", "react-router", "react-router-dom"],
   },
   optimizeDeps: {
     force: true,
@@ -30,6 +32,8 @@ export default defineConfig(({ mode }) => ({
       "react-dom",
       "react/jsx-runtime",
       "react/jsx-dev-runtime",
+      "react-router",
+      "react-router-dom",
     ],
     esbuildOptions: {
       resolveExtensions: [".mjs", ".js", ".mts", ".ts", ".jsx", ".tsx", ".json"],

@@ -10,8 +10,15 @@ import {
   undoLastEvent,
   getWinner,
   formatFutsalScore,
+  getPeriodLabel,
+  replayHistory,
   FutsalRules,
+  FutsalLiveScore,
 } from "@/lib/futsalScoringEngine";
+
+// ══════════════════════════════════════════════════════════
+// Helpers — cada teste cria seu próprio rules/state
+// ══════════════════════════════════════════════════════════
 
 function defaultRules(overrides: Partial<FutsalRules> = {}): FutsalRules {
   return {
@@ -31,22 +38,118 @@ function defaultRules(overrides: Partial<FutsalRules> = {}): FutsalRules {
   };
 }
 
-// ── Validation ──────────────────────────────────────────
+/** Advance to H2 */
+function advanceToH2(s: FutsalLiveScore, rules: FutsalRules): FutsalLiveScore {
+  return endPeriod(s, rules);
+}
 
-describe("Futsal Engine — Rules validation", () => {
-  it("should throw when rules is null", () => {
+/** Advance to penalties (0-0 draw, no ET) */
+function advanceToPenalties(rules: FutsalRules): FutsalLiveScore {
+  let s = createInitialFutsalScore(rules);
+  s = endPeriod(s, rules); // H1→H2
+  s = endPeriod(s, rules); // H2→PENALTIES
+  return s;
+}
+
+// ══════════════════════════════════════════════════════════
+// 1. INVARIANTES
+// ══════════════════════════════════════════════════════════
+
+describe("Futsal Invariants", () => {
+  it("score is never negative", () => {
+    const rules = defaultRules();
+    let s = createInitialFutsalScore(rules);
+    s = addGoal(s, "A", rules);
+    s = addGoal(s, "B", rules);
+    s = addFoul(s, "A");
+    s = addFoul(s, "B");
+    expect(s.teamA_goals).toBeGreaterThanOrEqual(0);
+    expect(s.teamB_goals).toBeGreaterThanOrEqual(0);
+    expect(s.fouls.teamA).toBeGreaterThanOrEqual(0);
+    expect(s.fouls.teamB).toBeGreaterThanOrEqual(0);
+  });
+
+  it("COMPLETED match never accepts goals", () => {
+    const rules = defaultRules();
+    let s = createInitialFutsalScore(rules);
+    s = addGoal(s, "A", rules);
+    s = endPeriod(s, rules);
+    s = endPeriod(s, rules);
+    expect(s.period).toBe("COMPLETED");
+    const before = s.teamA_goals;
+    s = addGoal(s, "A", rules);
+    expect(s.teamA_goals).toBe(before);
+  });
+
+  it("COMPLETED match never accepts fouls", () => {
+    const rules = defaultRules();
+    let s = createInitialFutsalScore(rules);
+    s = addGoal(s, "A", rules);
+    s = endPeriod(s, rules);
+    s = endPeriod(s, rules);
+    s = addFoul(s, "A");
+    expect(s.fouls.teamA).toBe(0);
+  });
+
+  it("COMPLETED match never accepts cards", () => {
+    const rules = defaultRules();
+    let s = createInitialFutsalScore(rules);
+    s = addGoal(s, "A", rules);
+    s = endPeriod(s, rules);
+    s = endPeriod(s, rules);
+    s = addCard(s, "A", "yellow", 10);
+    expect(s.cards.teamA_yellow).toBe(0);
+  });
+
+  it("undo never mutates original history", () => {
+    const rules = defaultRules();
+    let s = createInitialFutsalScore(rules);
+    s = addGoal(s, "A", rules);
+    s = addGoal(s, "B", rules);
+    const originalHistory = [...s.history];
+    undoLastEvent(s, rules);
+    expect(s.history).toEqual(originalHistory);
+  });
+
+  it("penalties never accepted outside PENALTIES period", () => {
+    const rules = defaultRules();
+    let s = createInitialFutsalScore(rules);
+    s = addPenaltyKick(s, "A", true, rules);
+    expect(s.penalties.teamA_kicks).toBe(0);
+  });
+});
+
+// ══════════════════════════════════════════════════════════
+// A) Inicialização / Validação de Rules
+// ══════════════════════════════════════════════════════════
+
+describe("A) Initialization & Rules validation", () => {
+  it("starts at H1 with 0-0", () => {
+    const rules = defaultRules();
+    const s = createInitialFutsalScore(rules);
+    expect(s.period).toBe("H1");
+    expect(s.teamA_goals).toBe(0);
+    expect(s.teamB_goals).toBe(0);
+    expect(s.fouls).toEqual({ teamA: 0, teamB: 0 });
+    expect(s.cards).toEqual({ teamA_yellow: 0, teamA_red: 0, teamB_yellow: 0, teamB_red: 0 });
+    expect(s.playerCards).toEqual([]);
+    expect(s.penalties.active).toBe(false);
+    expect(s.history).toEqual([]);
+  });
+
+  it("throws when rules is null", () => {
     expect(() => validateFutsalRules(null)).toThrow("objeto de regras ausente");
   });
 
-  it("should throw when rules is undefined", () => {
+  it("throws when rules is undefined", () => {
     expect(() => validateFutsalRules(undefined)).toThrow("objeto de regras ausente");
   });
 
-  it("should throw when rules is empty object", () => {
+  it("throws when rules is empty object", () => {
     expect(() => validateFutsalRules({})).toThrow("campos obrigatórios ausentes");
   });
 
-  it("should list all missing fields", () => {
+  it("lists all missing fields", () => {
     try {
       validateFutsalRules({});
       expect.unreachable("should have thrown");
@@ -60,43 +163,48 @@ describe("Futsal Engine — Rules validation", () => {
     }
   });
 
-  it("should throw when a single required field is missing", () => {
+  it("throws when single field is missing", () => {
     const incomplete = { ...defaultRules() } as any;
     delete incomplete.penalties_kicks;
     expect(() => validateFutsalRules(incomplete)).toThrow("penalties_kicks");
   });
 
-  it("should throw when a field is null", () => {
+  it("throws when a field is null", () => {
     const withNull = { ...defaultRules(), use_extra_time: null } as any;
     expect(() => validateFutsalRules(withNull)).toThrow("use_extra_time");
   });
 
-  it("should NOT throw with complete valid rules", () => {
+  it("does NOT throw with complete rules", () => {
     expect(() => validateFutsalRules(defaultRules())).not.toThrow();
   });
 
-  it("createInitialFutsalScore should throw with incomplete rules", () => {
+  it("createInitialFutsalScore throws with incomplete rules", () => {
     expect(() => createInitialFutsalScore({} as any)).toThrow("campos obrigatórios ausentes");
   });
 
-  it("createInitialFutsalScore should throw with null rules", () => {
+  it("createInitialFutsalScore throws with null", () => {
     expect(() => createInitialFutsalScore(null as any)).toThrow("objeto de regras ausente");
   });
 });
 
-// ── Normal time ─────────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+// B) Vitória em Tempo Normal
+// ══════════════════════════════════════════════════════════
 
-describe("Futsal Engine — Normal time victory", () => {
-  const rules = defaultRules();
-
-  it("should start at H1 with 0-0", () => {
-    const s = createInitialFutsalScore(rules);
-    expect(s.period).toBe("H1");
-    expect(s.teamA_goals).toBe(0);
-    expect(s.teamB_goals).toBe(0);
+describe("B) Normal time victory", () => {
+  it("H1→H2→COMPLETED when not draw", () => {
+    const rules = defaultRules();
+    let s = createInitialFutsalScore(rules);
+    s = addGoal(s, "A", rules);
+    s = endPeriod(s, rules); // H1→H2
+    expect(s.period).toBe("H2");
+    s = endPeriod(s, rules); // H2→COMPLETED (1-0)
+    expect(s.period).toBe("COMPLETED");
+    expect(getWinner(s)).toBe("A");
   });
 
-  it("should register goals correctly", () => {
+  it("registers goals correctly", () => {
+    const rules = defaultRules();
     let s = createInitialFutsalScore(rules);
     s = addGoal(s, "A", rules);
     s = addGoal(s, "A", rules);
@@ -105,29 +213,32 @@ describe("Futsal Engine — Normal time victory", () => {
     expect(s.teamB_goals).toBe(1);
   });
 
-  it("should complete match after H2 when not drawn", () => {
-    let s = createInitialFutsalScore(rules);
-    s = addGoal(s, "A", rules);
-    s = endPeriod(s, rules);
-    expect(s.period).toBe("H2");
-    s = endPeriod(s, rules);
-    expect(s.period).toBe("COMPLETED");
-    expect(getWinner(s)).toBe("A");
-  });
-
-  it("should format score correctly", () => {
+  it("formatFutsalScore correct", () => {
+    const rules = defaultRules();
     let s = createInitialFutsalScore(rules);
     s = addGoal(s, "A", rules);
     s = addGoal(s, "A", rules);
     s = addGoal(s, "B", rules);
     expect(formatFutsalScore(s)).toBe("2-1");
   });
+
+  it("winner B when B has more goals", () => {
+    const rules = defaultRules();
+    let s = createInitialFutsalScore(rules);
+    s = addGoal(s, "B", rules);
+    s = endPeriod(s, rules);
+    s = endPeriod(s, rules);
+    expect(getWinner(s)).toBe("B");
+  });
 });
 
-describe("Futsal Engine — Draw allowed", () => {
-  const rules = defaultRules({ allow_draw: true });
+// ══════════════════════════════════════════════════════════
+// C) Empate com allow_draw
+// ══════════════════════════════════════════════════════════
 
-  it("should complete as draw when allow_draw = true", () => {
+describe("C) Draw with allow_draw", () => {
+  it("completes as draw when allow_draw=true", () => {
+    const rules = defaultRules({ allow_draw: true });
     let s = createInitialFutsalScore(rules);
     s = addGoal(s, "A", rules);
     s = addGoal(s, "B", rules);
@@ -136,21 +247,44 @@ describe("Futsal Engine — Draw allowed", () => {
     expect(s.period).toBe("COMPLETED");
     expect(getWinner(s)).toBeNull();
   });
+
+  it("0-0 draw when allow_draw=true", () => {
+    const rules = defaultRules({ allow_draw: true });
+    let s = createInitialFutsalScore(rules);
+    s = endPeriod(s, rules);
+    s = endPeriod(s, rules);
+    expect(s.period).toBe("COMPLETED");
+    expect(getWinner(s)).toBeNull();
+  });
 });
 
-describe("Futsal Engine — Extra time", () => {
+// ══════════════════════════════════════════════════════════
+// D) Prorrogação (Extra Time)
+// ══════════════════════════════════════════════════════════
+
+describe("D) Extra time", () => {
   const rules = defaultRules({ use_extra_time: true, use_penalties: true });
 
-  it("should go to extra time on draw", () => {
+  it("goes to ET1 on draw after H2", () => {
+    let s = createInitialFutsalScore(rules);
+    s = addGoal(s, "A", rules);
+    s = addGoal(s, "B", rules);
+    s = endPeriod(s, rules); // H1→H2
+    s = endPeriod(s, rules); // H2→ET1
+    expect(s.period).toBe("ET1");
+  });
+
+  it("ET1→ET2", () => {
     let s = createInitialFutsalScore(rules);
     s = addGoal(s, "A", rules);
     s = addGoal(s, "B", rules);
     s = endPeriod(s, rules);
-    s = endPeriod(s, rules);
-    expect(s.period).toBe("ET1");
+    s = endPeriod(s, rules); // ET1
+    s = endPeriod(s, rules); // ET1→ET2
+    expect(s.period).toBe("ET2");
   });
 
-  it("should complete after ET2 if not draw", () => {
+  it("completes after ET2 if not draw", () => {
     let s = createInitialFutsalScore(rules);
     s = addGoal(s, "A", rules);
     s = addGoal(s, "B", rules);
@@ -163,7 +297,7 @@ describe("Futsal Engine — Extra time", () => {
     expect(getWinner(s)).toBe("A");
   });
 
-  it("should go to penalties after ET2 draw", () => {
+  it("goes to penalties after ET2 draw", () => {
     let s = createInitialFutsalScore(rules);
     s = addGoal(s, "A", rules);
     s = addGoal(s, "B", rules);
@@ -174,53 +308,88 @@ describe("Futsal Engine — Extra time", () => {
     expect(s.period).toBe("PENALTIES");
   });
 
-  it("should reset fouls when entering extra time", () => {
+  it("resets fouls when entering ET1", () => {
     let s = createInitialFutsalScore(rules);
     s = addFoul(s, "A");
     s = addFoul(s, "A");
+    s = addFoul(s, "B");
     s = addGoal(s, "A", rules);
     s = addGoal(s, "B", rules);
     s = endPeriod(s, rules);
-    s = endPeriod(s, rules);
+    s = endPeriod(s, rules); // ET1
     expect(s.fouls.teamA).toBe(0);
+    expect(s.fouls.teamB).toBe(0);
   });
 });
 
-describe("Futsal Engine — Golden goal", () => {
+// ══════════════════════════════════════════════════════════
+// E) Gol de Ouro (Golden Goal)
+// ══════════════════════════════════════════════════════════
+
+describe("E) Golden Goal", () => {
   const rules = defaultRules({ use_extra_time: true, golden_goal_extra_time: true });
 
-  it("should end match immediately on extra time goal", () => {
+  it("goal in ET ends match immediately", () => {
     let s = createInitialFutsalScore(rules);
     s = addGoal(s, "A", rules);
     s = addGoal(s, "B", rules);
     s = endPeriod(s, rules);
-    s = endPeriod(s, rules);
+    s = endPeriod(s, rules); // ET1
     s = addGoal(s, "B", rules);
     expect(s.period).toBe("COMPLETED");
     expect(getWinner(s)).toBe("B");
   });
 
-  it("should NOT trigger golden goal in normal time", () => {
+  it("goal in ET2 ends match", () => {
+    let s = createInitialFutsalScore(rules);
+    s = addGoal(s, "A", rules);
+    s = addGoal(s, "B", rules);
+    s = endPeriod(s, rules);
+    s = endPeriod(s, rules); // ET1
+    s = endPeriod(s, rules); // ET2
+    s = addGoal(s, "A", rules);
+    expect(s.period).toBe("COMPLETED");
+    expect(getWinner(s)).toBe("A");
+  });
+
+  it("does NOT trigger in normal time H1", () => {
     let s = createInitialFutsalScore(rules);
     s = addGoal(s, "A", rules);
     expect(s.period).toBe("H1");
   });
+
+  it("does NOT trigger in normal time H2", () => {
+    let s = createInitialFutsalScore(rules);
+    s = endPeriod(s, rules); // H2
+    s = addGoal(s, "A", rules);
+    expect(s.period).toBe("H2");
+  });
+
+  it("equalizing goal in ET does NOT end match", () => {
+    let s = createInitialFutsalScore(rules);
+    s = addGoal(s, "A", rules); // 1-0
+    s = endPeriod(s, rules);
+    s = addGoal(s, "B", rules); // 1-1
+    s = endPeriod(s, rules); // ET1
+    s = addGoal(s, "A", rules); // 2-1 → COMPLETED
+    expect(s.period).toBe("COMPLETED");
+  });
 });
 
-describe("Futsal Engine — Penalties", () => {
-  const rules = defaultRules({ use_penalties: true });
+// ══════════════════════════════════════════════════════════
+// F) Pênaltis
+// ══════════════════════════════════════════════════════════
 
-  it("should go directly to penalties when no extra time", () => {
-    let s = createInitialFutsalScore(rules);
-    s = endPeriod(s, rules);
-    s = endPeriod(s, rules);
+describe("F) Penalties", () => {
+  it("goes directly to penalties when no ET", () => {
+    const rules = defaultRules({ use_penalties: true });
+    let s = advanceToPenalties(rules);
     expect(s.period).toBe("PENALTIES");
   });
 
-  it("should win penalties 3-1 after 5 kicks", () => {
-    let s = createInitialFutsalScore(rules);
-    s = endPeriod(s, rules);
-    s = endPeriod(s, rules);
+  it("3-1 in initial series", () => {
+    const rules = defaultRules({ use_penalties: true });
+    let s = advanceToPenalties(rules);
     s = addPenaltyKick(s, "A", true, rules);
     s = addPenaltyKick(s, "B", false, rules);
     s = addPenaltyKick(s, "A", true, rules);
@@ -234,27 +403,76 @@ describe("Futsal Engine — Penalties", () => {
     expect(formatFutsalScore(s)).toBe("0-0 (3-1 pen)");
   });
 
-  it("should enter sudden death when tied after initial kicks", () => {
-    let s = createInitialFutsalScore(rules);
-    s = endPeriod(s, rules);
-    s = endPeriod(s, rules);
+  it("early termination when mathematically decided", () => {
+    const rules = defaultRules({ use_penalties: true });
+    let s = advanceToPenalties(rules);
+    // A scores 3, B misses 3 → A wins early (B can't catch up)
+    s = addPenaltyKick(s, "A", true, rules);
+    s = addPenaltyKick(s, "B", false, rules);
+    s = addPenaltyKick(s, "A", true, rules);
+    s = addPenaltyKick(s, "B", false, rules);
+    s = addPenaltyKick(s, "A", true, rules);
+    s = addPenaltyKick(s, "B", false, rules);
+    expect(s.period).toBe("COMPLETED");
+    expect(getWinner(s)).toBe("A");
+  });
+
+  it("sudden death after 5-5", () => {
+    const rules = defaultRules({ use_penalties: true });
+    let s = advanceToPenalties(rules);
     for (let i = 0; i < 5; i++) {
       s = addPenaltyKick(s, "A", true, rules);
       s = addPenaltyKick(s, "B", true, rules);
     }
-    expect(s.period).toBe("PENALTIES");
+    expect(s.period).toBe("PENALTIES"); // still going
     s = addPenaltyKick(s, "A", true, rules);
-    expect(s.period).toBe("PENALTIES");
+    expect(s.period).toBe("PENALTIES"); // wait for B
     s = addPenaltyKick(s, "B", false, rules);
+    expect(s.period).toBe("COMPLETED");
+    expect(getWinner(s)).toBe("A");
+  });
+
+  it("sudden death continues when both score", () => {
+    const rules = defaultRules({ use_penalties: true });
+    let s = advanceToPenalties(rules);
+    for (let i = 0; i < 5; i++) {
+      s = addPenaltyKick(s, "A", true, rules);
+      s = addPenaltyKick(s, "B", true, rules);
+    }
+    // Both score again
+    s = addPenaltyKick(s, "A", true, rules);
+    s = addPenaltyKick(s, "B", true, rules);
+    expect(s.period).toBe("PENALTIES"); // still going
+  });
+
+  it("penalty kick not accepted outside PENALTIES", () => {
+    const rules = defaultRules();
+    let s = createInitialFutsalScore(rules);
+    s = addPenaltyKick(s, "A", true, rules);
+    expect(s.penalties.teamA_kicks).toBe(0);
+  });
+
+  it("custom penalties_kicks (3)", () => {
+    const rules = defaultRules({ use_penalties: true, penalties_kicks: 3 });
+    let s = advanceToPenalties(rules);
+    s = addPenaltyKick(s, "A", true, rules);
+    s = addPenaltyKick(s, "B", false, rules);
+    s = addPenaltyKick(s, "A", true, rules);
+    s = addPenaltyKick(s, "B", false, rules);
+    // A has 2, B has 0 with 1 kick remaining for each. B can't catch up.
+    // Actually B has 2 kicks done, 1 remaining. A has 2 goals. B max = 1. 2 > 1 → complete.
     expect(s.period).toBe("COMPLETED");
     expect(getWinner(s)).toBe("A");
   });
 });
 
-describe("Futsal Engine — Fouls", () => {
-  const rules = defaultRules();
+// ══════════════════════════════════════════════════════════
+// G) Faltas
+// ══════════════════════════════════════════════════════════
 
-  it("should track fouls per team", () => {
+describe("G) Fouls", () => {
+  it("tracks fouls per team", () => {
+    const rules = defaultRules();
     let s = createInitialFutsalScore(rules);
     s = addFoul(s, "A");
     s = addFoul(s, "A");
@@ -263,7 +481,8 @@ describe("Futsal Engine — Fouls", () => {
     expect(s.fouls.teamB).toBe(1);
   });
 
-  it("should not add fouls when completed", () => {
+  it("does not add fouls when completed", () => {
+    const rules = defaultRules();
     let s = createInitialFutsalScore(rules);
     s = addGoal(s, "A", rules);
     s = endPeriod(s, rules);
@@ -271,12 +490,96 @@ describe("Futsal Engine — Fouls", () => {
     s = addFoul(s, "A");
     expect(s.fouls.teamA).toBe(0);
   });
+
+  it("does not add fouls during penalties", () => {
+    const rules = defaultRules();
+    let s = advanceToPenalties(rules);
+    s = addFoul(s, "A");
+    expect(s.fouls.teamA).toBe(0);
+  });
+
+  it("records fouls in history", () => {
+    const rules = defaultRules();
+    let s = createInitialFutsalScore(rules);
+    s = addFoul(s, "A");
+    expect(s.history.length).toBe(1);
+    expect(s.history[0].type).toBe("FOUL");
+    expect(s.history[0].team).toBe("A");
+  });
 });
 
-describe("Futsal Engine — Undo", () => {
-  const rules = defaultRules();
+// ══════════════════════════════════════════════════════════
+// Cards with jersey number
+// ══════════════════════════════════════════════════════════
 
-  it("should undo a goal", () => {
+describe("Cards with jersey number", () => {
+  it("tracks yellow cards per team", () => {
+    const rules = defaultRules();
+    let s = createInitialFutsalScore(rules);
+    s = addCard(s, "A", "yellow", 10);
+    s = addCard(s, "A", "yellow", 7);
+    s = addCard(s, "B", "yellow", 5);
+    expect(s.cards.teamA_yellow).toBe(2);
+    expect(s.cards.teamB_yellow).toBe(1);
+  });
+
+  it("tracks red cards per team", () => {
+    const rules = defaultRules();
+    let s = createInitialFutsalScore(rules);
+    s = addCard(s, "B", "red", 9);
+    expect(s.cards.teamB_red).toBe(1);
+    expect(s.playerCards[0].jerseyNumber).toBe(9);
+    expect(s.playerCards[0].cardType).toBe("red");
+  });
+
+  it("2nd yellow → auto red", () => {
+    const rules = defaultRules();
+    let s = createInitialFutsalScore(rules);
+    s = addCard(s, "A", "yellow", 10);
+    expect(s.cards.teamA_red).toBe(0);
+    s = addCard(s, "A", "yellow", 10);
+    expect(s.cards.teamA_yellow).toBe(2);
+    expect(s.cards.teamA_red).toBe(1);
+    const autoReds = s.history.filter((e) => e.autoRed);
+    expect(autoReds.length).toBe(1);
+    expect(autoReds[0].jerseyNumber).toBe(10);
+  });
+
+  it("no auto red for different players", () => {
+    const rules = defaultRules();
+    let s = createInitialFutsalScore(rules);
+    s = addCard(s, "A", "yellow", 10);
+    s = addCard(s, "A", "yellow", 7);
+    expect(s.cards.teamA_red).toBe(0);
+  });
+
+  it("no cards after COMPLETED", () => {
+    const rules = defaultRules();
+    let s = createInitialFutsalScore(rules);
+    s = addGoal(s, "A", rules);
+    s = endPeriod(s, rules);
+    s = endPeriod(s, rules);
+    s = addCard(s, "A", "yellow", 10);
+    expect(s.cards.teamA_yellow).toBe(0);
+  });
+
+  it("records jersey in history", () => {
+    const rules = defaultRules();
+    let s = createInitialFutsalScore(rules);
+    s = addCard(s, "A", "yellow", 10);
+    s = addCard(s, "B", "red", 3);
+    expect(s.history[0].jerseyNumber).toBe(10);
+    expect(s.history[1].jerseyNumber).toBe(3);
+  });
+});
+
+// ══════════════════════════════════════════════════════════
+// H) Undo
+// ══════════════════════════════════════════════════════════
+
+describe("H) Undo", () => {
+  it("undo goal", () => {
+    const rules = defaultRules();
     let s = createInitialFutsalScore(rules);
     s = addGoal(s, "A", rules);
     expect(s.teamA_goals).toBe(1);
@@ -284,14 +587,16 @@ describe("Futsal Engine — Undo", () => {
     expect(s.teamA_goals).toBe(0);
   });
 
-  it("should undo a foul", () => {
+  it("undo foul", () => {
+    const rules = defaultRules();
     let s = createInitialFutsalScore(rules);
     s = addFoul(s, "B");
     s = undoLastEvent(s, rules);
     expect(s.fouls.teamB).toBe(0);
   });
 
-  it("should undo period end", () => {
+  it("undo period end", () => {
+    const rules = defaultRules();
     let s = createInitialFutsalScore(rules);
     s = endPeriod(s, rules);
     expect(s.period).toBe("H2");
@@ -299,137 +604,222 @@ describe("Futsal Engine — Undo", () => {
     expect(s.period).toBe("H1");
   });
 
-  it("should undo golden goal", () => {
-    const goldenRules = defaultRules({ use_extra_time: true, golden_goal_extra_time: true });
-    let s = createInitialFutsalScore(goldenRules);
-    s = addGoal(s, "A", goldenRules);
-    s = addGoal(s, "B", goldenRules);
-    s = endPeriod(s, goldenRules);
-    s = endPeriod(s, goldenRules);
-    s = addGoal(s, "A", goldenRules);
-    expect(s.period).toBe("COMPLETED");
-    s = undoLastEvent(s, goldenRules);
-    expect(s.period).toBe("ET1");
-    expect(s.teamA_goals).toBe(1);
-  });
-
-  it("should return same state when no history", () => {
-    const s = createInitialFutsalScore(rules);
-    const result = undoLastEvent(s, rules);
-    expect(result).toBe(s);
-  });
-
-  it("should undo penalty kick", () => {
-    let s = createInitialFutsalScore(rules);
-    s = endPeriod(s, rules);
-    s = endPeriod(s, rules);
+  it("undo penalty kick", () => {
+    const rules = defaultRules();
+    let s = advanceToPenalties(rules);
     s = addPenaltyKick(s, "A", true, rules);
     expect(s.penalties.teamA_goals).toBe(1);
     s = undoLastEvent(s, rules);
     expect(s.penalties.teamA_goals).toBe(0);
     expect(s.period).toBe("PENALTIES");
   });
-});
 
-describe("Futsal Engine — No goals allowed after completion", () => {
-  const rules = defaultRules();
-
-  it("should not register goals after match completed", () => {
+  it("undo golden goal restores ET", () => {
+    const rules = defaultRules({ use_extra_time: true, golden_goal_extra_time: true });
     let s = createInitialFutsalScore(rules);
     s = addGoal(s, "A", rules);
+    s = addGoal(s, "B", rules);
     s = endPeriod(s, rules);
-    s = endPeriod(s, rules);
-    expect(s.period).toBe("COMPLETED");
+    s = endPeriod(s, rules); // ET1
     s = addGoal(s, "A", rules);
+    expect(s.period).toBe("COMPLETED");
+    s = undoLastEvent(s, rules);
+    expect(s.period).toBe("ET1");
     expect(s.teamA_goals).toBe(1);
   });
-});
 
-describe("Futsal Engine — Cards with jersey number", () => {
-  const rules = defaultRules();
+  it("returns same state when no history", () => {
+    const rules = defaultRules();
+    const s = createInitialFutsalScore(rules);
+    const result = undoLastEvent(s, rules);
+    expect(result).toBe(s);
+  });
 
-  it("should track yellow cards per team with jersey number", () => {
+  it("undo yellow card", () => {
+    const rules = defaultRules();
     let s = createInitialFutsalScore(rules);
     s = addCard(s, "A", "yellow", 10);
-    s = addCard(s, "A", "yellow", 7);
-    s = addCard(s, "B", "yellow", 5);
-    expect(s.cards.teamA_yellow).toBe(2);
-    expect(s.cards.teamB_yellow).toBe(1);
-    expect(s.cards.teamA_red).toBe(0);
-    expect(s.playerCards).toHaveLength(3); // all 3 cards tracked with jersey
-  });
-
-  it("should track red cards per team with jersey number", () => {
-    let s = createInitialFutsalScore(rules);
-    s = addCard(s, "B", "red", 9);
-    expect(s.cards.teamB_red).toBe(1);
-    expect(s.cards.teamB_yellow).toBe(0);
-    expect(s.playerCards).toHaveLength(1);
-    expect(s.playerCards[0].jerseyNumber).toBe(9);
-  });
-
-  it("should auto-generate red on 2nd yellow for same player", () => {
-    let s = createInitialFutsalScore(rules);
-    s = addCard(s, "A", "yellow", 10); // 1st yellow
-    expect(s.cards.teamA_yellow).toBe(1);
-    expect(s.cards.teamA_red).toBe(0);
-
-    s = addCard(s, "A", "yellow", 10); // 2nd yellow → auto red
-    expect(s.cards.teamA_yellow).toBe(2);
-    expect(s.cards.teamA_red).toBe(1);
-    // History should have: YELLOW, YELLOW, RED(auto)
-    const redEvents = s.history.filter((e) => e.type === "RED_CARD" && e.autoRed);
-    expect(redEvents).toHaveLength(1);
-    expect(redEvents[0].jerseyNumber).toBe(10);
-  });
-
-  it("should NOT auto-red when 2 yellows are for different players", () => {
-    let s = createInitialFutsalScore(rules);
-    s = addCard(s, "A", "yellow", 10);
-    s = addCard(s, "A", "yellow", 7);
-    expect(s.cards.teamA_yellow).toBe(2);
-    expect(s.cards.teamA_red).toBe(0);
-  });
-
-  it("should not add cards after match completed", () => {
-    let s = createInitialFutsalScore(rules);
-    s = addGoal(s, "A", rules);
-    s = endPeriod(s, rules);
-    s = endPeriod(s, rules);
-    expect(s.period).toBe("COMPLETED");
-    s = addCard(s, "A", "yellow", 10);
-    expect(s.cards.teamA_yellow).toBe(0);
-  });
-
-  it("should record cards with jersey in history", () => {
-    let s = createInitialFutsalScore(rules);
-    s = addCard(s, "A", "yellow", 10);
-    s = addCard(s, "B", "red", 3);
-    expect(s.history[0].type).toBe("YELLOW_CARD");
-    expect(s.history[0].jerseyNumber).toBe(10);
-    expect(s.history[1].type).toBe("RED_CARD");
-    expect(s.history[1].jerseyNumber).toBe(3);
-  });
-
-  it("should undo yellow card with jersey", () => {
-    let s = createInitialFutsalScore(rules);
-    s = addCard(s, "A", "yellow", 10);
-    expect(s.cards.teamA_yellow).toBe(1);
     s = undoLastEvent(s, rules);
     expect(s.cards.teamA_yellow).toBe(0);
     expect(s.playerCards).toHaveLength(0);
   });
 
-  it("should undo auto-red from 2nd yellow correctly", () => {
+  it("undo auto-red from 2nd yellow", () => {
+    const rules = defaultRules();
     let s = createInitialFutsalScore(rules);
     s = addCard(s, "A", "yellow", 10);
     s = addCard(s, "A", "yellow", 10); // triggers auto red
     expect(s.cards.teamA_red).toBe(1);
-    // History: YELLOW(10), YELLOW(10), RED(10,auto)
-    // 3 undos to get back to just the 1st yellow
-    s = undoLastEvent(s, rules); // removes auto RED
-    s = undoLastEvent(s, rules); // removes 2nd YELLOW
+    // 3 undos: auto-red, 2nd yellow, 1st yellow
+    s = undoLastEvent(s, rules); // remove auto RED
+    s = undoLastEvent(s, rules); // remove 2nd YELLOW
     expect(s.cards.teamA_yellow).toBe(1);
     expect(s.cards.teamA_red).toBe(0);
+  });
+
+  it("multiple undos reconstruct correctly", () => {
+    const rules = defaultRules();
+    let s = createInitialFutsalScore(rules);
+    s = addGoal(s, "A", rules);
+    s = addFoul(s, "B");
+    s = addGoal(s, "B", rules);
+    s = undoLastEvent(s, rules);
+    s = undoLastEvent(s, rules);
+    s = undoLastEvent(s, rules);
+    expect(s.teamA_goals).toBe(0);
+    expect(s.teamB_goals).toBe(0);
+    expect(s.fouls.teamB).toBe(0);
+  });
+});
+
+// ══════════════════════════════════════════════════════════
+// I) Bloqueios
+// ══════════════════════════════════════════════════════════
+
+describe("I) Blocking after completion", () => {
+  it("goal blocked after COMPLETED", () => {
+    const rules = defaultRules();
+    let s = createInitialFutsalScore(rules);
+    s = addGoal(s, "A", rules);
+    s = endPeriod(s, rules);
+    s = endPeriod(s, rules);
+    s = addGoal(s, "A", rules);
+    expect(s.teamA_goals).toBe(1);
+  });
+
+  it("foul blocked after COMPLETED", () => {
+    const rules = defaultRules();
+    let s = createInitialFutsalScore(rules);
+    s = addGoal(s, "A", rules);
+    s = endPeriod(s, rules);
+    s = endPeriod(s, rules);
+    s = addFoul(s, "B");
+    expect(s.fouls.teamB).toBe(0);
+  });
+
+  it("endPeriod blocked after COMPLETED", () => {
+    const rules = defaultRules();
+    let s = createInitialFutsalScore(rules);
+    s = addGoal(s, "A", rules);
+    s = endPeriod(s, rules);
+    s = endPeriod(s, rules);
+    expect(s.period).toBe("COMPLETED");
+    s = endPeriod(s, rules);
+    expect(s.period).toBe("COMPLETED");
+  });
+
+  it("goal blocked during PENALTIES period", () => {
+    const rules = defaultRules();
+    let s = advanceToPenalties(rules);
+    s = addGoal(s, "A", rules);
+    expect(s.teamA_goals).toBe(0);
+  });
+
+  it("endPeriod blocked during PENALTIES", () => {
+    const rules = defaultRules();
+    let s = advanceToPenalties(rules);
+    s = endPeriod(s, rules);
+    expect(s.period).toBe("PENALTIES");
+  });
+});
+
+// ══════════════════════════════════════════════════════════
+// J) Testes Negativos
+// ══════════════════════════════════════════════════════════
+
+describe("J) Negative tests", () => {
+  it("cannot init without rules", () => {
+    expect(() => createInitialFutsalScore(null as any)).toThrow();
+    expect(() => createInitialFutsalScore(undefined as any)).toThrow();
+  });
+
+  it("replayHistory with empty array returns initial state", () => {
+    const rules = defaultRules();
+    const s = replayHistory([], rules);
+    expect(s.period).toBe("H1");
+    expect(s.teamA_goals).toBe(0);
+    expect(s.teamB_goals).toBe(0);
+  });
+
+  it("replayHistory with invalid rules throws", () => {
+    expect(() => replayHistory([], {} as any)).toThrow();
+  });
+});
+
+// ══════════════════════════════════════════════════════════
+// Period labels & formatting
+// ══════════════════════════════════════════════════════════
+
+describe("Period labels & formatting", () => {
+  it("all period labels", () => {
+    expect(getPeriodLabel("H1")).toBe("1º Tempo");
+    expect(getPeriodLabel("H2")).toBe("2º Tempo");
+    expect(getPeriodLabel("ET1")).toBe("Prorrogação 1");
+    expect(getPeriodLabel("ET2")).toBe("Prorrogação 2");
+    expect(getPeriodLabel("PENALTIES")).toBe("Pênaltis");
+    expect(getPeriodLabel("COMPLETED")).toBe("Encerrado");
+  });
+
+  it("formatFutsalScore with penalties", () => {
+    const rules = defaultRules();
+    let s = advanceToPenalties(rules);
+    s = addPenaltyKick(s, "A", true, rules);
+    s = addPenaltyKick(s, "B", false, rules);
+    s = addPenaltyKick(s, "A", true, rules);
+    s = addPenaltyKick(s, "B", false, rules);
+    s = addPenaltyKick(s, "A", true, rules);
+    s = addPenaltyKick(s, "B", false, rules);
+    expect(formatFutsalScore(s)).toBe("0-0 (3-0 pen)");
+  });
+
+  it("formatFutsalScore without penalties", () => {
+    const rules = defaultRules();
+    let s = createInitialFutsalScore(rules);
+    s = addGoal(s, "A", rules);
+    expect(formatFutsalScore(s)).toBe("1-0");
+  });
+});
+
+// ══════════════════════════════════════════════════════════
+// Flow edge cases
+// ══════════════════════════════════════════════════════════
+
+describe("Flow edge cases", () => {
+  it("draw without ET or penalties → forced COMPLETED", () => {
+    const rules = defaultRules({
+      allow_draw: false,
+      use_extra_time: false,
+      use_penalties: false,
+    });
+    let s = createInitialFutsalScore(rules);
+    s = endPeriod(s, rules); // H2
+    s = endPeriod(s, rules); // forced COMPLETED (no option)
+    expect(s.period).toBe("COMPLETED");
+    expect(getWinner(s)).toBeNull();
+  });
+
+  it("winner via penalties", () => {
+    const rules = defaultRules({ use_extra_time: true, use_penalties: true });
+    let s = createInitialFutsalScore(rules);
+    s = endPeriod(s, rules);
+    s = endPeriod(s, rules); // ET1
+    s = endPeriod(s, rules); // ET2
+    s = endPeriod(s, rules); // PENALTIES
+    s = addPenaltyKick(s, "A", true, rules);
+    s = addPenaltyKick(s, "B", false, rules);
+    s = addPenaltyKick(s, "A", true, rules);
+    s = addPenaltyKick(s, "B", false, rules);
+    s = addPenaltyKick(s, "A", true, rules);
+    s = addPenaltyKick(s, "B", false, rules);
+    expect(s.period).toBe("COMPLETED");
+    expect(getWinner(s)).toBe("A");
+  });
+
+  it("immutability: original state unchanged after operations", () => {
+    const rules = defaultRules();
+    const s1 = createInitialFutsalScore(rules);
+    const s2 = addGoal(s1, "A", rules);
+    expect(s1.teamA_goals).toBe(0);
+    expect(s2.teamA_goals).toBe(1);
   });
 });

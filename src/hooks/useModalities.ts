@@ -17,7 +17,10 @@ export function useModalities(tournamentId: string | undefined) {
   const [loading, setLoading] = useState(true);
 
   const fetchModalities = useCallback(async () => {
-    if (!tournamentId) return;
+    if (!tournamentId) {
+      setLoading(false);
+      return;
+    }
     const { data, error } = await supabase
       .from("modalities")
       .select("*")

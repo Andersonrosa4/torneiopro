@@ -1279,6 +1279,19 @@ const TournamentDetail = () => {
         console.log(`[SE:Propagate] Winner ${winnerId} → Match ${match.next_win_match_id} (${slotField})`);
       }
 
+      // Normal bracket: propagate LOSER to 3rd place match via next_lose_match_id
+      if (match.next_lose_match_id && loserId) {
+        const isTopSlot = match.position % 2 === 1;
+        const slotField = isTopSlot ? 'team1_id' : 'team2_id';
+        await organizerQuery({
+          table: "matches",
+          operation: "update",
+          data: { [slotField]: loserId },
+          filters: { id: match.next_lose_match_id },
+        });
+        console.log(`[SE:3rdPlace] Loser ${loserId} → Match ${match.next_lose_match_id} (${slotField})`);
+      }
+
       // Re-fetch fresh state to check round completion
       const { data: currentMatches } = await organizerQuery({
         table: "matches",

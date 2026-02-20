@@ -738,7 +738,7 @@ const NormalKnockout = ({
   slotMap: Map<string, "A" | "B">;
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const knockoutMatches = matches.filter((m) => m.round > 0);
+  const knockoutMatches = matches.filter((m) => m.round > 0 && m.bracket_type !== 'third_place');
 
   if (knockoutMatches.length === 0) return null;
 
@@ -986,6 +986,33 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
           <NormalKnockout matches={matches} getName={getName} matchNumberMap={matchNumberMap} slotMap={slotMap} />
         </div>
       )}
+
+      {/* 3rd Place Match */}
+      {(() => {
+        const thirdPlaceMatches = matches.filter(m => m.bracket_type === 'third_place');
+        if (thirdPlaceMatches.length === 0) return null;
+        return (
+          <div className="rounded-xl border border-primary/40 bg-gradient-to-r from-primary/10 to-accent/10 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🥉</span>
+              <h3 className="text-sm font-black uppercase tracking-widest text-primary">Disputa de 3º Lugar</h3>
+            </div>
+            <div className="flex flex-wrap gap-4">
+              {thirdPlaceMatches.map(m => (
+                <MatchCard
+                  key={m.id}
+                  match={m}
+                  getName={getName}
+                  scale="semi"
+                  allMatches={matches}
+                  matchNumber={matchNumberMap?.get(m.id)}
+                  matchNumberMap={matchNumberMap}
+                />
+              ))}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

@@ -248,7 +248,7 @@ const MatchCard = ({
             JOGO {matchNumber}
           </span>
           {match.court_number != null && (
-            <span className="inline-flex items-center rounded-sm bg-accent/15 border border-accent/20 px-1.5 py-0.5 text-[8px] font-bold text-accent-foreground leading-none">
+            <span className="inline-flex items-center rounded-sm bg-blue-600 border border-blue-400 px-1.5 py-0.5 text-[8px] font-black text-white leading-none shadow-[0_0_6px_hsl(217,91%,60%/0.5)]">
               Q{match.court_number}
             </span>
           )}

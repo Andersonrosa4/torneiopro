@@ -43,48 +43,65 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const loginInProgress = useRef(false);
+  // Track whether login() already set state, so onAuthStateChange doesn't overwrite
+  const loginDone = useRef(false);
 
-  const fetchOrganizer = useCallback(async (userId: string) => {
+  const fetchOrganizer = useCallback(async (userId: string, token?: string): Promise<{ id: string; role: string } | null> => {
     try {
+      const headers: Record<string, string> = {};
+      const tok = token || _accessToken;
+      if (tok) headers["Authorization"] = `Bearer ${tok}`;
+
       const { data: org } = await supabase
         .from("organizers")
         .select("id, role")
         .eq("user_id", userId)
         .maybeSingle();
-      if (org) {
-        setOrganizerId(org.id);
-        setUserRole(org.role);
-      }
+      return org ?? null;
     } catch (e) {
       console.error("Failed to fetch organizer:", e);
+      return null;
     }
   }, []);
 
   useEffect(() => {
-    // Check existing session first
+    // On mount: restore existing Supabase session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user && !loginInProgress.current) {
-        setUser({ id: session.user.id });
+      if (loginDone.current) {
+        // login() already ran, state is set — just clear loading
+        setLoading(false);
+        return;
+      }
+      if (session?.user) {
         _accessToken = session.access_token;
         setAccessToken(session.access_token);
-        await fetchOrganizer(session.user.id);
+        setUser({ id: session.user.id });
+        const org = await fetchOrganizer(session.user.id, session.access_token);
+        if (org) {
+          setOrganizerId(org.id);
+          setUserRole(org.role);
+        }
       }
       setLoading(false);
     });
 
-    // Listen to future auth changes
+    // Listen to future auth state changes (SIGNED_OUT, TOKEN_REFRESHED, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (loginInProgress.current) return;
+      // If login() already handled setup, ignore SIGNED_IN events to avoid race
+      if (loginDone.current && event === "SIGNED_IN") return;
 
       if (session?.user) {
-        setUser({ id: session.user.id });
         _accessToken = session.access_token;
         setAccessToken(session.access_token);
-        if (event === "SIGNED_IN") {
-          await fetchOrganizer(session.user.id);
+        setUser({ id: session.user.id });
+        if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+          const org = await fetchOrganizer(session.user.id, session.access_token);
+          if (org) {
+            setOrganizerId(org.id);
+            setUserRole(org.role);
+          }
         }
-      } else {
+      } else if (event === "SIGNED_OUT") {
         setUser(null);
         setOrganizerId(null);
         setUserRole(null);
@@ -102,8 +119,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     newOrganizerId: string,
     role?: string
   ) => {
-    loginInProgress.current = true;
-
     try {
       // Decode user id from JWT directly (synchronous, no network)
       const payload = JSON.parse(atob(session.access_token.split('.')[1]));
@@ -112,23 +127,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Store token at module level for immediate access in queries
       _accessToken = session.access_token;
 
-      // Update React state
+      // Mark as done BEFORE setting state so onAuthStateChange ignores the setSession event
+      loginDone.current = true;
+
+      // Update React state immediately
       setUser({ id: userId });
       setOrganizerId(newOrganizerId);
       setUserRole(role || null);
       setAccessToken(session.access_token);
+      setLoading(false);
 
-      // Persist session in Supabase client (non-blocking)
+      // Persist session in Supabase client (non-blocking, runs after state is set)
       supabase.auth.setSession({
         access_token: session.access_token,
         refresh_token: session.refresh_token,
       }).catch((e) => console.error("setSession error:", e));
 
+      // Allow onAuthStateChange to work again after 2s (for token refresh etc.)
+      setTimeout(() => { loginDone.current = false; }, 2000);
+
     } catch (e) {
       console.error("Login error:", e);
-    } finally {
       setLoading(false);
-      setTimeout(() => { loginInProgress.current = false; }, 1000);
     }
   }, []);
 

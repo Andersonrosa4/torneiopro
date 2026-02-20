@@ -91,19 +91,53 @@ const Index = () => {
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 py-10">
-      {/* Beach arena background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[hsl(220_15%_8%)] via-[hsl(220_12%_12%)] to-[hsl(25_15%_14%)]" />
+      {/* Deep layered background */}
+      <div className="absolute inset-0 bg-gradient-to-b from-[hsl(220_20%_5%)] via-[hsl(220_15%_10%)] to-[hsl(25_20%_8%)]" />
 
-      {/* Sand texture at bottom */}
-      <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-[hsl(35_35%_65%/0.15)] to-transparent" />
+      {/* Mesh gradient orbs */}
+      <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,hsl(195_80%_50%/0.12),transparent_60%)] blur-3xl animate-float-slow" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full bg-[radial-gradient(circle,hsl(22_90%_55%/0.1),transparent_60%)] blur-3xl animate-float-slow" style={{ animationDelay: "3s" }} />
+      <div className="absolute top-[40%] left-[60%] w-[400px] h-[400px] rounded-full bg-[radial-gradient(circle,hsl(270_60%_50%/0.06),transparent_60%)] blur-3xl animate-float-slow" style={{ animationDelay: "5s" }} />
 
-      {/* Animated light beams */}
-      <div className="absolute top-0 left-1/4 w-32 h-full bg-gradient-to-b from-[hsl(195_80%_60%/0.08)] to-transparent rotate-12 animate-light-beam" />
-      <div className="absolute top-0 right-1/3 w-24 h-full bg-gradient-to-b from-[hsl(35_80%_60%/0.06)] to-transparent -rotate-6 animate-light-beam" style={{ animationDelay: "2s" }} />
+      {/* Subtle grid pattern */}
+      <div className="absolute inset-0 opacity-[0.03]" style={{
+        backgroundImage: "linear-gradient(hsl(195_80%_60%/0.3) 1px, transparent 1px), linear-gradient(90deg, hsl(195_80%_60%/0.3) 1px, transparent 1px)",
+        backgroundSize: "60px 60px",
+      }} />
 
-      {/* Stadium light spots */}
-      <div className="absolute top-0 left-0 w-96 h-96 bg-[radial-gradient(ellipse_at_center,hsl(195_80%_60%/0.1),transparent_70%)]" />
-      <div className="absolute top-0 right-0 w-96 h-96 bg-[radial-gradient(ellipse_at_center,hsl(22_80%_55%/0.08),transparent_70%)]" />
+      {/* Diagonal light streaks */}
+      <div className="absolute top-0 left-[10%] w-[2px] h-full bg-gradient-to-b from-transparent via-[hsl(195_80%_60%/0.15)] to-transparent rotate-[15deg] animate-light-beam" />
+      <div className="absolute top-0 left-[30%] w-[1px] h-full bg-gradient-to-b from-transparent via-[hsl(35_80%_60%/0.1)] to-transparent rotate-[8deg] animate-light-beam" style={{ animationDelay: "2s" }} />
+      <div className="absolute top-0 right-[20%] w-[2px] h-full bg-gradient-to-b from-transparent via-[hsl(22_90%_55%/0.12)] to-transparent rotate-[-12deg] animate-light-beam" style={{ animationDelay: "4s" }} />
+
+      {/* Stadium floodlights */}
+      <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-[radial-gradient(ellipse_at_top_left,hsl(195_80%_60%/0.08),transparent_70%)]" />
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[radial-gradient(ellipse_at_top_right,hsl(22_80%_55%/0.06),transparent_70%)]" />
+      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-[radial-gradient(ellipse_at_bottom,hsl(35_40%_50%/0.08),transparent_70%)]" />
+
+      {/* Floating particles */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {[...Array(12)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute rounded-full animate-particle"
+            style={{
+              width: `${2 + (i % 3)}px`,
+              height: `${2 + (i % 3)}px`,
+              left: `${8 + i * 8}%`,
+              top: `${10 + (i * 17) % 80}%`,
+              background: i % 2 === 0
+                ? "hsl(195 80% 60% / 0.4)"
+                : "hsl(35 80% 60% / 0.3)",
+              animationDelay: `${i * 0.7}s`,
+              animationDuration: `${4 + (i % 3) * 2}s`,
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Vignette */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_40%,hsl(220_20%_5%/0.6)_100%)]" />
 
       {/* Content */}
       <div className="relative z-10 w-full max-w-5xl">

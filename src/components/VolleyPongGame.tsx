@@ -22,20 +22,20 @@ const NET_X = W / 2;
 const NET_H = 85;
 const NET_TOP = GROUND_Y - NET_H;
 const BALL_R = 9;
-const GRAVITY = 0.26;
-const SERVE_VX = 4.0;
-const SERVE_VY = -6.5;
+const GRAVITY = 0.22;
+const SERVE_VX = 3.5;
+const SERVE_VY = -7.5;
 const MAX_TOUCHES = 3;
 const MAX_SCORE = 5;
 const MIN_DIFF = 2;
 
 // Alien body
 const ALIEN_R = 18;
-const JUMP_VY = -6.0;
+const JUMP_VY = -6.5;
 const MOVE_SPEED = 3.8;
 const AI_SPEED = 2.4;
-const BALL_SPEED_CAP = 6.0;
-const BALL_VY_CAP = 7.0;
+const BALL_SPEED_CAP = 7.0;
+const BALL_VY_CAP = 9.0;
 
 type Phase = "start" | "waiting" | "playing" | "gameover";
 type GameMode = "solo" | "multi";
@@ -821,7 +821,8 @@ const VolleyPongGame = ({
     const cx = p.x, cy = p.y - ALIEN_R;
     const dx = ball.x - cx, dy = ball.y - cy;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const hitR = ALIEN_R + BALL_R * ball.sizeMultiplier + (isLeft ? 8 : 2);
+    // HUGE hit radius — any part of body touches = hit
+    const hitR = ALIEN_R + BALL_R * ball.sizeMultiplier + 18;
     const dir = isLeft ? 1 : -1;
 
     if (dist < hitR && p.touches < MAX_TOUCHES) {
@@ -831,31 +832,29 @@ const VolleyPongGame = ({
       const inAir = p.y < GROUND_Y - 12;
       const isSpike = inAir && p.attackCooldown <= 0;
 
-      // ALL hits = inverted U arc (always goes UP first)
+      // ALL hits = inverted U arc — ball goes HIGH
       if (isSpike) {
-        // CORTADA: fast arc, more horizontal, still goes up
-        ball.vx = dir * 5.2 * ball.speedMultiplier;
-        ball.vy = -3.2;
+        ball.vx = dir * 5.5 * ball.speedMultiplier;
+        ball.vy = -5.0;
         p.attackCooldown = 18;
         p.expression = "determined";
         playSpikeSound();
         spawnParticles(ball.x, ball.y, 6, ["#FFD700", "#FF6B6B"], false);
       } else if (inAir) {
-        // TOQUE NO AR: medium arc
-        ball.vx = dir * 3.5 * ball.speedMultiplier;
-        ball.vy = -4.5;
+        ball.vx = dir * 4.0 * ball.speedMultiplier;
+        ball.vy = -6.5;
         p.expression = "happy";
         playHitSound();
       } else if (p.touches === 1) {
-        // MANCHETE: high defensive arc
-        ball.vx = dir * 2.8 * ball.speedMultiplier;
-        ball.vy = -5.8;
+        // MANCHETE: very high arc
+        ball.vx = dir * 3.2 * ball.speedMultiplier;
+        ball.vy = -8.0;
         p.expression = "surprised";
         playHitSound();
       } else {
-        // LEVANTAMENTO: tall controlled arc
-        ball.vx = dir * 3.2 * ball.speedMultiplier;
-        ball.vy = -5.2;
+        // LEVANTAMENTO: tall arc
+        ball.vx = dir * 3.5 * ball.speedMultiplier;
+        ball.vy = -7.0;
         p.expression = "happy";
         playHitSound();
       }

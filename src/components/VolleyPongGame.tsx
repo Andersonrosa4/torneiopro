@@ -736,18 +736,36 @@ const VolleyPongGame = ({
     setSubmitting(false);
   };
 
+  const countdownRef = useRef(0); // countdown frames (180 = 3s)
+  const countdownTextRef = useRef<string | null>(null);
+  const ballFrozenRef = useRef(true); // ball stays above player until countdown ends
+
   // ── Serve ──
   const serveBall = useCallback((who: "player" | "ai") => {
     rallyCountRef.current = 0;
     const p = who === "player" ? playerRef.current : aiRef.current;
     ballRef.current = {
-      x: p.x, y: p.y - ALIEN_R - BALL_R - 10,
-      vx: who === "player" ? SERVE_VX : -SERVE_VX,
-      vy: SERVE_VY, rotation: 0,
+      x: p.x, y: p.y - ALIEN_R - BALL_R - 25,
+      vx: 0, vy: 0, rotation: 0,
       sizeMultiplier: 1, speedMultiplier: 1, curveActive: false,
     };
-    p.touches = 1;
+    p.touches = 0;
     effectsRef.current = [];
+    // Start countdown: 180 frames ≈ 3 seconds
+    countdownRef.current = 180;
+    ballFrozenRef.current = true;
+  }, []);
+
+  // Actually launch the ball after countdown
+  const launchBall = useCallback((who: "player" | "ai") => {
+    const p = who === "player" ? playerRef.current : aiRef.current;
+    ballRef.current.x = p.x;
+    ballRef.current.y = p.y - ALIEN_R - BALL_R - 15;
+    ballRef.current.vx = who === "player" ? SERVE_VX : -SERVE_VX;
+    ballRef.current.vy = SERVE_VY;
+    p.touches = 1;
+    ballFrozenRef.current = false;
+    playHitSound();
   }, []);
 
   // ── Score point ──
@@ -784,14 +802,19 @@ const VolleyPongGame = ({
       setNumRef.current += 1; setCurrentSet(setNumRef.current);
       pScoreRef.current = 0; aScoreRef.current = 0; setPlayerScore(0); setAiScore(0);
     }
+    const lastScorer = scorer;
     setTimeout(() => {
       if (phaseRef.current === "playing") {
         playerRef.current = createPlayer(W * 0.25);
         aiRef.current = createPlayer(W * 0.75);
-        serveBall(scorer);
+        serveOwnerRef.current = lastScorer;
+        serveBall(lastScorer);
       }
     }, 900);
   }, [serveBall, opponentName]);
+
+  // Track who should launch the ball after countdown
+  const serveOwnerRef = useRef<"player" | "ai">("player");
 
   // ── Ball-player collision — ALL HITS = inverted U arc ──
   const checkHit = (p: Player, ball: Ball, isLeft: boolean): boolean => {
@@ -898,7 +921,39 @@ const VolleyPongGame = ({
 
     // --- Physics (host/solo only) ---
     if (!isGuest) {
-      if (pauseRef.current > 0) { pauseRef.current--; if (isHostMulti) broadcastState(); }
+      // Countdown logic
+      if (countdownRef.current > 0) {
+        countdownRef.current--;
+        const sec = Math.ceil(countdownRef.current / 60);
+        if (sec > 0) countdownTextRef.current = String(sec);
+        else countdownTextRef.current = "GO!";
+        
+        // Keep ball floating above server during countdown
+        if (ballFrozenRef.current) {
+          const server = serveOwnerRef.current === "player" ? playerRef.current : aiRef.current;
+          ballRef.current.x = server.x;
+          ballRef.current.y = server.y - ALIEN_R - BALL_R - 25;
+          ballRef.current.vx = 0;
+          ballRef.current.vy = 0;
+        }
+        
+        // Allow player movement during countdown
+        const player = playerRef.current, ai = aiRef.current;
+        const keys = keysRef.current;
+        let moveDir = touchDirRef.current;
+        if (keys.has("ArrowLeft") || keys.has("a")) moveDir = -1;
+        if (keys.has("ArrowRight") || keys.has("d")) moveDir = 1;
+        player.x += moveDir * MOVE_SPEED;
+        player.x = Math.max(ALIEN_R + 4, Math.min(NET_X - ALIEN_R - 4, player.x));
+        
+        if (countdownRef.current === 0) {
+          countdownTextRef.current = null;
+          launchBall(serveOwnerRef.current);
+        }
+        
+        if (isHostMulti) broadcastState();
+      }
+      else if (pauseRef.current > 0) { pauseRef.current--; if (isHostMulti) broadcastState(); }
       else {
         const player = playerRef.current, ai = aiRef.current, ball = ballRef.current;
         const keys = keysRef.current;
@@ -1107,6 +1162,24 @@ const VolleyPongGame = ({
       // HUD
       drawHUD(ctx, pScoreRef.current, aScoreRef.current, setsRef.current, setNumRef.current, energyRef.current, coinsRef.current, frame);
 
+      // Countdown overlay
+      if (countdownRef.current > 0 && countdownTextRef.current) {
+        ctx.fillStyle = "rgba(0,0,0,0.35)";
+        ctx.fillRect(0, 0, W, H);
+        ctx.font = "bold 52px sans-serif";
+        ctx.fillStyle = "#FFFFFF";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.strokeStyle = "rgba(0,0,0,0.5)";
+        ctx.lineWidth = 3;
+        ctx.strokeText(countdownTextRef.current, W / 2, H * 0.4);
+        ctx.fillText(countdownTextRef.current, W / 2, H * 0.4);
+        // Sub-text
+        ctx.font = "bold 12px sans-serif";
+        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        ctx.fillText("Prepare-se!", W / 2, H * 0.4 + 35);
+      }
+
       // Pause overlay
       if (pauseRef.current > 0) {
         const pointText = lastPointRef.current;
@@ -1123,12 +1196,15 @@ const VolleyPongGame = ({
     }
 
     animRef.current = requestAnimationFrame(gameLoop);
-  }, [scorePoint, broadcastState, sendGuestInput]);
+  }, [scorePoint, broadcastState, sendGuestInput, launchBall]);
 
   // Start render loop
   useEffect(() => {
     if (phase !== "playing") return;
-    if (multiRoleRef.current !== "guest") serveBall("player");
+    if (multiRoleRef.current !== "guest") {
+      serveOwnerRef.current = "player";
+      serveBall("player");
+    }
     animRef.current = requestAnimationFrame(gameLoop);
     return () => cancelAnimationFrame(animRef.current);
   }, [phase, serveBall, gameLoop]);

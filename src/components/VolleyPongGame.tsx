@@ -3,8 +3,9 @@ import { publicQuery } from "@/lib/organizerApi";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { Medal, Zap, RotateCcw, Trash2 } from "lucide-react";
+import { Medal, Zap, RotateCcw, Trash2, Copy, UserPlus, LogIn } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
 
 interface GameScore {
   id: string;
@@ -14,37 +15,40 @@ interface GameScore {
 }
 
 // ── Canvas & physics ──
-const W = 360;
-const H = 400;
-const GROUND_Y = H - 40;
+const W = 480;
+const H = 360;
+const GROUND_Y = H - 50;
 const NET_X = W / 2;
-const NET_H = 90;
+const NET_H = 100;
 const NET_TOP = GROUND_Y - NET_H;
-const BALL_R = 9;
-const GRAVITY = 0.18;
-const BOUNCE = -0.65;
+const BALL_R = 10;
+const GRAVITY = 0.22;
 const MAX_TOUCHES = 3;
-const SERVE_VX = 2.5;
-const SERVE_VY = -5;
+const SERVE_VX = 3;
+const SERVE_VY = -6;
 const MAX_SCORE = 15;
 const MIN_DIFF = 2;
 
 // Player body
-const P_W = 18;
-const P_H = 44;
-const HEAD_R = 8;
-const JUMP_VY = -6.5;
-const MOVE_SPEED = 2.8;
-const AI_SPEED = 2.4;
+const P_W = 22;
+const P_H = 52;
+const HEAD_R = 9;
+const JUMP_VY = -7.2;
+const MOVE_SPEED = 3.2;
+const AI_SPEED = 2.8;
+const ATTACK_BOOST = 2.5; // extra power on spike
 
 type Phase = "start" | "playing" | "gameover";
 
 interface Player {
   x: number;
-  y: number; // feet Y (ground = GROUND_Y)
+  y: number;
   vy: number;
-  armAngle: number; // 0-1 for attack animation
+  armAngle: number;
   touches: number;
+  isAttacking: boolean;
+  attackCooldown: number;
+  legPhase: number; // for running animation
 }
 
 interface Ball {
@@ -52,259 +56,525 @@ interface Ball {
   y: number;
   vx: number;
   vy: number;
+  rotation: number;
+  trail: { x: number; y: number; alpha: number }[];
 }
 
+const createPlayer = (x: number): Player => ({
+  x, y: GROUND_Y, vy: 0, armAngle: 0, touches: 0,
+  isAttacking: false, attackCooldown: 0, legPhase: 0,
+});
+
+const createBall = (x: number, y: number): Ball => ({
+  x, y, vx: 0, vy: 0, rotation: 0, trail: [],
+});
+
 // ── Draw helpers ──
-const drawStickPlayer = (
+
+const drawSky = (ctx: CanvasRenderingContext2D) => {
+  const sky = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
+  sky.addColorStop(0, "#0f2b4a");
+  sky.addColorStop(0.3, "#1a4570");
+  sky.addColorStop(0.6, "#2a6a9e");
+  sky.addColorStop(1, "#4a9dd4");
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, GROUND_Y);
+
+  // Clouds
+  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  ctx.beginPath();
+  ctx.ellipse(80, 40, 50, 15, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(350, 55, 40, 12, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(220, 30, 35, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+};
+
+const drawCourt = (ctx: CanvasRenderingContext2D) => {
+  drawSky(ctx);
+
+  // Sand with texture
+  const sand = ctx.createLinearGradient(0, GROUND_Y, 0, H);
+  sand.addColorStop(0, "#d4a96a");
+  sand.addColorStop(0.15, "#c89e5f");
+  sand.addColorStop(0.5, "#b88d4f");
+  sand.addColorStop(1, "#a07940");
+  ctx.fillStyle = sand;
+  ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
+
+  // Sand grain texture
+  ctx.fillStyle = "rgba(0,0,0,0.03)";
+  for (let i = 0; i < 100; i++) {
+    const sx = (i * 47 + 13) % W;
+    const sy = GROUND_Y + 3 + ((i * 29) % (H - GROUND_Y - 6));
+    ctx.beginPath();
+    ctx.arc(sx, sy, 0.8 + (i % 3) * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Light sand highlights
+  ctx.fillStyle = "rgba(255,255,200,0.04)";
+  for (let i = 0; i < 30; i++) {
+    const sx = (i * 71 + 5) % W;
+    const sy = GROUND_Y + 5 + ((i * 37) % (H - GROUND_Y - 10));
+    ctx.beginPath();
+    ctx.arc(sx, sy, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Court boundary lines (white tape in sand)
+  ctx.strokeStyle = "rgba(255,255,255,0.5)";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(20, GROUND_Y + 1);
+  ctx.lineTo(W - 20, GROUND_Y + 1);
+  ctx.stroke();
+
+  // Side lines
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(20, GROUND_Y);
+  ctx.lineTo(20, H - 8);
+  ctx.moveTo(W - 20, GROUND_Y);
+  ctx.lineTo(W - 20, H - 8);
+  ctx.stroke();
+
+  // Bottom line
+  ctx.beginPath();
+  ctx.moveTo(20, H - 8);
+  ctx.lineTo(W - 20, H - 8);
+  ctx.stroke();
+};
+
+const drawNet = (ctx: CanvasRenderingContext2D) => {
+  // Post shadow
+  ctx.fillStyle = "rgba(0,0,0,0.1)";
+  ctx.fillRect(NET_X + 2, NET_TOP - 8, 5, NET_H + 10);
+
+  // Post (metallic gradient)
+  const postGrad = ctx.createLinearGradient(NET_X - 3, 0, NET_X + 3, 0);
+  postGrad.addColorStop(0, "#999");
+  postGrad.addColorStop(0.3, "#ddd");
+  postGrad.addColorStop(0.7, "#bbb");
+  postGrad.addColorStop(1, "#888");
+  ctx.fillStyle = postGrad;
+  ctx.fillRect(NET_X - 3, NET_TOP - 10, 6, NET_H + 12);
+
+  // Post cap (sphere)
+  const capGrad = ctx.createRadialGradient(NET_X - 1, NET_TOP - 12, 1, NET_X, NET_TOP - 10, 6);
+  capGrad.addColorStop(0, "#eee");
+  capGrad.addColorStop(1, "#888");
+  ctx.fillStyle = capGrad;
+  ctx.beginPath();
+  ctx.arc(NET_X, NET_TOP - 10, 6, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Net mesh
+  const meshSpacingH = 10;
+  const meshSpacingV = 10;
+  ctx.strokeStyle = "rgba(255,255,255,0.18)";
+  ctx.lineWidth = 0.6;
+
+  // Horizontal ropes
+  for (let y = NET_TOP; y <= GROUND_Y; y += meshSpacingH) {
+    ctx.beginPath();
+    const sag = Math.sin(((y - NET_TOP) / (GROUND_Y - NET_TOP)) * Math.PI) * 3;
+    ctx.moveTo(NET_X - 20, y);
+    ctx.quadraticCurveTo(NET_X, y + sag, NET_X + 20, y);
+    ctx.stroke();
+  }
+  // Vertical ropes
+  for (let x = NET_X - 18; x <= NET_X + 18; x += meshSpacingV) {
+    ctx.beginPath();
+    ctx.moveTo(x, NET_TOP);
+    ctx.lineTo(x, GROUND_Y);
+    ctx.stroke();
+  }
+
+  // Top tape (white band)
+  const tapeGrad = ctx.createLinearGradient(0, NET_TOP - 4, 0, NET_TOP + 4);
+  tapeGrad.addColorStop(0, "rgba(255,255,255,0.9)");
+  tapeGrad.addColorStop(1, "rgba(220,220,220,0.8)");
+  ctx.fillStyle = tapeGrad;
+  ctx.beginPath();
+  ctx.roundRect(NET_X - 22, NET_TOP - 4, 44, 7, 2);
+  ctx.fill();
+
+  // Antenna markers (red/white stripes)
+  for (let i = 0; i < 4; i++) {
+    ctx.fillStyle = i % 2 === 0 ? "#e63946" : "#ffffff";
+    ctx.fillRect(NET_X - 22, NET_TOP - 4 - (i + 1) * 6, 2.5, 6);
+    ctx.fillRect(NET_X + 20, NET_TOP - 4 - (i + 1) * 6, 2.5, 6);
+  }
+};
+
+const drawPlayer = (
   ctx: CanvasRenderingContext2D,
   p: Player,
   faceRight: boolean,
   shirtColor: string,
   shortColor: string,
+  skinTone: string,
+  hairColor: string,
+  number: string,
 ) => {
   const dir = faceRight ? 1 : -1;
   const feetY = p.y;
-  const hipY = feetY - 14;
-  const shoulderY = feetY - P_H + HEAD_R + 2;
-  const headY = feetY - P_H - HEAD_R + 2;
+  const hipY = feetY - 18;
+  const shoulderY = feetY - P_H + HEAD_R + 4;
+  const headY = feetY - P_H - HEAD_R + 4;
   const isJumping = p.y < GROUND_Y;
-  const kneeSpread = isJumping ? 8 : 5;
+  const isMoving = Math.abs(p.legPhase) > 0.1;
 
-  // Shadow on ground
-  ctx.fillStyle = "rgba(0,0,0,0.15)";
+  // Dynamic shadow on ground (smaller when jumping)
+  const shadowScale = isJumping ? Math.max(0.3, 1 - (GROUND_Y - p.y) / 150) : 1;
+  ctx.fillStyle = `rgba(0,0,0,${0.15 * shadowScale})`;
   ctx.beginPath();
-  ctx.ellipse(p.x, GROUND_Y + 2, 12, 3, 0, 0, Math.PI * 2);
+  ctx.ellipse(p.x, GROUND_Y + 3, 14 * shadowScale, 4 * shadowScale, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Legs (skin)
-  ctx.strokeStyle = "#c8956c";
-  ctx.lineWidth = 3;
+  // Legs with running animation
+  ctx.strokeStyle = skinTone;
+  ctx.lineWidth = 3.5;
   ctx.lineCap = "round";
+
+  const legAnim = isMoving && !isJumping ? Math.sin(p.legPhase) * 8 : 0;
+  const jumpSpread = isJumping ? 10 : 6;
+
+  // Left leg
+  const lFootX = p.x - jumpSpread + legAnim;
+  const lKneeX = p.x - 4 + legAnim * 0.3;
+  const lKneeY = hipY + (hipY < feetY ? (feetY - hipY) * 0.55 : 0);
   ctx.beginPath();
-  ctx.moveTo(p.x - kneeSpread, feetY);
-  ctx.lineTo(p.x - 3, hipY + 4);
-  ctx.lineTo(p.x, hipY);
+  ctx.moveTo(lFootX, feetY);
+  ctx.quadraticCurveTo(lKneeX, lKneeY, p.x - 2, hipY);
   ctx.stroke();
+
+  // Right leg
+  const rFootX = p.x + jumpSpread - legAnim;
+  const rKneeX = p.x + 4 - legAnim * 0.3;
   ctx.beginPath();
-  ctx.moveTo(p.x + kneeSpread, feetY);
-  ctx.lineTo(p.x + 3, hipY + 4);
-  ctx.lineTo(p.x, hipY);
+  ctx.moveTo(rFootX, feetY);
+  ctx.quadraticCurveTo(rKneeX, lKneeY, p.x + 2, hipY);
   ctx.stroke();
+
+  // Shoes
+  ctx.fillStyle = "#1a1a2e";
+  ctx.beginPath();
+  ctx.ellipse(lFootX, feetY + 1, 5, 2.5, dir * 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(rFootX, feetY + 1, 5, 2.5, dir * 0.2, 0, Math.PI * 2);
+  ctx.fill();
 
   // Shorts
   ctx.fillStyle = shortColor;
   ctx.beginPath();
-  ctx.roundRect(p.x - 7, hipY - 2, 14, 10, 3);
+  ctx.roundRect(p.x - 9, hipY - 3, 18, 12, 4);
+  ctx.fill();
+  // Shorts stripe
+  ctx.fillStyle = "rgba(255,255,255,0.15)";
+  ctx.fillRect(p.x - 9 + (faceRight ? 14 : 0), hipY - 1, 3, 10);
+
+  // Torso (shirt with gradient)
+  const shirtGrad = ctx.createLinearGradient(p.x - 10, shoulderY, p.x + 10, hipY);
+  shirtGrad.addColorStop(0, shirtColor);
+  shirtGrad.addColorStop(1, adjustColor(shirtColor, -20));
+  ctx.fillStyle = shirtGrad;
+  ctx.beginPath();
+  ctx.roundRect(p.x - 10, shoulderY, 20, hipY - shoulderY + 2, 4);
   ctx.fill();
 
-  // Torso (shirt)
-  ctx.fillStyle = shirtColor;
-  ctx.beginPath();
-  ctx.roundRect(p.x - 8, shoulderY, 16, hipY - shoulderY, 3);
-  ctx.fill();
-  // Number on shirt
-  ctx.fillStyle = "rgba(255,255,255,0.6)";
-  ctx.font = "bold 8px system-ui";
+  // Shirt number
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.font = "bold 10px 'Segoe UI', system-ui, sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText(faceRight ? "1" : "2", p.x, shoulderY + 14);
+  ctx.fillText(number, p.x, shoulderY + 16);
+
+  // Collar
+  ctx.strokeStyle = "rgba(255,255,255,0.3)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(p.x, shoulderY + 2, 5, Math.PI * 0.1, Math.PI * 0.9);
+  ctx.stroke();
 
   // Arms
-  const armBase = shoulderY + 4;
-  ctx.strokeStyle = "#c8956c";
-  ctx.lineWidth = 3;
-  
-  // Attack arm (hitting side)
-  const attackAngle = p.armAngle;
-  if (attackAngle > 0) {
-    // Raised arm for attack
-    const armEndX = p.x + dir * (10 + attackAngle * 8);
-    const armEndY = armBase - attackAngle * 22;
+  ctx.strokeStyle = skinTone;
+  ctx.lineWidth = 3.5;
+  ctx.lineCap = "round";
+  const armBaseY = shoulderY + 6;
+
+  if (p.isAttacking || p.armAngle > 0.3) {
+    // ATTACK ARM - raised high and swinging
+    const attackProgress = p.armAngle;
+    const swingAngle = -Math.PI * 0.4 - attackProgress * Math.PI * 0.5;
+    const armLen = 20;
+    const elbowX = p.x + dir * 8;
+    const elbowY = armBaseY - 6;
+    const handX = elbowX + Math.cos(swingAngle) * armLen * dir;
+    const handY = elbowY + Math.sin(swingAngle) * armLen;
+
+    // Upper arm
     ctx.beginPath();
-    ctx.moveTo(p.x + dir * 6, armBase);
-    ctx.lineTo(armEndX, armEndY);
+    ctx.moveTo(p.x + dir * 8, armBaseY);
+    ctx.lineTo(elbowX, elbowY);
     ctx.stroke();
-    // Hand/fist
-    ctx.fillStyle = "#c8956c";
+    // Forearm
     ctx.beginPath();
-    ctx.arc(armEndX, armEndY, 3, 0, Math.PI * 2);
+    ctx.moveTo(elbowX, elbowY);
+    ctx.lineTo(handX, handY);
+    ctx.stroke();
+
+    // Fist (closed hand)
+    ctx.fillStyle = skinTone;
+    ctx.beginPath();
+    ctx.arc(handX, handY, 3.5, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = adjustColor(skinTone, -30);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Motion lines for attack
+    if (attackProgress > 0.5) {
+      ctx.strokeStyle = "rgba(255,255,255,0.3)";
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(handX - dir * (8 + i * 5), handY - 3 + i * 3);
+        ctx.lineTo(handX - dir * (14 + i * 5), handY - 1 + i * 3);
+        ctx.stroke();
+      }
+    }
   } else {
-    // Resting arms
+    // Relaxed arms - ready position (forearms forward like a volleyball player)
+    // Front arm
     ctx.beginPath();
-    ctx.moveTo(p.x + dir * 6, armBase);
-    ctx.lineTo(p.x + dir * 12, armBase + 14);
+    ctx.moveTo(p.x + dir * 8, armBaseY);
+    ctx.quadraticCurveTo(p.x + dir * 14, armBaseY + 4, p.x + dir * 16, armBaseY + 12);
+    ctx.stroke();
+    // Back arm
+    ctx.beginPath();
+    ctx.moveTo(p.x - dir * 7, armBaseY);
+    ctx.quadraticCurveTo(p.x - dir * 10, armBaseY + 6, p.x - dir * 8, armBaseY + 14);
     ctx.stroke();
   }
-  // Other arm (always relaxed)
+
+  // Neck
+  ctx.strokeStyle = skinTone;
+  ctx.lineWidth = 4;
   ctx.beginPath();
-  ctx.moveTo(p.x - dir * 6, armBase);
-  ctx.lineTo(p.x - dir * 10, armBase + 12);
+  ctx.moveTo(p.x, shoulderY);
+  ctx.lineTo(p.x, headY + HEAD_R);
   ctx.stroke();
 
   // Head
-  ctx.fillStyle = "#d4a574";
+  const headGrad = ctx.createRadialGradient(p.x - 1, headY - 2, 1, p.x, headY, HEAD_R);
+  headGrad.addColorStop(0, lightenColor(skinTone, 10));
+  headGrad.addColorStop(1, skinTone);
+  ctx.fillStyle = headGrad;
   ctx.beginPath();
   ctx.arc(p.x, headY, HEAD_R, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = "rgba(0,0,0,0.1)";
-  ctx.lineWidth = 1;
-  ctx.stroke();
 
   // Hair
-  ctx.fillStyle = faceRight ? "#3b2507" : "#1a1a2e";
+  ctx.fillStyle = hairColor;
   ctx.beginPath();
-  ctx.arc(p.x, headY - 2, HEAD_R, Math.PI, 2 * Math.PI);
+  ctx.arc(p.x, headY - 1, HEAD_R + 0.5, Math.PI * 1.1, Math.PI * 1.9, false);
+  ctx.arc(p.x, headY - 3, HEAD_R - 1, Math.PI * 1.9, Math.PI * 1.1, true);
   ctx.fill();
 
   // Eyes
   ctx.fillStyle = "#1a1a1a";
-  const eyeX = p.x + dir * 3;
+  const eyeX = p.x + dir * 3.5;
   ctx.beginPath();
-  ctx.arc(eyeX, headY - 1, 1.5, 0, Math.PI * 2);
+  ctx.ellipse(eyeX, headY - 1, 1.8, 2, 0, 0, Math.PI * 2);
   ctx.fill();
-};
-
-const drawNet = (ctx: CanvasRenderingContext2D) => {
-  // Posts
-  ctx.fillStyle = "#8B8B8B";
-  ctx.fillRect(NET_X - 3, NET_TOP - 6, 6, NET_H + 6);
-  // Post caps
-  ctx.fillStyle = "#aaa";
+  // Eye highlight
+  ctx.fillStyle = "#fff";
   ctx.beginPath();
-  ctx.arc(NET_X, NET_TOP - 6, 5, 0, Math.PI * 2);
+  ctx.arc(eyeX + 0.5, headY - 2, 0.7, 0, Math.PI * 2);
   ctx.fill();
 
-  // Net mesh
-  const meshTop = NET_TOP;
-  const meshBot = GROUND_Y;
-  const spacing = 8;
-
-  ctx.strokeStyle = "rgba(255,255,255,0.3)";
-  ctx.lineWidth = 0.8;
-  // Horizontal lines
-  for (let y = meshTop; y <= meshBot; y += spacing) {
-    ctx.beginPath();
-    ctx.moveTo(NET_X - 3, y);
-    ctx.lineTo(NET_X + 3, y);
-    ctx.stroke();
-  }
-  // Top band (white tape)
-  ctx.fillStyle = "rgba(255,255,255,0.7)";
-  ctx.fillRect(NET_X - 4, meshTop - 2, 8, 5);
-
-  // Antenna markers (red/white)
-  ctx.fillStyle = "#ef4444";
-  ctx.fillRect(NET_X - 1, meshTop - 14, 2, 8);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(NET_X - 1, meshTop - 22, 2, 8);
-};
-
-const drawCourt = (ctx: CanvasRenderingContext2D) => {
-  // Sky gradient
-  const sky = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
-  sky.addColorStop(0, "#1a3a5c");
-  sky.addColorStop(0.6, "#2d5a7b");
-  sky.addColorStop(1, "#3a7ca5");
-  ctx.fillStyle = sky;
-  ctx.fillRect(0, 0, W, GROUND_Y);
-
-  // Sand/court floor
-  const sand = ctx.createLinearGradient(0, GROUND_Y, 0, H);
-  sand.addColorStop(0, "#c2956a");
-  sand.addColorStop(0.3, "#d4a574");
-  sand.addColorStop(1, "#b8885c");
-  ctx.fillStyle = sand;
-  ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
-
-  // Court boundary lines
-  ctx.strokeStyle = "rgba(255,255,255,0.5)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(16, GROUND_Y);
-  ctx.lineTo(W - 16, GROUND_Y);
-  ctx.stroke();
-
-  // Side lines
-  ctx.strokeStyle = "rgba(255,255,255,0.25)";
+  // Eyebrow
+  ctx.strokeStyle = hairColor;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(16, GROUND_Y);
-  ctx.lineTo(16, GROUND_Y + 30);
-  ctx.moveTo(W - 16, GROUND_Y);
-  ctx.lineTo(W - 16, GROUND_Y + 30);
+  ctx.moveTo(eyeX - 3, headY - 4);
+  ctx.lineTo(eyeX + 2, headY - 4.5);
   ctx.stroke();
 
-  // Attack lines (3m)
-  ctx.setLineDash([3, 3]);
-  ctx.strokeStyle = "rgba(255,255,255,0.15)";
+  // Mouth
+  ctx.strokeStyle = adjustColor(skinTone, -40);
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(NET_X - 60, GROUND_Y + 2);
-  ctx.lineTo(NET_X - 60, GROUND_Y + 28);
-  ctx.moveTo(NET_X + 60, GROUND_Y + 2);
-  ctx.lineTo(NET_X + 60, GROUND_Y + 28);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Sand texture dots
-  ctx.fillStyle = "rgba(0,0,0,0.04)";
-  for (let i = 0; i < 40; i++) {
-    const sx = (i * 73 + 17) % W;
-    const sy = GROUND_Y + 5 + ((i * 31) % 30);
-    ctx.beginPath();
-    ctx.arc(sx, sy, 1, 0, Math.PI * 2);
-    ctx.fill();
+  if (p.isAttacking) {
+    // Open mouth when attacking
+    ctx.arc(p.x + dir * 2, headY + 3, 2, 0, Math.PI);
+  } else {
+    ctx.moveTo(p.x + dir * 1, headY + 3);
+    ctx.lineTo(p.x + dir * 4, headY + 2.5);
   }
+  ctx.stroke();
+
+  // Sweatband
+  ctx.strokeStyle = "rgba(255,255,255,0.6)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(p.x, headY, HEAD_R + 0.5, Math.PI * 0.85, Math.PI * 0.15, true);
+  ctx.stroke();
 };
 
 const drawBall = (ctx: CanvasRenderingContext2D, ball: Ball) => {
-  // Shadow
-  ctx.fillStyle = "rgba(0,0,0,0.15)";
+  // Trail
+  for (const t of ball.trail) {
+    ctx.fillStyle = `rgba(255,255,230,${t.alpha * 0.3})`;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, BALL_R * t.alpha * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Dynamic shadow
+  const shadowDist = Math.max(0, GROUND_Y - ball.y);
+  const shadowScale = Math.max(0.2, 1 - shadowDist / 250);
+  ctx.fillStyle = `rgba(0,0,0,${0.12 * shadowScale})`;
   ctx.beginPath();
-  ctx.ellipse(ball.x, GROUND_Y + 2, 8, 2.5, 0, 0, Math.PI * 2);
+  ctx.ellipse(ball.x + shadowDist * 0.05, GROUND_Y + 3, 10 * shadowScale, 3 * shadowScale, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Ball body
-  const g = ctx.createRadialGradient(
-    ball.x - 2, ball.y - 2, 1,
-    ball.x, ball.y, BALL_R
-  );
-  g.addColorStop(0, "#ffffff");
-  g.addColorStop(0.5, "#f5f0e0");
-  g.addColorStop(1, "#ddd5c0");
+  ctx.save();
+  ctx.translate(ball.x, ball.y);
+  ctx.rotate(ball.rotation);
+
+  // Ball body with gradient
+  const g = ctx.createRadialGradient(-2, -3, 1, 0, 0, BALL_R);
+  g.addColorStop(0, "#fffef5");
+  g.addColorStop(0.3, "#f8f3e0");
+  g.addColorStop(0.7, "#e8dcc0");
+  g.addColorStop(1, "#d5c8a5");
   ctx.fillStyle = g;
   ctx.beginPath();
-  ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
+  ctx.arc(0, 0, BALL_R, 0, Math.PI * 2);
   ctx.fill();
 
-  // Panel lines (volleyball look)
-  ctx.strokeStyle = "rgba(0,0,0,0.18)";
-  ctx.lineWidth = 1;
-  // Vertical seam
+  // Volleyball panel lines
+  ctx.strokeStyle = "rgba(0,0,0,0.2)";
+  ctx.lineWidth = 1.2;
+
+  // Three curved seams
   ctx.beginPath();
-  ctx.arc(ball.x, ball.y, BALL_R * 0.85, -1.2, 1.2);
-  ctx.stroke();
-  // Horizontal seam
-  ctx.beginPath();
-  ctx.arc(ball.x, ball.y, BALL_R * 0.85, 0.4 + Math.PI / 2, 2.7 + Math.PI / 2);
-  ctx.stroke();
-  // Curved seam
-  ctx.beginPath();
-  ctx.arc(ball.x + 3, ball.y - 2, BALL_R * 0.6, -2, -0.5);
+  ctx.arc(0, 0, BALL_R * 0.8, -1.3, 1.3);
   ctx.stroke();
 
-  // Shine
-  ctx.fillStyle = "rgba(255,255,255,0.5)";
   ctx.beginPath();
-  ctx.arc(ball.x - 3, ball.y - 3, 3, 0, Math.PI * 2);
+  ctx.arc(0, 0, BALL_R * 0.8, Math.PI / 2 - 1.1, Math.PI / 2 + 1.1);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(3, -2, BALL_R * 0.55, -2.2, -0.3);
+  ctx.stroke();
+
+  // Color panels (Mikasa-style blue/yellow)
+  ctx.fillStyle = "rgba(59,130,246,0.12)";
+  ctx.beginPath();
+  ctx.arc(-3, -2, BALL_R * 0.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(234,179,8,0.1)";
+  ctx.beginPath();
+  ctx.arc(4, 3, BALL_R * 0.35, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Shine highlight
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.beginPath();
+  ctx.ellipse(-3, -4, 3.5, 2, -0.3, 0, Math.PI * 2);
   ctx.fill();
 
   // Outline
-  ctx.strokeStyle = "rgba(0,0,0,0.12)";
-  ctx.lineWidth = 0.8;
+  ctx.strokeStyle = "rgba(0,0,0,0.15)";
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
+  ctx.arc(0, 0, BALL_R, 0, Math.PI * 2);
   ctx.stroke();
+
+  ctx.restore();
 };
+
+const drawHUD = (
+  ctx: CanvasRenderingContext2D,
+  pScore: number, aScore: number,
+  setNum: number, sets: number[],
+  pTouches: number, aTouches: number,
+  rallyCount: number,
+) => {
+  // Scoreboard background
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.beginPath();
+  ctx.roundRect(W / 2 - 80, 6, 160, 40, 8);
+  ctx.fill();
+
+  // Backdrop glow
+  ctx.fillStyle = "rgba(255,255,255,0.03)";
+  ctx.beginPath();
+  ctx.roundRect(W / 2 - 82, 4, 164, 44, 10);
+  ctx.fill();
+
+  // Player score
+  ctx.fillStyle = "#3b82f6";
+  ctx.font = "bold 22px 'Segoe UI', system-ui";
+  ctx.textAlign = "right";
+  ctx.fillText(String(pScore), W / 2 - 12, 34);
+
+  // Separator
+  ctx.fillStyle = "rgba(255,255,255,0.5)";
+  ctx.font = "bold 18px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText("×", W / 2, 33);
+
+  // AI score
+  ctx.fillStyle = "#ef4444";
+  ctx.font = "bold 22px 'Segoe UI', system-ui";
+  ctx.textAlign = "left";
+  ctx.fillText(String(aScore), W / 2 + 12, 34);
+
+  // Set info
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.font = "10px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText(`Set ${setNum} • Sets: ${sets[0]}-${sets[1]}`, W / 2, 20);
+
+  // Touches display
+  ctx.fillStyle = "rgba(255,255,255,0.4)";
+  ctx.font = "9px system-ui";
+  ctx.textAlign = "left";
+  ctx.fillText(`Toques: ${pTouches}/${MAX_TOUCHES}`, 10, H - 8);
+  ctx.textAlign = "right";
+  ctx.fillText(`IA: ${aTouches}/${MAX_TOUCHES}`, W - 10, H - 8);
+
+  // Rally counter
+  if (rallyCount > 3) {
+    ctx.fillStyle = "rgba(255,215,0,0.7)";
+    ctx.font = "bold 11px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText(`🔥 Rally: ${rallyCount}`, W / 2, H - 8);
+  }
+};
+
+// Color utility helpers
+function adjustColor(hex: string, amount: number): string {
+  const c = hex.replace("#", "");
+  const num = parseInt(c, 16);
+  const r = Math.min(255, Math.max(0, ((num >> 16) & 0xff) + amount));
+  const g = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + amount));
+  const b = Math.min(255, Math.max(0, (num & 0xff) + amount));
+  return `rgb(${r},${g},${b})`;
+}
+
+function lightenColor(hex: string, amount: number): string {
+  return adjustColor(hex, amount);
+}
 
 // ── Component ──
 const VolleyPongGame = ({
@@ -327,11 +597,15 @@ const VolleyPongGame = ({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [lastPoint, setLastPoint] = useState<string | null>(null);
+  const [inviteCode, setInviteCode] = useState("");
+  const [joinCode, setJoinCode] = useState("");
+  const [showInvite, setShowInvite] = useState(false);
+  const [showJoin, setShowJoin] = useState(false);
 
   // Game state refs
-  const playerRef = useRef<Player>({ x: W * 0.25, y: GROUND_Y, vy: 0, armAngle: 0, touches: 0 });
-  const aiRef = useRef<Player>({ x: W * 0.75, y: GROUND_Y, vy: 0, armAngle: 0, touches: 0 });
-  const ballRef = useRef<Ball>({ x: W * 0.25, y: GROUND_Y - 80, vx: 0, vy: 0 });
+  const playerRef = useRef<Player>(createPlayer(W * 0.25));
+  const aiRef = useRef<Player>(createPlayer(W * 0.75));
+  const ballRef = useRef<Ball>(createBall(W * 0.25, GROUND_Y - 80));
   const pScoreRef = useRef(0);
   const aScoreRef = useRef(0);
   const setsRef = useRef([0, 0]);
@@ -340,10 +614,30 @@ const VolleyPongGame = ({
   const animRef = useRef(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const keysRef = useRef<Set<string>>(new Set());
-  const touchDirRef = useRef(0); // -1 left, 0 none, 1 right for touch
+  const touchDirRef = useRef(0);
   const touchJumpRef = useRef(false);
+  const touchAttackRef = useRef(false);
   const rallyCountRef = useRef(0);
-  const pauseRef = useRef(0); // frames to pause after point
+  const pauseRef = useRef(0);
+  const frameCountRef = useRef(0);
+
+  // Generate invite code
+  useEffect(() => {
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    setInviteCode(code);
+  }, []);
+
+  const copyInviteCode = () => {
+    navigator.clipboard.writeText(inviteCode);
+    toast({ title: "Código copiado!", description: `Envie "${inviteCode}" para seu amigo` });
+  };
+
+  const handleJoinCode = () => {
+    if (!joinCode.trim()) return;
+    toast({ title: "Em breve!", description: "Modo multiplayer será liberado em breve. Por enquanto, jogue contra a IA!" });
+    setShowJoin(false);
+    setJoinCode("");
+  };
 
   // ─── Ranking ─────────────────────────────────
   const fetchRanking = useCallback(async () => {
@@ -398,12 +692,16 @@ const VolleyPongGame = ({
     const p = who === "player" ? playerRef.current : aiRef.current;
     ballRef.current = {
       x: p.x,
-      y: GROUND_Y - P_H - BALL_R - 10,
+      y: GROUND_Y - P_H - BALL_R - 14,
       vx: who === "player" ? SERVE_VX : -SERVE_VX,
       vy: SERVE_VY,
+      rotation: 0,
+      trail: [],
     };
     p.touches = 1;
     p.armAngle = 1;
+    p.isAttacking = true;
+    setTimeout(() => { p.isAttacking = false; }, 200);
   }, []);
 
   // ─── Score point ─────────────────────────────
@@ -417,7 +715,7 @@ const VolleyPongGame = ({
       setAiScore(aScoreRef.current);
       setLastPoint("Ponto da IA 🤖");
     }
-    pauseRef.current = 60; // ~1 second pause
+    pauseRef.current = 60;
 
     const p = pScoreRef.current;
     const a = aScoreRef.current;
@@ -444,15 +742,8 @@ const VolleyPongGame = ({
 
     setTimeout(() => {
       if (phaseRef.current === "playing") {
-        // Reset positions
-        playerRef.current.x = W * 0.25;
-        playerRef.current.y = GROUND_Y;
-        playerRef.current.vy = 0;
-        playerRef.current.touches = 0;
-        aiRef.current.x = W * 0.75;
-        aiRef.current.y = GROUND_Y;
-        aiRef.current.vy = 0;
-        aiRef.current.touches = 0;
+        playerRef.current = createPlayer(W * 0.25);
+        aiRef.current = createPlayer(W * 0.75);
         serveBall(scorer);
       }
     }, 1000);
@@ -460,30 +751,39 @@ const VolleyPongGame = ({
 
   // ─── Ball-player collision ─────────────────
   const checkPlayerBallHit = (p: Player, ball: Ball, isLeft: boolean): boolean => {
-    const headY = p.y - P_H - HEAD_R + 2;
-    const bodyTop = headY - HEAD_R;
-    // Check collision with upper body / arms area
+    const headY = p.y - P_H - HEAD_R + 4;
+    const bodyCenter = headY + P_H * 0.4;
     const dx = ball.x - p.x;
-    const dy = ball.y - (bodyTop + 10);
+    const dy = ball.y - bodyCenter;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const hitRadius = 22;
+    const hitRadius = 26;
 
     if (dist < hitRadius + BALL_R && p.touches < MAX_TOUCHES) {
       p.touches += 1;
       p.armAngle = 1;
+      p.isAttacking = true;
+      setTimeout(() => { p.isAttacking = false; }, 250);
       rallyCountRef.current += 1;
 
-      // Reflect ball based on hit position
       const angle = Math.atan2(dy, dx);
       const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
-      const newSpeed = Math.max(speed, 3.5);
-      // Always send ball toward opposite side
       const targetDir = isLeft ? 1 : -1;
-      ball.vx = targetDir * Math.abs(Math.cos(angle)) * newSpeed * 0.8 + targetDir * 1.5;
-      ball.vy = -Math.abs(newSpeed * 0.7) - 1.5;
-      // Push ball out of collision
-      ball.x = p.x + (hitRadius + BALL_R + 2) * Math.cos(angle);
-      ball.y = (bodyTop + 10) + (hitRadius + BALL_R + 2) * Math.sin(angle);
+
+      // Spike detection: jumping + attacking = more power
+      const isSpike = p.y < GROUND_Y - 20 && p.attackCooldown <= 0;
+      const spikeBoost = isSpike ? ATTACK_BOOST : 0;
+      const newSpeed = Math.max(speed, 4) + spikeBoost;
+
+      ball.vx = targetDir * Math.abs(Math.cos(angle)) * newSpeed * 0.85 + targetDir * 2;
+      ball.vy = isSpike
+        ? Math.abs(newSpeed * 0.5) + 1 // spike downward
+        : -Math.abs(newSpeed * 0.7) - 2; // normal bump upward
+
+      // Push out of collision
+      ball.x = p.x + (hitRadius + BALL_R + 3) * Math.cos(angle);
+      ball.y = bodyCenter + (hitRadius + BALL_R + 3) * Math.sin(angle);
+
+      if (isSpike) p.attackCooldown = 20;
 
       return true;
     }
@@ -497,23 +797,18 @@ const VolleyPongGame = ({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    frameCountRef.current++;
+
     if (pauseRef.current > 0) {
       pauseRef.current--;
-      // Still draw but don't update physics
       ctx.clearRect(0, 0, W, H);
       drawCourt(ctx);
       drawNet(ctx);
-      drawStickPlayer(ctx, aiRef.current, false, "#ef4444", "#1e293b");
-      drawStickPlayer(ctx, playerRef.current, true, "#3b82f6", "#f8f8f8");
+      drawPlayer(ctx, aiRef.current, false, "#dc2626", "#1e293b", "#8B6914", "#1a1a2e", "2");
+      drawPlayer(ctx, playerRef.current, true, "#2563eb", "#f0f0f0", "#c8956c", "#3b2507", "1");
       drawBall(ctx, ballRef.current);
-      // HUD
-      ctx.fillStyle = "rgba(255,255,255,0.95)";
-      ctx.font = "bold 18px system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(`${pScoreRef.current} - ${aScoreRef.current}`, W / 2, 28);
-      ctx.font = "11px system-ui, sans-serif";
-      ctx.fillStyle = "rgba(255,255,255,0.5)";
-      ctx.fillText(`Set ${setNumRef.current} | Sets: ${setsRef.current[0]}-${setsRef.current[1]}`, W / 2, 44);
+      drawHUD(ctx, pScoreRef.current, aScoreRef.current, setNumRef.current, setsRef.current,
+        playerRef.current.touches, aiRef.current.touches, rallyCountRef.current);
       animRef.current = requestAnimationFrame(drawGame);
       return;
     }
@@ -523,90 +818,111 @@ const VolleyPongGame = ({
     const ball = ballRef.current;
     const keys = keysRef.current;
 
-    // ── Player movement (left side of court) ──
+    // ── Player movement ──
     let moveDir = touchDirRef.current;
     if (keys.has("ArrowLeft") || keys.has("a")) moveDir = -1;
     if (keys.has("ArrowRight") || keys.has("d")) moveDir = 1;
-    
+
     player.x += moveDir * MOVE_SPEED;
-    player.x = Math.max(20, Math.min(NET_X - P_W / 2 - 4, player.x));
+    player.x = Math.max(22, Math.min(NET_X - P_W / 2 - 6, player.x));
+
+    // Running animation
+    if (Math.abs(moveDir) > 0 && player.y >= GROUND_Y) {
+      player.legPhase += 0.4;
+    } else {
+      player.legPhase *= 0.8;
+    }
 
     // Jump
     if ((keys.has("ArrowUp") || keys.has("w") || keys.has(" ") || touchJumpRef.current) && player.y >= GROUND_Y) {
       player.vy = JUMP_VY;
       touchJumpRef.current = false;
     }
-    player.vy += GRAVITY;
-    player.y += player.vy;
-    if (player.y >= GROUND_Y) {
-      player.y = GROUND_Y;
-      player.vy = 0;
+
+    // Attack (manual spike with "x" key or touch)
+    if ((keys.has("x") || keys.has("z") || touchAttackRef.current) && player.attackCooldown <= 0) {
+      player.armAngle = 1;
+      player.isAttacking = true;
+      player.attackCooldown = 15;
+      touchAttackRef.current = false;
+      setTimeout(() => { player.isAttacking = false; }, 300);
     }
 
-    // Arm decay
-    player.armAngle = Math.max(0, player.armAngle - 0.06);
+    player.vy += GRAVITY;
+    player.y += player.vy;
+    if (player.y >= GROUND_Y) { player.y = GROUND_Y; player.vy = 0; }
+    player.armAngle = Math.max(0, player.armAngle - 0.05);
+    player.attackCooldown = Math.max(0, player.attackCooldown - 1);
 
     // ── AI movement ──
-    // Simple AI: move toward ball when it's on AI's side, jump to hit
     const ballOnAiSide = ball.x > NET_X;
     if (ballOnAiSide) {
-      const aiDiff = ball.x - ai.x;
-      if (Math.abs(aiDiff) > 5) {
-        ai.x += Math.sign(aiDiff) * Math.min(AI_SPEED + rallyCountRef.current * 0.02, Math.abs(aiDiff));
+      const targetX = ball.x + ball.vx * 5;
+      const aiDiff = targetX - ai.x;
+      if (Math.abs(aiDiff) > 4) {
+        ai.x += Math.sign(aiDiff) * Math.min(AI_SPEED + rallyCountRef.current * 0.015, Math.abs(aiDiff));
       }
-      // Jump when ball is close and coming down or at good height
+      // AI running animation
+      if (Math.abs(aiDiff) > 4 && ai.y >= GROUND_Y) {
+        ai.legPhase += 0.35;
+      }
+
+      // Jump to spike
       const distToBall = Math.sqrt((ball.x - ai.x) ** 2 + (ball.y - (ai.y - P_H)) ** 2);
-      if (distToBall < 50 && ball.y < GROUND_Y - 30 && ai.y >= GROUND_Y) {
-        ai.vy = JUMP_VY * 0.9;
+      if (distToBall < 55 && ball.y < GROUND_Y - 25 && ai.y >= GROUND_Y) {
+        ai.vy = JUMP_VY * 0.85;
       }
     } else {
-      // Return to center of AI's side
       const homeX = W * 0.75;
       const aiDiff = homeX - ai.x;
       if (Math.abs(aiDiff) > 3) {
-        ai.x += Math.sign(aiDiff) * AI_SPEED * 0.5;
+        ai.x += Math.sign(aiDiff) * AI_SPEED * 0.4;
+        if (ai.y >= GROUND_Y) ai.legPhase += 0.25;
       }
+      ai.legPhase *= 0.9;
     }
-    ai.x = Math.max(NET_X + P_W / 2 + 4, Math.min(W - 20, ai.x));
+    ai.x = Math.max(NET_X + P_W / 2 + 6, Math.min(W - 22, ai.x));
     ai.vy += GRAVITY;
     ai.y += ai.vy;
-    if (ai.y >= GROUND_Y) {
-      ai.y = GROUND_Y;
-      ai.vy = 0;
-    }
-    ai.armAngle = Math.max(0, ai.armAngle - 0.06);
+    if (ai.y >= GROUND_Y) { ai.y = GROUND_Y; ai.vy = 0; }
+    ai.armAngle = Math.max(0, ai.armAngle - 0.05);
+    ai.attackCooldown = Math.max(0, ai.attackCooldown - 1);
 
     // ── Ball physics ──
     ball.vy += GRAVITY;
     ball.x += ball.vx;
     ball.y += ball.vy;
+    ball.rotation += ball.vx * 0.06;
+
+    // Trail
+    if (frameCountRef.current % 2 === 0) {
+      ball.trail.push({ x: ball.x, y: ball.y, alpha: 1 });
+      if (ball.trail.length > 8) ball.trail.shift();
+    }
+    for (const t of ball.trail) { t.alpha -= 0.12; }
+    ball.trail = ball.trail.filter(t => t.alpha > 0);
 
     // Wall bounces
     if (ball.x <= BALL_R) { ball.vx = Math.abs(ball.vx) * 0.8; ball.x = BALL_R; }
     if (ball.x >= W - BALL_R) { ball.vx = -Math.abs(ball.vx) * 0.8; ball.x = W - BALL_R; }
-    // Ceiling
     if (ball.y <= BALL_R) { ball.vy = Math.abs(ball.vy) * 0.5; ball.y = BALL_R; }
 
     // Net collision
     if (
       ball.y + BALL_R > NET_TOP &&
       ball.y - BALL_R < GROUND_Y &&
-      Math.abs(ball.x - NET_X) < BALL_R + 4
+      Math.abs(ball.x - NET_X) < BALL_R + 5
     ) {
-      ball.vx = -ball.vx * 0.6;
-      ball.x = ball.x < NET_X ? NET_X - BALL_R - 5 : NET_X + BALL_R + 5;
+      ball.vx = -ball.vx * 0.5;
+      ball.x = ball.x < NET_X ? NET_X - BALL_R - 6 : NET_X + BALL_R + 6;
     }
 
     // Player-ball collisions
     const playerHit = checkPlayerBallHit(player, ball, true);
-    if (playerHit) player.touches = Math.min(player.touches, MAX_TOUCHES);
-    
+    if (playerHit) { player.touches = Math.min(player.touches, MAX_TOUCHES); }
+
     const aiHit = checkPlayerBallHit(ai, ball, false);
-    if (aiHit) {
-      ai.touches = Math.min(ai.touches, MAX_TOUCHES);
-      // Reset player touches when ball crosses
-      player.touches = 0;
-    }
+    if (aiHit) { ai.touches = Math.min(ai.touches, MAX_TOUCHES); player.touches = 0; }
     if (playerHit) ai.touches = 0;
 
     // Ball hits ground
@@ -614,11 +930,10 @@ const VolleyPongGame = ({
       ball.y = GROUND_Y - BALL_R;
       ball.vy = 0;
       ball.vx = 0;
-      // Who scores?
       if (ball.x < NET_X) {
-        scorePoint("ai"); // ball on player's side = AI scores
+        scorePoint("ai");
       } else {
-        scorePoint("player"); // ball on AI's side = player scores
+        scorePoint("player");
       }
       animRef.current = requestAnimationFrame(drawGame);
       return;
@@ -628,38 +943,15 @@ const VolleyPongGame = ({
     ctx.clearRect(0, 0, W, H);
     drawCourt(ctx);
     drawNet(ctx);
-    
-    // Players
-    drawStickPlayer(ctx, ai, false, "#ef4444", "#1e293b");
-    drawStickPlayer(ctx, player, true, "#3b82f6", "#f8f8f8");
-    
-    // Ball
+
+    // Draw players (back to front based on position)
+    drawPlayer(ctx, ai, false, "#dc2626", "#1e293b", "#8B6914", "#1a1a2e", "2");
+    drawPlayer(ctx, player, true, "#2563eb", "#f0f0f0", "#c8956c", "#3b2507", "1");
+
     drawBall(ctx, ball);
 
-    // ── HUD ──
-    ctx.fillStyle = "rgba(255,255,255,0.95)";
-    ctx.font = "bold 18px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(`${pScoreRef.current} - ${aScoreRef.current}`, W / 2, 28);
-
-    ctx.font = "11px system-ui, sans-serif";
-    ctx.fillStyle = "rgba(255,255,255,0.5)";
-    ctx.fillText(`Set ${setNumRef.current} | Sets: ${setsRef.current[0]}-${setsRef.current[1]}`, W / 2, 44);
-
-    // Touch labels
-    ctx.fillStyle = "rgba(255,255,255,0.3)";
-    ctx.font = "9px system-ui, sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText(`Toques: ${player.touches}/${MAX_TOUCHES}`, 8, H - 6);
-    ctx.textAlign = "right";
-    ctx.fillText(`IA: ${ai.touches}/${MAX_TOUCHES}`, W - 8, H - 6);
-
-    if (rallyCountRef.current > 3) {
-      ctx.fillStyle = "rgba(255,215,0,0.5)";
-      ctx.font = "10px system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(`Rally: ${rallyCountRef.current}`, W / 2, H - 6);
-    }
+    drawHUD(ctx, pScoreRef.current, aScoreRef.current, setNumRef.current, setsRef.current,
+      player.touches, ai.touches, rallyCountRef.current);
 
     animRef.current = requestAnimationFrame(drawGame);
   }, [scorePoint]);
@@ -693,7 +985,7 @@ const VolleyPongGame = ({
     };
   }, [phase]);
 
-  // Touch controls
+  // Touch controls - improved zones
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     e.preventDefault();
     const canvas = canvasRef.current;
@@ -703,11 +995,15 @@ const VolleyPongGame = ({
     if (!touch) return;
     const tx = (touch.clientX - rect.left) / rect.width;
     const ty = (touch.clientY - rect.top) / rect.height;
-    
-    // Top half = jump, bottom-left = move left, bottom-right = move right
-    if (ty < 0.5) {
+
+    if (ty < 0.35) {
+      // Top zone = jump
       touchJumpRef.current = true;
+    } else if (ty > 0.35 && ty < 0.65 && tx > 0.3 && tx < 0.7) {
+      // Middle center = attack
+      touchAttackRef.current = true;
     } else {
+      // Bottom / sides = movement
       touchDirRef.current = tx < 0.5 ? -1 : 1;
     }
   }, []);
@@ -716,6 +1012,7 @@ const VolleyPongGame = ({
     e.preventDefault();
     touchDirRef.current = 0;
     touchJumpRef.current = false;
+    touchAttackRef.current = false;
   }, []);
 
   const startGame = () => {
@@ -726,8 +1023,9 @@ const VolleyPongGame = ({
     setNumRef.current = 1;
     rallyCountRef.current = 0;
     pauseRef.current = 0;
-    playerRef.current = { x: W * 0.25, y: GROUND_Y, vy: 0, armAngle: 0, touches: 0 };
-    aiRef.current = { x: W * 0.75, y: GROUND_Y, vy: 0, armAngle: 0, touches: 0 };
+    frameCountRef.current = 0;
+    playerRef.current = createPlayer(W * 0.25);
+    aiRef.current = createPlayer(W * 0.75);
     setPlayerScore(0);
     setAiScore(0);
     setSetsWon([0, 0]);
@@ -823,11 +1121,11 @@ const VolleyPongGame = ({
               <div className="text-5xl">🏐</div>
               <h3 className="text-xl font-bold">Vôlei 1v1</h3>
               <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                Controle seu jogador para rebater a bola por cima da rede!
+                Controle seu jogador, ataque e faça pontos por cima da rede!
               </p>
               <div className="text-xs text-muted-foreground max-w-xs mx-auto space-y-1">
-                <p>🖥️ <strong>Teclado:</strong> ← → para mover, ↑ ou Espaço para pular</p>
-                <p>📱 <strong>Toque:</strong> Parte inferior = mover, parte superior = pular</p>
+                <p>🖥️ <strong>Teclado:</strong> ← → mover | ↑ pular | X atacar</p>
+                <p>📱 <strong>Toque:</strong> Laterais = mover | Topo = pular | Centro = atacar</p>
               </div>
               <input
                 type="text"
@@ -838,11 +1136,79 @@ const VolleyPongGame = ({
                 className="w-full max-w-xs mx-auto rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 block"
                 maxLength={30}
               />
-              <div>
+              <div className="flex gap-2 justify-center flex-wrap">
                 <Button onClick={startGame} disabled={!playerName.trim()} className="gap-2">
                   <Zap className="h-4 w-4" /> Jogar!
                 </Button>
               </div>
+
+              {/* Invite / Join buttons */}
+              <div className="flex gap-2 justify-center flex-wrap pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setShowInvite(!showInvite); setShowJoin(false); }}
+                  className="gap-1.5 text-xs"
+                >
+                  <UserPlus className="h-3.5 w-3.5" /> Convidar amigo
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setShowJoin(!showJoin); setShowInvite(false); }}
+                  className="gap-1.5 text-xs"
+                >
+                  <LogIn className="h-3.5 w-3.5" /> Digitar código
+                </Button>
+              </div>
+
+              <AnimatePresence>
+                {showInvite && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 max-w-xs mx-auto space-y-2">
+                      <p className="text-xs text-muted-foreground">Compartilhe este código com seu amigo:</p>
+                      <div className="flex items-center gap-2 justify-center">
+                        <span className="font-mono text-lg font-bold tracking-[0.3em] text-primary bg-background px-3 py-1 rounded border border-border">
+                          {inviteCode}
+                        </span>
+                        <Button variant="ghost" size="sm" onClick={copyInviteCode} className="h-8 w-8 p-0">
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {showJoin && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 max-w-xs mx-auto space-y-2">
+                      <p className="text-xs text-muted-foreground">Digite o código do seu amigo:</p>
+                      <div className="flex items-center gap-2 justify-center">
+                        <Input
+                          value={joinCode}
+                          onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                          placeholder="EX: A1B2C3"
+                          maxLength={6}
+                          className="max-w-[140px] text-center font-mono tracking-wider uppercase"
+                        />
+                        <Button size="sm" onClick={handleJoinCode} disabled={joinCode.length < 4}>
+                          Entrar
+                        </Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           )}
 
@@ -872,9 +1238,11 @@ const VolleyPongGame = ({
                 onTouchEnd={handleTouchEnd}
                 onTouchMove={(e) => e.preventDefault()}
                 className="rounded-xl border border-border/50 touch-none select-none"
-                style={{ maxWidth: "100%", cursor: "default" }}
+                style={{ maxWidth: "100%", cursor: "default", imageRendering: "auto" }}
               />
-              <p className="text-xs text-muted-foreground">← → mover | ↑ pular | Toque para controlar</p>
+              <p className="text-xs text-muted-foreground">
+                ← → mover | ↑ pular | X atacar | Toque para controlar
+              </p>
             </motion.div>
           )}
 

@@ -89,7 +89,8 @@ const AtletaCadastro = () => {
       title: "Cadastro realizado!",
       description: "Sua conta foi criada com sucesso.",
     });
-    navigate("/atleta/login");
+    // After signup, user is already authenticated — go directly to athlete area
+    navigate("/athlete-login");
     setLoading(false);
   };
 

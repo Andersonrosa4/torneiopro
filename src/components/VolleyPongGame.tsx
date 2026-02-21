@@ -27,8 +27,8 @@ const BALL_R = 10;
 // Physics tuned for realistic feel
 const GRAVITY = 0.30;          // Strong gravity — ball arcs naturally
 const MAX_TOUCHES = 3;         // Official volleyball rule
-const SERVE_VX = 2.8;
-const SERVE_VY = -5.5;
+const SERVE_VX = 5.2;
+const SERVE_VY = -4.8;
 const MAX_SCORE = 10;
 const MIN_DIFF = 2;
 

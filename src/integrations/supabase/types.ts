@@ -371,9 +371,12 @@ export type Database = {
         Row: {
           active: boolean
           arena_id: string
+          close_time: string | null
           created_at: string
           id: string
           name: string
+          open_time: string | null
+          photo_url: string | null
           price_per_slot: number
           slot_duration_minutes: number
           sport_type: string
@@ -382,9 +385,12 @@ export type Database = {
         Insert: {
           active?: boolean
           arena_id: string
+          close_time?: string | null
           created_at?: string
           id?: string
           name: string
+          open_time?: string | null
+          photo_url?: string | null
           price_per_slot?: number
           slot_duration_minutes?: number
           sport_type?: string
@@ -393,9 +399,12 @@ export type Database = {
         Update: {
           active?: boolean
           arena_id?: string
+          close_time?: string | null
           created_at?: string
           id?: string
           name?: string
+          open_time?: string | null
+          photo_url?: string | null
           price_per_slot?: number
           slot_duration_minutes?: number
           sport_type?: string

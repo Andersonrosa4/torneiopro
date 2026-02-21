@@ -22,20 +22,20 @@ const NET_X = W / 2;
 const NET_H = 85;
 const NET_TOP = GROUND_Y - NET_H;
 const BALL_R = 9;
-const GRAVITY = 0.22;
-const SERVE_VX = 3.5;
-const SERVE_VY = -7.5;
+const GRAVITY = 0.18;
+const SERVE_VX = 2.5;
+const SERVE_VY = -5.5;
 const MAX_TOUCHES = 3;
 const MAX_SCORE = 5;
 const MIN_DIFF = 2;
 
 // Alien body
 const ALIEN_R = 18;
-const JUMP_VY = -6.5;
-const MOVE_SPEED = 3.8;
-const AI_SPEED = 2.4;
-const BALL_SPEED_CAP = 7.0;
-const BALL_VY_CAP = 9.0;
+const JUMP_VY = -5.5;
+const MOVE_SPEED = 3.0;
+const AI_SPEED = 2.0;
+const BALL_SPEED_CAP = 4.5;
+const BALL_VY_CAP = 6.5;
 
 type Phase = "start" | "waiting" | "playing" | "gameover";
 type GameMode = "solo" | "multi";
@@ -832,29 +832,29 @@ const VolleyPongGame = ({
       const inAir = p.y < GROUND_Y - 12;
       const isSpike = inAir && p.attackCooldown <= 0;
 
-      // ALL hits = inverted U arc — ball goes HIGH
+      // ALL hits = inverted U arc — realistic speed
       if (isSpike) {
-        ball.vx = dir * 5.5 * ball.speedMultiplier;
-        ball.vy = -5.0;
+        ball.vx = dir * 3.8 * ball.speedMultiplier;
+        ball.vy = -3.8;
         p.attackCooldown = 18;
         p.expression = "determined";
         playSpikeSound();
         spawnParticles(ball.x, ball.y, 6, ["#FFD700", "#FF6B6B"], false);
       } else if (inAir) {
-        ball.vx = dir * 4.0 * ball.speedMultiplier;
-        ball.vy = -6.5;
+        ball.vx = dir * 2.8 * ball.speedMultiplier;
+        ball.vy = -4.5;
         p.expression = "happy";
         playHitSound();
       } else if (p.touches === 1) {
-        // MANCHETE: very high arc
-        ball.vx = dir * 3.2 * ball.speedMultiplier;
-        ball.vy = -8.0;
+        // MANCHETE: high gentle arc
+        ball.vx = dir * 2.2 * ball.speedMultiplier;
+        ball.vy = -5.5;
         p.expression = "surprised";
         playHitSound();
       } else {
-        // LEVANTAMENTO: tall arc
-        ball.vx = dir * 3.5 * ball.speedMultiplier;
-        ball.vy = -7.0;
+        // LEVANTAMENTO: controlled arc
+        ball.vx = dir * 2.5 * ball.speedMultiplier;
+        ball.vy = -5.0;
         p.expression = "happy";
         playHitSound();
       }

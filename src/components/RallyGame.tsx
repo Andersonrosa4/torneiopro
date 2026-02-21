@@ -523,6 +523,7 @@ const RallyGame = ({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="flex flex-col items-center gap-2"
+              ref={(el) => { if (el) el.scrollIntoView({ behavior: "smooth", block: "center" }); }}
             >
               <canvas
                 ref={canvasRef}

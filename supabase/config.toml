@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.organizer-login]
 verify_jwt = false
+
+[functions.challenge-api]
+verify_jwt = false

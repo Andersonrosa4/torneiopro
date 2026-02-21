@@ -60,11 +60,23 @@ const RankingCommunities = () => {
 
   const loadCommunities = async () => {
     setLoading(true);
-    const { data, error } = await supabase.functions.invoke("challenge-api", {
-      body: { action: "list_communities" },
-    });
-    if (data && !error) setCommunities(data);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase.functions.invoke("challenge-api", {
+        body: { action: "list_communities" },
+      });
+      console.log("challenge-api response:", { data, error });
+      if (error) {
+        console.error("challenge-api error:", error);
+      } else if (Array.isArray(data)) {
+        setCommunities(data);
+      } else if (data && !data.error) {
+        setCommunities(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error("challenge-api exception:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCreate = async () => {

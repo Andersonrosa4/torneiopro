@@ -752,41 +752,67 @@ const VolleyPongGame = ({
   // ─── Ball-player collision ─────────────────
   const checkPlayerBallHit = (p: Player, ball: Ball, isLeft: boolean): boolean => {
     const headY = p.y - P_H - HEAD_R + 4;
-    const bodyCenter = headY + P_H * 0.4;
-    const dx = ball.x - p.x;
-    const dy = ball.y - bodyCenter;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const hitRadius = 26;
+    const shoulderY = p.y - P_H + HEAD_R + 4;
+    const targetDir = isLeft ? 1 : -1;
 
-    if (dist < hitRadius + BALL_R && p.touches < MAX_TOUCHES) {
-      p.touches += 1;
-      p.armAngle = 1;
-      p.isAttacking = true;
-      setTimeout(() => { p.isAttacking = false; }, 250);
-      rallyCountRef.current += 1;
+    // Helper to apply hit
+    const applyHit = (centerX: number, centerY: number, radius: number, isHead: boolean) => {
+      const dx = ball.x - centerX;
+      const dy = ball.y - centerY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
 
-      const angle = Math.atan2(dy, dx);
-      const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
-      const targetDir = isLeft ? 1 : -1;
+      if (dist < radius + BALL_R && p.touches < MAX_TOUCHES) {
+        p.touches += 1;
+        p.armAngle = 1;
+        p.isAttacking = true;
+        setTimeout(() => { p.isAttacking = false; }, 250);
+        rallyCountRef.current += 1;
 
-      // Spike detection: jumping + attacking = more power
-      const isSpike = p.y < GROUND_Y - 20 && p.attackCooldown <= 0;
-      const spikeBoost = isSpike ? ATTACK_BOOST : 0;
-      const newSpeed = Math.max(speed, 4) + spikeBoost;
+        const angle = Math.atan2(dy, dx);
+        const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
 
-      ball.vx = targetDir * Math.abs(Math.cos(angle)) * newSpeed * 0.85 + targetDir * 2;
-      ball.vy = isSpike
-        ? Math.abs(newSpeed * 0.5) + 1 // spike downward
-        : -Math.abs(newSpeed * 0.7) - 2; // normal bump upward
+        // Spike detection: jumping + attacking = more power
+        const isSpike = p.y < GROUND_Y - 20 && p.attackCooldown <= 0;
+        const spikeBoost = isSpike ? ATTACK_BOOST : 0;
+        const newSpeed = Math.max(speed, 4) + spikeBoost;
 
-      // Push out of collision
-      ball.x = p.x + (hitRadius + BALL_R + 3) * Math.cos(angle);
-      ball.y = bodyCenter + (hitRadius + BALL_R + 3) * Math.sin(angle);
+        if (isHead) {
+          // Head hit: ball goes upward and forward (header)
+          ball.vx = targetDir * (newSpeed * 0.6 + 2);
+          ball.vy = -Math.abs(newSpeed * 0.8) - 3;
+        } else if (isSpike) {
+          ball.vx = targetDir * Math.abs(Math.cos(angle)) * newSpeed * 0.85 + targetDir * 2;
+          ball.vy = Math.abs(newSpeed * 0.5) + 1;
+        } else {
+          ball.vx = targetDir * Math.abs(Math.cos(angle)) * newSpeed * 0.85 + targetDir * 2;
+          ball.vy = -Math.abs(newSpeed * 0.7) - 2;
+        }
 
-      if (isSpike) p.attackCooldown = 20;
+        // Push out of collision
+        ball.x = centerX + (radius + BALL_R + 3) * Math.cos(angle);
+        ball.y = centerY + (radius + BALL_R + 3) * Math.sin(angle);
 
-      return true;
+        if (isSpike) p.attackCooldown = 20;
+        return true;
+      }
+      return false;
+    };
+
+    // Check HEAD collision first (priority)
+    if (applyHit(p.x, headY, HEAD_R + 3, true)) return true;
+
+    // Check BODY collision (arms/torso area)
+    const bodyCenter = shoulderY + (p.y - shoulderY) * 0.4;
+    if (applyHit(p.x, bodyCenter, 22, false)) return true;
+
+    // Check ARMS when attacking (extended reach)
+    if (p.isAttacking || p.armAngle > 0.3) {
+      const dir = isLeft ? 1 : -1;
+      const armX = p.x + dir * 22;
+      const armY = shoulderY;
+      if (applyHit(armX, armY, 12, false)) return true;
     }
+
     return false;
   };
 
@@ -985,35 +1011,7 @@ const VolleyPongGame = ({
     };
   }, [phase]);
 
-  // Touch controls - improved zones
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    e.preventDefault();
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const touch = e.touches[0];
-    if (!touch) return;
-    const tx = (touch.clientX - rect.left) / rect.width;
-    const ty = (touch.clientY - rect.top) / rect.height;
-
-    if (ty < 0.35) {
-      // Top zone = jump
-      touchJumpRef.current = true;
-    } else if (ty > 0.35 && ty < 0.65 && tx > 0.3 && tx < 0.7) {
-      // Middle center = attack
-      touchAttackRef.current = true;
-    } else {
-      // Bottom / sides = movement
-      touchDirRef.current = tx < 0.5 ? -1 : 1;
-    }
-  }, []);
-
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    e.preventDefault();
-    touchDirRef.current = 0;
-    touchJumpRef.current = false;
-    touchAttackRef.current = false;
-  }, []);
+  // Touch controls handled by visible buttons below
 
   const startGame = () => {
     if (!playerName.trim()) return;
@@ -1218,31 +1216,87 @@ const VolleyPongGame = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex flex-col items-center gap-2"
+              className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center"
             >
-              {lastPoint && (
-                <motion.p
-                  key={lastPoint + pScoreRef.current + aScoreRef.current}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="text-sm font-bold text-primary"
-                >
-                  {lastPoint}
-                </motion.p>
-              )}
-              <canvas
-                ref={canvasRef}
-                width={W}
-                height={H}
-                onTouchStart={handleTouchStart}
-                onTouchEnd={handleTouchEnd}
-                onTouchMove={(e) => e.preventDefault()}
-                className="rounded-xl border border-border/50 touch-none select-none"
-                style={{ maxWidth: "100%", cursor: "default", imageRendering: "auto" }}
-              />
-              <p className="text-xs text-muted-foreground">
-                ← → mover | ↑ pular | X atacar | Toque para controlar
-              </p>
+              {/* Top bar */}
+              <div className="w-full flex items-center justify-between px-3 py-1.5 bg-black/80 shrink-0">
+                <Button variant="ghost" size="sm" onClick={resetGame} className="text-white/70 text-xs h-7 px-2">
+                  ← Sair
+                </Button>
+                {lastPoint && (
+                  <motion.p
+                    key={lastPoint + pScoreRef.current + aScoreRef.current}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="text-xs font-bold text-yellow-400"
+                  >
+                    {lastPoint}
+                  </motion.p>
+                )}
+                <span className="text-white/50 text-[10px]">Set {currentSet}</span>
+              </div>
+
+              {/* Canvas */}
+              <div className="flex-1 flex items-center justify-center w-full px-1 min-h-0">
+                <canvas
+                  ref={canvasRef}
+                  width={W}
+                  height={H}
+                  className="rounded-lg border border-white/10 touch-none select-none"
+                  style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", imageRendering: "auto" }}
+                />
+              </div>
+
+              {/* Visible control buttons */}
+              <div className="w-full px-3 pb-4 pt-2 bg-black/80 shrink-0">
+                <div className="flex items-center justify-between gap-2 max-w-md mx-auto">
+                  {/* Left: movement */}
+                  <div className="flex gap-1.5">
+                    <button
+                      onTouchStart={(e) => { e.preventDefault(); touchDirRef.current = -1; }}
+                      onTouchEnd={(e) => { e.preventDefault(); touchDirRef.current = 0; }}
+                      onMouseDown={() => touchDirRef.current = -1}
+                      onMouseUp={() => touchDirRef.current = 0}
+                      onMouseLeave={() => touchDirRef.current = 0}
+                      className="w-14 h-14 rounded-xl bg-white/10 border border-white/20 text-white text-xl font-bold active:bg-white/25 active:scale-95 transition-all select-none touch-none flex items-center justify-center"
+                    >
+                      ◀
+                    </button>
+                    <button
+                      onTouchStart={(e) => { e.preventDefault(); touchDirRef.current = 1; }}
+                      onTouchEnd={(e) => { e.preventDefault(); touchDirRef.current = 0; }}
+                      onMouseDown={() => touchDirRef.current = 1}
+                      onMouseUp={() => touchDirRef.current = 0}
+                      onMouseLeave={() => touchDirRef.current = 0}
+                      className="w-14 h-14 rounded-xl bg-white/10 border border-white/20 text-white text-xl font-bold active:bg-white/25 active:scale-95 transition-all select-none touch-none flex items-center justify-center"
+                    >
+                      ▶
+                    </button>
+                  </div>
+
+                  {/* Center: jump */}
+                  <button
+                    onTouchStart={(e) => { e.preventDefault(); touchJumpRef.current = true; }}
+                    onTouchEnd={(e) => { e.preventDefault(); }}
+                    onMouseDown={() => { touchJumpRef.current = true; }}
+                    className="w-16 h-16 rounded-full bg-blue-500/30 border-2 border-blue-400/50 text-white text-sm font-bold active:bg-blue-500/50 active:scale-95 transition-all select-none touch-none flex flex-col items-center justify-center gap-0.5"
+                  >
+                    <span className="text-lg">⬆</span>
+                    <span className="text-[9px] opacity-70">PULAR</span>
+                  </button>
+
+                  {/* Right: attack */}
+                  <button
+                    onTouchStart={(e) => { e.preventDefault(); touchAttackRef.current = true; }}
+                    onTouchEnd={(e) => { e.preventDefault(); }}
+                    onMouseDown={() => { touchAttackRef.current = true; }}
+                    className="w-16 h-16 rounded-full bg-red-500/30 border-2 border-red-400/50 text-white text-sm font-bold active:bg-red-500/50 active:scale-95 transition-all select-none touch-none flex flex-col items-center justify-center gap-0.5"
+                  >
+                    <span className="text-lg">👊</span>
+                    <span className="text-[9px] opacity-70">ATACAR</span>
+                  </button>
+                </div>
+              </div>
             </motion.div>
           )}
 

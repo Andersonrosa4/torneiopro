@@ -37,9 +37,18 @@ const AthleteLogin = () => {
       setRememberMe(true);
     }
 
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       if (data.user) {
-        setIsLoggedIn(true);
+        // Check if user has athlete role
+        const { data: roleData } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", data.user.id)
+          .eq("role", "athlete")
+          .maybeSingle();
+        if (roleData) {
+          setIsLoggedIn(true);
+        }
       }
       setCheckingAuth(false);
     });

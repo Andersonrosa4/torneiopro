@@ -829,28 +829,28 @@ const VolleyPongGame = ({
       p.touches += 1;
       rallyCountRef.current += 1;
       energyRef.current = Math.min(1, energyRef.current + 0.15);
-      const inAir = p.y < GROUND_Y - 12;
-      const isSpike = inAir && p.attackCooldown <= 0;
+      const inAir = p.y < GROUND_Y - 8;
+      // ANY touch while in air = automatic spike (no button needed!)
+      const isSpike = inAir;
 
-      // Spike types based on height and ball position
       if (isSpike) {
-        const highUp = p.y < GROUND_Y - 50; // jumped high
-        const ballAboveNet = ball.y < NET_TOP + 20; // ball is near/above net height
+        const height = GROUND_Y - p.y; // how high the player is
+        const ballHigh = ball.y < NET_TOP + 30;
         
-        if (highUp && ballAboveNet) {
-          // ATAQUE RAZANTE — player jumped high, ball is high = smash down fast!
+        if (height > 40 && ballHigh) {
+          // ATAQUE RAZANTE — jumped high + ball high = devastating smash!
           ball.vx = dir * 5.0 * ball.speedMultiplier;
-          ball.vy = 2.5; // goes DOWN aggressively
-        } else if (highUp) {
-          // High spike but ball lower — moderate downward angle
-          ball.vx = dir * 4.5 * ball.speedMultiplier;
-          ball.vy = 0.8; // slight downward
+          ball.vy = 2.5;
+        } else if (height > 25) {
+          // Strong spike — moderate downward
+          ball.vx = dir * 4.2 * ball.speedMultiplier;
+          ball.vy = 0.5;
         } else {
-          // Regular spike — still arcs up
-          ball.vx = dir * 3.5 * ball.speedMultiplier;
-          ball.vy = -4.0;
+          // Low jump spike — fast arc
+          ball.vx = dir * 3.8 * ball.speedMultiplier;
+          ball.vy = -3.0;
         }
-        p.attackCooldown = 18;
+        p.attackCooldown = 12;
         p.expression = "determined";
         playSpikeSound();
         spawnParticles(ball.x, ball.y, 8, ["#FFD700", "#FF6B6B", "#FF4444"], false);

@@ -729,8 +729,12 @@ const VolleyPongGame = ({
   };
   const submitScore = async (finalScore: number) => {
     setSubmitting(true);
-    await supabase.functions.invoke("organizer-api", {
-      body: { table: "game_scores", operation: "insert", data: { tournament_id: tournamentId, game_type: "volley_pong", player_name: playerName.trim(), sport, score: finalScore } },
+    await supabase.from("game_scores").insert({
+      tournament_id: tournamentId,
+      game_type: "volley_pong",
+      player_name: playerName.trim(),
+      sport,
+      score: finalScore,
     });
     await fetchRanking();
     setSubmitting(false);

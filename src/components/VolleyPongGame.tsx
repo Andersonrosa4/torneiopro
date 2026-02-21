@@ -36,7 +36,7 @@ const P_H = 52;
 const HEAD_R = 9;
 const JUMP_VY = -5.8;
 const MOVE_SPEED = 2.2;
-const AI_SPEED = 2.0;
+const AI_SPEED = 3.0;
 const ATTACK_BOOST = 2.0;
 
 type Phase = "start" | "waiting" | "playing" | "gameover";
@@ -686,26 +686,46 @@ const VolleyPongGame = ({
         setTimeout(() => { ai.isAttacking = false; }, 300);
       }
     } else {
-      // Solo: AI logic
+      // Solo: AI logic — aggressive and competitive
       const ballOnAiSide = ball.x > NET_X;
-      if (ballOnAiSide) {
-        const targetX = ball.x + ball.vx * 5;
+      const ballComingToAi = ball.vx > 0;
+      const aiSpeed = AI_SPEED + rallyCountRef.current * 0.03;
+
+      if (ballOnAiSide || (ballComingToAi && ball.x > NET_X - 60)) {
+        // Predict where the ball will be
+        const predFrames = Math.max(5, Math.min(20, Math.abs(ball.x - ai.x) / (aiSpeed + 1)));
+        const predictedX = ball.x + ball.vx * predFrames;
+        const predictedY = ball.y + ball.vy * predFrames + 0.5 * GRAVITY * predFrames * predFrames;
+        const targetX = Math.max(NET_X + P_W / 2 + 10, Math.min(W - 22, predictedX));
         const aiDiff = targetX - ai.x;
-        if (Math.abs(aiDiff) > 4) {
-          ai.x += Math.sign(aiDiff) * Math.min(AI_SPEED + rallyCountRef.current * 0.015, Math.abs(aiDiff));
+
+        if (Math.abs(aiDiff) > 2) {
+          ai.x += Math.sign(aiDiff) * Math.min(aiSpeed, Math.abs(aiDiff));
         }
-        if (Math.abs(aiDiff) > 4 && ai.y >= GROUND_Y) {
-          ai.legPhase += 0.35;
+        if (Math.abs(aiDiff) > 2 && ai.y >= GROUND_Y) {
+          ai.legPhase += 0.4;
         }
-        const distToBall = Math.sqrt((ball.x - ai.x) ** 2 + (ball.y - (ai.y - P_H)) ** 2);
-        if (distToBall < 55 && ball.y < GROUND_Y - 25 && ai.y >= GROUND_Y) {
-          ai.vy = JUMP_VY * 0.85;
+
+        // Jump to intercept — more aggressive distance check
+        const headY = ai.y - P_H;
+        const distToBall = Math.sqrt((ball.x - ai.x) ** 2 + (ball.y - headY) ** 2);
+        if (distToBall < 90 && ball.y < GROUND_Y - 15 && ai.y >= GROUND_Y) {
+          ai.vy = JUMP_VY * 0.9;
+        }
+
+        // AI attacks when close and in air
+        if (distToBall < 50 && ai.y < GROUND_Y - 10 && ai.attackCooldown <= 0) {
+          ai.armAngle = 1;
+          ai.isAttacking = true;
+          ai.attackCooldown = 15;
+          setTimeout(() => { ai.isAttacking = false; }, 300);
         }
       } else {
-        const homeX = W * 0.75;
+        // Ball on player side — move to strategic position
+        const homeX = W * 0.72;
         const aiDiff = homeX - ai.x;
         if (Math.abs(aiDiff) > 3) {
-          ai.x += Math.sign(aiDiff) * AI_SPEED * 0.4;
+          ai.x += Math.sign(aiDiff) * aiSpeed * 0.6;
           if (ai.y >= GROUND_Y) ai.legPhase += 0.25;
         }
         ai.legPhase *= 0.9;

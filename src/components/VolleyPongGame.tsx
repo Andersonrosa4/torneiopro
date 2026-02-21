@@ -807,10 +807,22 @@ const VolleyPongGame = ({
     for (const t of ball.trail) { t.alpha -= 0.12; }
     ball.trail = ball.trail.filter(t => t.alpha > 0);
 
-    // Wall bounces — full energy, ball always returns to court (never scores on wall hit)
-    if (ball.x <= BALL_R) { ball.vx = Math.abs(ball.vx); ball.x = BALL_R + 1; }
-    if (ball.x >= W - BALL_R) { ball.vx = -Math.abs(ball.vx); ball.x = W - BALL_R - 1; }
-    if (ball.y <= BALL_R) { ball.vy = Math.abs(ball.vy); ball.y = BALL_R; }
+    // Wall bounces — ALWAYS clamp and reflect before anything else
+    // Left wall
+    if (ball.x - BALL_R <= 0) {
+      ball.x = BALL_R + 1;
+      ball.vx = Math.abs(ball.vx);
+    }
+    // Right wall
+    if (ball.x + BALL_R >= W) {
+      ball.x = W - BALL_R - 1;
+      ball.vx = -Math.abs(ball.vx);
+    }
+    // Ceiling
+    if (ball.y - BALL_R <= 0) {
+      ball.y = BALL_R + 1;
+      ball.vy = Math.abs(ball.vy);
+    }
 
     // Net collision — ball bounces off net like a wall
     if (
@@ -831,7 +843,10 @@ const VolleyPongGame = ({
     if (aiHit) { ai.touches = Math.min(ai.touches, MAX_TOUCHES); player.touches = 0; }
     if (playerHit) ai.touches = 0;
 
-    // Ball hits ground
+    // Final safety clamp — ensure ball never escapes court bounds before scoring
+    ball.x = Math.max(BALL_R, Math.min(W - BALL_R, ball.x));
+
+    // Ball hits ground — ONLY ground contact scores points
     if (ball.y + BALL_R >= GROUND_Y) {
       ball.y = GROUND_Y - BALL_R;
       ball.vy = 0;

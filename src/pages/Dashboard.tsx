@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AppHeader from "@/components/AppHeader";
 import ThemedBackground from "@/components/ThemedBackground";
 import UserManagementTab from "@/components/UserManagementTab";
+import AthleteManagementTab from "@/components/AthleteManagementTab";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
 import PromoPopup from "@/components/PromoPopup";
 
@@ -205,6 +206,7 @@ const Dashboard = () => {
             <>
               <TabsList className="mb-4">
                 <TabsTrigger value="tournaments">Meus Torneios</TabsTrigger>
+                <TabsTrigger value="athletes">Atletas Cadastrados</TabsTrigger>
                 <TabsTrigger value="users">Gestão de Usuários</TabsTrigger>
               </TabsList>
               <div className="mb-4">
@@ -220,6 +222,12 @@ const Dashboard = () => {
           {isAdmin && (
             <TabsContent value="users">
               <UserManagementTab />
+            </TabsContent>
+          )}
+
+          {isAdmin && (
+            <TabsContent value="athletes">
+              <AthleteManagementTab />
             </TabsContent>
           )}
 

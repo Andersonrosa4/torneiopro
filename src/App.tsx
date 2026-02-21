@@ -27,6 +27,8 @@ import AtletaRecuperarSenha from "./pages/AtletaRecuperarSenha";
 import ResetPassword from "./pages/ResetPassword";
 import MeusAgendamentos from "./pages/MeusAgendamentos";
 import AdminArenaOwners from "./pages/AdminArenaOwners";
+import RankingCommunities from "./pages/RankingCommunities";
+import CommunityDetail from "./pages/CommunityDetail";
 
 import ScrollToTop from "@/components/ScrollToTop";
 import AiAssistant from "@/components/AiAssistant";
@@ -62,6 +64,8 @@ const App = () => (
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/atleta/meus-agendamentos" element={<MeusAgendamentos />} />
               <Route path="/admin-arenas" element={<AdminArenaOwners />} />
+              <Route path="/comunidades" element={<RankingCommunities />} />
+              <Route path="/comunidade/:id" element={<CommunityDetail />} />
               <Route path="/simulation-test" element={<SimulationTest />} />
               <Route path="/diagnostics" element={<ProtectedRoute><SystemDiagnostics /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />

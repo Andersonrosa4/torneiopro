@@ -169,6 +169,124 @@ export type Database = {
           },
         ]
       }
+      challenge_notifications: {
+        Row: {
+          challenge_id: string
+          created_at: string
+          id: string
+          message: string
+          read: boolean
+          type: string
+          user_id: string
+        }
+        Insert: {
+          challenge_id: string
+          created_at?: string
+          id?: string
+          message: string
+          read?: boolean
+          type: string
+          user_id: string
+        }
+        Update: {
+          challenge_id?: string
+          created_at?: string
+          id?: string
+          message?: string
+          read?: boolean
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenge_notifications_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "challenges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      challenges: {
+        Row: {
+          challenged_id: string
+          challenger_id: string
+          community_id: string
+          completed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          id: string
+          organizer_notes: string | null
+          score_data: Json | null
+          sets_won_challenged: number
+          sets_won_challenger: number
+          status: string
+          submitted_by: string | null
+          winner_member_id: string | null
+        }
+        Insert: {
+          challenged_id: string
+          challenger_id: string
+          community_id: string
+          completed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          id?: string
+          organizer_notes?: string | null
+          score_data?: Json | null
+          sets_won_challenged?: number
+          sets_won_challenger?: number
+          status?: string
+          submitted_by?: string | null
+          winner_member_id?: string | null
+        }
+        Update: {
+          challenged_id?: string
+          challenger_id?: string
+          community_id?: string
+          completed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          id?: string
+          organizer_notes?: string | null
+          score_data?: Json | null
+          sets_won_challenged?: number
+          sets_won_challenger?: number
+          status?: string
+          submitted_by?: string | null
+          winner_member_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenges_challenged_id_fkey"
+            columns: ["challenged_id"]
+            isOneToOne: false
+            referencedRelation: "community_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenges_challenger_id_fkey"
+            columns: ["challenger_id"]
+            isOneToOne: false
+            referencedRelation: "community_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenges_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "ranking_communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenges_winner_member_id_fkey"
+            columns: ["winner_member_id"]
+            isOneToOne: false
+            referencedRelation: "community_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cities: {
         Row: {
           id: string
@@ -258,6 +376,59 @@ export type Database = {
             columns: ["tournament_id"]
             isOneToOne: false
             referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_members: {
+        Row: {
+          athlete_name: string
+          community_id: string
+          cpf: string | null
+          created_at: string
+          id: string
+          losses: number
+          phone: string | null
+          photo_url: string | null
+          points: number
+          position: number
+          user_id: string
+          wins: number
+        }
+        Insert: {
+          athlete_name: string
+          community_id: string
+          cpf?: string | null
+          created_at?: string
+          id?: string
+          losses?: number
+          phone?: string | null
+          photo_url?: string | null
+          points?: number
+          position?: number
+          user_id: string
+          wins?: number
+        }
+        Update: {
+          athlete_name?: string
+          community_id?: string
+          cpf?: string | null
+          created_at?: string
+          id?: string
+          losses?: number
+          phone?: string | null
+          photo_url?: string | null
+          points?: number
+          position?: number
+          user_id?: string
+          wins?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_members_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "ranking_communities"
             referencedColumns: ["id"]
           },
         ]
@@ -951,6 +1122,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ranking_communities: {
+        Row: {
+          active: boolean
+          challenge_range: number
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+          scoring_mode: string
+          sport: Database["public"]["Enums"]["sport_type"]
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          challenge_range?: number
+          created_at?: string
+          created_by: string
+          id?: string
+          name: string
+          scoring_mode?: string
+          sport?: Database["public"]["Enums"]["sport_type"]
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          challenge_range?: number
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+          scoring_mode?: string
+          sport?: Database["public"]["Enums"]["sport_type"]
+          updated_at?: string
+        }
+        Relationships: []
       }
       rankings: {
         Row: {

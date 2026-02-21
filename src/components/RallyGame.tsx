@@ -263,7 +263,23 @@ const RallyGame = ({
     ctx.fillText("TOQUE AQUI ↓", COURT_WIDTH / 2, SWEET_ZONE_Y - 8);
 
     animFrameRef.current = requestAnimationFrame(drawGame);
-  }, [emoji]);
+  }, [sport]);
+
+  // Start animation loop once canvas is mounted (AnimatePresence delay-safe)
+  useEffect(() => {
+    if (phase !== "playing") return;
+    // Wait for canvas to mount, then start the loop
+    const tryStart = () => {
+      if (canvasRef.current) {
+        animFrameRef.current = requestAnimationFrame(drawGame);
+      } else {
+        // Canvas not yet in DOM, retry next frame
+        animFrameRef.current = requestAnimationFrame(tryStart);
+      }
+    };
+    tryStart();
+    return () => cancelAnimationFrame(animFrameRef.current);
+  }, [phase, drawGame]);
 
   const startGame = () => {
     if (!playerName.trim()) return;
@@ -281,7 +297,6 @@ const RallyGame = ({
     setScore(0);
     phaseRef.current = "playing";
     setPhase("playing");
-    animFrameRef.current = requestAnimationFrame(drawGame);
   };
 
   const handleTap = () => {

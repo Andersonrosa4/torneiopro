@@ -24,13 +24,21 @@ const ArenaLogin = () => {
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      toast({ title: "Erro ao entrar", description: error.message, variant: "destructive" });
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        toast({ title: "Erro ao entrar", description: error.message, variant: "destructive" });
+        setLoading(false);
+        return;
+      }
+      // Small delay to ensure session is persisted before navigation
+      setTimeout(() => {
+        navigate("/arena-dashboard");
+      }, 300);
+    } catch (err: any) {
+      toast({ title: "Erro inesperado", description: err?.message || "Tente novamente", variant: "destructive" });
       setLoading(false);
-      return;
     }
-    navigate("/arena-dashboard");
   };
 
   return (

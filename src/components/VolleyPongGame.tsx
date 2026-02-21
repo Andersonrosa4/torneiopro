@@ -23,10 +23,10 @@ const NET_X = W / 2;
 const NET_H = 100;
 const NET_TOP = GROUND_Y - NET_H;
 const BALL_R = 10;
-const GRAVITY = 0.22;
+const GRAVITY = 0.18;
 const MAX_TOUCHES = 3;
-const SERVE_VX = 3;
-const SERVE_VY = -6;
+const SERVE_VX = 2.5;
+const SERVE_VY = -5;
 const MAX_SCORE = 15;
 const MIN_DIFF = 2;
 
@@ -34,12 +34,12 @@ const MIN_DIFF = 2;
 const P_W = 22;
 const P_H = 52;
 const HEAD_R = 9;
-const JUMP_VY = -5.5;
-const MOVE_SPEED = 2.8;
-const AI_SPEED = 2.8;
-const ATTACK_BOOST = 1.6;
-const BALL_SPEED_CAP = 7;
-const BALL_VY_CAP = 8;
+const JUMP_VY = -6.2;
+const MOVE_SPEED = 3.5;
+const AI_SPEED = 2.2;
+const ATTACK_BOOST = 1.8;
+const BALL_SPEED_CAP = 5.5;
+const BALL_VY_CAP = 6.5;
 
 type Phase = "start" | "waiting" | "playing" | "gameover";
 type GameMode = "solo" | "multi";
@@ -556,14 +556,16 @@ const VolleyPongGame = ({
       return false;
     };
 
-    if (applyHit(p.x, headY, HEAD_R + 3, true)) return true;
+    // Player (isLeft) gets bigger hitbox for easier contact
+    const hitBonus = isLeft ? 6 : 0;
+    if (applyHit(p.x, headY, HEAD_R + 3 + hitBonus, true)) return true;
     const bodyCenter = shoulderY + (p.y - shoulderY) * 0.4;
-    if (applyHit(p.x, bodyCenter, 22, false)) return true;
+    if (applyHit(p.x, bodyCenter, 22 + hitBonus, false)) return true;
     if (p.isAttacking || p.armAngle > 0.3) {
       const dir = isLeft ? 1 : -1;
       const armX = p.x + dir * 22;
       const armY = shoulderY;
-      if (applyHit(armX, armY, 12, false)) return true;
+      if (applyHit(armX, armY, 12 + hitBonus, false)) return true;
     }
     return false;
   };
@@ -695,7 +697,7 @@ const VolleyPongGame = ({
     } else {
       // Solo: AI logic — simulate real ball trajectory to find landing point
       const ball_ = ballRef.current;
-      const aiSpeed = AI_SPEED + Math.min(rallyCountRef.current * 0.02, 0.8);
+      const aiSpeed = AI_SPEED + Math.min(rallyCountRef.current * 0.01, 0.4);
 
       // Simulate ball trajectory to predict where it will be at AI's height
       const simulateLanding = () => {

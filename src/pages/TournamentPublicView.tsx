@@ -27,6 +27,7 @@ import MatchSequenceViewer from "@/components/MatchSequenceViewer";
 import ClassificationTab from "@/components/ClassificationTab";
 import RankingsTab from "@/components/RankingsTab";
 import SportQuiz from "@/components/SportQuiz";
+import RallyGame from "@/components/RallyGame";
 
 const sportLabels: Record<string, string> = {
   beach_volleyball: "Vôlei de Praia",
@@ -240,9 +241,10 @@ const TournamentPublicView = () => {
               <TabsTrigger value="classification" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm">Class.</TabsTrigger>
               <TabsTrigger value="rankings" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm">Ranking</TabsTrigger>
             </TabsList>
-            {/* Quiz tab — full width, highlighted */}
-            <TabsList className="flex mb-4 sm:mb-5 h-auto bg-transparent p-0 w-full">
-              <TabsTrigger value="quiz" className="w-full text-sm sm:text-base font-extrabold h-10 sm:h-11 rounded-[12px] border-2 border-[#ffd700] bg-gradient-to-r from-[#ffd700]/20 via-primary/15 to-[#ffd700]/20 text-[#ffd700] shadow-lg shadow-[#ffd700]/15 data-[state=active]:from-[#ffd700]/30 data-[state=active]:via-primary/25 data-[state=active]:to-[#ffd700]/30 data-[state=active]:border-[#ffd700] data-[state=active]:text-[#ffd700] data-[state=active]:shadow-xl data-[state=active]:shadow-[#ffd700]/25 transition-all duration-300 animate-[quiz-pulse_2.5s_ease-in-out_infinite] data-[state=active]:animate-none">🎮 Quiz — Teste seus conhecimentos!</TabsTrigger>
+            {/* Mini-games tabs — full width, highlighted */}
+            <TabsList className="flex gap-2 mb-4 sm:mb-5 h-auto bg-transparent p-0 w-full">
+              <TabsTrigger value="quiz" className="flex-1 text-xs sm:text-sm font-extrabold h-10 sm:h-11 rounded-[12px] border-2 border-[#ffd700] bg-gradient-to-r from-[#ffd700]/20 via-primary/15 to-[#ffd700]/20 text-[#ffd700] shadow-lg shadow-[#ffd700]/15 data-[state=active]:from-[#ffd700]/30 data-[state=active]:via-primary/25 data-[state=active]:to-[#ffd700]/30 data-[state=active]:border-[#ffd700] data-[state=active]:text-[#ffd700] data-[state=active]:shadow-xl data-[state=active]:shadow-[#ffd700]/25 transition-all duration-300 animate-[quiz-pulse_2.5s_ease-in-out_infinite] data-[state=active]:animate-none">🎮 Quiz</TabsTrigger>
+              <TabsTrigger value="rally" className="flex-1 text-xs sm:text-sm font-extrabold h-10 sm:h-11 rounded-[12px] border-2 border-[#00e5ff] bg-gradient-to-r from-[#00e5ff]/20 via-primary/15 to-[#00e5ff]/20 text-[#00e5ff] shadow-lg shadow-[#00e5ff]/15 data-[state=active]:from-[#00e5ff]/30 data-[state=active]:via-primary/25 data-[state=active]:to-[#00e5ff]/30 data-[state=active]:border-[#00e5ff] data-[state=active]:text-[#00e5ff] data-[state=active]:shadow-xl data-[state=active]:shadow-[#00e5ff]/25 transition-all duration-300 animate-[quiz-pulse_2.5s_ease-in-out_infinite] data-[state=active]:animate-none">⚡ Rally Infinito</TabsTrigger>
             </TabsList>
 
             <TabsContent value="teams">
@@ -344,6 +346,10 @@ const TournamentPublicView = () => {
 
             <TabsContent value="quiz">
               <SportQuiz tournamentId={id || ""} sport={tournament.sport} isAdmin={isAdmin} />
+            </TabsContent>
+
+            <TabsContent value="rally">
+              <RallyGame tournamentId={id || ""} sport={tournament.sport} isAdmin={isAdmin} />
             </TabsContent>
           </Tabs>
           <FlowAppsBranding variant="tournament-cta" />

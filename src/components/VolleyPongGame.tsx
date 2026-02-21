@@ -23,10 +23,10 @@ const NET_X = W / 2;
 const NET_H = 100;
 const NET_TOP = GROUND_Y - NET_H;
 const BALL_R = 10;
-const GRAVITY = 0.14;
-const MAX_TOUCHES = 8;
-const SERVE_VX = 1.2;
-const SERVE_VY = -3;
+const GRAVITY = 0.22;
+const MAX_TOUCHES = 3;
+const SERVE_VX = 2.0;
+const SERVE_VY = -4.5;
 const MAX_SCORE = 10;
 const MIN_DIFF = 2;
 
@@ -34,12 +34,12 @@ const MIN_DIFF = 2;
 const P_W = 22;
 const P_H = 52;
 const HEAD_R = 9;
-const JUMP_VY = -5.5;
-const MOVE_SPEED = 5.5;
-const AI_SPEED = 1.2;
-const ATTACK_BOOST = 1.0;
-const BALL_SPEED_CAP = 3.0;
-const BALL_VY_CAP = 3.5;
+const JUMP_VY = -5.8;
+const MOVE_SPEED = 3.8;
+const AI_SPEED = 1.8;
+const ATTACK_BOOST = 1.5;
+const BALL_SPEED_CAP = 5.5;
+const BALL_VY_CAP = 6.5;
 
 type Phase = "start" | "waiting" | "playing" | "gameover";
 type GameMode = "solo" | "multi";
@@ -528,21 +528,21 @@ const VolleyPongGame = ({
         const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
         const isSpike = p.y < GROUND_Y - 20 && p.attackCooldown <= 0;
         const spikeBoost = isSpike ? ATTACK_BOOST : 0;
-        const baseSpeed = Math.max(speed * 0.7, 3); // dampen incoming speed
-        const newSpeed = Math.min(baseSpeed + spikeBoost + 1.5, BALL_SPEED_CAP);
+        const baseSpeed = Math.max(speed * 0.6, 2.5);
+        const newSpeed = Math.min(baseSpeed + spikeBoost + 1.0, BALL_SPEED_CAP);
 
         if (isHead) {
-          // Cabeceio: upward arc toward opponent
-          ball.vx = targetDir * (newSpeed * 0.55 + 1.5);
-          ball.vy = -Math.abs(newSpeed * 0.7) - 2;
+          // Cabeceio: high upward arc toward opponent
+          ball.vx = targetDir * (newSpeed * 0.5 + 1.0);
+          ball.vy = -Math.abs(newSpeed * 0.8) - 2.5;
         } else if (isSpike) {
           // Corte: downward aggressive hit
-          ball.vx = targetDir * Math.abs(Math.cos(angle)) * newSpeed * 0.8 + targetDir * 1.5;
-          ball.vy = Math.abs(newSpeed * 0.4) + 0.8;
+          ball.vx = targetDir * Math.abs(Math.cos(angle)) * newSpeed * 0.85 + targetDir * 1.2;
+          ball.vy = Math.abs(newSpeed * 0.35) + 0.5;
         } else {
-          // Toque normal: smooth upward arc
-          ball.vx = targetDir * Math.abs(Math.cos(angle)) * newSpeed * 0.6 + targetDir * 1.2;
-          ball.vy = -Math.abs(newSpeed * 0.65) - 1.8;
+          // Toque normal: smooth upward arc toward opponent
+          ball.vx = targetDir * Math.abs(Math.cos(angle)) * newSpeed * 0.5 + targetDir * 1.0;
+          ball.vy = -Math.abs(newSpeed * 0.75) - 2.0;
         }
 
         // Separate ball from player
@@ -557,7 +557,7 @@ const VolleyPongGame = ({
     };
 
     // Player (isLeft) gets bigger hitbox for easier contact
-    const hitBonus = isLeft ? 20 : 0;
+    const hitBonus = isLeft ? 10 : 0;
     if (applyHit(p.x, headY, HEAD_R + 3 + hitBonus, true)) return true;
     const bodyCenter = shoulderY + (p.y - shoulderY) * 0.4;
     if (applyHit(p.x, bodyCenter, 22 + hitBonus, false)) return true;
@@ -697,7 +697,7 @@ const VolleyPongGame = ({
     } else {
       // Solo: AI logic — simulate real ball trajectory to find landing point
       const ball_ = ballRef.current;
-      const aiSpeed = AI_SPEED + Math.min(rallyCountRef.current * 0.003, 0.15);
+      const aiSpeed = AI_SPEED + Math.min(rallyCountRef.current * 0.008, 0.4);
 
       // Simulate ball trajectory to predict where it will be at AI's height
       const simulateLanding = () => {
@@ -760,7 +760,7 @@ const VolleyPongGame = ({
         );
         
         if (shouldJump) {
-          ai.vy = JUMP_VY * 0.65;
+          ai.vy = JUMP_VY * 0.85;
         }
 
         // Attack when in air and close to ball
@@ -791,11 +791,11 @@ const VolleyPongGame = ({
 
     // ── Ball physics ──
     ball.vy += GRAVITY;
-    // Cap ball speed for realism
+    // Cap ball speed
     ball.vx = Math.max(-BALL_SPEED_CAP, Math.min(BALL_SPEED_CAP, ball.vx));
     ball.vy = Math.max(-BALL_VY_CAP, Math.min(BALL_VY_CAP, ball.vy));
-    // Apply slight air resistance
-    ball.vx *= 0.998;
+    // Air resistance
+    ball.vx *= 0.995;
     ball.x += ball.vx;
     ball.y += ball.vy;
     ball.rotation += ball.vx * 0.05;
@@ -807,23 +807,21 @@ const VolleyPongGame = ({
     for (const t of ball.trail) { t.alpha -= 0.12; }
     ball.trail = ball.trail.filter(t => t.alpha > 0);
 
-    // Wall bounces — walls act like a teammate, ball bounces back into play with upward arc
-    // Left wall (player's side) — send ball up and back toward center
+    // Wall bounces — realistic elastic bounce, ball stays in play
+    // Left wall
     if (ball.x - BALL_R <= 0) {
-      ball.x = BALL_R + 2;
-      ball.vx = Math.abs(ball.vx) + 0.5;
-      ball.vy = -Math.abs(ball.vy) - 1.5; // push ball upward so player can recover
+      ball.x = BALL_R + 1;
+      ball.vx = Math.abs(ball.vx) * 0.85;
     }
-    // Right wall (AI's side)
+    // Right wall
     if (ball.x + BALL_R >= W) {
-      ball.x = W - BALL_R - 2;
-      ball.vx = -Math.abs(ball.vx) - 0.5;
-      ball.vy = -Math.abs(ball.vy) - 1.5;
+      ball.x = W - BALL_R - 1;
+      ball.vx = -Math.abs(ball.vx) * 0.85;
     }
-    // Ceiling
+    // Ceiling — slight energy loss
     if (ball.y - BALL_R <= 0) {
       ball.y = BALL_R + 1;
-      ball.vy = Math.abs(ball.vy);
+      ball.vy = Math.abs(ball.vy) * 0.7;
     }
 
     // Net collision — ball bounces off net like a wall

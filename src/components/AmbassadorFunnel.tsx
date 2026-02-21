@@ -41,6 +41,8 @@ const AmbassadorFunnel = ({ forceOpen = false, onClose }: AmbassadorFunnelProps)
   const [answers, setAnswers] = useState<(boolean | null)[]>([null, null, null]);
   const [showInterestForm, setShowInterestForm] = useState(false);
   const [playerName, setPlayerName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [city, setCity] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -112,6 +114,8 @@ const AmbassadorFunnel = ({ forceOpen = false, onClose }: AmbassadorFunnelProps)
         data.user.user_metadata?.full_name ||
         ""
       );
+      setEmail(data.user.email || "");
+      setPhone(data.user.user_metadata?.phone || data.user.phone || "");
     }
   };
 
@@ -136,12 +140,15 @@ const AmbassadorFunnel = ({ forceOpen = false, onClose }: AmbassadorFunnelProps)
       await supabase.from("ambassador_interests").insert({
         user_id: userId,
         player_name: playerName || "Atleta",
-        whatsapp: city || null,
+        email: email || null,
+        phone: phone || null,
+        city: city || null,
+        whatsapp: null,
         answer_1: answers[0],
         answer_2: answers[1],
         answer_3: answers[2],
         final_action: finalAction,
-      });
+      } as any);
     }
     localStorage.setItem(FUNNEL_STORAGE_KEY, Date.now().toString());
     setVisible(false);
@@ -156,6 +163,14 @@ const AmbassadorFunnel = ({ forceOpen = false, onClose }: AmbassadorFunnelProps)
       toast({ title: "Digite seu nome", variant: "destructive" });
       return;
     }
+    if (!email.trim()) {
+      toast({ title: "Digite seu e-mail", variant: "destructive" });
+      return;
+    }
+    if (!phone.trim()) {
+      toast({ title: "Digite seu celular", variant: "destructive" });
+      return;
+    }
     if (!city.trim()) {
       toast({ title: "Digite sua cidade", variant: "destructive" });
       return;
@@ -163,9 +178,8 @@ const AmbassadorFunnel = ({ forceOpen = false, onClose }: AmbassadorFunnelProps)
     setSubmitting(true);
     await saveAndClose("interested");
 
-    // Redirect to WhatsApp with pre-filled message
     const msg = encodeURIComponent(
-      `Olá! Meu nome é ${playerName.trim()} e tenho interesse em criar um torneio na cidade de ${city.trim()}. Vim pelo app TorneioPro!`
+      `Olá! Meu nome é ${playerName.trim()}, e-mail: ${email.trim()}, celular: ${phone.trim()}. Tenho interesse em criar um torneio na cidade de ${city.trim()}. Vim pelo app TorneioPro!`
     );
     window.open(`https://wa.me/5565993379751?text=${msg}`, "_blank");
 
@@ -350,6 +364,29 @@ const AmbassadorFunnel = ({ forceOpen = false, onClose }: AmbassadorFunnelProps)
                     value={playerName}
                     onChange={(e) => setPlayerName(e.target.value)}
                     placeholder="Seu nome completo"
+                    className="h-12 rounded-xl bg-muted/40 border-border/50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+                    E-mail
+                  </Label>
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="seu@email.com"
+                    className="h-12 rounded-xl bg-muted/40 border-border/50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+                    Celular
+                  </Label>
+                  <Input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="(99) 99999-9999"
                     className="h-12 rounded-xl bg-muted/40 border-border/50"
                   />
                 </div>

@@ -29,7 +29,7 @@ const AtletaLoginPage = () => {
       setLoading(false);
       return;
     }
-    navigate("/atleta/home");
+    navigate("/athlete-login");
   };
 
   return (

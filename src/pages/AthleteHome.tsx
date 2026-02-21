@@ -7,6 +7,7 @@ import { toast } from "@/hooks/use-toast";
 import { Trophy, Bell, Activity, Calendar, ArrowLeft, Star } from "lucide-react";
 import LogoImage from "@/components/LogoImage";
 import NotificationBell from "@/components/NotificationBell";
+import SystemAdsBanner from "@/components/SystemAdsBanner";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
@@ -216,6 +217,9 @@ const AthleteHome = () => {
             </div>
           )}
         </div>
+
+        {/* Anúncios do Sistema */}
+        <SystemAdsBanner />
 
         {/* Notificações recentes */}
         <div>

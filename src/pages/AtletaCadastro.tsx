@@ -12,20 +12,12 @@ import { Link, useNavigate } from "react-router-dom";
 const AtletaCadastro = () => {
   const navigate = useNavigate();
   const [name, setName] = useState("");
-  const [cpf, setCpf] = useState("");
+  const [nickname, setNickname] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const formatCpf = (value: string) => {
-    const digits = value.replace(/\D/g, "").slice(0, 11);
-    return digits
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
-  };
 
   const formatPhone = (value: string) => {
     const digits = value.replace(/\D/g, "").slice(0, 11);
@@ -37,13 +29,13 @@ const AtletaCadastro = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const cleanCpf = cpf.replace(/\D/g, "");
-    if (cleanCpf.length !== 11) {
-      toast({ title: "CPF inválido", variant: "destructive" });
+    if (!name.trim() || !nickname.trim() || !email.trim() || !phone.trim()) {
+      toast({ title: "Preencha todos os campos", variant: "destructive" });
       return;
     }
-    if (!name.trim() || !email.trim() || !phone.trim()) {
-      toast({ title: "Preencha todos os campos", variant: "destructive" });
+    const cleanPhone = phone.replace(/\D/g, "");
+    if (cleanPhone.length < 10) {
+      toast({ title: "WhatsApp inválido", description: "Informe DDD + número", variant: "destructive" });
       return;
     }
     if (password.length < 6) {
@@ -57,26 +49,17 @@ const AtletaCadastro = () => {
 
     setLoading(true);
 
-    // Check CPF uniqueness via customers table
-    const { data: existingCpf } = await supabase
-      .from("customers")
-      .select("id")
-      .eq("cpf", cleanCpf)
-      .maybeSingle();
-
-    if (existingCpf) {
-      toast({ title: "CPF já cadastrado", description: "Já existe uma conta com este CPF.", variant: "destructive" });
-      setLoading(false);
-      return;
-    }
-
     // Create auth user
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       options: {
         emailRedirectTo: window.location.origin,
-        data: { display_name: name.trim(), cpf: cleanCpf, phone: phone.trim() },
+        data: {
+          display_name: name.trim(),
+          nickname: nickname.trim(),
+          phone: cleanPhone,
+        },
       },
     });
 
@@ -89,12 +72,13 @@ const AtletaCadastro = () => {
       return;
     }
 
-    // Create customer record linked by CPF
+    // Create customer record
     if (authData.user) {
       await supabase.from("customers").insert({
         name: name.trim(),
-        cpf: cleanCpf,
-        phone: phone.replace(/\D/g, ""),
+        nickname: nickname.trim(),
+        cpf: "",
+        phone: cleanPhone,
       });
 
       // Assign athlete role
@@ -104,7 +88,10 @@ const AtletaCadastro = () => {
       });
     }
 
-    toast({ title: "Cadastro realizado!", description: "Verifique seu email para confirmar a conta." });
+    toast({
+      title: "Cadastro realizado!",
+      description: "Verifique seu email para confirmar a conta. Você também receberá uma mensagem no WhatsApp.",
+    });
     navigate("/atleta/login");
     setLoading(false);
   };
@@ -119,33 +106,34 @@ const AtletaCadastro = () => {
           <CardTitle className="flex items-center justify-center gap-2">
             <UserPlus className="h-5 w-5" /> Cadastro de Atleta
           </CardTitle>
-          <CardDescription>Crie sua conta para agendar quadras</CardDescription>
+          <CardDescription>Crie sua conta para acessar torneios e agendamentos</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label>Nome Completo</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="João da Silva" />
+              <Label>Nome Completo *</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="João da Silva" required />
             </div>
             <div className="space-y-2">
-              <Label>CPF</Label>
-              <Input value={cpf} onChange={(e) => setCpf(formatCpf(e.target.value))} placeholder="000.000.000-00" maxLength={14} />
+              <Label>Nome de Jogador (Nickname) *</Label>
+              <Input value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="JoãoBT" required />
+              <p className="text-xs text-muted-foreground">Este nome será exibido nas tabelas dos torneios</p>
             </div>
             <div className="space-y-2">
-              <Label>Telefone</Label>
-              <Input value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} placeholder="(00) 00000-0000" maxLength={15} />
+              <Label>WhatsApp (com DDD) *</Label>
+              <Input value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} placeholder="(00) 00000-0000" maxLength={15} required />
             </div>
             <div className="space-y-2">
-              <Label>Email</Label>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="joao@email.com" />
+              <Label>Email *</Label>
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="joao@email.com" required />
             </div>
             <div className="space-y-2">
-              <Label>Senha</Label>
-              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
+              <Label>Senha *</Label>
+              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" required />
             </div>
             <div className="space-y-2">
-              <Label>Confirmar Senha</Label>
-              <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repita a senha" />
+              <Label>Confirmar Senha *</Label>
+              <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repita a senha" required />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Cadastrando..." : "Criar Conta"}
@@ -155,8 +143,8 @@ const AtletaCadastro = () => {
             <Link to="/atleta/login" className="text-sm text-primary hover:underline block">
               Já tem uma conta? Entrar
             </Link>
-            <Link to="/agendamentos" className="text-sm text-muted-foreground hover:underline block">
-              ← Voltar para agendamentos
+            <Link to="/" className="text-sm text-muted-foreground hover:underline block">
+              ← Voltar ao início
             </Link>
           </div>
         </CardContent>

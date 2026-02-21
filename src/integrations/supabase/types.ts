@@ -692,28 +692,31 @@ export type Database = {
       customers: {
         Row: {
           city_id: string | null
-          cpf: string
+          cpf: string | null
           created_at: string
           id: string
           name: string
+          nickname: string | null
           phone: string
           state_id: string | null
         }
         Insert: {
           city_id?: string | null
-          cpf: string
+          cpf?: string | null
           created_at?: string
           id?: string
           name: string
+          nickname?: string | null
           phone: string
           state_id?: string | null
         }
         Update: {
           city_id?: string | null
-          cpf?: string
+          cpf?: string | null
           created_at?: string
           id?: string
           name?: string
+          nickname?: string | null
           phone?: string
           state_id?: string | null
         }
@@ -1323,6 +1326,39 @@ export type Database = {
           id?: string
           name?: string
           uf?: string
+        }
+        Relationships: []
+      }
+      system_ads: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          display_order: number
+          id: string
+          image_url: string | null
+          link_url: string | null
+          title: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          id?: string
+          image_url?: string | null
+          link_url?: string | null
+          title: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          id?: string
+          image_url?: string | null
+          link_url?: string | null
+          title?: string
         }
         Relationships: []
       }

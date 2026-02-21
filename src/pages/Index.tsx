@@ -181,7 +181,7 @@ const Index = () => {
                 Criar Conta
               </button>
               <button
-                onClick={() => { setMenuOpen(false); navigate("/atleta/login"); }}
+                onClick={() => { setMenuOpen(false); navigate("/athlete-login"); }}
                 className="flex items-center gap-3 rounded-xl px-4 py-3 text-left font-medium text-foreground hover:bg-[hsl(0_0%_100%/0.08)] transition-colors"
               >
                 <LogIn className="h-5 w-5 text-sky-400" />

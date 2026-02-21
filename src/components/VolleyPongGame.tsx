@@ -27,6 +27,100 @@ const AI_SPEED_BASE = 2.2;
 const MAX_SCORE = 25;
 const MIN_DIFF = 2;
 
+// Stick figure dimensions
+const BODY_H = 36;
+const HEAD_R = 7;
+const ARM_LEN = 16;
+
+/** Draw a stick-figure volleyball player */
+const drawPlayer = (
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  footY: number,
+  facingUp: boolean,
+  skinColor: string,
+  shirtColor: string,
+  shortColor: string,
+  armAngle: number, // 0 = resting, 1 = hitting
+) => {
+  const dir = facingUp ? -1 : 1;
+  const headY = footY + dir * (BODY_H + HEAD_R);
+  const shoulderY = headY + dir * (HEAD_R + 4);
+  const hipY = footY + dir * 10;
+  const kneeY = footY + dir * 4;
+
+  // Legs
+  ctx.strokeStyle = skinColor;
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = "round";
+  // Left leg
+  ctx.beginPath();
+  ctx.moveTo(x - 6, footY);
+  ctx.lineTo(x - 3, kneeY);
+  ctx.lineTo(x, hipY);
+  ctx.stroke();
+  // Right leg
+  ctx.beginPath();
+  ctx.moveTo(x + 6, footY);
+  ctx.lineTo(x + 3, kneeY);
+  ctx.lineTo(x, hipY);
+  ctx.stroke();
+
+  // Shorts
+  ctx.strokeStyle = shortColor;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(x - 4, hipY + dir * 2);
+  ctx.lineTo(x, hipY);
+  ctx.lineTo(x + 4, hipY + dir * 2);
+  ctx.stroke();
+
+  // Torso (shirt)
+  ctx.strokeStyle = shirtColor;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(x, hipY);
+  ctx.lineTo(x, shoulderY);
+  ctx.stroke();
+
+  // Arms
+  const armRaise = armAngle * (Math.PI * 0.6);
+  const baseArmAngle = facingUp ? Math.PI * 0.25 : -Math.PI * 0.25;
+  ctx.strokeStyle = skinColor;
+  ctx.lineWidth = 2.5;
+  // Left arm
+  const laAngle = baseArmAngle - armRaise;
+  ctx.beginPath();
+  ctx.moveTo(x, shoulderY);
+  ctx.lineTo(x - Math.cos(laAngle) * ARM_LEN, shoulderY + Math.sin(laAngle) * ARM_LEN);
+  ctx.stroke();
+  // Right arm
+  const raAngle = baseArmAngle + armRaise * 0.5;
+  ctx.beginPath();
+  ctx.moveTo(x, shoulderY);
+  ctx.lineTo(x + Math.cos(raAngle) * ARM_LEN, shoulderY + Math.sin(raAngle) * ARM_LEN);
+  ctx.stroke();
+
+  // Head
+  ctx.fillStyle = skinColor;
+  ctx.beginPath();
+  ctx.arc(x, headY, HEAD_R, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.15)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Hair
+  ctx.fillStyle = "rgba(50,30,10,0.8)";
+  ctx.beginPath();
+  if (facingUp) {
+    ctx.arc(x, headY - 1, HEAD_R, Math.PI, 2 * Math.PI);
+  } else {
+    ctx.arc(x, headY + 1, HEAD_R, 0, Math.PI);
+  }
+  ctx.fill();
+};
+
 type Phase = "start" | "playing" | "gameover";
 
 const VolleyPongGame = ({
@@ -64,6 +158,8 @@ const VolleyPongGame = ({
   const servingRef = useRef<"player" | "ai">("player");
   const rallyCountRef = useRef(0);
   const flashRef = useRef(0);
+  const playerArmRef = useRef(0); // 0-1 arm raise animation
+  const aiArmRef = useRef(0);
 
   // ─── Ranking ─────────────────────────────────
   const fetchRanking = useCallback(async () => {
@@ -215,7 +311,12 @@ const VolleyPongGame = ({
       ball.dx = hitPos * 3;
       rallyCountRef.current += 1;
       flashRef.current = 0.6;
+      playerArmRef.current = 1;
     }
+
+    // Decay arm animations
+    playerArmRef.current = Math.max(0, playerArmRef.current - 0.04);
+    aiArmRef.current = Math.max(0, aiArmRef.current - 0.04);
 
     // AI paddle collision (top)
     const aLeft = aiXRef.current - PAD_W / 2;
@@ -232,6 +333,7 @@ const VolleyPongGame = ({
       const hitPos = (ball.x - aiXRef.current) / (PAD_W / 2);
       ball.dx = hitPos * 3;
       rallyCountRef.current += 1;
+      aiArmRef.current = 1;
     }
 
     // Ball out top → player scores
@@ -285,37 +387,34 @@ const VolleyPongGame = ({
       ctx.stroke();
     }
 
-    // ── AI paddle (top) ──
-    const aiLeft = aiXRef.current - PAD_W / 2;
-    const aiGrad = ctx.createLinearGradient(aiLeft, AI_Y, aiLeft, AI_Y + PAD_H);
-    aiGrad.addColorStop(0, "rgba(239, 68, 68, 0.9)");
-    aiGrad.addColorStop(1, "rgba(185, 28, 28, 0.8)");
-    ctx.fillStyle = aiGrad;
-    ctx.beginPath();
-    ctx.roundRect(aiLeft, AI_Y, PAD_W, PAD_H, 5);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.2)";
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    // ── AI player (top, facing down) ──
+    drawPlayer(
+      ctx,
+      aiXRef.current,
+      AI_Y + PAD_H, // feet position
+      false, // facing down
+      "#e8c4a0", // skin
+      "#ef4444", // red shirt
+      "#1e293b", // dark shorts
+      aiArmRef.current,
+    );
 
-    // ── Player paddle (bottom) ──
-    const plLeft = padX - PAD_W / 2;
-    const plGrad = ctx.createLinearGradient(plLeft, PLAYER_Y, plLeft, PLAYER_Y + PAD_H);
+    // ── Player (bottom, facing up) ──
+    drawPlayer(
+      ctx,
+      padX,
+      PLAYER_Y, // feet position
+      true, // facing up
+      "#d4a574", // skin
+      "#3b82f6", // blue shirt
+      "#1e293b", // dark shorts
+      playerArmRef.current,
+    );
+
+    // Flash decay
     if (flashRef.current > 0) {
-      plGrad.addColorStop(0, `rgba(74, 222, 128, ${0.8 + flashRef.current * 0.2})`);
-      plGrad.addColorStop(1, `rgba(34, 197, 94, ${0.6 + flashRef.current * 0.2})`);
       flashRef.current = Math.max(0, flashRef.current - 0.02);
-    } else {
-      plGrad.addColorStop(0, "rgba(59, 130, 246, 0.9)");
-      plGrad.addColorStop(1, "rgba(29, 78, 216, 0.8)");
     }
-    ctx.fillStyle = plGrad;
-    ctx.beginPath();
-    ctx.roundRect(plLeft, PLAYER_Y, PAD_W, PAD_H, 5);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.25)";
-    ctx.lineWidth = 1;
-    ctx.stroke();
 
     // ── Ball shadow ──
     ctx.fillStyle = "rgba(0,0,0,0.25)";

@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 import { Hash, ArrowLeft, Trophy } from "lucide-react";
 import LogoImage from "@/components/LogoImage";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
+import PromoPopup from "@/components/PromoPopup";
 
 const AthleteLogin = () => {
   const [code, setCode] = useState("");
@@ -42,6 +43,7 @@ const AthleteLogin = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-[hsl(220_15%_10%)] via-[hsl(220_12%_14%)] to-[hsl(25_15%_12%)] px-4 relative overflow-hidden">
+      <PromoPopup />
       {/* Ambient glow orbs */}
       <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.12),transparent_70%)] blur-3xl pointer-events-none" />
       <div className="absolute bottom-[-15%] right-[-10%] w-[400px] h-[400px] rounded-full bg-[radial-gradient(circle,hsl(var(--accent)/0.1),transparent_70%)] blur-3xl pointer-events-none" />

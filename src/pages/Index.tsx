@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { QrCode, Smartphone, Download, Menu, CalendarDays, LogIn, X } from "lucide-react";
+import { QrCode, Smartphone, Download, Menu, CalendarDays, LogIn, UserPlus, X } from "lucide-react";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
 import LogoImage from "@/components/LogoImage";
 import qrCodeImg from "@/assets/qrcode-torneiopro.png";
@@ -147,7 +147,7 @@ const Index = () => {
               </button>
             </div>
 
-            <nav className="flex flex-col gap-2">
+            <nav className="flex flex-col gap-1">
               <button
                 onClick={() => { setMenuOpen(false); navigate("/agendamentos"); }}
                 className="flex items-center gap-3 rounded-xl px-4 py-3 text-left font-medium text-foreground hover:bg-[hsl(0_0%_100%/0.08)] transition-colors"
@@ -155,12 +155,34 @@ const Index = () => {
                 <CalendarDays className="h-5 w-5 text-primary" />
                 Agendamento de Quadras
               </button>
+
+              <div className="my-2 border-t border-[hsl(0_0%_100%/0.08)]" />
+              <p className="px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Atleta</p>
+
+              <button
+                onClick={() => { setMenuOpen(false); navigate("/atleta/cadastro"); }}
+                className="flex items-center gap-3 rounded-xl px-4 py-3 text-left font-medium text-foreground hover:bg-[hsl(0_0%_100%/0.08)] transition-colors"
+              >
+                <UserPlus className="h-5 w-5 text-emerald-400" />
+                Criar Conta
+              </button>
+              <button
+                onClick={() => { setMenuOpen(false); navigate("/atleta/login"); }}
+                className="flex items-center gap-3 rounded-xl px-4 py-3 text-left font-medium text-foreground hover:bg-[hsl(0_0%_100%/0.08)] transition-colors"
+              >
+                <LogIn className="h-5 w-5 text-sky-400" />
+                Entrar como Atleta
+              </button>
+
+              <div className="my-2 border-t border-[hsl(0_0%_100%/0.08)]" />
+              <p className="px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Arena</p>
+
               <button
                 onClick={() => { setMenuOpen(false); navigate("/arena-login"); }}
                 className="flex items-center gap-3 rounded-xl px-4 py-3 text-left font-medium text-foreground hover:bg-[hsl(0_0%_100%/0.08)] transition-colors"
               >
-                <LogIn className="h-5 w-5 text-muted-foreground" />
-                Painel da Arena
+                <LogIn className="h-5 w-5 text-amber-400" />
+                Login da Arena
               </button>
             </nav>
           </motion.div>

@@ -482,6 +482,44 @@ export type Database = {
           },
         ]
       }
+      game_scores: {
+        Row: {
+          created_at: string
+          game_type: string
+          id: string
+          player_name: string
+          score: number
+          sport: string
+          tournament_id: string
+        }
+        Insert: {
+          created_at?: string
+          game_type?: string
+          id?: string
+          player_name: string
+          score?: number
+          sport: string
+          tournament_id: string
+        }
+        Update: {
+          created_at?: string
+          game_type?: string
+          id?: string
+          player_name?: string
+          score?: number
+          sport?: string
+          tournament_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_scores_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       groups: {
         Row: {
           created_at: string

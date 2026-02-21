@@ -719,11 +719,7 @@ const VolleyPongGame = ({
   const deleteScore = async (scoreId: string, name: string) => {
     if (!confirm(`Excluir a pontuação de "${name}" do ranking?`)) return;
     setDeletingId(scoreId);
-    const token = sessionStorage.getItem("organizer_token");
-    const organizerId = sessionStorage.getItem("organizer_id");
-    const { error } = await supabase.functions.invoke("organizer-api", {
-      body: { token, organizerId, table: "game_scores", operation: "delete", filters: { id: scoreId } },
-    });
+    const { error } = await supabase.from("game_scores").delete().eq("id", scoreId);
     if (error) toast({ title: "Erro ao excluir", variant: "destructive" });
     else { toast({ title: "Excluído" }); await fetchRanking(); }
     setDeletingId(null);

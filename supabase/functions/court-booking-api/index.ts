@@ -723,6 +723,195 @@ Deno.serve(async (req) => {
       return jsonResponse({ data });
     }
 
+    // ═══════════════════════════════════════
+    // ATHLETE ACTIONS
+    // ═══════════════════════════════════════
+
+    if (action === "list_athlete_bookings") {
+      const { user_id } = body;
+      if (!user_id) return errorResponse("user_id é obrigatório");
+
+      // Find customer by user metadata (cpf)
+      // First get user info
+      const token = authHeader?.replace("Bearer ", "");
+      if (!token) return errorResponse("Autenticação necessária", 401);
+      const { data: { user: authUser } } = await supabase.auth.getUser(token);
+      if (!authUser || authUser.id !== user_id) return errorResponse("Não autorizado", 401);
+
+      const cpf = authUser.user_metadata?.cpf;
+      if (!cpf) return errorResponse("CPF não encontrado no perfil");
+
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("cpf", cpf)
+        .maybeSingle();
+
+      if (!customer) return jsonResponse({ data: [] });
+
+      const { data: bookings, error: bErr } = await supabase
+        .from("court_bookings")
+        .select("id, date, start_time, end_time, status, price, courts(name), arenas:arena_id(name)")
+        .eq("customer_id", customer.id)
+        .order("date", { ascending: false })
+        .order("start_time", { ascending: false })
+        .limit(50);
+
+      if (bErr) return errorResponse(bErr.message);
+
+      const mapped = (bookings || []).map((b: any) => ({
+        id: b.id,
+        date: b.date,
+        start_time: b.start_time,
+        end_time: b.end_time,
+        status: b.status,
+        price: b.price,
+        court_name: b.courts?.name || "—",
+        arena_name: b.arenas?.name || "—",
+      }));
+
+      return jsonResponse({ data: mapped });
+    }
+
+    if (action === "cancel_athlete_booking") {
+      const token = authHeader?.replace("Bearer ", "");
+      if (!token) return errorResponse("Autenticação necessária", 401);
+      const { data: { user: authUser } } = await supabase.auth.getUser(token);
+      if (!authUser) return errorResponse("Não autorizado", 401);
+
+      const { booking_id } = body;
+      if (!booking_id) return errorResponse("booking_id é obrigatório");
+
+      const cpf = authUser.user_metadata?.cpf;
+      if (!cpf) return errorResponse("CPF não encontrado no perfil");
+
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("cpf", cpf)
+        .maybeSingle();
+      if (!customer) return errorResponse("Cliente não encontrado", 404);
+
+      const { data: booking } = await supabase
+        .from("court_bookings")
+        .select("id, customer_id, court_id, date, start_time, end_time, status")
+        .eq("id", booking_id)
+        .single();
+
+      if (!booking) return errorResponse("Reserva não encontrada", 404);
+      if (booking.customer_id !== customer.id) return errorResponse("Sem permissão", 403);
+      if (booking.status !== "reserved") return errorResponse("Apenas reservas confirmadas podem ser canceladas");
+
+      // Check 2-hour rule
+      const now = new Date();
+      const bookingDateTime = new Date(`${booking.date}T${booking.start_time}`);
+      const diffMs = bookingDateTime.getTime() - now.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+
+      if (diffHours <= 2) {
+        return errorResponse("Cancelamento permitido apenas com mais de 2 horas de antecedência");
+      }
+
+      // Cancel booking
+      await supabase
+        .from("court_bookings")
+        .update({ status: "canceled" })
+        .eq("id", booking_id);
+
+      // Release time slot
+      await supabase
+        .from("court_time_slots")
+        .update({ status: "available" })
+        .eq("court_id", booking.court_id)
+        .eq("date", booking.date)
+        .eq("start_time", booking.start_time)
+        .eq("end_time", booking.end_time);
+
+      return jsonResponse({ data: null });
+    }
+
+    if (action === "list_arena_owners") {
+      const token = authHeader?.replace("Bearer ", "");
+      if (!token) return errorResponse("Autenticação necessária", 401);
+      const { data: { user: authUser } } = await supabase.auth.getUser(token);
+      if (!authUser) return errorResponse("Não autorizado", 401);
+
+      const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: authUser.id, _role: "admin" });
+      if (!isAdmin) return errorResponse("Apenas admins", 403);
+
+      const { data: admins, error: aErr } = await supabase
+        .from("arena_admins")
+        .select("id, user_id, arena_id, created_at, arenas(name)")
+        .order("created_at", { ascending: false });
+
+      if (aErr) return errorResponse(aErr.message);
+
+      // Get user emails
+      const result = [];
+      for (const a of (admins || [])) {
+        const { data: { user: u } } = await supabase.auth.admin.getUserById(a.user_id);
+        result.push({
+          ...a,
+          user_email: u?.email || a.user_id,
+          arena_name: (a as any).arenas?.name || a.arena_id,
+        });
+      }
+
+      return jsonResponse({ data: result });
+    }
+
+    if (action === "create_arena_owner") {
+      const token = authHeader?.replace("Bearer ", "");
+      if (!token) return errorResponse("Autenticação necessária", 401);
+      const { data: { user: authUser } } = await supabase.auth.getUser(token);
+      if (!authUser) return errorResponse("Não autorizado", 401);
+
+      const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: authUser.id, _role: "admin" });
+      if (!isAdmin) return errorResponse("Apenas admins", 403);
+
+      const { email, password, arena_id } = body;
+      if (!email || !password || !arena_id) return errorResponse("email, password e arena_id são obrigatórios");
+
+      // Create auth user with auto-confirm
+      const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+      });
+      if (createErr) return errorResponse(createErr.message);
+
+      // Create arena_admin record
+      const { data: adminRec, error: adminErr } = await supabase
+        .from("arena_admins")
+        .insert({ user_id: newUser.user.id, arena_id })
+        .select()
+        .single();
+      if (adminErr) return errorResponse(adminErr.message);
+
+      return jsonResponse({ data: adminRec });
+    }
+
+    if (action === "remove_arena_owner") {
+      const token = authHeader?.replace("Bearer ", "");
+      if (!token) return errorResponse("Autenticação necessária", 401);
+      const { data: { user: authUser } } = await supabase.auth.getUser(token);
+      if (!authUser) return errorResponse("Não autorizado", 401);
+
+      const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: authUser.id, _role: "admin" });
+      if (!isAdmin) return errorResponse("Apenas admins", 403);
+
+      const { owner_id } = body;
+      if (!owner_id) return errorResponse("owner_id é obrigatório");
+
+      const { error } = await supabase
+        .from("arena_admins")
+        .delete()
+        .eq("id", owner_id);
+      if (error) return errorResponse(error.message);
+
+      return jsonResponse({ data: null });
+    }
+
     return errorResponse("Ação não reconhecida: " + action);
   } catch (err) {
     return jsonResponse({ error: "Erro interno: " + (err as Error).message }, 500);

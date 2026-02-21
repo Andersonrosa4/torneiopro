@@ -21,6 +21,12 @@ import QRCodePage from "./pages/QRCodePage";
 import CourtBooking from "./pages/CourtBooking";
 import ArenaLogin from "./pages/ArenaLogin";
 import ArenaDashboard from "./pages/ArenaDashboard";
+import AtletaCadastro from "./pages/AtletaCadastro";
+import AtletaLoginPage from "./pages/AtletaLoginPage";
+import AtletaRecuperarSenha from "./pages/AtletaRecuperarSenha";
+import ResetPassword from "./pages/ResetPassword";
+import MeusAgendamentos from "./pages/MeusAgendamentos";
+import AdminArenaOwners from "./pages/AdminArenaOwners";
 
 import ScrollToTop from "@/components/ScrollToTop";
 import AiAssistant from "@/components/AiAssistant";
@@ -50,6 +56,12 @@ const App = () => (
               <Route path="/agendamentos" element={<CourtBooking />} />
               <Route path="/arena-login" element={<ArenaLogin />} />
               <Route path="/arena-dashboard" element={<ArenaDashboard />} />
+              <Route path="/atleta/cadastro" element={<AtletaCadastro />} />
+              <Route path="/atleta/login" element={<AtletaLoginPage />} />
+              <Route path="/atleta/recuperar-senha" element={<AtletaRecuperarSenha />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/atleta/meus-agendamentos" element={<MeusAgendamentos />} />
+              <Route path="/admin-arenas" element={<AdminArenaOwners />} />
               <Route path="/simulation-test" element={<SimulationTest />} />
               <Route path="/diagnostics" element={<ProtectedRoute><SystemDiagnostics /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />

@@ -3,7 +3,7 @@ import { publicQuery } from "@/lib/organizerApi";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Medal, Zap, RotateCcw, Trash2 } from "lucide-react";
+import { Medal, Zap, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface GameScore {
@@ -12,15 +12,6 @@ interface GameScore {
   score: number;
   created_at: string;
 }
-
-const sportEmoji: Record<string, string> = {
-  beach_volleyball: "🏐",
-  futevolei: "⚽",
-  beach_tennis: "🎾",
-  tennis: "🎾",
-  padel: "🏓",
-  futsal: "⚽",
-};
 
 const sportLabels: Record<string, string> = {
   beach_volleyball: "Vôlei de Praia",
@@ -31,15 +22,35 @@ const sportLabels: Record<string, string> = {
   futsal: "Futsal",
 };
 
+const sportEmoji: Record<string, string> = {
+  beach_volleyball: "🏐",
+  futevolei: "⚽",
+  beach_tennis: "🎾",
+  tennis: "🎾",
+  padel: "🏓",
+  futsal: "⚽",
+};
+
 // Game constants
-const COURT_WIDTH = 320;
-const COURT_HEIGHT = 420;
-const BALL_SIZE = 36;
-const SWEET_ZONE_HEIGHT = 60;
-const SWEET_ZONE_Y = COURT_HEIGHT - 90;
-const INITIAL_SPEED = 2.5;
-const SPEED_INCREMENT = 0.15;
-const MAX_SPEED = 12;
+const W = 320;
+const H = 480;
+const BALL_R = 11;
+const PAD_W = 72;
+const PAD_H = 14;
+const PAD_Y = H - 36;
+const INIT_SPEED = 3;
+const SPEED_INC = 0.12;
+const MAX_SPEED = 10;
+
+// Ball colors per sport
+const ballColors: Record<string, [string, string, string]> = {
+  beach_volleyball: ["#fff9c4", "#fdd835", "#f9a825"],
+  futevolei: ["#ffffff", "#e0e0e0", "#9e9e9e"],
+  beach_tennis: ["#c8e6c9", "#66bb6a", "#2e7d32"],
+  tennis: ["#c8e6c9", "#66bb6a", "#2e7d32"],
+  padel: ["#bbdefb", "#42a5f5", "#1565c0"],
+  futsal: ["#ffffff", "#e0e0e0", "#9e9e9e"],
+};
 
 type Phase = "start" | "playing" | "gameover";
 
@@ -61,19 +72,19 @@ const RallyGame = ({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Game state refs (for animation loop)
-  const ballRef = useRef({ x: COURT_WIDTH / 2, y: 60, dx: 1.8, dy: 1 });
-  const speedRef = useRef(INITIAL_SPEED);
+  // Game refs
+  const ballRef = useRef({ x: W / 2, y: 60, dx: 1.5, dy: 1 });
+  const padXRef = useRef(W / 2); // paddle center X
+  const speedRef = useRef(INIT_SPEED);
   const scoreRef = useRef(0);
   const phaseRef = useRef<Phase>("start");
-  const animFrameRef = useRef<number>(0);
+  const animRef = useRef(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const lastHitRef = useRef(false);
   const flashRef = useRef(0);
-  const missFlashRef = useRef(0);
 
   const emoji = sportEmoji[sport] || "🏐";
 
+  // ─── Ranking ─────────────────────────────────
   const fetchRanking = useCallback(async () => {
     setLoadingRanking(true);
     const { data } = await publicQuery<GameScore[]>({
@@ -89,9 +100,7 @@ const RallyGame = ({
     setLoadingRanking(false);
   }, [tournamentId, sport]);
 
-  useEffect(() => {
-    fetchRanking();
-  }, [fetchRanking]);
+  useEffect(() => { fetchRanking(); }, [fetchRanking]);
 
   const deleteScore = async (scoreId: string, name: string) => {
     if (!confirm(`Excluir a pontuação de "${name}" do ranking?`)) return;
@@ -99,13 +108,7 @@ const RallyGame = ({
     const token = sessionStorage.getItem("organizer_token");
     const organizerId = sessionStorage.getItem("organizer_id");
     const { error } = await supabase.functions.invoke("organizer-api", {
-      body: {
-        token,
-        organizerId,
-        table: "game_scores",
-        operation: "delete",
-        filters: { id: scoreId },
-      },
+      body: { token, organizerId, table: "game_scores", operation: "delete", filters: { id: scoreId } },
     });
     if (error) {
       toast({ title: "Erro ao excluir", variant: "destructive" });
@@ -114,6 +117,19 @@ const RallyGame = ({
       await fetchRanking();
     }
     setDeletingId(null);
+  };
+
+  const submitScore = async (finalScore: number) => {
+    setSubmitting(true);
+    await supabase.functions.invoke("organizer-api", {
+      body: {
+        table: "game_scores",
+        operation: "insert",
+        data: { tournament_id: tournamentId, game_type: "rally", player_name: playerName.trim(), sport, score: finalScore },
+      },
+    });
+    await fetchRanking();
+    setSubmitting(false);
   };
 
   // ─── Game Loop ─────────────────────────────────
@@ -125,24 +141,42 @@ const RallyGame = ({
 
     const ball = ballRef.current;
     const speed = speedRef.current;
+    const padX = padXRef.current;
 
     // Move ball
     ball.x += ball.dx * speed;
     ball.y += ball.dy * speed;
 
-    // Bounce off walls
-    if (ball.x <= BALL_SIZE / 2 || ball.x >= COURT_WIDTH - BALL_SIZE / 2) {
-      ball.dx *= -1;
-      ball.x = Math.max(BALL_SIZE / 2, Math.min(COURT_WIDTH - BALL_SIZE / 2, ball.x));
-    }
+    // Bounce off left/right walls
+    if (ball.x <= BALL_R) { ball.dx = Math.abs(ball.dx); ball.x = BALL_R; }
+    if (ball.x >= W - BALL_R) { ball.dx = -Math.abs(ball.dx); ball.x = W - BALL_R; }
     // Bounce off top
-    if (ball.y <= BALL_SIZE / 2) {
-      ball.dy = Math.abs(ball.dy);
-      ball.y = BALL_SIZE / 2;
+    if (ball.y <= BALL_R) { ball.dy = Math.abs(ball.dy); ball.y = BALL_R; }
+
+    // Paddle collision
+    const padLeft = padX - PAD_W / 2;
+    const padRight = padX + PAD_W / 2;
+    if (
+      ball.dy > 0 &&
+      ball.y + BALL_R >= PAD_Y &&
+      ball.y + BALL_R <= PAD_Y + PAD_H + speed * 2 &&
+      ball.x >= padLeft - BALL_R * 0.5 &&
+      ball.x <= padRight + BALL_R * 0.5
+    ) {
+      // Hit!
+      ball.dy = -Math.abs(ball.dy);
+      ball.y = PAD_Y - BALL_R;
+      // Angle based on where it hit the paddle
+      const hitPos = (ball.x - padX) / (PAD_W / 2); // -1 to 1
+      ball.dx = hitPos * 2.5;
+      scoreRef.current += 1;
+      setScore(scoreRef.current);
+      speedRef.current = Math.min(MAX_SPEED, speedRef.current + SPEED_INC);
+      flashRef.current = 1;
     }
 
-    // Ball passed the sweet zone — game over
-    if (ball.y >= COURT_HEIGHT - 10) {
+    // Ball fell past paddle — game over
+    if (ball.y > H + BALL_R) {
       phaseRef.current = "gameover";
       setPhase("gameover");
       setScore(scoreRef.current);
@@ -150,210 +184,165 @@ const RallyGame = ({
       return;
     }
 
-    // Clear
-    ctx.clearRect(0, 0, COURT_WIDTH, COURT_HEIGHT);
+    // ── Draw ──
+    ctx.clearRect(0, 0, W, H);
 
-    // Draw court background
-    const grad = ctx.createLinearGradient(0, 0, 0, COURT_HEIGHT);
-    grad.addColorStop(0, "rgba(30, 60, 40, 0.3)");
-    grad.addColorStop(1, "rgba(20, 40, 30, 0.5)");
+    // Court background
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, "rgba(20, 45, 35, 0.4)");
+    grad.addColorStop(1, "rgba(15, 30, 25, 0.6)");
     ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, COURT_WIDTH, COURT_HEIGHT);
+    ctx.fillRect(0, 0, W, H);
 
     // Court lines
-    ctx.strokeStyle = "rgba(255,255,255,0.08)";
+    ctx.strokeStyle = "rgba(255,255,255,0.06)";
     ctx.lineWidth = 1;
-    ctx.setLineDash([8, 8]);
-    // Center line
+    ctx.setLineDash([6, 6]);
     ctx.beginPath();
-    ctx.moveTo(0, COURT_HEIGHT / 2);
-    ctx.lineTo(COURT_WIDTH, COURT_HEIGHT / 2);
+    ctx.moveTo(W / 2, 0);
+    ctx.lineTo(W / 2, H);
     ctx.stroke();
-    // Net
-    ctx.strokeStyle = "rgba(255,255,255,0.15)";
+    ctx.beginPath();
+    ctx.moveTo(0, H / 2);
+    ctx.lineTo(W, H / 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Net line
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
     ctx.lineWidth = 2;
-    ctx.setLineDash([]);
     ctx.beginPath();
-    ctx.moveTo(0, COURT_HEIGHT / 2 - 2);
-    ctx.lineTo(COURT_WIDTH, COURT_HEIGHT / 2 - 2);
+    ctx.moveTo(0, H / 2);
+    ctx.lineTo(W, H / 2);
     ctx.stroke();
 
-    // Sweet zone (hit area)
+    // ── Paddle ──
+    const padGrad = ctx.createLinearGradient(padLeft, PAD_Y, padLeft, PAD_Y + PAD_H);
     if (flashRef.current > 0) {
-      ctx.fillStyle = `rgba(74, 222, 128, ${0.15 + flashRef.current * 0.1})`;
-      flashRef.current -= 0.02;
-    } else if (missFlashRef.current > 0) {
-      ctx.fillStyle = `rgba(248, 113, 113, ${0.15 + missFlashRef.current * 0.1})`;
-      missFlashRef.current -= 0.03;
+      padGrad.addColorStop(0, `rgba(74, 222, 128, ${0.8 + flashRef.current * 0.2})`);
+      padGrad.addColorStop(1, `rgba(34, 197, 94, ${0.6 + flashRef.current * 0.2})`);
+      flashRef.current = Math.max(0, flashRef.current - 0.03);
     } else {
-      ctx.fillStyle = "rgba(255, 215, 0, 0.08)";
+      padGrad.addColorStop(0, "rgba(255, 215, 0, 0.9)");
+      padGrad.addColorStop(1, "rgba(245, 158, 11, 0.8)");
     }
-    ctx.fillRect(0, SWEET_ZONE_Y, COURT_WIDTH, SWEET_ZONE_HEIGHT);
-    
-    // Sweet zone borders
-    ctx.strokeStyle = "rgba(255, 215, 0, 0.25)";
+    ctx.fillStyle = padGrad;
+    ctx.beginPath();
+    ctx.roundRect(padLeft, PAD_Y, PAD_W, PAD_H, 6);
+    ctx.fill();
+    // Paddle border
+    ctx.strokeStyle = "rgba(255,255,255,0.3)";
     ctx.lineWidth = 1;
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(0, SWEET_ZONE_Y);
-    ctx.lineTo(COURT_WIDTH, SWEET_ZONE_Y);
-    ctx.moveTo(0, SWEET_ZONE_Y + SWEET_ZONE_HEIGHT);
-    ctx.lineTo(COURT_WIDTH, SWEET_ZONE_Y + SWEET_ZONE_HEIGHT);
     ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Draw ball shadow
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    // Paddle shine
+    ctx.fillStyle = "rgba(255,255,255,0.2)";
     ctx.beginPath();
-    ctx.ellipse(ball.x + 3, ball.y + 4, BALL_SIZE / 2.2, BALL_SIZE / 4, 0, 0, Math.PI * 2);
+    ctx.roundRect(padLeft + 4, PAD_Y + 2, PAD_W - 8, 4, 2);
     ctx.fill();
 
-    // Draw ball (gradient sphere)
-    const ballRadius = BALL_SIZE / 2;
-    const ballGrad = ctx.createRadialGradient(
-      ball.x - ballRadius * 0.3, ball.y - ballRadius * 0.3, ballRadius * 0.1,
-      ball.x, ball.y, ballRadius
-    );
-    // Sport-specific ball colors
-    const ballColors: Record<string, [string, string, string]> = {
-      beach_volleyball: ["#fff9c4", "#fdd835", "#f9a825"],
-      futevolei: ["#ffffff", "#e0e0e0", "#9e9e9e"],
-      beach_tennis: ["#c8e6c9", "#66bb6a", "#2e7d32"],
-      tennis: ["#c8e6c9", "#66bb6a", "#2e7d32"],
-      padel: ["#bbdefb", "#42a5f5", "#1565c0"],
-      futsal: ["#ffffff", "#e0e0e0", "#9e9e9e"],
-    };
+    // ── Ball shadow ──
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.beginPath();
+    ctx.ellipse(ball.x + 2, ball.y + 3, BALL_R, BALL_R * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ── Ball ──
     const [c1, c2, c3] = ballColors[sport] || ballColors.beach_volleyball;
+    const ballGrad = ctx.createRadialGradient(
+      ball.x - BALL_R * 0.3, ball.y - BALL_R * 0.3, BALL_R * 0.1,
+      ball.x, ball.y, BALL_R
+    );
     ballGrad.addColorStop(0, c1);
     ballGrad.addColorStop(0.6, c2);
     ballGrad.addColorStop(1, c3);
     ctx.fillStyle = ballGrad;
     ctx.beginPath();
-    ctx.arc(ball.x, ball.y, ballRadius, 0, Math.PI * 2);
+    ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI * 2);
     ctx.fill();
-
-    // Ball outline
-    ctx.strokeStyle = "rgba(0,0,0,0.2)";
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = "rgba(0,0,0,0.15)";
+    ctx.lineWidth = 1;
     ctx.stroke();
-
-    // Ball highlight (shine)
-    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    // Ball shine
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
     ctx.beginPath();
-    ctx.arc(ball.x - ballRadius * 0.25, ball.y - ballRadius * 0.25, ballRadius * 0.25, 0, Math.PI * 2);
+    ctx.arc(ball.x - BALL_R * 0.25, ball.y - BALL_R * 0.25, BALL_R * 0.3, 0, Math.PI * 2);
     ctx.fill();
 
-    // Score display on canvas
+    // ── HUD ──
     ctx.fillStyle = "rgba(255,255,255,0.9)";
     ctx.font = "bold 16px system-ui, sans-serif";
     ctx.textAlign = "left";
     ctx.fillText(`Rally: ${scoreRef.current}`, 12, 28);
 
-    // Speed indicator
-    const speedLevel = Math.floor((speedRef.current - INITIAL_SPEED) / SPEED_INCREMENT);
     ctx.fillStyle = "rgba(255,215,0,0.7)";
     ctx.font = "11px system-ui, sans-serif";
     ctx.textAlign = "right";
-    ctx.fillText(`⚡ x${(speedRef.current / INITIAL_SPEED).toFixed(1)}`, COURT_WIDTH - 12, 28);
+    ctx.fillText(`⚡ x${(speedRef.current / INIT_SPEED).toFixed(1)}`, W - 12, 28);
 
-    // "TOQUE!" hint text
-    ctx.fillStyle = "rgba(255,215,0,0.3)";
-    ctx.font = "bold 11px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("TOQUE AQUI ↓", COURT_WIDTH / 2, SWEET_ZONE_Y - 8);
-
-    animFrameRef.current = requestAnimationFrame(drawGame);
+    animRef.current = requestAnimationFrame(drawGame);
   }, [sport]);
 
-  // Start animation loop once canvas is mounted (AnimatePresence delay-safe)
+  // Start loop when phase is playing and canvas is ready
   useEffect(() => {
     if (phase !== "playing") return;
-    // Wait for canvas to mount, then start the loop
     const tryStart = () => {
       if (canvasRef.current) {
-        animFrameRef.current = requestAnimationFrame(drawGame);
+        animRef.current = requestAnimationFrame(drawGame);
       } else {
-        // Canvas not yet in DOM, retry next frame
-        animFrameRef.current = requestAnimationFrame(tryStart);
+        animRef.current = requestAnimationFrame(tryStart);
       }
     };
     tryStart();
-    return () => cancelAnimationFrame(animFrameRef.current);
+    return () => cancelAnimationFrame(animRef.current);
   }, [phase, drawGame]);
+
+  // ─── Paddle control via touch/mouse ─────────
+  const getCanvasX = (clientX: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return W / 2;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    return Math.max(PAD_W / 2, Math.min(W - PAD_W / 2, (clientX - rect.left) * scaleX));
+  };
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (phaseRef.current !== "playing") return;
+    padXRef.current = getCanvasX(e.clientX);
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (phaseRef.current !== "playing") return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    if (touch) padXRef.current = getCanvasX(touch.clientX);
+  }, []);
 
   const startGame = () => {
     if (!playerName.trim()) return;
     scoreRef.current = 0;
-    speedRef.current = INITIAL_SPEED;
+    speedRef.current = INIT_SPEED;
+    padXRef.current = W / 2;
     ballRef.current = {
-      x: COURT_WIDTH / 2,
-      y: 60,
-      dx: (Math.random() > 0.5 ? 1 : -1) * 1.5,
+      x: W / 2,
+      y: 80,
+      dx: (Math.random() > 0.5 ? 1 : -1) * 1.2,
       dy: 1,
     };
-    lastHitRef.current = false;
     flashRef.current = 0;
-    missFlashRef.current = 0;
     setScore(0);
     phaseRef.current = "playing";
     setPhase("playing");
   };
 
-  const handleTap = () => {
-    if (phaseRef.current !== "playing") return;
-    const ball = ballRef.current;
-
-    // Check if ball is in the sweet zone
-    if (
-      ball.y >= SWEET_ZONE_Y - BALL_SIZE / 2 &&
-      ball.y <= SWEET_ZONE_Y + SWEET_ZONE_HEIGHT + BALL_SIZE / 2
-    ) {
-      // Successful hit!
-      scoreRef.current += 1;
-      setScore(scoreRef.current);
-      ball.dy = -Math.abs(ball.dy); // Send ball back up
-      // Randomize horizontal direction slightly
-      ball.dx = (Math.random() - 0.5) * 3;
-      // Increase speed
-      speedRef.current = Math.min(MAX_SPEED, speedRef.current + SPEED_INCREMENT);
-      flashRef.current = 1;
-      lastHitRef.current = true;
-    } else {
-      // Missed — visual feedback but no penalty (ball just keeps going)
-      missFlashRef.current = 1;
-    }
-  };
-
-  const submitScore = async (finalScore: number) => {
-    setSubmitting(true);
-    await supabase.functions.invoke("organizer-api", {
-      body: {
-        table: "game_scores",
-        operation: "insert",
-        data: {
-          tournament_id: tournamentId,
-          game_type: "rally",
-          player_name: playerName.trim(),
-          sport,
-          score: finalScore,
-        },
-      },
-    });
-    await fetchRanking();
-    setSubmitting(false);
-  };
-
   const resetGame = () => {
-    cancelAnimationFrame(animFrameRef.current);
+    cancelAnimationFrame(animRef.current);
     phaseRef.current = "start";
     setPhase("start");
     setScore(0);
   };
 
   // Cleanup
-  useEffect(() => {
-    return () => cancelAnimationFrame(animFrameRef.current);
-  }, []);
+  useEffect(() => () => cancelAnimationFrame(animRef.current), []);
 
   return (
     <div className="space-y-6">
@@ -374,12 +363,9 @@ const RallyGame = ({
               <div
                 key={r.id}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm ${
-                  i === 0
-                    ? "bg-primary/15 border border-primary/30 font-bold"
-                    : i === 1
-                    ? "bg-primary/10 border border-primary/20"
-                    : i === 2
-                    ? "bg-primary/5 border border-primary/10"
+                  i === 0 ? "bg-primary/15 border border-primary/30 font-bold"
+                    : i === 1 ? "bg-primary/10 border border-primary/20"
+                    : i === 2 ? "bg-primary/5 border border-primary/10"
                     : "bg-secondary/50 border border-border"
                 }`}
               >
@@ -434,7 +420,7 @@ const RallyGame = ({
               <div className="text-5xl">{emoji}</div>
               <h3 className="text-xl font-bold">Rally Infinito</h3>
               <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                A bola vem na sua direção! Toque na zona dourada no momento certo para rebater.
+                Arraste a raquete para rebater a bola e não deixe ela cair!
                 <br />
                 <span className="text-xs">⚡ A cada rally a velocidade aumenta!</span>
               </p>
@@ -461,24 +447,27 @@ const RallyGame = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex flex-col items-center gap-3"
+              className="flex flex-col items-center gap-2"
             >
               <canvas
                 ref={canvasRef}
-                width={COURT_WIDTH}
-                height={COURT_HEIGHT}
-                onClick={handleTap}
+                width={W}
+                height={H}
+                onPointerMove={handlePointerMove}
+                onTouchMove={handleTouchMove}
                 onTouchStart={(e) => {
                   e.preventDefault();
-                  handleTap();
+                  const touch = e.touches[0];
+                  if (touch) padXRef.current = getCanvasX(touch.clientX);
                 }}
-                className="rounded-xl border border-border/50 cursor-pointer touch-none select-none"
+                className="rounded-xl border border-border/50 touch-none select-none"
                 style={{
                   maxWidth: "100%",
+                  cursor: "none",
                   background: "linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--muted)) 100%)",
                 }}
               />
-              <p className="text-xs text-muted-foreground">Toque/clique na zona dourada quando a bola chegar!</p>
+              <p className="text-xs text-muted-foreground">Arraste o dedo / mouse para mover a raquete</p>
             </motion.div>
           )}
 

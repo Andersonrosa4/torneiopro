@@ -38,9 +38,9 @@ const BALL_R = 11;
 const PAD_W = 72;
 const PAD_H = 14;
 const PAD_Y = H - 36;
-const INIT_SPEED = 3;
-const SPEED_INC = 0.12;
-const MAX_SPEED = 10;
+const INIT_SPEED = 2.5;
+const SPEED_INC = 0;       // no speed increase — consistent single-hit feel
+const MAX_SPEED = 2.5;     // fixed speed throughout
 
 // Block constants
 const BLOCK_ROWS = 4;
@@ -204,7 +204,7 @@ const RallyGame = ({
         // Respawn all blocks if all destroyed
         if (blocks.every(b => !b.alive)) {
           blocksRef.current = createBlocks();
-          speedRef.current = Math.min(MAX_SPEED, speedRef.current + 0.5);
+          // No speed increase on respawn — keep consistent pace
         }
         break;
       }
@@ -225,11 +225,10 @@ const RallyGame = ({
       ball.y = PAD_Y - BALL_R;
       // Angle based on where it hit the paddle
       const hitPos = (ball.x - padX) / (PAD_W / 2); // -1 to 1
-      ball.dx = hitPos * 2.5;
+      ball.dx = hitPos * 1.8; // gentler angle for easier control
       scoreRef.current += 1;
       setScore(scoreRef.current);
-      speedRef.current = Math.min(MAX_SPEED, speedRef.current + SPEED_INC);
-      flashRef.current = 1;
+      // No speed increase on paddle hit — constant pace
     }
 
     // Ball fell past paddle — game over
@@ -352,7 +351,7 @@ const RallyGame = ({
     ctx.fillStyle = "rgba(255,215,0,0.7)";
     ctx.font = "11px system-ui, sans-serif";
     ctx.textAlign = "right";
-    ctx.fillText(`⚡ x${(speedRef.current / INIT_SPEED).toFixed(1)}`, W - 12, 28);
+    ctx.fillText(`${emoji}`, W - 12, 28);
 
     animRef.current = requestAnimationFrame(drawGame);
   }, [sport]);

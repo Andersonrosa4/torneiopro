@@ -108,6 +108,15 @@ const AmbassadorFunnel = ({ forceOpen = false, onClose }: AmbassadorFunnelProps)
     const { data } = await supabase.auth.getUser();
     if (data.user) {
       setUserId(data.user.id);
+      setPlayerName(
+        data.user.user_metadata?.display_name ||
+        data.user.user_metadata?.name ||
+        data.user.user_metadata?.full_name ||
+        ""
+      );
+      setEmail(data.user.email || "");
+      setPhone(data.user.user_metadata?.phone || data.user.phone || "");
+      setCity(data.user.user_metadata?.city || "");
     }
   };
 

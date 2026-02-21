@@ -3,7 +3,7 @@ import { publicQuery } from "@/lib/organizerApi";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { Medal, Zap, RotateCcw, Trash2, Copy, UserPlus, LogIn } from "lucide-react";
+import { Medal, Zap, RotateCcw, Trash2, Copy, UserPlus, LogIn, Wifi, WifiOff } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 
@@ -36,9 +36,11 @@ const HEAD_R = 9;
 const JUMP_VY = -7.2;
 const MOVE_SPEED = 3.2;
 const AI_SPEED = 2.8;
-const ATTACK_BOOST = 2.5; // extra power on spike
+const ATTACK_BOOST = 2.5;
 
-type Phase = "start" | "playing" | "gameover";
+type Phase = "start" | "waiting" | "playing" | "gameover";
+type GameMode = "solo" | "multi";
+type MultiRole = "host" | "guest" | null;
 
 interface Player {
   x: number;
@@ -48,7 +50,7 @@ interface Player {
   touches: number;
   isAttacking: boolean;
   attackCooldown: number;
-  legPhase: number; // for running animation
+  legPhase: number;
 }
 
 interface Ball {
@@ -602,6 +604,12 @@ const VolleyPongGame = ({
   const [showInvite, setShowInvite] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
 
+  // ── Multiplayer state ──
+  const [gameMode, setGameMode] = useState<GameMode>("solo");
+  const [multiRole, setMultiRole] = useState<MultiRole>(null);
+  const [opponentName, setOpponentName] = useState("");
+  const [opponentConnected, setOpponentConnected] = useState(false);
+
   // Game state refs
   const playerRef = useRef<Player>(createPlayer(W * 0.25));
   const aiRef = useRef<Player>(createPlayer(W * 0.75));
@@ -621,6 +629,13 @@ const VolleyPongGame = ({
   const pauseRef = useRef(0);
   const frameCountRef = useRef(0);
 
+  // Multiplayer refs
+  const gameModeRef = useRef<GameMode>("solo");
+  const multiRoleRef = useRef<MultiRole>(null);
+  const channelRef = useRef<any>(null);
+  const remoteInputRef = useRef({ dir: 0, jump: false, attack: false });
+  const broadcastCountRef = useRef(0);
+
   // Generate invite code
   useEffect(() => {
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -632,12 +647,132 @@ const VolleyPongGame = ({
     toast({ title: "Código copiado!", description: `Envie "${inviteCode}" para seu amigo` });
   };
 
-  const handleJoinCode = () => {
-    if (!joinCode.trim()) return;
-    toast({ title: "Em breve!", description: "Modo multiplayer será liberado em breve. Por enquanto, jogue contra a IA!" });
-    setShowJoin(false);
-    setJoinCode("");
-  };
+  // ── Channel management ──
+  const cleanupChannel = useCallback(() => {
+    if (channelRef.current) {
+      channelRef.current.send({ type: "broadcast", event: "game", payload: { type: "leave" } });
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+  }, []);
+
+  const createRoom = useCallback(() => {
+    if (!playerName.trim()) return;
+    cleanupChannel();
+
+    const channel = supabase.channel(`volley-room-${inviteCode}`, {
+      config: { broadcast: { self: false } },
+    });
+
+    channel.on("broadcast", { event: "game" }, ({ payload }) => {
+      if (payload.type === "join") {
+        setOpponentName(payload.name);
+        setOpponentConnected(true);
+        // Send back host info
+        channel.send({
+          type: "broadcast",
+          event: "game",
+          payload: { type: "host_info", name: playerName.trim() },
+        });
+        toast({ title: "Jogador conectado!", description: `${payload.name} entrou na sala` });
+      } else if (payload.type === "input" && multiRoleRef.current === "host") {
+        remoteInputRef.current = payload.input;
+      } else if (payload.type === "leave") {
+        setOpponentConnected(false);
+        setOpponentName("");
+        toast({ title: "Jogador saiu", variant: "destructive" });
+        if (phaseRef.current === "playing") {
+          phaseRef.current = "start";
+          setPhase("start");
+          cancelAnimationFrame(animRef.current);
+        }
+      }
+    });
+
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        setGameMode("multi");
+        setMultiRole("host");
+        gameModeRef.current = "multi";
+        multiRoleRef.current = "host";
+        setPhase("waiting");
+        phaseRef.current = "waiting";
+      }
+    });
+
+    channelRef.current = channel;
+  }, [playerName, inviteCode, cleanupChannel]);
+
+  const joinRoom = useCallback(() => {
+    if (!playerName.trim() || !joinCode.trim()) return;
+    cleanupChannel();
+
+    const channel = supabase.channel(`volley-room-${joinCode.toUpperCase()}`, {
+      config: { broadcast: { self: false } },
+    });
+
+    channel.on("broadcast", { event: "game" }, ({ payload }) => {
+      if (payload.type === "host_info") {
+        setOpponentName(payload.name);
+        setOpponentConnected(true);
+      } else if (payload.type === "state" && multiRoleRef.current === "guest") {
+        // Apply received state from host
+        const s = payload;
+        playerRef.current = { ...playerRef.current, ...s.p1 };
+        aiRef.current = { ...aiRef.current, ...s.p2 };
+        ballRef.current = { ...ballRef.current, x: s.ball.x, y: s.ball.y, vx: s.ball.vx, vy: s.ball.vy, rotation: s.ball.rotation };
+        pScoreRef.current = s.scores.p;
+        aScoreRef.current = s.scores.a;
+        setsRef.current = s.scores.sets;
+        setNumRef.current = s.scores.setNum;
+        rallyCountRef.current = s.rally;
+        pauseRef.current = s.pause;
+        setPlayerScore(s.scores.p);
+        setAiScore(s.scores.a);
+        setSetsWon([...s.scores.sets]);
+        setCurrentSet(s.scores.setNum);
+      } else if (payload.type === "start_game") {
+        phaseRef.current = "playing";
+        setPhase("playing");
+      } else if (payload.type === "game_over") {
+        phaseRef.current = "gameover";
+        setPhase("gameover");
+        setPlayerScore(payload.scores.p);
+        setAiScore(payload.scores.a);
+        setSetsWon(payload.scores.sets);
+      } else if (payload.type === "point") {
+        setLastPoint(payload.msg);
+      } else if (payload.type === "leave") {
+        setOpponentConnected(false);
+        setOpponentName("");
+        toast({ title: "Host saiu da sala", variant: "destructive" });
+        phaseRef.current = "start";
+        setPhase("start");
+        cancelAnimationFrame(animRef.current);
+      }
+    });
+
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        setGameMode("multi");
+        setMultiRole("guest");
+        gameModeRef.current = "multi";
+        multiRoleRef.current = "guest";
+        setPhase("waiting");
+        phaseRef.current = "waiting";
+        setShowJoin(false);
+        // Announce join
+        channel.send({
+          type: "broadcast",
+          event: "game",
+          payload: { type: "join", name: playerName.trim() },
+        });
+        toast({ title: "Conectado!", description: "Aguardando o host iniciar..." });
+      }
+    });
+
+    channelRef.current = channel;
+  }, [playerName, joinCode, cleanupChannel]);
 
   // ─── Ranking ─────────────────────────────────
   const fetchRanking = useCallback(async () => {
@@ -706,14 +841,23 @@ const VolleyPongGame = ({
 
   // ─── Score point ─────────────────────────────
   const scorePoint = useCallback((scorer: "player" | "ai") => {
+    const isMulti = gameModeRef.current === "multi";
     if (scorer === "player") {
       pScoreRef.current += 1;
       setPlayerScore(pScoreRef.current);
-      setLastPoint("Ponto seu! 🏐");
+      const msg = "Ponto seu! 🏐";
+      setLastPoint(msg);
+      if (isMulti && channelRef.current) {
+        channelRef.current.send({ type: "broadcast", event: "game", payload: { type: "point", msg } });
+      }
     } else {
       aScoreRef.current += 1;
       setAiScore(aScoreRef.current);
-      setLastPoint("Ponto da IA 🤖");
+      const msg = isMulti ? `Ponto de ${opponentName || "P2"} 🏐` : "Ponto da IA 🤖";
+      setLastPoint(msg);
+      if (isMulti && channelRef.current) {
+        channelRef.current.send({ type: "broadcast", event: "game", payload: { type: "point", msg: `Ponto do adversário 🏐` } });
+      }
     }
     pauseRef.current = 60;
 
@@ -729,6 +873,12 @@ const VolleyPongGame = ({
         phaseRef.current = "gameover";
         setPhase("gameover");
         submitScore(finalScore);
+        if (isMulti && channelRef.current) {
+          channelRef.current.send({
+            type: "broadcast", event: "game",
+            payload: { type: "game_over", scores: { p: pScoreRef.current, a: aScoreRef.current, sets: [...setsRef.current] } },
+          });
+        }
         return;
       }
 
@@ -747,7 +897,7 @@ const VolleyPongGame = ({
         serveBall(scorer);
       }
     }, 1000);
-  }, [serveBall]);
+  }, [serveBall, opponentName]);
 
   // ─── Ball-player collision ─────────────────
   const checkPlayerBallHit = (p: Player, ball: Ball, isLeft: boolean): boolean => {
@@ -755,7 +905,6 @@ const VolleyPongGame = ({
     const shoulderY = p.y - P_H + HEAD_R + 4;
     const targetDir = isLeft ? 1 : -1;
 
-    // Helper to apply hit
     const applyHit = (centerX: number, centerY: number, radius: number, isHead: boolean) => {
       const dx = ball.x - centerX;
       const dy = ball.y - centerY;
@@ -770,14 +919,11 @@ const VolleyPongGame = ({
 
         const angle = Math.atan2(dy, dx);
         const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
-
-        // Spike detection: jumping + attacking = more power
         const isSpike = p.y < GROUND_Y - 20 && p.attackCooldown <= 0;
         const spikeBoost = isSpike ? ATTACK_BOOST : 0;
         const newSpeed = Math.max(speed, 4) + spikeBoost;
 
         if (isHead) {
-          // Head hit: ball goes upward and forward (header)
           ball.vx = targetDir * (newSpeed * 0.6 + 2);
           ball.vy = -Math.abs(newSpeed * 0.8) - 3;
         } else if (isSpike) {
@@ -788,7 +934,6 @@ const VolleyPongGame = ({
           ball.vy = -Math.abs(newSpeed * 0.7) - 2;
         }
 
-        // Push out of collision
         ball.x = centerX + (radius + BALL_R + 3) * Math.cos(angle);
         ball.y = centerY + (radius + BALL_R + 3) * Math.sin(angle);
 
@@ -798,23 +943,62 @@ const VolleyPongGame = ({
       return false;
     };
 
-    // Check HEAD collision first (priority)
     if (applyHit(p.x, headY, HEAD_R + 3, true)) return true;
-
-    // Check BODY collision (arms/torso area)
     const bodyCenter = shoulderY + (p.y - shoulderY) * 0.4;
     if (applyHit(p.x, bodyCenter, 22, false)) return true;
-
-    // Check ARMS when attacking (extended reach)
     if (p.isAttacking || p.armAngle > 0.3) {
       const dir = isLeft ? 1 : -1;
       const armX = p.x + dir * 22;
       const armY = shoulderY;
       if (applyHit(armX, armY, 12, false)) return true;
     }
-
     return false;
   };
+
+  // ─── Broadcast state (host only) ────────────
+  const broadcastState = useCallback(() => {
+    if (gameModeRef.current !== "multi" || multiRoleRef.current !== "host" || !channelRef.current) return;
+    broadcastCountRef.current++;
+    if (broadcastCountRef.current % 3 !== 0) return; // Send every 3 frames (~20hz)
+
+    const p = playerRef.current;
+    const a = aiRef.current;
+    const b = ballRef.current;
+    channelRef.current.send({
+      type: "broadcast",
+      event: "game",
+      payload: {
+        type: "state",
+        p1: { x: p.x, y: p.y, vy: p.vy, armAngle: p.armAngle, isAttacking: p.isAttacking, legPhase: p.legPhase, touches: p.touches, attackCooldown: p.attackCooldown },
+        p2: { x: a.x, y: a.y, vy: a.vy, armAngle: a.armAngle, isAttacking: a.isAttacking, legPhase: a.legPhase, touches: a.touches, attackCooldown: a.attackCooldown },
+        ball: { x: b.x, y: b.y, vx: b.vx, vy: b.vy, rotation: b.rotation },
+        scores: { p: pScoreRef.current, a: aScoreRef.current, sets: [...setsRef.current], setNum: setNumRef.current },
+        rally: rallyCountRef.current,
+        pause: pauseRef.current,
+      },
+    });
+  }, []);
+
+  // ─── Send guest input ────────────────────────
+  const sendGuestInput = useCallback(() => {
+    if (gameModeRef.current !== "multi" || multiRoleRef.current !== "guest" || !channelRef.current) return;
+
+    const keys = keysRef.current;
+    let dir = touchDirRef.current;
+    if (keys.has("ArrowLeft") || keys.has("a")) dir = -1;
+    if (keys.has("ArrowRight") || keys.has("d")) dir = 1;
+    const jump = keys.has("ArrowUp") || keys.has("w") || keys.has(" ") || touchJumpRef.current;
+    const attack = keys.has("x") || keys.has("z") || touchAttackRef.current;
+
+    if (jump) touchJumpRef.current = false;
+    if (attack) touchAttackRef.current = false;
+
+    channelRef.current.send({
+      type: "broadcast",
+      event: "game",
+      payload: { type: "input", input: { dir, jump, attack } },
+    });
+  }, []);
 
   // ─── Game Loop ─────────────────────────────────
   const drawGame = useCallback(() => {
@@ -824,9 +1008,12 @@ const VolleyPongGame = ({
     if (!ctx) return;
 
     frameCountRef.current++;
+    const isGuest = gameModeRef.current === "multi" && multiRoleRef.current === "guest";
+    const isHostMulti = gameModeRef.current === "multi" && multiRoleRef.current === "host";
 
-    if (pauseRef.current > 0) {
-      pauseRef.current--;
+    // Guest: just render received state + send inputs
+    if (isGuest) {
+      sendGuestInput();
       ctx.clearRect(0, 0, W, H);
       drawCourt(ctx);
       drawNet(ctx);
@@ -839,12 +1026,28 @@ const VolleyPongGame = ({
       return;
     }
 
+    // Host or Solo: run full physics
+    if (pauseRef.current > 0) {
+      pauseRef.current--;
+      ctx.clearRect(0, 0, W, H);
+      drawCourt(ctx);
+      drawNet(ctx);
+      drawPlayer(ctx, aiRef.current, false, "#dc2626", "#1e293b", "#8B6914", "#1a1a2e", "2");
+      drawPlayer(ctx, playerRef.current, true, "#2563eb", "#f0f0f0", "#c8956c", "#3b2507", "1");
+      drawBall(ctx, ballRef.current);
+      drawHUD(ctx, pScoreRef.current, aScoreRef.current, setNumRef.current, setsRef.current,
+        playerRef.current.touches, aiRef.current.touches, rallyCountRef.current);
+      if (isHostMulti) broadcastState();
+      animRef.current = requestAnimationFrame(drawGame);
+      return;
+    }
+
     const player = playerRef.current;
     const ai = aiRef.current;
     const ball = ballRef.current;
     const keys = keysRef.current;
 
-    // ── Player movement ──
+    // ── Player 1 movement (local) ──
     let moveDir = touchDirRef.current;
     if (keys.has("ArrowLeft") || keys.has("a")) moveDir = -1;
     if (keys.has("ArrowRight") || keys.has("d")) moveDir = 1;
@@ -852,20 +1055,17 @@ const VolleyPongGame = ({
     player.x += moveDir * MOVE_SPEED;
     player.x = Math.max(22, Math.min(NET_X - P_W / 2 - 6, player.x));
 
-    // Running animation
     if (Math.abs(moveDir) > 0 && player.y >= GROUND_Y) {
       player.legPhase += 0.4;
     } else {
       player.legPhase *= 0.8;
     }
 
-    // Jump
     if ((keys.has("ArrowUp") || keys.has("w") || keys.has(" ") || touchJumpRef.current) && player.y >= GROUND_Y) {
       player.vy = JUMP_VY;
       touchJumpRef.current = false;
     }
 
-    // Attack (manual spike with "x" key or touch)
     if ((keys.has("x") || keys.has("z") || touchAttackRef.current) && player.attackCooldown <= 0) {
       player.armAngle = 1;
       player.isAttacking = true;
@@ -880,34 +1080,59 @@ const VolleyPongGame = ({
     player.armAngle = Math.max(0, player.armAngle - 0.05);
     player.attackCooldown = Math.max(0, player.attackCooldown - 1);
 
-    // ── AI movement ──
-    const ballOnAiSide = ball.x > NET_X;
-    if (ballOnAiSide) {
-      const targetX = ball.x + ball.vx * 5;
-      const aiDiff = targetX - ai.x;
-      if (Math.abs(aiDiff) > 4) {
-        ai.x += Math.sign(aiDiff) * Math.min(AI_SPEED + rallyCountRef.current * 0.015, Math.abs(aiDiff));
-      }
-      // AI running animation
-      if (Math.abs(aiDiff) > 4 && ai.y >= GROUND_Y) {
-        ai.legPhase += 0.35;
+    // ── Player 2 / AI movement ──
+    if (isHostMulti) {
+      // Multiplayer: apply remote guest inputs
+      const ri = remoteInputRef.current;
+      ai.x += ri.dir * MOVE_SPEED;
+      ai.x = Math.max(NET_X + P_W / 2 + 6, Math.min(W - 22, ai.x));
+
+      if (Math.abs(ri.dir) > 0 && ai.y >= GROUND_Y) {
+        ai.legPhase += 0.4;
+      } else {
+        ai.legPhase *= 0.8;
       }
 
-      // Jump to spike
-      const distToBall = Math.sqrt((ball.x - ai.x) ** 2 + (ball.y - (ai.y - P_H)) ** 2);
-      if (distToBall < 55 && ball.y < GROUND_Y - 25 && ai.y >= GROUND_Y) {
-        ai.vy = JUMP_VY * 0.85;
+      if (ri.jump && ai.y >= GROUND_Y) {
+        ai.vy = JUMP_VY;
+        remoteInputRef.current = { ...ri, jump: false };
+      }
+
+      if (ri.attack && ai.attackCooldown <= 0) {
+        ai.armAngle = 1;
+        ai.isAttacking = true;
+        ai.attackCooldown = 15;
+        remoteInputRef.current = { ...ri, attack: false };
+        setTimeout(() => { ai.isAttacking = false; }, 300);
       }
     } else {
-      const homeX = W * 0.75;
-      const aiDiff = homeX - ai.x;
-      if (Math.abs(aiDiff) > 3) {
-        ai.x += Math.sign(aiDiff) * AI_SPEED * 0.4;
-        if (ai.y >= GROUND_Y) ai.legPhase += 0.25;
+      // Solo: AI logic
+      const ballOnAiSide = ball.x > NET_X;
+      if (ballOnAiSide) {
+        const targetX = ball.x + ball.vx * 5;
+        const aiDiff = targetX - ai.x;
+        if (Math.abs(aiDiff) > 4) {
+          ai.x += Math.sign(aiDiff) * Math.min(AI_SPEED + rallyCountRef.current * 0.015, Math.abs(aiDiff));
+        }
+        if (Math.abs(aiDiff) > 4 && ai.y >= GROUND_Y) {
+          ai.legPhase += 0.35;
+        }
+        const distToBall = Math.sqrt((ball.x - ai.x) ** 2 + (ball.y - (ai.y - P_H)) ** 2);
+        if (distToBall < 55 && ball.y < GROUND_Y - 25 && ai.y >= GROUND_Y) {
+          ai.vy = JUMP_VY * 0.85;
+        }
+      } else {
+        const homeX = W * 0.75;
+        const aiDiff = homeX - ai.x;
+        if (Math.abs(aiDiff) > 3) {
+          ai.x += Math.sign(aiDiff) * AI_SPEED * 0.4;
+          if (ai.y >= GROUND_Y) ai.legPhase += 0.25;
+        }
+        ai.legPhase *= 0.9;
       }
-      ai.legPhase *= 0.9;
+      ai.x = Math.max(NET_X + P_W / 2 + 6, Math.min(W - 22, ai.x));
     }
-    ai.x = Math.max(NET_X + P_W / 2 + 6, Math.min(W - 22, ai.x));
+
     ai.vy += GRAVITY;
     ai.y += ai.vy;
     if (ai.y >= GROUND_Y) { ai.y = GROUND_Y; ai.vy = 0; }
@@ -920,7 +1145,6 @@ const VolleyPongGame = ({
     ball.y += ball.vy;
     ball.rotation += ball.vx * 0.06;
 
-    // Trail
     if (frameCountRef.current % 2 === 0) {
       ball.trail.push({ x: ball.x, y: ball.y, alpha: 1 });
       if (ball.trail.length > 8) ball.trail.shift();
@@ -928,7 +1152,6 @@ const VolleyPongGame = ({
     for (const t of ball.trail) { t.alpha -= 0.12; }
     ball.trail = ball.trail.filter(t => t.alpha > 0);
 
-    // Wall bounces
     if (ball.x <= BALL_R) { ball.vx = Math.abs(ball.vx) * 0.8; ball.x = BALL_R; }
     if (ball.x >= W - BALL_R) { ball.vx = -Math.abs(ball.vx) * 0.8; ball.x = W - BALL_R; }
     if (ball.y <= BALL_R) { ball.vy = Math.abs(ball.vy) * 0.5; ball.y = BALL_R; }
@@ -961,6 +1184,7 @@ const VolleyPongGame = ({
       } else {
         scorePoint("player");
       }
+      if (isHostMulti) broadcastState();
       animRef.current = requestAnimationFrame(drawGame);
       return;
     }
@@ -969,25 +1193,25 @@ const VolleyPongGame = ({
     ctx.clearRect(0, 0, W, H);
     drawCourt(ctx);
     drawNet(ctx);
-
-    // Draw players (back to front based on position)
     drawPlayer(ctx, ai, false, "#dc2626", "#1e293b", "#8B6914", "#1a1a2e", "2");
     drawPlayer(ctx, player, true, "#2563eb", "#f0f0f0", "#c8956c", "#3b2507", "1");
-
     drawBall(ctx, ball);
-
     drawHUD(ctx, pScoreRef.current, aScoreRef.current, setNumRef.current, setsRef.current,
       player.touches, ai.touches, rallyCountRef.current);
 
+    if (isHostMulti) broadcastState();
+
     animRef.current = requestAnimationFrame(drawGame);
-  }, [scorePoint]);
+  }, [scorePoint, broadcastState, sendGuestInput]);
 
   // Start loop
   useEffect(() => {
     if (phase !== "playing") return;
     const tryStart = () => {
       if (canvasRef.current) {
-        serveBall("player");
+        if (multiRoleRef.current !== "guest") {
+          serveBall("player");
+        }
         animRef.current = requestAnimationFrame(drawGame);
       } else {
         animRef.current = requestAnimationFrame(tryStart);
@@ -1013,7 +1237,7 @@ const VolleyPongGame = ({
 
   // Touch controls handled by visible buttons below
 
-  const startGame = () => {
+  const startGame = (mode: GameMode = "solo") => {
     if (!playerName.trim()) return;
     pScoreRef.current = 0;
     aScoreRef.current = 0;
@@ -1022,6 +1246,7 @@ const VolleyPongGame = ({
     rallyCountRef.current = 0;
     pauseRef.current = 0;
     frameCountRef.current = 0;
+    broadcastCountRef.current = 0;
     playerRef.current = createPlayer(W * 0.25);
     aiRef.current = createPlayer(W * 0.75);
     setPlayerScore(0);
@@ -1029,12 +1254,36 @@ const VolleyPongGame = ({
     setSetsWon([0, 0]);
     setCurrentSet(1);
     setLastPoint(null);
+
+    if (mode === "solo") {
+      gameModeRef.current = "solo";
+      multiRoleRef.current = null;
+      setGameMode("solo");
+      setMultiRole(null);
+    }
+
     phaseRef.current = "playing";
     setPhase("playing");
+
+    // Notify guest to start
+    if (gameModeRef.current === "multi" && multiRoleRef.current === "host" && channelRef.current) {
+      channelRef.current.send({
+        type: "broadcast",
+        event: "game",
+        payload: { type: "start_game" },
+      });
+    }
   };
 
   const resetGame = () => {
     cancelAnimationFrame(animRef.current);
+    cleanupChannel();
+    gameModeRef.current = "solo";
+    multiRoleRef.current = null;
+    setGameMode("solo");
+    setMultiRole(null);
+    setOpponentName("");
+    setOpponentConnected(false);
     phaseRef.current = "start";
     setPhase("start");
     setPlayerScore(0);
@@ -1042,9 +1291,14 @@ const VolleyPongGame = ({
     setSetsWon([0, 0]);
     setCurrentSet(1);
     setLastPoint(null);
+    setShowInvite(false);
+    setShowJoin(false);
   };
 
-  useEffect(() => () => cancelAnimationFrame(animRef.current), []);
+  useEffect(() => () => {
+    cancelAnimationFrame(animRef.current);
+    cleanupChannel();
+  }, [cleanupChannel]);
 
   const matchWinner = setsWon[0] >= 2 ? "player" : setsWon[1] >= 2 ? "ai" : null;
 
@@ -1119,36 +1373,48 @@ const VolleyPongGame = ({
               <div className="text-5xl">🏐</div>
               <h3 className="text-xl font-bold">Vôlei 1v1</h3>
               <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                Controle seu jogador, ataque e faça pontos por cima da rede!
+                Jogue contra a IA ou convide um amigo para jogar online!
               </p>
               <div className="text-xs text-muted-foreground max-w-xs mx-auto space-y-1">
                 <p>🖥️ <strong>Teclado:</strong> ← → mover | ↑ pular | X atacar</p>
-                <p>📱 <strong>Toque:</strong> Laterais = mover | Topo = pular | Centro = atacar</p>
+                <p>📱 <strong>Toque:</strong> Botões na tela</p>
               </div>
               <input
                 type="text"
                 placeholder="Digite seu nome"
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && startGame()}
+                onKeyDown={(e) => e.key === "Enter" && startGame("solo")}
                 className="w-full max-w-xs mx-auto rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 block"
                 maxLength={30}
               />
               <div className="flex gap-2 justify-center flex-wrap">
-                <Button onClick={startGame} disabled={!playerName.trim()} className="gap-2">
-                  <Zap className="h-4 w-4" /> Jogar!
+                <Button onClick={() => startGame("solo")} disabled={!playerName.trim()} className="gap-2">
+                  <Zap className="h-4 w-4" /> Jogar vs IA
                 </Button>
               </div>
 
-              {/* Invite / Join buttons */}
+              {/* Multiplayer buttons */}
               <div className="flex gap-2 justify-center flex-wrap pt-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => { setShowInvite(!showInvite); setShowJoin(false); }}
+                  onClick={() => {
+                    if (!playerName.trim()) {
+                      toast({ title: "Digite seu nome primeiro" });
+                      return;
+                    }
+                    setShowJoin(false);
+                    if (showInvite) {
+                      setShowInvite(false);
+                    } else {
+                      createRoom();
+                      setShowInvite(true);
+                    }
+                  }}
                   className="gap-1.5 text-xs"
                 >
-                  <UserPlus className="h-3.5 w-3.5" /> Convidar amigo
+                  <UserPlus className="h-3.5 w-3.5" /> Criar sala
                 </Button>
                 <Button
                   variant="outline"
@@ -1156,7 +1422,7 @@ const VolleyPongGame = ({
                   onClick={() => { setShowJoin(!showJoin); setShowInvite(false); }}
                   className="gap-1.5 text-xs"
                 >
-                  <LogIn className="h-3.5 w-3.5" /> Digitar código
+                  <LogIn className="h-3.5 w-3.5" /> Entrar com código
                 </Button>
               </div>
 
@@ -1190,7 +1456,7 @@ const VolleyPongGame = ({
                     className="overflow-hidden"
                   >
                     <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 max-w-xs mx-auto space-y-2">
-                      <p className="text-xs text-muted-foreground">Digite o código do seu amigo:</p>
+                      <p className="text-xs text-muted-foreground">Digite o código da sala:</p>
                       <div className="flex items-center gap-2 justify-center">
                         <Input
                           value={joinCode}
@@ -1199,7 +1465,7 @@ const VolleyPongGame = ({
                           maxLength={6}
                           className="max-w-[140px] text-center font-mono tracking-wider uppercase"
                         />
-                        <Button size="sm" onClick={handleJoinCode} disabled={joinCode.length < 4}>
+                        <Button size="sm" onClick={joinRoom} disabled={joinCode.length < 4 || !playerName.trim()}>
                           Entrar
                         </Button>
                       </div>
@@ -1207,6 +1473,86 @@ const VolleyPongGame = ({
                   </motion.div>
                 )}
               </AnimatePresence>
+            </motion.div>
+          )}
+
+          {/* WAITING LOBBY */}
+          {phase === "waiting" && (
+            <motion.div
+              key="waiting"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="space-y-4 text-center"
+            >
+              <div className="text-5xl">🏐</div>
+              <h3 className="text-xl font-bold">Sala Multiplayer</h3>
+
+              {multiRole === "host" && (
+                <>
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 max-w-xs mx-auto space-y-3">
+                    <p className="text-xs text-muted-foreground">Código da sala:</p>
+                    <div className="flex items-center gap-2 justify-center">
+                      <span className="font-mono text-2xl font-bold tracking-[0.3em] text-primary">
+                        {inviteCode}
+                      </span>
+                      <Button variant="ghost" size="sm" onClick={copyInviteCode} className="h-8 w-8 p-0">
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-center gap-2 text-sm">
+                    {opponentConnected ? (
+                      <>
+                        <Wifi className="h-4 w-4 text-green-500" />
+                        <span className="text-green-500 font-semibold">{opponentName} conectado!</span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                        <span className="text-muted-foreground">Aguardando jogador...</span>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 justify-center">
+                    <Button
+                      onClick={() => startGame("multi")}
+                      disabled={!opponentConnected}
+                      className="gap-2"
+                    >
+                      <Zap className="h-4 w-4" /> Começar partida!
+                    </Button>
+                    <Button variant="ghost" onClick={resetGame}>
+                      Cancelar
+                    </Button>
+                  </div>
+                </>
+              )}
+
+              {multiRole === "guest" && (
+                <>
+                  <div className="flex items-center justify-center gap-2 text-sm">
+                    {opponentConnected ? (
+                      <>
+                        <Wifi className="h-4 w-4 text-green-500" />
+                        <span className="text-green-500 font-semibold">Conectado! Host: {opponentName}</span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                        <span className="text-muted-foreground">Conectando à sala...</span>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Aguardando o host iniciar a partida...</p>
+                  <p className="text-xs text-muted-foreground font-medium">Você controla o jogador da <span className="text-red-400">direita</span> (vermelho)</p>
+                  <Button variant="ghost" onClick={resetGame}>
+                    Cancelar
+                  </Button>
+                </>
+              )}
             </motion.div>
           )}
 
@@ -1223,16 +1569,23 @@ const VolleyPongGame = ({
                 <Button variant="ghost" size="sm" onClick={resetGame} className="text-white/70 text-xs h-7 px-2">
                   ← Sair
                 </Button>
-                {lastPoint && (
-                  <motion.p
-                    key={lastPoint + pScoreRef.current + aScoreRef.current}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="text-xs font-bold text-yellow-400"
-                  >
-                    {lastPoint}
-                  </motion.p>
-                )}
+                <div className="flex items-center gap-2">
+                  {lastPoint && (
+                    <motion.p
+                      key={lastPoint + pScoreRef.current + aScoreRef.current}
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="text-xs font-bold text-yellow-400"
+                    >
+                      {lastPoint}
+                    </motion.p>
+                  )}
+                  {gameMode === "multi" && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 border border-green-500/30">
+                      <Wifi className="h-3 w-3 inline mr-0.5" /> ONLINE
+                    </span>
+                  )}
+                </div>
                 <span className="text-white/50 text-[10px]">Set {currentSet}</span>
               </div>
 
@@ -1316,12 +1669,13 @@ const VolleyPongGame = ({
               </h3>
               <p className="text-sm text-muted-foreground">
                 Sets: {setsWon[0]} x {setsWon[1]}
+                {gameMode === "multi" && opponentName && ` • vs ${opponentName}`}
               </p>
               {submitting && (
                 <p className="text-xs text-muted-foreground">Salvando pontuação...</p>
               )}
               <div className="flex gap-3 justify-center">
-                <Button onClick={startGame} className="gap-2">
+                <Button onClick={() => startGame(gameMode)} className="gap-2">
                   <RotateCcw className="h-4 w-4" /> Jogar de novo
                 </Button>
                 <Button variant="ghost" onClick={resetGame}>

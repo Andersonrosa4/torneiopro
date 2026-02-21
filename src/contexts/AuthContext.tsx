@@ -71,7 +71,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (prev) console.warn("Auth loading safety timeout triggered");
         return false;
       });
-    }, 5000);
+    }, 2000);
 
     // On mount: restore existing Supabase session
     supabase.auth.getSession().then(async ({ data: { session } }) => {

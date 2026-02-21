@@ -635,6 +635,112 @@ const VolleyPongGame = ({
   const channelRef = useRef<any>(null);
   const remoteInputRef = useRef({ dir: 0, jump: false, attack: false });
   const broadcastCountRef = useRef(0);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  // ── Sound Engine (Web Audio API) ──
+  const getAudioCtx = () => {
+    if (!audioCtxRef.current) {
+      audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    if (audioCtxRef.current.state === "suspended") {
+      audioCtxRef.current.resume();
+    }
+    return audioCtxRef.current;
+  };
+
+  const playHitSound = (isSpike = false) => {
+    try {
+      const ctx = getAudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(isSpike ? 600 : 400, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(isSpike ? 200 : 150, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(isSpike ? 0.25 : 0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.15);
+      // Add a "thud" layer
+      const noise = ctx.createOscillator();
+      const ng = ctx.createGain();
+      noise.connect(ng);
+      ng.connect(ctx.destination);
+      noise.type = "sine";
+      noise.frequency.setValueAtTime(isSpike ? 180 : 120, ctx.currentTime);
+      noise.frequency.exponentialRampToValueAtTime(60, ctx.currentTime + 0.08);
+      ng.gain.setValueAtTime(0.2, ctx.currentTime);
+      ng.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+      noise.start(ctx.currentTime);
+      noise.stop(ctx.currentTime + 0.1);
+    } catch {}
+  };
+
+  const playScoreSound = (isPlayerPoint: boolean) => {
+    try {
+      const ctx = getAudioCtx();
+      const notes = isPlayerPoint ? [523, 659, 784] : [400, 320, 260];
+      notes.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = isPlayerPoint ? "sine" : "square";
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.12);
+        gain.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.2);
+        osc.start(ctx.currentTime + i * 0.12);
+        osc.stop(ctx.currentTime + i * 0.12 + 0.2);
+      });
+    } catch {}
+  };
+
+  const playCrowdSound = () => {
+    try {
+      const ctx = getAudioCtx();
+      // Simulate crowd noise with multiple detuned oscillators
+      for (let i = 0; i < 6; i++) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const filter = ctx.createBiquadFilter();
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(200 + Math.random() * 400, ctx.currentTime);
+        osc.detune.setValueAtTime(Math.random() * 100 - 50, ctx.currentTime);
+        filter.type = "bandpass";
+        filter.frequency.setValueAtTime(800 + Math.random() * 600, ctx.currentTime);
+        filter.Q.setValueAtTime(0.5, ctx.currentTime);
+        const delay = Math.random() * 0.1;
+        gain.gain.setValueAtTime(0, ctx.currentTime + delay);
+        gain.gain.linearRampToValueAtTime(0.03, ctx.currentTime + delay + 0.15);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.6);
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + 0.6);
+      }
+    } catch {}
+  };
+
+  const playWhistle = () => {
+    try {
+      const ctx = getAudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(900, ctx.currentTime);
+      osc.frequency.setValueAtTime(1200, ctx.currentTime + 0.1);
+      osc.frequency.setValueAtTime(900, ctx.currentTime + 0.2);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime + 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.35);
+    } catch {}
+  };
 
   // Generate invite code
   useEffect(() => {
@@ -860,6 +966,9 @@ const VolleyPongGame = ({
       }
     }
     pauseRef.current = 60;
+    playWhistle();
+    playScoreSound(scorer === "player");
+    setTimeout(() => playCrowdSound(), 300);
 
     const p = pScoreRef.current;
     const a = aScoreRef.current;
@@ -938,6 +1047,7 @@ const VolleyPongGame = ({
         ball.y = centerY + (radius + BALL_R + 3) * Math.sin(angle);
 
         if (isSpike) p.attackCooldown = 20;
+        playHitSound(isSpike);
         return true;
       }
       return false;

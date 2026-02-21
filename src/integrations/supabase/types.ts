@@ -55,9 +55,12 @@ export type Database = {
           answer_1: boolean | null
           answer_2: boolean | null
           answer_3: boolean | null
+          city: string | null
           created_at: string
+          email: string | null
           final_action: string | null
           id: string
+          phone: string | null
           player_name: string
           user_id: string
           whatsapp: string | null
@@ -66,9 +69,12 @@ export type Database = {
           answer_1?: boolean | null
           answer_2?: boolean | null
           answer_3?: boolean | null
+          city?: string | null
           created_at?: string
+          email?: string | null
           final_action?: string | null
           id?: string
+          phone?: string | null
           player_name: string
           user_id: string
           whatsapp?: string | null
@@ -77,9 +83,12 @@ export type Database = {
           answer_1?: boolean | null
           answer_2?: boolean | null
           answer_3?: boolean | null
+          city?: string | null
           created_at?: string
+          email?: string | null
           final_action?: string | null
           id?: string
+          phone?: string | null
           player_name?: string
           user_id?: string
           whatsapp?: string | null

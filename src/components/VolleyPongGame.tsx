@@ -807,18 +807,19 @@ const VolleyPongGame = ({
     for (const t of ball.trail) { t.alpha -= 0.12; }
     ball.trail = ball.trail.filter(t => t.alpha > 0);
 
-    // Wall bounces — full energy so ball returns to court
+    // Wall bounces — full energy, ball always returns to court (never scores on wall hit)
     if (ball.x <= BALL_R) { ball.vx = Math.abs(ball.vx); ball.x = BALL_R + 1; }
     if (ball.x >= W - BALL_R) { ball.vx = -Math.abs(ball.vx); ball.x = W - BALL_R - 1; }
-    if (ball.y <= BALL_R) { ball.vy = Math.abs(ball.vy) * 0.8; ball.y = BALL_R; }
+    if (ball.y <= BALL_R) { ball.vy = Math.abs(ball.vy); ball.y = BALL_R; }
 
-    // Net collision
+    // Net collision — ball bounces off net like a wall
     if (
       ball.y + BALL_R > NET_TOP &&
       ball.y - BALL_R < GROUND_Y &&
       Math.abs(ball.x - NET_X) < BALL_R + 5
     ) {
-      ball.vx = -ball.vx * 0.5;
+      ball.vx = -ball.vx * 0.8;
+      ball.vy = ball.vy * 0.9;
       ball.x = ball.x < NET_X ? NET_X - BALL_R - 6 : NET_X + BALL_R + 6;
     }
 

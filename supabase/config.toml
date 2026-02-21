@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.challenge-api]
 verify_jwt = false
+
+[functions.activity-api]
+verify_jwt = false

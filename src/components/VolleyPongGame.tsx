@@ -531,23 +531,24 @@ const VolleyPongGame = ({
         const inAir = p.y < GROUND_Y - 15;
         const isSpike = inAir && p.attackCooldown <= 0 && p.isAttacking;
 
+        // ALL hits produce an inverted-U arc (always goes UP first, lands on other side)
         if (isHead) {
-          // LEVANTAMENTO / TOQUE: High arc upward, slightly toward opponent
-          ball.vx = targetDir * 1.8;
-          ball.vy = -5.5;
-        } else if (isSpike) {
-          // CORTADA / SPIKE: Fast downward diagonal toward opponent's court
-          ball.vx = targetDir * (4.5 + ATTACK_BOOST * 0.5);
-          ball.vy = 2.5;
-          if (isSpike) p.attackCooldown = 20;
-        } else if (inAir) {
-          // TOQUE NO AR (sem ataque): Medium arc toward opponent
+          // LEVANTAMENTO: tall arc, moderate forward
           ball.vx = targetDir * 3.0;
+          ball.vy = -6.0;
+        } else if (isSpike) {
+          // CORTADA: fast & aggressive but STILL arcs up first, then drops steeply
+          ball.vx = targetDir * 5.0;
           ball.vy = -3.5;
+          p.attackCooldown = 20;
+        } else if (inAir) {
+          // TOQUE NO AR: medium arc toward opponent
+          ball.vx = targetDir * 3.8;
+          ball.vy = -4.5;
         } else {
-          // MANCHETE: Ball goes UP with natural arc, slight direction toward opponent
-          ball.vx = targetDir * 2.0;
-          ball.vy = -5.0;
+          // MANCHETE: classic high arc toward opponent
+          ball.vx = targetDir * 3.2;
+          ball.vy = -5.5;
         }
 
         // Clamp speeds

@@ -455,15 +455,29 @@ const drawParticles = (ctx: CanvasRenderingContext2D, particles: Particle[]) => 
   ctx.globalAlpha = 1;
 };
 
+// Safe rounded rect helper
+const safeRoundRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+};
+
 const drawHUD = (
   ctx: CanvasRenderingContext2D, pScore: number, aScore: number,
-  sets: number[], setNum: number, energy: number, coins: number, frame: number
+  sets: number[], setNum: number, energy: number, coins: number, _frame: number
 ) => {
   // Score panel - top center
   ctx.fillStyle = "rgba(0,0,0,0.55)";
   const panelW = 160, panelH = 32, panelX = (W - panelW) / 2, panelY = 6;
-  ctx.beginPath();
-  ctx.roundRect(panelX, panelY, panelW, panelH, 10);
+  safeRoundRect(ctx, panelX, panelY, panelW, panelH, 10);
   ctx.fill();
 
   ctx.font = "bold 16px sans-serif";
@@ -486,12 +500,14 @@ const drawHUD = (
   // Energy bar - bottom left
   const barW = 60, barH = 6, barX = 8, barY = H - 14;
   ctx.fillStyle = "rgba(0,0,0,0.4)";
-  ctx.beginPath(); ctx.roundRect(barX, barY, barW, barH, 3); ctx.fill();
-  const energyGrad = ctx.createLinearGradient(barX, 0, barX + barW * energy, 0);
-  energyGrad.addColorStop(0, "#76FF03");
-  energyGrad.addColorStop(1, "#00E676");
-  ctx.fillStyle = energyGrad;
-  ctx.beginPath(); ctx.roundRect(barX, barY, barW * energy, barH, 3); ctx.fill();
+  safeRoundRect(ctx, barX, barY, barW, barH, 3); ctx.fill();
+  if (energy > 0.01) {
+    const energyGrad = ctx.createLinearGradient(barX, 0, barX + barW * energy, 0);
+    energyGrad.addColorStop(0, "#76FF03");
+    energyGrad.addColorStop(1, "#00E676");
+    ctx.fillStyle = energyGrad;
+    safeRoundRect(ctx, barX, barY, Math.max(3, barW * energy), barH, 3); ctx.fill();
+  }
   ctx.font = "7px sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.6)";
   ctx.textAlign = "left";
@@ -553,6 +569,7 @@ const VolleyPongGame = ({
   const energyRef = useRef(0);
   const coinsRef = useRef(0);
   const effectsRef = useRef<{ type: PowerUpType; remaining: number }[]>([]);
+  const lastPointRef = useRef<string | null>(null);
 
   // Multiplayer refs
   const gameModeRef = useRef<GameMode>("solo");
@@ -666,7 +683,7 @@ const VolleyPongGame = ({
       else if (payload.type === "game_over") {
         phaseRef.current = "gameover"; setPhase("gameover");
         setPlayerScore(payload.scores.p); setAiScore(payload.scores.a); setSetsWon(payload.scores.sets);
-      } else if (payload.type === "point") { setLastPoint(payload.msg); }
+      } else if (payload.type === "point") { setLastPoint(payload.msg); lastPointRef.current = payload.msg; }
       else if (payload.type === "leave") {
         setOpponentConnected(false); setOpponentName("");
         toast({ title: "Host saiu da sala", variant: "destructive" });
@@ -739,12 +756,12 @@ const VolleyPongGame = ({
     if (scorer === "player") {
       pScoreRef.current += 1; setPlayerScore(pScoreRef.current);
       coinsRef.current += 5;
-      const msg = "Ponto seu! 🏐"; setLastPoint(msg);
+      const msg = "Ponto seu! 🏐"; setLastPoint(msg); lastPointRef.current = msg;
       spawnParticles(W * 0.75, GROUND_Y - 40, 15, ["#FFD700", "#FF6B6B", "#64DD17", "#00BCD4"], true);
       if (isMulti && channelRef.current) channelRef.current.send({ type: "broadcast", event: "game", payload: { type: "point", msg } });
     } else {
       aScoreRef.current += 1; setAiScore(aScoreRef.current);
-      const msg = isMulti ? `Ponto de ${opponentName || "P2"} 🏐` : "Ponto da IA 🤖"; setLastPoint(msg);
+      const msg = isMulti ? `Ponto de ${opponentName || "P2"} 🏐` : "Ponto da IA 🤖"; setLastPoint(msg); lastPointRef.current = msg;
       if (isMulti && channelRef.current) channelRef.current.send({ type: "broadcast", event: "game", payload: { type: "point", msg: "Ponto do adversário 🏐" } });
     }
     pauseRef.current = 80;
@@ -1066,44 +1083,47 @@ const VolleyPongGame = ({
 
     // ── RENDER ──
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const ctx = canvas?.getContext("2d");
 
-    ctx.clearRect(0, 0, W, H);
-    drawBackground(ctx, frame);
-    drawNet(ctx);
+    if (canvas && ctx) {
+      ctx.clearRect(0, 0, W, H);
+      drawBackground(ctx, frame);
+      drawNet(ctx);
 
-    // Power-ups
-    for (const pu of powerUpsRef.current) drawPowerUp(ctx, pu, frame);
+      // Power-ups
+      for (const pu of powerUpsRef.current) drawPowerUp(ctx, pu, frame);
 
-    // Players
-    const p = playerRef.current, a = aiRef.current;
-    drawAlien(ctx, p.x, p.y, "#64DD17", "#388E3C", true, p.expression, p.blinkTimer < 8, frame);
-    drawAlien(ctx, a.x, a.y, "#CE93D8", "#7B1FA2", false, a.expression, a.blinkTimer < 8, frame);
+      // Players
+      const p2 = playerRef.current, a2 = aiRef.current;
+      drawAlien(ctx, p2.x, p2.y, "#64DD17", "#388E3C", true, p2.expression, p2.blinkTimer < 8, frame);
+      drawAlien(ctx, a2.x, a2.y, "#CE93D8", "#7B1FA2", false, a2.expression, a2.blinkTimer < 8, frame);
 
-    // Ball
-    drawBall(ctx, ballRef.current);
+      // Ball
+      drawBall(ctx, ballRef.current);
 
-    // Particles
-    drawParticles(ctx, particlesRef.current);
+      // Particles
+      drawParticles(ctx, particlesRef.current);
 
-    // HUD
-    drawHUD(ctx, pScoreRef.current, aScoreRef.current, setsRef.current, setNumRef.current, energyRef.current, coinsRef.current, frame);
+      // HUD
+      drawHUD(ctx, pScoreRef.current, aScoreRef.current, setsRef.current, setNumRef.current, energyRef.current, coinsRef.current, frame);
 
-    // Pause overlay
-    if (pauseRef.current > 0 && lastPoint) {
-      ctx.fillStyle = "rgba(0,0,0,0.3)";
-      ctx.fillRect(0, H * 0.35, W, 40);
-      ctx.font = "bold 16px sans-serif";
-      ctx.fillStyle = "#FFFFFF";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(lastPoint, W / 2, H * 0.35 + 20);
+      // Pause overlay
+      if (pauseRef.current > 0) {
+        const pointText = lastPointRef.current;
+        if (pointText) {
+          ctx.fillStyle = "rgba(0,0,0,0.3)";
+          ctx.fillRect(0, H * 0.35, W, 40);
+          ctx.font = "bold 16px sans-serif";
+          ctx.fillStyle = "#FFFFFF";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(pointText, W / 2, H * 0.35 + 20);
+        }
+      }
     }
 
     animRef.current = requestAnimationFrame(gameLoop);
-  }, [scorePoint, broadcastState, sendGuestInput, lastPoint]);
+  }, [scorePoint, broadcastState, sendGuestInput]);
 
   // Start render loop
   useEffect(() => {
@@ -1134,7 +1154,7 @@ const VolleyPongGame = ({
     playerRef.current = createPlayer(W * 0.25);
     aiRef.current = createPlayer(W * 0.75);
     ballRef.current = createBall(W * 0.25, GROUND_Y - 80);
-    setPlayerScore(0); setAiScore(0); setSetsWon([0, 0]); setCurrentSet(1); setLastPoint(null);
+    setPlayerScore(0); setAiScore(0); setSetsWon([0, 0]); setCurrentSet(1); setLastPoint(null); lastPointRef.current = null;
     if (mode === "solo") { gameModeRef.current = "solo"; multiRoleRef.current = null; setGameMode("solo"); setMultiRole(null); }
     phaseRef.current = "playing"; setPhase("playing");
     if (gameModeRef.current === "multi" && multiRoleRef.current === "host" && channelRef.current) {
@@ -1150,7 +1170,7 @@ const VolleyPongGame = ({
     setOpponentName(""); setOpponentConnected(false);
     phaseRef.current = "start"; setPhase("start");
     setPlayerScore(0); setAiScore(0); setSetsWon([0, 0]); setCurrentSet(1);
-    setLastPoint(null); setShowInvite(false); setShowJoin(false);
+    setLastPoint(null); lastPointRef.current = null; setShowInvite(false); setShowJoin(false);
   };
 
   useEffect(() => () => { cancelAnimationFrame(animRef.current); cleanupChannel(); }, [cleanupChannel]);

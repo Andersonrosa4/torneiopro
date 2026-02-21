@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { Trophy, Bell, Activity, Calendar, ArrowLeft, Star } from "lucide-react";
+import { Trophy, Bell, Activity, Calendar, ArrowLeft, Star, Handshake } from "lucide-react";
 import LogoImage from "@/components/LogoImage";
 import NotificationBell from "@/components/NotificationBell";
 import SystemAdsBanner from "@/components/SystemAdsBanner";
+import AmbassadorFunnel from "@/components/AmbassadorFunnel";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
@@ -58,6 +59,7 @@ const AthleteHome = () => {
   const [ranking, setRanking] = useState<any>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAmbassadorFunnel, setShowAmbassadorFunnel] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -100,6 +102,8 @@ const AthleteHome = () => {
   return (
     <div className="min-h-screen relative overflow-hidden">
       <div className="fixed inset-0 bg-gradient-to-b from-[hsl(220_25%_4%)] via-[hsl(15_15%_7%)] to-[hsl(20_20%_6%)]" />
+      <AmbassadorFunnel onClose={() => setShowAmbassadorFunnel(false)} />
+      {showAmbassadorFunnel && <AmbassadorFunnel forceOpen onClose={() => setShowAmbassadorFunnel(false)} />}
 
       <header className="sticky top-0 z-50 border-b border-[hsl(0_0%_100%/0.1)] bg-[hsl(220_15%_8%/0.9)] backdrop-blur-md relative">
         <div className="container flex h-14 items-center justify-between px-4">
@@ -217,6 +221,16 @@ const AthleteHome = () => {
             </div>
           )}
         </div>
+
+        {/* Seja nosso Embaixador */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+          <button
+            onClick={() => setShowAmbassadorFunnel(true)}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400 text-sm font-semibold hover:bg-amber-500/20 transition-all active:scale-[0.98]"
+          >
+            <Handshake className="h-4 w-4" /> Seja nosso Embaixador
+          </button>
+        </motion.div>
 
         {/* Anúncios do Sistema */}
         <SystemAdsBanner />

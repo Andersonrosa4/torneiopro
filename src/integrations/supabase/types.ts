@@ -50,6 +50,42 @@ export type Database = {
         }
         Relationships: []
       }
+      ambassador_interests: {
+        Row: {
+          answer_1: boolean | null
+          answer_2: boolean | null
+          answer_3: boolean | null
+          created_at: string
+          final_action: string | null
+          id: string
+          player_name: string
+          user_id: string
+          whatsapp: string | null
+        }
+        Insert: {
+          answer_1?: boolean | null
+          answer_2?: boolean | null
+          answer_3?: boolean | null
+          created_at?: string
+          final_action?: string | null
+          id?: string
+          player_name: string
+          user_id: string
+          whatsapp?: string | null
+        }
+        Update: {
+          answer_1?: boolean | null
+          answer_2?: boolean | null
+          answer_3?: boolean | null
+          created_at?: string
+          final_action?: string | null
+          id?: string
+          player_name?: string
+          user_id?: string
+          whatsapp?: string | null
+        }
+        Relationships: []
+      }
       arena_admins: {
         Row: {
           arena_id: string

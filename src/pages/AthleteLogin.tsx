@@ -8,16 +8,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Hash, ArrowLeft, Trophy, LogIn, UserPlus, Lock } from "lucide-react";
+import { Hash, ArrowLeft, Trophy, LogIn, UserPlus, Lock, Handshake } from "lucide-react";
 import LogoImage from "@/components/LogoImage";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
 import PromoPopup from "@/components/PromoPopup";
+import AmbassadorFunnel from "@/components/AmbassadorFunnel";
 import { Link } from "react-router-dom";
 
 const AthleteLogin = () => {
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [showAmbassadorFunnel, setShowAmbassadorFunnel] = useState(false);
 
   // Login state
   const [email, setEmail] = useState("");
@@ -75,6 +77,11 @@ const AthleteLogin = () => {
       localStorage.removeItem("athlete_remembered_email");
     }
 
+    // Record login timestamp for ambassador funnel timing
+    if (!localStorage.getItem("ambassador_funnel_login_ts")) {
+      localStorage.setItem("ambassador_funnel_login_ts", Date.now().toString());
+    }
+
     setIsLoggedIn(true);
     toast.success("Login realizado com sucesso!");
     setLoginLoading(false);
@@ -121,6 +128,8 @@ const AthleteLogin = () => {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-[hsl(220_15%_10%)] via-[hsl(220_12%_14%)] to-[hsl(25_15%_12%)] px-4 relative overflow-hidden">
       <PromoPopup />
+      {isLoggedIn && <AmbassadorFunnel onClose={() => setShowAmbassadorFunnel(false)} />}
+      {showAmbassadorFunnel && <AmbassadorFunnel forceOpen onClose={() => setShowAmbassadorFunnel(false)} />}
       {/* Ambient glow orbs */}
       <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-[radial-gradient(circle,hsl(var(--primary)/0.12),transparent_70%)] blur-3xl pointer-events-none" />
       <div className="absolute bottom-[-15%] right-[-10%] w-[400px] h-[400px] rounded-full bg-[radial-gradient(circle,hsl(var(--accent)/0.1),transparent_70%)] blur-3xl pointer-events-none" />
@@ -290,13 +299,21 @@ const AthleteLogin = () => {
                 </Button>
               </form>
 
-              <div className="mt-4 flex items-center justify-between">
-                <Button variant="ghost" size="sm" className="text-xs text-primary" onClick={() => navigate("/atleta/home")}>
-                  Meu Painel
-                </Button>
-                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={handleLogout}>
-                  Sair
-                </Button>
+              <div className="mt-4 space-y-2">
+                <button
+                  onClick={() => setShowAmbassadorFunnel(true)}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400 text-sm font-semibold hover:bg-amber-500/20 transition-all active:scale-[0.98]"
+                >
+                  <Handshake className="h-4 w-4" /> Seja nosso Embaixador
+                </button>
+                <div className="flex items-center justify-between">
+                  <Button variant="ghost" size="sm" className="text-xs text-primary" onClick={() => navigate("/atleta/home")}>
+                    Meu Painel
+                  </Button>
+                  <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={handleLogout}>
+                    Sair
+                  </Button>
+                </div>
               </div>
             </>
           )}

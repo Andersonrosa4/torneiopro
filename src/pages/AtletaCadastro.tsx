@@ -81,11 +81,8 @@ const AtletaCadastro = () => {
         phone: cleanPhone,
       });
 
-      // Assign athlete role
-      await supabase.from("user_roles").insert({
-        user_id: authData.user.id,
-        role: "athlete" as any,
-      });
+      // Assign athlete role via edge function (bypasses RLS)
+      await supabase.functions.invoke("assign-athlete-role");
     }
 
     toast({

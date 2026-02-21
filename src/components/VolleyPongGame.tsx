@@ -577,6 +577,7 @@ const VolleyPongGame = ({
   const channelRef = useRef<any>(null);
   const remoteInputRef = useRef({ dir: 0, jump: false, attack: false });
   const broadcastCountRef = useRef(0);
+  const guestInputCountRef = useRef(0);
   const audioCtxRef = useRef<AudioContext | null>(null);
 
   // ── Sound ──
@@ -885,15 +886,16 @@ const VolleyPongGame = ({
   const broadcastState = useCallback(() => {
     if (gameModeRef.current !== "multi" || multiRoleRef.current !== "host" || !channelRef.current) return;
     broadcastCountRef.current++;
-    if (broadcastCountRef.current % 2 !== 0) return;
+    // Send state ~10x/s instead of 30x/s to reduce lag
+    if (broadcastCountRef.current % 6 !== 0) return;
     const p = playerRef.current, a = aiRef.current, b = ballRef.current;
     channelRef.current.send({
       type: "broadcast", event: "game",
       payload: {
         type: "state",
-        p1: { x: p.x, y: p.y, vy: p.vy, touches: p.touches, expression: p.expression, attackCooldown: p.attackCooldown, blinkTimer: p.blinkTimer },
-        p2: { x: a.x, y: a.y, vy: a.vy, touches: a.touches, expression: a.expression, attackCooldown: a.attackCooldown, blinkTimer: a.blinkTimer },
-        ball: { x: b.x, y: b.y, vx: b.vx, vy: b.vy, rotation: b.rotation },
+        p1: { x: p.x, y: p.y, vy: p.vy },
+        p2: { x: a.x, y: a.y, vy: a.vy },
+        ball: { x: b.x, y: b.y, vx: b.vx, vy: b.vy },
         scores: { p: pScoreRef.current, a: aScoreRef.current, sets: [...setsRef.current], setNum: setNumRef.current },
         rally: rallyCountRef.current, pause: pauseRef.current,
       },
@@ -902,6 +904,9 @@ const VolleyPongGame = ({
 
   const sendGuestInput = useCallback(() => {
     if (gameModeRef.current !== "multi" || multiRoleRef.current !== "guest" || !channelRef.current) return;
+    guestInputCountRef.current++;
+    // Throttle guest input to ~10x/s
+    if (guestInputCountRef.current % 6 !== 0) return;
     const keys = keysRef.current;
     let dir = touchDirRef.current;
     if (keys.has("ArrowLeft") || keys.has("a")) dir = -1;

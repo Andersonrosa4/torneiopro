@@ -51,6 +51,9 @@ const PromoPopup = () => {
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   Quer um aplicativo personalizado para sua arena ou evento? A <span className="font-semibold text-foreground">FlowApps</span> cria pra você!
                 </p>
+                <p className="text-xs font-semibold text-primary mt-2">
+                  Siga nosso Instagram para fechar este anúncio 👇
+                </p>
               </div>
 
               <a

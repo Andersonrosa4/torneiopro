@@ -41,7 +41,7 @@ const AmbassadorFunnel = ({ forceOpen = false, onClose }: AmbassadorFunnelProps)
   const [answers, setAnswers] = useState<(boolean | null)[]>([null, null, null]);
   const [showInterestForm, setShowInterestForm] = useState(false);
   const [playerName, setPlayerName] = useState("");
-  const [whatsapp, setWhatsapp] = useState("");
+  const [city, setCity] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -112,7 +112,6 @@ const AmbassadorFunnel = ({ forceOpen = false, onClose }: AmbassadorFunnelProps)
         data.user.user_metadata?.full_name ||
         ""
       );
-      setWhatsapp(data.user.user_metadata?.phone || data.user.phone || "");
     }
   };
 
@@ -137,7 +136,7 @@ const AmbassadorFunnel = ({ forceOpen = false, onClose }: AmbassadorFunnelProps)
       await supabase.from("ambassador_interests").insert({
         user_id: userId,
         player_name: playerName || "Atleta",
-        whatsapp: whatsapp || null,
+        whatsapp: city || null,
         answer_1: answers[0],
         answer_2: answers[1],
         answer_3: answers[2],
@@ -157,11 +156,22 @@ const AmbassadorFunnel = ({ forceOpen = false, onClose }: AmbassadorFunnelProps)
       toast({ title: "Digite seu nome", variant: "destructive" });
       return;
     }
+    if (!city.trim()) {
+      toast({ title: "Digite sua cidade", variant: "destructive" });
+      return;
+    }
     setSubmitting(true);
     await saveAndClose("interested");
+
+    // Redirect to WhatsApp with pre-filled message
+    const msg = encodeURIComponent(
+      `Olá! Meu nome é ${playerName.trim()} e tenho interesse em criar um torneio na cidade de ${city.trim()}. Vim pelo app TorneioPro!`
+    );
+    window.open(`https://wa.me/5565993379751?text=${msg}`, "_blank");
+
     toast({
       title: "Interesse enviado! 🎉",
-      description: "Entraremos em contato em breve.",
+      description: "Você será redirecionado para o WhatsApp.",
     });
     setSubmitting(false);
   };
@@ -345,12 +355,12 @@ const AmbassadorFunnel = ({ forceOpen = false, onClose }: AmbassadorFunnelProps)
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
-                    WhatsApp
+                    Em qual cidade você tem interesse em criar um torneio?
                   </Label>
                   <Input
-                    value={whatsapp}
-                    onChange={(e) => setWhatsapp(e.target.value)}
-                    placeholder="(99) 99999-9999"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="Ex: Cuiabá - MT"
                     className="h-12 rounded-xl bg-muted/40 border-border/50"
                   />
                 </div>

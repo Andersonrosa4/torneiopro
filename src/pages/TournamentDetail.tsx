@@ -565,10 +565,22 @@ const TournamentDetail = () => {
             // Semi round = totalKORounds - 1
             const semiRound = totalKORounds - 1;
             
+            // Quarter-final round for cup-style crossing (Q1 vs Q4, Q2 vs Q3)
+            const quarterRound = totalKORounds - 2; // e.g. round 2 when totalKORounds=4
+            const numQuarterMatches = nextPow / Math.pow(2, quarterRound);
+            
             for (const m of koOnly) {
               if (m.bracket_type === 'third_place') continue; // skip 3rd place from normal linking
               if (m.round < totalKORounds) {
-                const nextPos = Math.ceil(m.position / 2);
+                let nextPos: number;
+                // Cup-style crossing: in quarter-finals, pair extremes (1↔4, 2↔3)
+                if (m.round === quarterRound && numQuarterMatches === 4) {
+                  // Map: pos 1→semi 1, pos 2→semi 2, pos 3→semi 2, pos 4→semi 1
+                  const cupMap: Record<number, number> = { 1: 1, 2: 2, 3: 2, 4: 1 };
+                  nextPos = cupMap[m.position] || Math.ceil(m.position / 2);
+                } else {
+                  nextPos = Math.ceil(m.position / 2);
+                }
                 const nextMatch = koOnly.find((nm: any) => nm.round === m.round + 1 && nm.position === nextPos && nm.bracket_type !== 'third_place');
                 if (nextMatch) {
                   const linkData: any = { next_win_match_id: nextMatch.id };

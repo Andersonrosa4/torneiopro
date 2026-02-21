@@ -71,8 +71,10 @@ const ArenaDashboard = () => {
       navigate("/arena-login");
       return;
     }
-    setArena(data.arena);
-    loadCourts(data.arena.id);
+    if (data.arena) {
+      setArena(data.arena);
+      loadCourts(data.arena.id);
+    }
     setLoading(false);
   };
 

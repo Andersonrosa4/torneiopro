@@ -40,13 +40,42 @@ Deno.serve(async (req) => {
       const { data: { user } } = await supabase.auth.getUser(token);
       if (!user) return null;
 
+      // Check if user is an arena admin
       const { data: adminData } = await supabase
         .from("arena_admins")
         .select("id, arena_id, user_id")
         .eq("user_id", user.id)
         .maybeSingle();
 
-      return adminData ? { ...adminData, authUserId: user.id } : null;
+      if (adminData) return { ...adminData, authUserId: user.id, isAppAdmin: false };
+
+      // Check if user is an app-level admin (master)
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+
+      if (roleData) {
+        // App admin: get first arena (or null if none exist)
+        const { data: firstArena } = await supabase
+          .from("arenas")
+          .select("id")
+          .order("created_at")
+          .limit(1)
+          .maybeSingle();
+
+        return {
+          id: "app-admin",
+          arena_id: firstArena?.id || null,
+          user_id: user.id,
+          authUserId: user.id,
+          isAppAdmin: true,
+        };
+      }
+
+      return null;
     }
 
     const authHeader = req.headers.get("authorization");
@@ -252,12 +281,18 @@ Deno.serve(async (req) => {
 
     if (action === "arena_login_check") {
       if (!admin) return errorResponse("Não autenticado como admin de arena", 401);
+
+      // App admin without any arena yet
+      if (admin.isAppAdmin && !admin.arena_id) {
+        return jsonResponse({ data: { admin, arena: null, isAppAdmin: true } });
+      }
+
       const { data: arena } = await supabase
         .from("arenas")
         .select("id, name, address, opening_time, closing_time, working_days, cancel_policy_hours")
         .eq("id", admin.arena_id)
         .single();
-      return jsonResponse({ data: { admin, arena } });
+      return jsonResponse({ data: { admin, arena, isAppAdmin: admin.isAppAdmin || false } });
     }
 
     if (action === "create_time_slots") {
@@ -323,9 +358,15 @@ Deno.serve(async (req) => {
       let q = supabase
         .from("court_bookings")
         .select("*, customers(name, cpf, phone), courts(name), payments(id, method, amount, status)")
-        .eq("arena_id", admin.arena_id)
         .order("date", { ascending: false })
         .order("start_time");
+
+      // Arena admin sees only their arena; app admin sees all (or filtered by arena_id if set)
+      if (!admin.isAppAdmin && admin.arena_id) {
+        q = q.eq("arena_id", admin.arena_id);
+      } else if (admin.arena_id) {
+        q = q.eq("arena_id", admin.arena_id);
+      }
 
       if (date) q = q.eq("date", date);
       if (status) q = q.eq("status", status);
@@ -347,7 +388,7 @@ Deno.serve(async (req) => {
         .eq("id", booking_id)
         .single();
 
-      if (!booking || booking.arena_id !== admin.arena_id) {
+      if (!booking || (!admin.isAppAdmin && booking.arena_id !== admin.arena_id)) {
         return errorResponse("Reserva não encontrada", 404);
       }
 
@@ -401,7 +442,7 @@ Deno.serve(async (req) => {
         .eq("id", booking_id)
         .single();
 
-      if (!booking || booking.arena_id !== admin.arena_id) {
+      if (!booking || (!admin.isAppAdmin && booking.arena_id !== admin.arena_id)) {
         return errorResponse("Reserva não encontrada", 404);
       }
 
@@ -454,11 +495,12 @@ Deno.serve(async (req) => {
       const { booking_id } = body;
       if (!booking_id) return errorResponse("booking_id é obrigatório");
 
-      await supabase
+      let q = supabase
         .from("court_bookings")
         .update({ status: "finished" })
-        .eq("id", booking_id)
-        .eq("arena_id", admin.arena_id);
+        .eq("id", booking_id);
+      if (!admin.isAppAdmin && admin.arena_id) q = q.eq("arena_id", admin.arena_id);
+      await q;
 
       return jsonResponse({ data: null });
     }
@@ -476,7 +518,7 @@ Deno.serve(async (req) => {
         .eq("id", booking_id)
         .single();
 
-      if (!booking || booking.arena_id !== admin.arena_id) {
+      if (!booking || (!admin.isAppAdmin && booking.arena_id !== admin.arena_id)) {
         return errorResponse("Reserva não encontrada", 404);
       }
 

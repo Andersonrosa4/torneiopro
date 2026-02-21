@@ -832,14 +832,28 @@ const VolleyPongGame = ({
       const inAir = p.y < GROUND_Y - 12;
       const isSpike = inAir && p.attackCooldown <= 0;
 
-      // ALL hits = HIGH arc that clears the net easily
+      // Spike types based on height and ball position
       if (isSpike) {
-        ball.vx = dir * 3.5 * ball.speedMultiplier;
-        ball.vy = -6.0;
+        const highUp = p.y < GROUND_Y - 50; // jumped high
+        const ballAboveNet = ball.y < NET_TOP + 20; // ball is near/above net height
+        
+        if (highUp && ballAboveNet) {
+          // ATAQUE RAZANTE — player jumped high, ball is high = smash down fast!
+          ball.vx = dir * 5.0 * ball.speedMultiplier;
+          ball.vy = 2.5; // goes DOWN aggressively
+        } else if (highUp) {
+          // High spike but ball lower — moderate downward angle
+          ball.vx = dir * 4.5 * ball.speedMultiplier;
+          ball.vy = 0.8; // slight downward
+        } else {
+          // Regular spike — still arcs up
+          ball.vx = dir * 3.5 * ball.speedMultiplier;
+          ball.vy = -4.0;
+        }
         p.attackCooldown = 18;
         p.expression = "determined";
         playSpikeSound();
-        spawnParticles(ball.x, ball.y, 6, ["#FFD700", "#FF6B6B"], false);
+        spawnParticles(ball.x, ball.y, 8, ["#FFD700", "#FF6B6B", "#FF4444"], false);
       } else if (inAir) {
         ball.vx = dir * 3.0 * ball.speedMultiplier;
         ball.vy = -6.5;

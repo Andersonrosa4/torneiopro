@@ -34,10 +34,12 @@ const MIN_DIFF = 2;
 const P_W = 22;
 const P_H = 52;
 const HEAD_R = 9;
-const JUMP_VY = -5.8;
-const MOVE_SPEED = 2.2;
-const AI_SPEED = 3.0;
-const ATTACK_BOOST = 2.0;
+const JUMP_VY = -5.5;
+const MOVE_SPEED = 2.8;
+const AI_SPEED = 2.8;
+const ATTACK_BOOST = 1.6;
+const BALL_SPEED_CAP = 7;
+const BALL_VY_CAP = 8;
 
 type Phase = "start" | "waiting" | "playing" | "gameover";
 type GameMode = "solo" | "multi";
@@ -526,19 +528,24 @@ const VolleyPongGame = ({
         const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
         const isSpike = p.y < GROUND_Y - 20 && p.attackCooldown <= 0;
         const spikeBoost = isSpike ? ATTACK_BOOST : 0;
-        const newSpeed = Math.max(speed, 4) + spikeBoost;
+        const baseSpeed = Math.max(speed * 0.7, 3); // dampen incoming speed
+        const newSpeed = Math.min(baseSpeed + spikeBoost + 1.5, BALL_SPEED_CAP);
 
         if (isHead) {
-          ball.vx = targetDir * (newSpeed * 0.6 + 2);
-          ball.vy = -Math.abs(newSpeed * 0.8) - 3;
-        } else if (isSpike) {
-          ball.vx = targetDir * Math.abs(Math.cos(angle)) * newSpeed * 0.85 + targetDir * 2;
-          ball.vy = Math.abs(newSpeed * 0.5) + 1;
-        } else {
-          ball.vx = targetDir * Math.abs(Math.cos(angle)) * newSpeed * 0.85 + targetDir * 2;
+          // Cabeceio: upward arc toward opponent
+          ball.vx = targetDir * (newSpeed * 0.55 + 1.5);
           ball.vy = -Math.abs(newSpeed * 0.7) - 2;
+        } else if (isSpike) {
+          // Corte: downward aggressive hit
+          ball.vx = targetDir * Math.abs(Math.cos(angle)) * newSpeed * 0.8 + targetDir * 1.5;
+          ball.vy = Math.abs(newSpeed * 0.4) + 0.8;
+        } else {
+          // Toque normal: smooth upward arc
+          ball.vx = targetDir * Math.abs(Math.cos(angle)) * newSpeed * 0.6 + targetDir * 1.2;
+          ball.vy = -Math.abs(newSpeed * 0.65) - 1.8;
         }
 
+        // Separate ball from player
         ball.x = centerX + (radius + BALL_R + 3) * Math.cos(angle);
         ball.y = centerY + (radius + BALL_R + 3) * Math.sin(angle);
 
@@ -686,47 +693,88 @@ const VolleyPongGame = ({
         setTimeout(() => { ai.isAttacking = false; }, 300);
       }
     } else {
-      // Solo: AI logic — aggressive and competitive
-      const ballOnAiSide = ball.x > NET_X;
-      const ballComingToAi = ball.vx > 0;
-      const aiSpeed = AI_SPEED + rallyCountRef.current * 0.03;
+      // Solo: AI logic — simulate real ball trajectory to find landing point
+      const ball_ = ballRef.current;
+      const aiSpeed = AI_SPEED + Math.min(rallyCountRef.current * 0.02, 0.8);
 
-      if (ballOnAiSide || (ballComingToAi && ball.x > NET_X - 60)) {
-        // Predict where the ball will be
-        const predFrames = Math.max(5, Math.min(20, Math.abs(ball.x - ai.x) / (aiSpeed + 1)));
-        const predictedX = ball.x + ball.vx * predFrames;
-        const predictedY = ball.y + ball.vy * predFrames + 0.5 * GRAVITY * predFrames * predFrames;
-        const targetX = Math.max(NET_X + P_W / 2 + 10, Math.min(W - 22, predictedX));
+      // Simulate ball trajectory to predict where it will be at AI's height
+      const simulateLanding = () => {
+        let sx = ball_.x, sy = ball_.y, svx = ball_.vx, svy = ball_.vy;
+        const targetH = GROUND_Y - P_H - HEAD_R; // head height
+        for (let i = 0; i < 120; i++) {
+          svy += GRAVITY;
+          sx += svx;
+          sy += svy;
+          // Bounce off walls
+          if (sx <= BALL_R) { svx = Math.abs(svx) * 0.8; sx = BALL_R; }
+          if (sx >= W - BALL_R) { svx = -Math.abs(svx) * 0.8; sx = W - BALL_R; }
+          // Net bounce
+          if (sy + BALL_R > NET_TOP && Math.abs(sx - NET_X) < BALL_R + 5) {
+            svx = -svx * 0.5;
+            sx = sx < NET_X ? NET_X - BALL_R - 6 : NET_X + BALL_R + 6;
+          }
+          // Ball reaches AI head height or ground on AI side
+          if (sx > NET_X && sy >= targetH) {
+            return { x: sx, y: sy, frames: i, willLand: sy >= GROUND_Y - BALL_R };
+          }
+          if (sy >= GROUND_Y) {
+            return { x: sx, y: GROUND_Y, frames: i, willLand: true };
+          }
+        }
+        return { x: W * 0.72, y: GROUND_Y, frames: 999, willLand: false };
+      };
+
+      const prediction = simulateLanding();
+      const ballOnAiSide = ball_.x > NET_X - 30;
+      const ballComingToAi = ball_.vx > 0;
+      const ballDangerous = ballComingToAi || ballOnAiSide;
+
+      if (ballDangerous && prediction.x > NET_X) {
+        // Move to predicted landing position with slight offset to be under the ball
+        const offsetX = ball_.vx > 0 ? -5 : 5; // position slightly behind for better contact
+        const targetX = Math.max(NET_X + P_W / 2 + 10, Math.min(W - 22, prediction.x + offsetX));
         const aiDiff = targetX - ai.x;
 
-        if (Math.abs(aiDiff) > 2) {
-          ai.x += Math.sign(aiDiff) * Math.min(aiSpeed, Math.abs(aiDiff));
+        if (Math.abs(aiDiff) > 1.5) {
+          const moveAmount = Math.min(aiSpeed, Math.abs(aiDiff));
+          ai.x += Math.sign(aiDiff) * moveAmount;
         }
-        if (Math.abs(aiDiff) > 2 && ai.y >= GROUND_Y) {
-          ai.legPhase += 0.4;
+        if (Math.abs(aiDiff) > 1.5 && ai.y >= GROUND_Y) {
+          ai.legPhase += 0.35;
         }
 
-        // Jump to intercept — more aggressive distance check
+        // Smart jump timing — jump when ball is approaching and close enough
         const headY = ai.y - P_H;
-        const distToBall = Math.sqrt((ball.x - ai.x) ** 2 + (ball.y - headY) ** 2);
-        if (distToBall < 90 && ball.y < GROUND_Y - 15 && ai.y >= GROUND_Y) {
-          ai.vy = JUMP_VY * 0.9;
+        const distX = Math.abs(ball_.x - ai.x);
+        const distY = ball_.y - headY;
+        const distToBall = Math.sqrt(distX * distX + distY * distY);
+        
+        // Jump when ball is descending toward AI and within reach
+        const shouldJump = ai.y >= GROUND_Y && (
+          // Ball close and at good height
+          (distToBall < 80 && ball_.y < GROUND_Y - 30 && ball_.y > NET_TOP - 20) ||
+          // Ball about to pass overhead, jump to intercept
+          (distX < 40 && ball_.vy > 0 && ball_.y < GROUND_Y - 60 && ball_.y > NET_TOP)
+        );
+        
+        if (shouldJump) {
+          ai.vy = JUMP_VY * 0.92;
         }
 
-        // AI attacks when close and in air
-        if (distToBall < 50 && ai.y < GROUND_Y - 10 && ai.attackCooldown <= 0) {
+        // Attack when in air and close to ball
+        if (ai.y < GROUND_Y - 15 && distToBall < 55 && ai.attackCooldown <= 0) {
           ai.armAngle = 1;
           ai.isAttacking = true;
-          ai.attackCooldown = 15;
-          setTimeout(() => { ai.isAttacking = false; }, 300);
+          ai.attackCooldown = 18;
+          setTimeout(() => { ai.isAttacking = false; }, 280);
         }
       } else {
-        // Ball on player side — move to strategic position
-        const homeX = W * 0.72;
+        // Return to ready position
+        const homeX = W * 0.73;
         const aiDiff = homeX - ai.x;
-        if (Math.abs(aiDiff) > 3) {
-          ai.x += Math.sign(aiDiff) * aiSpeed * 0.6;
-          if (ai.y >= GROUND_Y) ai.legPhase += 0.25;
+        if (Math.abs(aiDiff) > 2) {
+          ai.x += Math.sign(aiDiff) * aiSpeed * 0.5;
+          if (ai.y >= GROUND_Y) ai.legPhase += 0.2;
         }
         ai.legPhase *= 0.9;
       }
@@ -741,9 +789,14 @@ const VolleyPongGame = ({
 
     // ── Ball physics ──
     ball.vy += GRAVITY;
+    // Cap ball speed for realism
+    ball.vx = Math.max(-BALL_SPEED_CAP, Math.min(BALL_SPEED_CAP, ball.vx));
+    ball.vy = Math.max(-BALL_VY_CAP, Math.min(BALL_VY_CAP, ball.vy));
+    // Apply slight air resistance
+    ball.vx *= 0.998;
     ball.x += ball.vx;
     ball.y += ball.vy;
-    ball.rotation += ball.vx * 0.06;
+    ball.rotation += ball.vx * 0.05;
 
     if (frameCountRef.current % 2 === 0) {
       ball.trail.push({ x: ball.x, y: ball.y, alpha: 1 });
@@ -1188,54 +1241,58 @@ const VolleyPongGame = ({
                 </div>
               </div>
 
-              {/* Touch controls */}
-              <div className="w-full px-3 pb-4 pt-2 bg-black/80 shrink-0">
-                <div className="flex items-center justify-between gap-2 max-w-md mx-auto">
-                  {/* Left: movement */}
-                  <div className="flex gap-1.5">
+              {/* Touch controls — ergonomic layout */}
+              <div className="w-full px-2 pb-3 pt-1.5 bg-black/70 shrink-0">
+                <div className="flex items-end justify-between max-w-lg mx-auto">
+                  {/* Left side: D-pad movement */}
+                  <div className="flex gap-2">
                     <button
                       onTouchStart={(e) => { e.preventDefault(); touchDirRef.current = -1; }}
                       onTouchEnd={(e) => { e.preventDefault(); touchDirRef.current = 0; }}
+                      onTouchCancel={() => touchDirRef.current = 0}
                       onMouseDown={() => touchDirRef.current = -1}
                       onMouseUp={() => touchDirRef.current = 0}
                       onMouseLeave={() => touchDirRef.current = 0}
-                      className="w-14 h-14 rounded-xl bg-white/10 border border-white/20 text-white text-xl font-bold active:bg-white/25 active:scale-95 transition-all select-none touch-none flex items-center justify-center"
+                      className="w-16 h-16 rounded-2xl bg-white/12 border border-white/25 text-white text-2xl font-bold active:bg-white/30 active:scale-95 transition-all select-none touch-none flex items-center justify-center"
                     >
                       ◀
                     </button>
                     <button
                       onTouchStart={(e) => { e.preventDefault(); touchDirRef.current = 1; }}
                       onTouchEnd={(e) => { e.preventDefault(); touchDirRef.current = 0; }}
+                      onTouchCancel={() => touchDirRef.current = 0}
                       onMouseDown={() => touchDirRef.current = 1}
                       onMouseUp={() => touchDirRef.current = 0}
                       onMouseLeave={() => touchDirRef.current = 0}
-                      className="w-14 h-14 rounded-xl bg-white/10 border border-white/20 text-white text-xl font-bold active:bg-white/25 active:scale-95 transition-all select-none touch-none flex items-center justify-center"
+                      className="w-16 h-16 rounded-2xl bg-white/12 border border-white/25 text-white text-2xl font-bold active:bg-white/30 active:scale-95 transition-all select-none touch-none flex items-center justify-center"
                     >
                       ▶
                     </button>
                   </div>
 
-                  {/* Center: jump */}
-                  <button
-                    onTouchStart={(e) => { e.preventDefault(); touchJumpRef.current = true; }}
-                    onTouchEnd={(e) => { e.preventDefault(); }}
-                    onMouseDown={() => { touchJumpRef.current = true; }}
-                    className="w-16 h-16 rounded-full bg-blue-500/30 border-2 border-blue-400/50 text-white text-sm font-bold active:bg-blue-500/50 active:scale-95 transition-all select-none touch-none flex flex-col items-center justify-center gap-0.5"
-                  >
-                    <span className="text-lg">⬆</span>
-                    <span className="text-[9px] opacity-70">PULAR</span>
-                  </button>
-
-                  {/* Right: attack */}
-                  <button
-                    onTouchStart={(e) => { e.preventDefault(); touchAttackRef.current = true; }}
-                    onTouchEnd={(e) => { e.preventDefault(); }}
-                    onMouseDown={() => { touchAttackRef.current = true; }}
-                    className="w-16 h-16 rounded-full bg-red-500/30 border-2 border-red-400/50 text-white text-sm font-bold active:bg-red-500/50 active:scale-95 transition-all select-none touch-none flex flex-col items-center justify-center gap-0.5"
-                  >
-                    <span className="text-lg">👊</span>
-                    <span className="text-[9px] opacity-70">ATACAR</span>
-                  </button>
+                  {/* Right side: action buttons */}
+                  <div className="flex gap-2 items-end">
+                    {/* Jump */}
+                    <button
+                      onTouchStart={(e) => { e.preventDefault(); touchJumpRef.current = true; }}
+                      onTouchEnd={(e) => { e.preventDefault(); }}
+                      onMouseDown={() => { touchJumpRef.current = true; }}
+                      className="w-[72px] h-[72px] rounded-full bg-blue-500/25 border-2 border-blue-400/50 text-white font-bold active:bg-blue-500/50 active:scale-95 transition-all select-none touch-none flex flex-col items-center justify-center"
+                    >
+                      <span className="text-2xl">⬆</span>
+                      <span className="text-[10px] opacity-70 -mt-0.5">PULAR</span>
+                    </button>
+                    {/* Attack */}
+                    <button
+                      onTouchStart={(e) => { e.preventDefault(); touchAttackRef.current = true; }}
+                      onTouchEnd={(e) => { e.preventDefault(); }}
+                      onMouseDown={() => { touchAttackRef.current = true; }}
+                      className="w-[72px] h-[72px] rounded-full bg-red-500/25 border-2 border-red-400/50 text-white font-bold active:bg-red-500/50 active:scale-95 transition-all select-none touch-none flex flex-col items-center justify-center"
+                    >
+                      <span className="text-2xl">👊</span>
+                      <span className="text-[10px] opacity-70 -mt-0.5">CORTE</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </motion.div>

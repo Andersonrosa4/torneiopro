@@ -90,7 +90,7 @@ const AtletaCadastro = () => {
 
     toast({
       title: "Cadastro realizado!",
-      description: "Verifique seu email para confirmar a conta. Você também receberá uma mensagem no WhatsApp.",
+      description: "Sua conta foi criada com sucesso.",
     });
     navigate("/atleta/login");
     setLoading(false);

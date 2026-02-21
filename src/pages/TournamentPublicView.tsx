@@ -29,6 +29,7 @@ import RankingsTab from "@/components/RankingsTab";
 import SportQuiz from "@/components/SportQuiz";
 import RallyGame from "@/components/RallyGame";
 import VolleyPongGame from "@/components/VolleyPongGame";
+import VolleyGame from "@/components/VolleyGame";
 
 const sportLabels: Record<string, string> = {
   beach_volleyball: "Vôlei de Praia",
@@ -247,6 +248,7 @@ const TournamentPublicView = () => {
               <TabsTrigger value="quiz" className="flex-1 text-xs sm:text-sm font-extrabold h-10 sm:h-11 rounded-[12px] border-2 border-[#ffd700] bg-gradient-to-r from-[#ffd700]/20 via-primary/15 to-[#ffd700]/20 text-[#ffd700] shadow-lg shadow-[#ffd700]/15 data-[state=active]:from-[#ffd700]/30 data-[state=active]:via-primary/25 data-[state=active]:to-[#ffd700]/30 data-[state=active]:border-[#ffd700] data-[state=active]:text-[#ffd700] data-[state=active]:shadow-xl data-[state=active]:shadow-[#ffd700]/25 transition-all duration-300 animate-[quiz-pulse_2.5s_ease-in-out_infinite] data-[state=active]:animate-none">🎮 Quiz</TabsTrigger>
               <TabsTrigger value="rally" className="flex-1 text-xs sm:text-sm font-extrabold h-10 sm:h-11 rounded-[12px] border-2 border-[#00e5ff] bg-gradient-to-r from-[#00e5ff]/20 via-primary/15 to-[#00e5ff]/20 text-[#00e5ff] shadow-lg shadow-[#00e5ff]/15 data-[state=active]:from-[#00e5ff]/30 data-[state=active]:via-primary/25 data-[state=active]:to-[#00e5ff]/30 data-[state=active]:border-[#00e5ff] data-[state=active]:text-[#00e5ff] data-[state=active]:shadow-xl data-[state=active]:shadow-[#00e5ff]/25 transition-all duration-300 animate-[quiz-pulse_2.5s_ease-in-out_infinite] data-[state=active]:animate-none">⚡ Rally Infinito</TabsTrigger>
               <TabsTrigger value="volley" className="flex-1 text-xs sm:text-sm font-extrabold h-10 sm:h-11 rounded-[12px] border-2 border-[#ff6b35] bg-gradient-to-r from-[#ff6b35]/20 via-primary/15 to-[#ff6b35]/20 text-[#ff6b35] shadow-lg shadow-[#ff6b35]/15 data-[state=active]:from-[#ff6b35]/30 data-[state=active]:via-primary/25 data-[state=active]:to-[#ff6b35]/30 data-[state=active]:border-[#ff6b35] data-[state=active]:text-[#ff6b35] data-[state=active]:shadow-xl data-[state=active]:shadow-[#ff6b35]/25 transition-all duration-300 animate-[quiz-pulse_2.5s_ease-in-out_infinite] data-[state=active]:animate-none">🏐 Vôlei 1v1</TabsTrigger>
+              <TabsTrigger value="volley2d" className="flex-1 text-xs sm:text-sm font-extrabold h-10 sm:h-11 rounded-[12px] border-2 border-[#8b5cf6] bg-gradient-to-r from-[#8b5cf6]/20 via-primary/15 to-[#8b5cf6]/20 text-[#8b5cf6] shadow-lg shadow-[#8b5cf6]/15 data-[state=active]:from-[#8b5cf6]/30 data-[state=active]:via-primary/25 data-[state=active]:to-[#8b5cf6]/30 data-[state=active]:border-[#8b5cf6] data-[state=active]:text-[#8b5cf6] data-[state=active]:shadow-xl data-[state=active]:shadow-[#8b5cf6]/25 transition-all duration-300 animate-[quiz-pulse_2.5s_ease-in-out_infinite] data-[state=active]:animate-none">🏐 Vôlei 2D</TabsTrigger>
             </TabsList>
 
             <TabsContent value="teams">
@@ -356,6 +358,10 @@ const TournamentPublicView = () => {
 
             <TabsContent value="volley">
               <VolleyPongGame tournamentId={id || ""} sport={tournament.sport} isAdmin={isAdmin} />
+            </TabsContent>
+
+            <TabsContent value="volley2d">
+              <VolleyGame tournamentId={id || ""} sport={tournament.sport} isAdmin={isAdmin} />
             </TabsContent>
           </Tabs>
           <FlowAppsBranding variant="tournament-cta" />

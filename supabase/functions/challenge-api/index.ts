@@ -65,12 +65,12 @@ Deno.serve(async (req) => {
     // ─── CREATE COMMUNITY (organizer) ───
     if (action === "create_community") {
       if (!user) return errorResponse("Não autenticado", 401);
-      const { name, sport, challenge_range, scoring_mode } = body;
+      const { name, sport, challenge_range, scoring_mode, visibility } = body;
       if (!name) return errorResponse("Nome obrigatório");
 
       const { data, error } = await adminClient
         .from("ranking_communities")
-        .insert({ name, sport: sport || "beach_tennis", challenge_range: challenge_range || 5, scoring_mode: scoring_mode || "athlete", created_by: user.id })
+        .insert({ name, sport: sport || "beach_tennis", challenge_range: challenge_range || 5, scoring_mode: scoring_mode || "athlete", created_by: user.id, visibility: visibility || "public" })
         .select()
         .single();
       if (error) return errorResponse(error.message);
@@ -271,8 +271,16 @@ Deno.serve(async (req) => {
           completed_at: new Date().toISOString(),
         }).eq("id", challenge_id);
 
-        // Update ranking
+        // Update community ranking
         await updateRanking(adminClient, challenge.community_id, winnerId, winnerId === challenger.id ? challenged.id : challenger.id);
+
+        // ELO + Activity + Notifications integration
+        const loserId = winnerId === challenger.id ? challenged.id : challenger.id;
+        const { data: commFull } = await adminClient.from("ranking_communities").select("sport").eq("id", challenge.community_id).single();
+        if (commFull) {
+          await logEloAndActivity(adminClient, challenger, challenged, winnerId, loserId, commFull.sport, challenge_id);
+        }
+
         return jsonResponse({ status: "confirmed" });
       }
 
@@ -320,8 +328,16 @@ Deno.serve(async (req) => {
           message: `Placar confirmado! Resultado: ${challenge.sets_won_challenger} x ${challenge.sets_won_challenged}`,
         });
 
-        // Update ranking
+        // Update community ranking
         await updateRanking(adminClient, challenge.community_id, winnerId, winnerId === challenger.id ? challenged.id : challenger.id);
+
+        // ELO + Activity + Notifications integration
+        const loserId2 = winnerId === challenger.id ? challenged.id : challenger.id;
+        const { data: commFull2 } = await adminClient.from("ranking_communities").select("sport").eq("id", challenge.community_id).single();
+        if (commFull2) {
+          await logEloAndActivity(adminClient, challenger, challenged, winnerId, loserId2, commFull2.sport, challenge_id);
+        }
+
         return jsonResponse({ status: "confirmed" });
       }
 
@@ -428,4 +444,48 @@ async function updateRanking(client: any, communityId: string, winnerId: string,
       await client.from("community_members").update({ position: i + 1 }).eq("id", allMembers[i].id);
     }
   }
+}
+
+async function logEloAndActivity(client: any, challenger: any, challenged: any, winnerId: string, loserId: string, sport: string, challengeId: string) {
+  const winnerMember = winnerId === challenger.id ? challenger : challenged;
+  const loserMember = loserId === challenger.id ? challenger : challenged;
+
+  // 1. Update ELO ratings
+  const K = 32;
+  const getOrCreateRanking = async (userId: string) => {
+    const { data } = await client.from("athlete_rankings").select("*").eq("user_id", userId).eq("sport", sport).maybeSingle();
+    if (data) return data;
+    const { data: created } = await client.from("athlete_rankings").insert({ user_id: userId, sport, elo_rating: 1200 }).select().single();
+    return created;
+  };
+
+  const winnerRank = await getOrCreateRanking(winnerMember.user_id);
+  const loserRank = await getOrCreateRanking(loserMember.user_id);
+
+  if (winnerRank && loserRank) {
+    const expectedWinner = 1 / (1 + Math.pow(10, (loserRank.elo_rating - winnerRank.elo_rating) / 400));
+    const expectedLoser = 1 - expectedWinner;
+    const newWinnerElo = Math.round(winnerRank.elo_rating + K * (1 - expectedWinner));
+    const newLoserElo = Math.max(100, Math.round(loserRank.elo_rating + K * (0 - expectedLoser)));
+
+    await client.from("athlete_rankings").update({
+      elo_rating: newWinnerElo, wins: winnerRank.wins + 1, matches_played: winnerRank.matches_played + 1, points: winnerRank.points + 10, updated_at: new Date().toISOString(),
+    }).eq("id", winnerRank.id);
+
+    await client.from("athlete_rankings").update({
+      elo_rating: newLoserElo, losses: loserRank.losses + 1, matches_played: loserRank.matches_played + 1, updated_at: new Date().toISOString(),
+    }).eq("id", loserRank.id);
+  }
+
+  // 2. Log activities
+  await client.from("activities").insert([
+    { actor_id: winnerMember.user_id, verb: "challenge_won", object_id: challengeId, object_type: "challenge", sport, visibility: "public", metadata: { opponent: loserMember.athlete_name } },
+    { actor_id: loserMember.user_id, verb: "challenge_lost", object_id: challengeId, object_type: "challenge", sport, visibility: "public", metadata: { opponent: winnerMember.athlete_name } },
+  ]);
+
+  // 3. Notify both
+  await client.from("notifications").insert([
+    { user_id: winnerMember.user_id, type: "result", title: "Vitória! 🏆", message: `Você venceu o desafio contra ${loserMember.athlete_name}`, reference_id: challengeId, reference_type: "challenge" },
+    { user_id: loserMember.user_id, type: "result", title: "Resultado do Desafio", message: `${winnerMember.athlete_name} venceu o desafio`, reference_id: challengeId, reference_type: "challenge" },
+  ]);
 }

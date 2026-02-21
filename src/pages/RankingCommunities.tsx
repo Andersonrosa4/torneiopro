@@ -52,6 +52,7 @@ const RankingCommunities = () => {
   const [newSport, setNewSport] = useState("beach_tennis");
   const [newRange, setNewRange] = useState("5");
   const [newMode, setNewMode] = useState("athlete");
+  const [newVisibility, setNewVisibility] = useState("public");
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
@@ -91,6 +92,7 @@ const RankingCommunities = () => {
         sport: newSport,
         challenge_range: parseInt(newRange),
         scoring_mode: newMode,
+        visibility: newVisibility,
       },
     });
     if (error || data?.error) {
@@ -177,6 +179,16 @@ const RankingCommunities = () => {
                     <SelectContent>
                       <SelectItem value="athlete">Atleta marca (com confirmação)</SelectItem>
                       <SelectItem value="organizer">Organizador marca tudo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-foreground text-sm">Visibilidade</Label>
+                  <Select value={newVisibility} onValueChange={setNewVisibility}>
+                    <SelectTrigger className="bg-[hsl(220_15%_12%)] border-[hsl(0_0%_100%/0.1)]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="public">🌐 Público</SelectItem>
+                      <SelectItem value="private">🔒 Privado</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

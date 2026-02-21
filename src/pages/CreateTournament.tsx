@@ -32,6 +32,7 @@ const CreateTournament = () => {
     event_date: "",
     location: "",
     tournament_code: "",
+    visibility: "public",
   });
 
   const [rules, setRules] = useState<TournamentRulesState>(getDefaultRules("tennis"));
@@ -86,6 +87,7 @@ const CreateTournament = () => {
         created_by: organizerId || "",
         status: "draft",
         tournament_code: normalizedCode,
+        visibility: form.visibility,
       },
       select: "*",
       single: true,
@@ -197,6 +199,18 @@ const CreateTournament = () => {
                 <TournamentRulesForm sport={form.sport} rules={rules} onChange={setRules} />
               </div>
             )}
+
+            <div className="space-y-2">
+              <Label>Visibilidade</Label>
+              <Select value={form.visibility} onValueChange={(v) => setForm({ ...form, visibility: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="public">🌐 Público</SelectItem>
+                  <SelectItem value="private">🔒 Privado</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Torneios públicos aparecem no feed e para todos os atletas.</p>
+            </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">

@@ -29,7 +29,7 @@ const AtletaLoginPage = () => {
       setLoading(false);
       return;
     }
-    navigate("/atleta/meus-agendamentos");
+    navigate("/atleta/home");
   };
 
   return (

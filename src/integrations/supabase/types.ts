@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      activities: {
+        Row: {
+          actor_id: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          object_id: string | null
+          object_type: string | null
+          sport: string | null
+          verb: string
+          visibility: string
+        }
+        Insert: {
+          actor_id: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          object_id?: string | null
+          object_type?: string | null
+          sport?: string | null
+          verb: string
+          visibility?: string
+        }
+        Update: {
+          actor_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          object_id?: string | null
+          object_type?: string | null
+          sport?: string | null
+          verb?: string
+          visibility?: string
+        }
+        Relationships: []
+      }
       arena_admins: {
         Row: {
           arena_id: string
@@ -111,6 +147,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      athlete_rankings: {
+        Row: {
+          elo_rating: number
+          id: string
+          losses: number
+          matches_played: number
+          points: number
+          sport: string
+          updated_at: string
+          user_id: string
+          wins: number
+        }
+        Insert: {
+          elo_rating?: number
+          id?: string
+          losses?: number
+          matches_played?: number
+          points?: number
+          sport: string
+          updated_at?: string
+          user_id: string
+          wins?: number
+        }
+        Update: {
+          elo_rating?: number
+          id?: string
+          losses?: number
+          matches_played?: number
+          points?: number
+          sport?: string
+          updated_at?: string
+          user_id?: string
+          wins?: number
+        }
+        Relationships: []
       }
       bookings: {
         Row: {
@@ -913,6 +985,42 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          read: boolean
+          reference_id: string | null
+          reference_type: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          read?: boolean
+          reference_id?: string | null
+          reference_type?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          read?: boolean
+          reference_id?: string | null
+          reference_type?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       organizers: {
         Row: {
           created_at: string
@@ -1134,6 +1242,7 @@ export type Database = {
           scoring_mode: string
           sport: Database["public"]["Enums"]["sport_type"]
           updated_at: string
+          visibility: string
         }
         Insert: {
           active?: boolean
@@ -1145,6 +1254,7 @@ export type Database = {
           scoring_mode?: string
           sport?: Database["public"]["Enums"]["sport_type"]
           updated_at?: string
+          visibility?: string
         }
         Update: {
           active?: boolean
@@ -1156,6 +1266,7 @@ export type Database = {
           scoring_mode?: string
           sport?: Database["public"]["Enums"]["sport_type"]
           updated_at?: string
+          visibility?: string
         }
         Relationships: []
       }
@@ -1454,6 +1565,7 @@ export type Database = {
           status: Database["public"]["Enums"]["tournament_status"]
           tournament_code: string
           updated_at: string
+          visibility: string
         }
         Insert: {
           category?: string | null
@@ -1474,6 +1586,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["tournament_status"]
           tournament_code: string
           updated_at?: string
+          visibility?: string
         }
         Update: {
           category?: string | null
@@ -1494,6 +1607,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["tournament_status"]
           tournament_code?: string
           updated_at?: string
+          visibility?: string
         }
         Relationships: []
       }

@@ -29,6 +29,9 @@ import MeusAgendamentos from "./pages/MeusAgendamentos";
 import AdminArenaOwners from "./pages/AdminArenaOwners";
 import RankingCommunities from "./pages/RankingCommunities";
 import CommunityDetail from "./pages/CommunityDetail";
+import AthleteHome from "./pages/AthleteHome";
+import AthleteNotifications from "./pages/AthleteNotifications";
+import PublicFeed from "./pages/PublicFeed";
 
 import ScrollToTop from "@/components/ScrollToTop";
 import AiAssistant from "@/components/AiAssistant";
@@ -66,6 +69,9 @@ const App = () => (
               <Route path="/admin-arenas" element={<AdminArenaOwners />} />
               <Route path="/comunidades" element={<RankingCommunities />} />
               <Route path="/comunidade/:id" element={<CommunityDetail />} />
+              <Route path="/atleta/home" element={<AthleteHome />} />
+              <Route path="/atleta/notificacoes" element={<AthleteNotifications />} />
+              <Route path="/feed" element={<PublicFeed />} />
               <Route path="/simulation-test" element={<SimulationTest />} />
               <Route path="/diagnostics" element={<ProtectedRoute><SystemDiagnostics /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />

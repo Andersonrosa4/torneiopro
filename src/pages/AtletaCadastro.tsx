@@ -15,6 +15,7 @@ const AtletaCadastro = () => {
   const [nickname, setNickname] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [city, setCity] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -29,7 +30,7 @@ const AtletaCadastro = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!name.trim() || !nickname.trim() || !email.trim() || !phone.trim()) {
+    if (!name.trim() || !nickname.trim() || !email.trim() || !phone.trim() || !city.trim()) {
       toast({ title: "Preencha todos os campos", variant: "destructive" });
       return;
     }
@@ -59,6 +60,7 @@ const AtletaCadastro = () => {
           display_name: name.trim(),
           nickname: nickname.trim(),
           phone: cleanPhone,
+          city: city.trim(),
         },
       },
     });
@@ -124,6 +126,10 @@ const AtletaCadastro = () => {
             <div className="space-y-2">
               <Label>Email *</Label>
               <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="joao@email.com" required />
+            </div>
+            <div className="space-y-2">
+              <Label>Cidade *</Label>
+              <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ex: Cuiabá - MT" required />
             </div>
             <div className="space-y-2">
               <Label>Senha *</Label>

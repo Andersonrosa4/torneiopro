@@ -203,16 +203,45 @@ const RallyGame = ({
     ctx.setLineDash([]);
 
     // Draw ball shadow
-    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
     ctx.beginPath();
-    ctx.ellipse(ball.x + 2, ball.y + 3, BALL_SIZE / 2.5, BALL_SIZE / 4, 0, 0, Math.PI * 2);
+    ctx.ellipse(ball.x + 3, ball.y + 4, BALL_SIZE / 2.2, BALL_SIZE / 4, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Draw ball
-    ctx.font = `${BALL_SIZE}px serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(emoji, ball.x, ball.y);
+    // Draw ball (gradient sphere)
+    const ballRadius = BALL_SIZE / 2;
+    const ballGrad = ctx.createRadialGradient(
+      ball.x - ballRadius * 0.3, ball.y - ballRadius * 0.3, ballRadius * 0.1,
+      ball.x, ball.y, ballRadius
+    );
+    // Sport-specific ball colors
+    const ballColors: Record<string, [string, string, string]> = {
+      beach_volleyball: ["#fff9c4", "#fdd835", "#f9a825"],
+      futevolei: ["#ffffff", "#e0e0e0", "#9e9e9e"],
+      beach_tennis: ["#c8e6c9", "#66bb6a", "#2e7d32"],
+      tennis: ["#c8e6c9", "#66bb6a", "#2e7d32"],
+      padel: ["#bbdefb", "#42a5f5", "#1565c0"],
+      futsal: ["#ffffff", "#e0e0e0", "#9e9e9e"],
+    };
+    const [c1, c2, c3] = ballColors[sport] || ballColors.beach_volleyball;
+    ballGrad.addColorStop(0, c1);
+    ballGrad.addColorStop(0.6, c2);
+    ballGrad.addColorStop(1, c3);
+    ctx.fillStyle = ballGrad;
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ballRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Ball outline
+    ctx.strokeStyle = "rgba(0,0,0,0.2)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Ball highlight (shine)
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.beginPath();
+    ctx.arc(ball.x - ballRadius * 0.25, ball.y - ballRadius * 0.25, ballRadius * 0.25, 0, Math.PI * 2);
+    ctx.fill();
 
     // Score display on canvas
     ctx.fillStyle = "rgba(255,255,255,0.9)";

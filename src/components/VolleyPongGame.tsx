@@ -37,7 +37,7 @@ const AI_SPEED = 2.0;
 const BALL_SPEED_CAP = 4.5;
 const BALL_VY_CAP = 6.5;
 
-type Phase = "start" | "waiting" | "playing" | "gameover";
+type Phase = "start" | "tutorial" | "waiting" | "playing" | "gameover";
 type GameMode = "solo" | "multi";
 type MultiRole = "host" | "guest" | null;
 type PowerUpType = "giant" | "fast" | "curve";
@@ -1229,8 +1229,15 @@ const VolleyPongGame = ({
     return () => { window.removeEventListener("keydown", onDown); window.removeEventListener("keyup", onUp); keysRef.current.clear(); };
   }, [phase]);
 
-  const startGame = (mode: GameMode = "solo") => {
+  const [pendingMode, setPendingMode] = useState<GameMode>("solo");
+
+  const showTutorial = (mode: GameMode = "solo") => {
     if (!playerName.trim()) return;
+    setPendingMode(mode);
+    phaseRef.current = "tutorial"; setPhase("tutorial");
+  };
+
+  const startGame = () => {
     pScoreRef.current = 0; aScoreRef.current = 0;
     setsRef.current = [0, 0]; setNumRef.current = 1;
     rallyCountRef.current = 0; pauseRef.current = 0;
@@ -1241,7 +1248,7 @@ const VolleyPongGame = ({
     aiRef.current = createPlayer(W * 0.75);
     ballRef.current = createBall(W * 0.25, GROUND_Y - 80);
     setPlayerScore(0); setAiScore(0); setSetsWon([0, 0]); setCurrentSet(1); setLastPoint(null); lastPointRef.current = null;
-    if (mode === "solo") { gameModeRef.current = "solo"; multiRoleRef.current = null; setGameMode("solo"); setMultiRole(null); }
+    if (pendingMode === "solo") { gameModeRef.current = "solo"; multiRoleRef.current = null; setGameMode("solo"); setMultiRole(null); }
     phaseRef.current = "playing"; setPhase("playing");
     if (gameModeRef.current === "multi" && multiRoleRef.current === "host" && channelRef.current) {
       channelRef.current.send({ type: "broadcast", event: "game", payload: { type: "start_game" } });
@@ -1326,11 +1333,11 @@ const VolleyPongGame = ({
               </div>
               <input type="text" placeholder="Digite seu nome" value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && startGame("solo")}
+                onKeyDown={(e) => e.key === "Enter" && showTutorial("solo")}
                 className="w-full max-w-xs mx-auto rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 block"
                 maxLength={30} />
               <div className="flex gap-2 justify-center flex-wrap">
-                <Button onClick={() => startGame("solo")} disabled={!playerName.trim()} className="gap-2">
+                <Button onClick={() => showTutorial("solo")} disabled={!playerName.trim()} className="gap-2">
                   <Zap className="h-4 w-4" /> Jogar vs IA
                 </Button>
               </div>
@@ -1395,7 +1402,7 @@ const VolleyPongGame = ({
                     )}
                   </div>
                   <div className="flex gap-2 justify-center">
-                    <Button onClick={() => startGame("multi")} disabled={!opponentConnected} className="gap-2"><Zap className="h-4 w-4" /> Começar partida!</Button>
+                    <Button onClick={() => showTutorial("multi")} disabled={!opponentConnected} className="gap-2"><Zap className="h-4 w-4" /> Começar partida!</Button>
                     <Button variant="ghost" onClick={resetGame}>Cancelar</Button>
                   </div>
                 </>
@@ -1414,6 +1421,83 @@ const VolleyPongGame = ({
                   <Button variant="ghost" onClick={resetGame}>Cancelar</Button>
                 </>
               )}
+            </motion.div>
+          )}
+
+          {phase === "tutorial" && (
+            <motion.div key="tutorial" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4 text-center max-w-sm mx-auto">
+              <div className="text-4xl">📖</div>
+              <h3 className="text-xl font-bold">Como Jogar</h3>
+
+              <div className="grid grid-cols-1 gap-3 text-left">
+                {/* Move */}
+                <div className="flex items-start gap-3 rounded-lg border border-border bg-secondary/30 p-3">
+                  <span className="text-2xl shrink-0">🏃</span>
+                  <div>
+                    <p className="text-sm font-bold">Mover</p>
+                    <p className="text-xs text-muted-foreground">
+                      🖥️ Setas ← → ou A/D<br/>
+                      📱 Botões ◀ ▶ na tela
+                    </p>
+                  </div>
+                </div>
+
+                {/* Jump */}
+                <div className="flex items-start gap-3 rounded-lg border border-border bg-secondary/30 p-3">
+                  <span className="text-2xl shrink-0">⬆️</span>
+                  <div>
+                    <p className="text-sm font-bold">Pular</p>
+                    <p className="text-xs text-muted-foreground">
+                      🖥️ Seta ↑ ou W ou Espaço<br/>
+                      📱 Botão PULAR na tela
+                    </p>
+                  </div>
+                </div>
+
+                {/* Hit */}
+                <div className="flex items-start gap-3 rounded-lg border border-border bg-secondary/30 p-3">
+                  <span className="text-2xl shrink-0">🏐</span>
+                  <div>
+                    <p className="text-sm font-bold">Tocar na bola</p>
+                    <p className="text-xs text-muted-foreground">
+                      Encoste no alien para rebater! A bola sobe em arco e vai para o outro lado.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Spike */}
+                <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/10 p-3">
+                  <span className="text-2xl shrink-0">💥</span>
+                  <div>
+                    <p className="text-sm font-bold text-primary">Ataque Razante!</p>
+                    <p className="text-xs text-muted-foreground">
+                      <strong>Pule bem alto</strong> e encontre a bola no topo! Quanto mais alto, mais forte o smash que vai rasante para baixo! 🔥
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      🖥️ Tecle X ou Z para atacar no ar<br/>
+                      📱 Botão ATACAR na tela
+                    </p>
+                  </div>
+                </div>
+
+                {/* Rules */}
+                <div className="flex items-start gap-3 rounded-lg border border-border bg-secondary/30 p-3">
+                  <span className="text-2xl shrink-0">🏆</span>
+                  <div>
+                    <p className="text-sm font-bold">Regras</p>
+                    <p className="text-xs text-muted-foreground">
+                      Melhor de 3 sets • 5 pontos por set (diferença de 2) • Máximo 3 toques por vez
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Button onClick={startGame} size="lg" className="gap-2 mt-2 w-full max-w-xs">
+                <Zap className="h-5 w-5" /> Começar Partida!
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => { phaseRef.current = "start"; setPhase("start"); }}>
+                ← Voltar
+              </Button>
             </motion.div>
           )}
 
@@ -1496,7 +1580,7 @@ const VolleyPongGame = ({
               <p className="text-xs text-muted-foreground">🪙 Moedas ganhas: {coinsRef.current}</p>
               {submitting && <p className="text-xs text-muted-foreground">Salvando pontuação...</p>}
               <div className="flex gap-3 justify-center">
-                <Button onClick={() => startGame(gameMode)} className="gap-2"><RotateCcw className="h-4 w-4" /> Jogar de novo</Button>
+                <Button onClick={() => showTutorial(gameMode)} className="gap-2"><RotateCcw className="h-4 w-4" /> Jogar de novo</Button>
                 <Button variant="ghost" onClick={resetGame}>Voltar</Button>
               </div>
             </motion.div>

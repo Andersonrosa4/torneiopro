@@ -101,7 +101,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     // Listen to future auth state changes (SIGNED_OUT, TOKEN_REFRESHED, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // IMPORTANT: callback must NOT be async to avoid blocking signInWithPassword
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       // If login() already handled setup, ignore SIGNED_IN events to avoid race
       if (loginDone.current && event === "SIGNED_IN") return;
 
@@ -110,11 +111,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setAccessToken(session.access_token);
         setUser({ id: session.user.id });
         if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-          const org = await fetchOrganizer(session.user.id, session.access_token);
-          if (org) {
-            setOrganizerId(org.id);
-            setUserRole(org.role);
-          }
+          // Fire-and-forget: don't block the auth state change callback
+          fetchOrganizer(session.user.id, session.access_token).then(org => {
+            if (org) {
+              setOrganizerId(org.id);
+              setUserRole(org.role);
+            }
+          }).catch(e => console.error("fetchOrganizer error:", e));
         }
       } else if (event === "SIGNED_OUT") {
         setUser(null);

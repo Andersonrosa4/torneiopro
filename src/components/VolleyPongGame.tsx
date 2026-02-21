@@ -574,7 +574,7 @@ const VolleyPongGame = ({
   const broadcastState = useCallback(() => {
     if (gameModeRef.current !== "multi" || multiRoleRef.current !== "host" || !channelRef.current) return;
     broadcastCountRef.current++;
-    if (broadcastCountRef.current % 3 !== 0) return; // Send every 3 frames (~20hz)
+    if (broadcastCountRef.current % 2 !== 0) return; // Send every 2 frames (~30hz)
 
     const p = playerRef.current;
     const a = aiRef.current;
@@ -807,9 +807,10 @@ const VolleyPongGame = ({
     for (const t of ball.trail) { t.alpha -= 0.12; }
     ball.trail = ball.trail.filter(t => t.alpha > 0);
 
-    if (ball.x <= BALL_R) { ball.vx = Math.abs(ball.vx) * 0.8; ball.x = BALL_R; }
-    if (ball.x >= W - BALL_R) { ball.vx = -Math.abs(ball.vx) * 0.8; ball.x = W - BALL_R; }
-    if (ball.y <= BALL_R) { ball.vy = Math.abs(ball.vy) * 0.5; ball.y = BALL_R; }
+    // Wall bounces — full energy so ball returns to court
+    if (ball.x <= BALL_R) { ball.vx = Math.abs(ball.vx); ball.x = BALL_R + 1; }
+    if (ball.x >= W - BALL_R) { ball.vx = -Math.abs(ball.vx); ball.x = W - BALL_R - 1; }
+    if (ball.y <= BALL_R) { ball.vy = Math.abs(ball.vy) * 0.8; ball.y = BALL_R; }
 
     // Net collision
     if (

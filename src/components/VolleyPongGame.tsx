@@ -15,7 +15,7 @@ interface GameScore {
   created_at: string;
 }
 
-// ── Canvas & physics ──
+// ── Canvas & physics — REALISTIC BEACH VOLLEYBALL ──
 const W = 480;
 const H = 360;
 const GROUND_Y = H - 50;
@@ -23,10 +23,12 @@ const NET_X = W / 2;
 const NET_H = 100;
 const NET_TOP = GROUND_Y - NET_H;
 const BALL_R = 10;
-const GRAVITY = 0.22;
-const MAX_TOUCHES = 3;
-const SERVE_VX = 2.0;
-const SERVE_VY = -4.5;
+
+// Physics tuned for realistic feel
+const GRAVITY = 0.30;          // Strong gravity — ball arcs naturally
+const MAX_TOUCHES = 3;         // Official volleyball rule
+const SERVE_VX = 2.8;
+const SERVE_VY = -5.5;
 const MAX_SCORE = 10;
 const MIN_DIFF = 2;
 
@@ -34,12 +36,12 @@ const MIN_DIFF = 2;
 const P_W = 22;
 const P_H = 52;
 const HEAD_R = 9;
-const JUMP_VY = -5.8;
-const MOVE_SPEED = 3.8;
-const AI_SPEED = 1.8;
-const ATTACK_BOOST = 1.5;
-const BALL_SPEED_CAP = 5.5;
-const BALL_VY_CAP = 6.5;
+const JUMP_VY = -6.2;         // Good jump height, lands quickly
+const MOVE_SPEED = 4.2;       // Responsive movement
+const AI_SPEED = 2.2;         // AI slightly slower than player
+const ATTACK_BOOST = 2.0;     // Strong spikes
+const BALL_SPEED_CAP = 6.5;   // Allows fast spikes
+const BALL_VY_CAP = 7.5;
 
 type Phase = "start" | "waiting" | "playing" | "gameover";
 type GameMode = "solo" | "multi";
@@ -506,7 +508,7 @@ const VolleyPongGame = ({
     }, 1000);
   }, [serveBall, opponentName]);
 
-  // ─── Ball-player collision ─────────────────
+  // ─── Ball-player collision — REALISTIC VOLLEYBALL HITS ─────────────────
   const checkPlayerBallHit = (p: Player, ball: Ball, isLeft: boolean): boolean => {
     const headY = p.y - P_H - HEAD_R + 4;
     const shoulderY = p.y - P_H + HEAD_R + 4;
@@ -517,55 +519,63 @@ const VolleyPongGame = ({
       const dy = ball.y - centerY;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (dist < radius + BALL_R && p.touches < MAX_TOUCHES) {
+      // Player gets slightly bigger hitbox for easier contact
+      const hitBonus = isLeft ? 8 : 0;
+      if (dist < radius + BALL_R + hitBonus && p.touches < MAX_TOUCHES) {
         p.touches += 1;
         p.armAngle = 1;
         p.isAttacking = true;
         setTimeout(() => { p.isAttacking = false; }, 250);
         rallyCountRef.current += 1;
 
-        const angle = Math.atan2(dy, dx);
-        const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
-        const isSpike = p.y < GROUND_Y - 20 && p.attackCooldown <= 0;
-        const spikeBoost = isSpike ? ATTACK_BOOST : 0;
-        const baseSpeed = Math.max(speed * 0.6, 2.5);
-        const newSpeed = Math.min(baseSpeed + spikeBoost + 1.0, BALL_SPEED_CAP);
+        const inAir = p.y < GROUND_Y - 15;
+        const isSpike = inAir && p.attackCooldown <= 0 && p.isAttacking;
 
         if (isHead) {
-          // Cabeceio: high upward arc toward opponent
-          ball.vx = targetDir * (newSpeed * 0.5 + 1.0);
-          ball.vy = -Math.abs(newSpeed * 0.8) - 2.5;
+          // LEVANTAMENTO / TOQUE: High arc upward, slightly toward opponent
+          ball.vx = targetDir * 1.8;
+          ball.vy = -5.5;
         } else if (isSpike) {
-          // Corte: downward aggressive hit
-          ball.vx = targetDir * Math.abs(Math.cos(angle)) * newSpeed * 0.85 + targetDir * 1.2;
-          ball.vy = Math.abs(newSpeed * 0.35) + 0.5;
+          // CORTADA / SPIKE: Fast downward diagonal toward opponent's court
+          ball.vx = targetDir * (4.5 + ATTACK_BOOST * 0.5);
+          ball.vy = 2.5;
+          if (isSpike) p.attackCooldown = 20;
+        } else if (inAir) {
+          // TOQUE NO AR (sem ataque): Medium arc toward opponent
+          ball.vx = targetDir * 3.0;
+          ball.vy = -3.5;
         } else {
-          // Toque normal: smooth upward arc toward opponent
-          ball.vx = targetDir * Math.abs(Math.cos(angle)) * newSpeed * 0.5 + targetDir * 1.0;
-          ball.vy = -Math.abs(newSpeed * 0.75) - 2.0;
+          // MANCHETE: Ball goes UP with natural arc, slight direction toward opponent
+          ball.vx = targetDir * 2.0;
+          ball.vy = -5.0;
         }
 
-        // Separate ball from player
-        ball.x = centerX + (radius + BALL_R + 3) * Math.cos(angle);
-        ball.y = centerY + (radius + BALL_R + 3) * Math.sin(angle);
+        // Clamp speeds
+        ball.vx = Math.max(-BALL_SPEED_CAP, Math.min(BALL_SPEED_CAP, ball.vx));
+        ball.vy = Math.max(-BALL_VY_CAP, Math.min(BALL_VY_CAP, ball.vy));
 
-        if (isSpike) p.attackCooldown = 20;
+        // Separate ball from player to prevent sticking
+        const angle = Math.atan2(dy, dx);
+        ball.x = centerX + (radius + BALL_R + 4) * Math.cos(angle);
+        ball.y = centerY + (radius + BALL_R + 4) * Math.sin(angle);
+
         playHitSound(isSpike);
         return true;
       }
       return false;
     };
 
-    // Player (isLeft) gets bigger hitbox for easier contact
-    const hitBonus = isLeft ? 10 : 0;
-    if (applyHit(p.x, headY, HEAD_R + 3 + hitBonus, true)) return true;
+    // Head hitbox
+    if (applyHit(p.x, headY, HEAD_R + 3, true)) return true;
+    // Body hitbox
     const bodyCenter = shoulderY + (p.y - shoulderY) * 0.4;
-    if (applyHit(p.x, bodyCenter, 22 + hitBonus, false)) return true;
+    if (applyHit(p.x, bodyCenter, 20, false)) return true;
+    // Arm hitbox when attacking
     if (p.isAttacking || p.armAngle > 0.3) {
       const dir = isLeft ? 1 : -1;
       const armX = p.x + dir * 22;
       const armY = shoulderY;
-      if (applyHit(armX, armY, 12 + hitBonus, false)) return true;
+      if (applyHit(armX, armY, 12, false)) return true;
     }
     return false;
   };
@@ -695,88 +705,73 @@ const VolleyPongGame = ({
         setTimeout(() => { ai.isAttacking = false; }, 300);
       }
     } else {
-      // Solo: AI logic — simulate real ball trajectory to find landing point
+      // Solo: AI logic — balanced, beatable but competent
       const ball_ = ballRef.current;
-      const aiSpeed = AI_SPEED + Math.min(rallyCountRef.current * 0.008, 0.4);
+      // AI gets slightly faster as rally continues (subtle)
+      const aiSpeed = AI_SPEED + Math.min(rallyCountRef.current * 0.005, 0.3);
 
-      // Simulate ball trajectory to predict where it will be at AI's height
-      const simulateLanding = () => {
+      // Simple prediction: where will ball cross AI's ideal hit height?
+      const predictBallX = () => {
         let sx = ball_.x, sy = ball_.y, svx = ball_.vx, svy = ball_.vy;
-        const targetH = GROUND_Y - P_H - HEAD_R; // head height
-        for (let i = 0; i < 120; i++) {
+        for (let i = 0; i < 90; i++) {
           svy += GRAVITY;
           sx += svx;
           sy += svy;
-          // Bounce off walls
-          if (sx <= BALL_R) { svx = Math.abs(svx) * 0.8; sx = BALL_R; }
-          if (sx >= W - BALL_R) { svx = -Math.abs(svx) * 0.8; sx = W - BALL_R; }
-          // Net bounce
+          if (sx <= BALL_R) { svx = Math.abs(svx) * 0.7; sx = BALL_R; }
+          if (sx >= W - BALL_R) { svx = -Math.abs(svx) * 0.7; sx = W - BALL_R; }
           if (sy + BALL_R > NET_TOP && Math.abs(sx - NET_X) < BALL_R + 5) {
             svx = -svx * 0.5;
             sx = sx < NET_X ? NET_X - BALL_R - 6 : NET_X + BALL_R + 6;
           }
-          // Ball reaches AI head height or ground on AI side
-          if (sx > NET_X && sy >= targetH) {
-            return { x: sx, y: sy, frames: i, willLand: sy >= GROUND_Y - BALL_R };
+          // Ball reaches hittable height on AI side
+          if (sx > NET_X && sy >= GROUND_Y - P_H - HEAD_R - 20) {
+            return sx;
           }
-          if (sy >= GROUND_Y) {
-            return { x: sx, y: GROUND_Y, frames: i, willLand: true };
-          }
+          if (sy >= GROUND_Y) return sx;
         }
-        return { x: W * 0.72, y: GROUND_Y, frames: 999, willLand: false };
+        return W * 0.72;
       };
 
-      const prediction = simulateLanding();
-      const ballOnAiSide = ball_.x > NET_X - 30;
-      const ballComingToAi = ball_.vx > 0;
-      const ballDangerous = ballComingToAi || ballOnAiSide;
+      const ballOnAiSide = ball_.x > NET_X - 20;
+      const ballComingToAi = ball_.vx > 0.5;
 
-      if (ballDangerous && prediction.x > NET_X) {
-        // Move to predicted landing position with slight offset to be under the ball
-        const offsetX = ball_.vx > 0 ? -5 : 5; // position slightly behind for better contact
-        const targetX = Math.max(NET_X + P_W / 2 + 10, Math.min(W - 22, prediction.x + offsetX));
-        const aiDiff = targetX - ai.x;
+      if (ballComingToAi || ballOnAiSide) {
+        // Move toward predicted position with slight inaccuracy
+        const targetX = predictBallX() + (Math.random() - 0.5) * 15; // Add randomness
+        const clampedTarget = Math.max(NET_X + P_W / 2 + 10, Math.min(W - 22, targetX));
+        const diff = clampedTarget - ai.x;
 
-        if (Math.abs(aiDiff) > 1.5) {
-          const moveAmount = Math.min(aiSpeed, Math.abs(aiDiff));
-          ai.x += Math.sign(aiDiff) * moveAmount;
-        }
-        if (Math.abs(aiDiff) > 1.5 && ai.y >= GROUND_Y) {
-          ai.legPhase += 0.35;
+        if (Math.abs(diff) > 3) {
+          const moveAmount = Math.min(aiSpeed, Math.abs(diff));
+          ai.x += Math.sign(diff) * moveAmount;
+          if (ai.y >= GROUND_Y) ai.legPhase += 0.35;
         }
 
-        // Smart jump timing — jump when ball is approaching and close enough
-        const headY = ai.y - P_H;
-        const distX = Math.abs(ball_.x - ai.x);
-        const distY = ball_.y - headY;
-        const distToBall = Math.sqrt(distX * distX + distY * distY);
-        
-        // Jump when ball is descending toward AI and within reach
-        const shouldJump = ai.y >= GROUND_Y && (
-          // Ball close and at good height
-          (distToBall < 80 && ball_.y < GROUND_Y - 30 && ball_.y > NET_TOP - 20) ||
-          // Ball about to pass overhead, jump to intercept
-          (distX < 40 && ball_.vy > 0 && ball_.y < GROUND_Y - 60 && ball_.y > NET_TOP)
-        );
-        
+        // Jump when ball is close and at right height — with delay for fairness
+        const distToBall = Math.sqrt((ball_.x - ai.x) ** 2 + (ball_.y - (ai.y - P_H)) ** 2);
+        const shouldJump = ai.y >= GROUND_Y && distToBall < 70 &&
+          ball_.y < GROUND_Y - 40 && ball_.y > NET_TOP - 10 &&
+          ball_.vy > -1 && // Ball not going up fast
+          Math.random() > 0.15; // 15% chance to NOT jump (makes AI beatable)
+
         if (shouldJump) {
-          ai.vy = JUMP_VY * 0.85;
+          ai.vy = JUMP_VY * 0.88; // AI jumps slightly lower than player
         }
 
         // Attack when in air and close to ball
-        if (ai.y < GROUND_Y - 15 && distToBall < 55 && ai.attackCooldown <= 0) {
+        if (ai.y < GROUND_Y - 20 && distToBall < 50 && ai.attackCooldown <= 0 && Math.random() > 0.2) {
           ai.armAngle = 1;
           ai.isAttacking = true;
-          ai.attackCooldown = 18;
+          ai.attackCooldown = 22; // Slightly longer cooldown than player
           setTimeout(() => { ai.isAttacking = false; }, 280);
         }
       } else {
-        // Return to ready position
-        const homeX = W * 0.73;
-        const aiDiff = homeX - ai.x;
-        if (Math.abs(aiDiff) > 2) {
-          ai.x += Math.sign(aiDiff) * aiSpeed * 0.5;
-          if (ai.y >= GROUND_Y) ai.legPhase += 0.2;
+        // Return to home position
+        const homeX = W * 0.72;
+        const diff = homeX - ai.x;
+        if (Math.abs(diff) > 3) {
+          ai.x += Math.sign(diff) * aiSpeed * 0.4;
+          if (ai.y >= GROUND_Y) ai.legPhase += 0.15;
         }
         ai.legPhase *= 0.9;
       }
@@ -789,17 +784,18 @@ const VolleyPongGame = ({
     ai.armAngle = Math.max(0, ai.armAngle - 0.05);
     ai.attackCooldown = Math.max(0, ai.attackCooldown - 1);
 
-    // ── Ball physics ──
+    // ── Ball physics — REALISTIC ──
     ball.vy += GRAVITY;
-    // Cap ball speed
+    // Cap speeds
     ball.vx = Math.max(-BALL_SPEED_CAP, Math.min(BALL_SPEED_CAP, ball.vx));
     ball.vy = Math.max(-BALL_VY_CAP, Math.min(BALL_VY_CAP, ball.vy));
-    // Air resistance
-    ball.vx *= 0.995;
+    // Natural air resistance (very subtle)
+    ball.vx *= 0.998;
     ball.x += ball.vx;
     ball.y += ball.vy;
-    ball.rotation += ball.vx * 0.05;
+    ball.rotation += ball.vx * 0.06;
 
+    // Trail
     if (frameCountRef.current % 2 === 0) {
       ball.trail.push({ x: ball.x, y: ball.y, alpha: 1 });
       if (ball.trail.length > 8) ball.trail.shift();
@@ -807,46 +803,53 @@ const VolleyPongGame = ({
     for (const t of ball.trail) { t.alpha -= 0.12; }
     ball.trail = ball.trail.filter(t => t.alpha > 0);
 
-    // Wall bounces — realistic elastic bounce, ball stays in play
-    // Left wall
+    // Wall bounces — elastic, realistic
     if (ball.x - BALL_R <= 0) {
       ball.x = BALL_R + 1;
-      ball.vx = Math.abs(ball.vx) * 0.85;
+      ball.vx = Math.abs(ball.vx) * 0.75; // Lose some energy
     }
-    // Right wall
     if (ball.x + BALL_R >= W) {
       ball.x = W - BALL_R - 1;
-      ball.vx = -Math.abs(ball.vx) * 0.85;
+      ball.vx = -Math.abs(ball.vx) * 0.75;
     }
-    // Ceiling — slight energy loss
+    // Ceiling
     if (ball.y - BALL_R <= 0) {
       ball.y = BALL_R + 1;
-      ball.vy = Math.abs(ball.vy) * 0.7;
+      ball.vy = Math.abs(ball.vy) * 0.6;
     }
 
-    // Net collision — ball bounces off net like a wall
+    // Net collision — solid barrier
     if (
       ball.y + BALL_R > NET_TOP &&
       ball.y - BALL_R < GROUND_Y &&
-      Math.abs(ball.x - NET_X) < BALL_R + 5
+      Math.abs(ball.x - NET_X) < BALL_R + 4
     ) {
-      ball.vx = -ball.vx * 0.8;
-      ball.vy = ball.vy * 0.9;
-      ball.x = ball.x < NET_X ? NET_X - BALL_R - 6 : NET_X + BALL_R + 6;
+      // Ball hits net — bounce back with energy loss
+      if (ball.x < NET_X) {
+        ball.x = NET_X - BALL_R - 5;
+      } else {
+        ball.x = NET_X + BALL_R + 5;
+      }
+      ball.vx = -ball.vx * 0.6;
+      ball.vy *= 0.85;
+      // If ball is sitting on top of net
+      if (ball.y + BALL_R > NET_TOP && ball.y < NET_TOP + 10 && Math.abs(ball.vy) < 1) {
+        ball.vy = 1.5; // Fall off the net
+        ball.vx += (Math.random() - 0.5) * 2; // Random direction
+      }
     }
 
     // Player-ball collisions
     const playerHit = checkPlayerBallHit(player, ball, true);
     if (playerHit) { player.touches = Math.min(player.touches, MAX_TOUCHES); }
-
     const aiHit = checkPlayerBallHit(ai, ball, false);
     if (aiHit) { ai.touches = Math.min(ai.touches, MAX_TOUCHES); player.touches = 0; }
     if (playerHit) ai.touches = 0;
 
-    // Final safety clamp — ensure ball never escapes court bounds before scoring
+    // Safety clamp
     ball.x = Math.max(BALL_R, Math.min(W - BALL_R, ball.x));
 
-    // Ball hits ground — ONLY ground contact scores points
+    // Ball hits ground — ONLY ground contact scores
     if (ball.y + BALL_R >= GROUND_Y) {
       ball.y = GROUND_Y - BALL_R;
       ball.vy = 0;

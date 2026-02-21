@@ -42,6 +42,35 @@ const INIT_SPEED = 3;
 const SPEED_INC = 0.12;
 const MAX_SPEED = 10;
 
+// Block constants
+const BLOCK_ROWS = 4;
+const BLOCK_COLS = 6;
+const BLOCK_W = (W - 20) / BLOCK_COLS; // with margin
+const BLOCK_H = 16;
+const BLOCK_PAD = 3;
+const BLOCK_TOP = 40;
+const BLOCK_LEFT = 10;
+const BLOCK_POINTS = [4, 3, 2, 1]; // points per row (top=more)
+
+const blockRowColors = [
+  ["#ef4444", "#dc2626"], // red
+  ["#f59e0b", "#d97706"], // amber
+  ["#22c55e", "#16a34a"], // green
+  ["#3b82f6", "#2563eb"], // blue
+];
+
+interface Block { row: number; col: number; alive: boolean; }
+
+const createBlocks = (): Block[] => {
+  const blocks: Block[] = [];
+  for (let r = 0; r < BLOCK_ROWS; r++) {
+    for (let c = 0; c < BLOCK_COLS; c++) {
+      blocks.push({ row: r, col: c, alive: true });
+    }
+  }
+  return blocks;
+};
+
 // Ball colors per sport
 const ballColors: Record<string, [string, string, string]> = {
   beach_volleyball: ["#fff9c4", "#fdd835", "#f9a825"],
@@ -81,6 +110,7 @@ const RallyGame = ({
   const animRef = useRef(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const flashRef = useRef(0);
+  const blocksRef = useRef<Block[]>(createBlocks());
 
   const emoji = sportEmoji[sport] || "🏐";
 
@@ -153,6 +183,33 @@ const RallyGame = ({
     // Bounce off top
     if (ball.y <= BALL_R) { ball.dy = Math.abs(ball.dy); ball.y = BALL_R; }
 
+    // Block collision
+    const blocks = blocksRef.current;
+    for (const block of blocks) {
+      if (!block.alive) continue;
+      const bx = BLOCK_LEFT + block.col * (BLOCK_W + BLOCK_PAD);
+      const by = BLOCK_TOP + block.row * (BLOCK_H + BLOCK_PAD);
+      if (
+        ball.x + BALL_R > bx &&
+        ball.x - BALL_R < bx + BLOCK_W &&
+        ball.y + BALL_R > by &&
+        ball.y - BALL_R < by + BLOCK_H
+      ) {
+        block.alive = false;
+        ball.dy = -ball.dy;
+        const pts = BLOCK_POINTS[block.row] || 1;
+        scoreRef.current += pts;
+        setScore(scoreRef.current);
+        flashRef.current = 1;
+        // Respawn all blocks if all destroyed
+        if (blocks.every(b => !b.alive)) {
+          blocksRef.current = createBlocks();
+          speedRef.current = Math.min(MAX_SPEED, speedRef.current + 0.5);
+        }
+        break;
+      }
+    }
+
     // Paddle collision
     const padLeft = padX - PAD_W / 2;
     const padRight = padX + PAD_W / 2;
@@ -215,6 +272,24 @@ const RallyGame = ({
     ctx.moveTo(0, H / 2);
     ctx.lineTo(W, H / 2);
     ctx.stroke();
+
+    // ── Blocks ──
+    for (const block of blocksRef.current) {
+      if (!block.alive) continue;
+      const bx = BLOCK_LEFT + block.col * (BLOCK_W + BLOCK_PAD);
+      const by = BLOCK_TOP + block.row * (BLOCK_H + BLOCK_PAD);
+      const [bc1, bc2] = blockRowColors[block.row] || blockRowColors[0];
+      const bg = ctx.createLinearGradient(bx, by, bx, by + BLOCK_H);
+      bg.addColorStop(0, bc1);
+      bg.addColorStop(1, bc2);
+      ctx.fillStyle = bg;
+      ctx.beginPath();
+      ctx.roundRect(bx, by, BLOCK_W, BLOCK_H, 3);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.15)";
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
 
     // ── Paddle ──
     const padGrad = ctx.createLinearGradient(padLeft, PAD_Y, padLeft, PAD_Y + PAD_H);
@@ -324,11 +399,12 @@ const RallyGame = ({
     padXRef.current = W / 2;
     ballRef.current = {
       x: W / 2,
-      y: 80,
+      y: H / 2,
       dx: (Math.random() > 0.5 ? 1 : -1) * 1.2,
       dy: 1,
     };
     flashRef.current = 0;
+    blocksRef.current = createBlocks();
     setScore(0);
     phaseRef.current = "playing";
     setPhase("playing");

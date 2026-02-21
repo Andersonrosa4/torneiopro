@@ -834,21 +834,24 @@ const VolleyPongGame = ({
       const isSpike = inAir;
 
       if (isSpike) {
-        const height = GROUND_Y - p.y; // how high the player is
+        const height = GROUND_Y - p.y;
         const ballHigh = ball.y < NET_TOP + 30;
         
         if (height > 40 && ballHigh) {
-          // ATAQUE RAZANTE — jumped high + ball high = devastating smash!
-          ball.vx = dir * 5.0 * ball.speedMultiplier;
-          ball.vy = 2.5;
+          // ATAQUE RAZANTE — ball is already high, launch it OVER the net to the other side
+          // Place ball just past the net at high speed
+          ball.x = NET_X + dir * 20;
+          ball.y = NET_TOP - 10;
+          ball.vx = dir * 4.5 * ball.speedMultiplier;
+          ball.vy = 2.8; // downward after crossing
         } else if (height > 25) {
-          // Strong spike — moderate downward
-          ball.vx = dir * 4.2 * ball.speedMultiplier;
-          ball.vy = 0.5;
+          // Strong spike — arc that MUST clear net
+          ball.vx = dir * 4.0 * ball.speedMultiplier;
+          ball.vy = -4.0; // goes up first, then falls on other side
         } else {
-          // Low jump spike — fast arc
-          ball.vx = dir * 3.8 * ball.speedMultiplier;
-          ball.vy = -3.0;
+          // Low jump spike — higher arc to guarantee crossing
+          ball.vx = dir * 3.5 * ball.speedMultiplier;
+          ball.vy = -5.0;
         }
         p.attackCooldown = 12;
         p.expression = "determined";

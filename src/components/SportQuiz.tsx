@@ -3,8 +3,9 @@ import { publicQuery } from "@/lib/organizerApi";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, CheckCircle, XCircle, Gamepad2, RotateCcw, Medal, Star, Flame, Crown, Trash2 } from "lucide-react";
+import { Trophy, CheckCircle, XCircle, Gamepad2, RotateCcw, Medal, Star, Flame, Crown, Trash2, Swords } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import QuizBattle from "@/components/QuizBattle";
 
 interface QuizQuestion {
   id: string;
@@ -36,6 +37,7 @@ const sportLabels: Record<string, string> = {
 const QUIZ_SIZE = 10;
 
 const SportQuiz = ({ tournamentId, sport, isAdmin = false }: { tournamentId: string; sport: string; isAdmin?: boolean }) => {
+  const [mode, setMode] = useState<"solo" | "battle" | null>(null);
   const [phase, setPhase] = useState<"start" | "playing" | "bonus" | "result">("start");
   const [playerName, setPlayerName] = useState("");
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -223,7 +225,18 @@ const SportQuiz = ({ tournamentId, sport, isAdmin = false }: { tournamentId: str
 
   return (
     <div className="space-y-6">
-      {/* RANKING */}
+      {/* BATTLE MODE */}
+      {mode === "battle" && (
+        <section className="relative rounded-xl border-2 border-primary/40 bg-gradient-to-br from-primary/5 via-card to-primary/5 p-4 sm:p-6 shadow-lg shadow-primary/10 overflow-hidden">
+          <QuizBattle
+            tournamentId={tournamentId}
+            sport={sport}
+            onBack={() => setMode(null)}
+          />
+        </section>
+      )}
+
+      {mode !== "battle" && (<>
       <section className="rounded-xl border border-border bg-card p-4 sm:p-6 shadow-card">
         <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
           <Medal className="h-5 w-5 text-primary" /> Ranking do Quiz — {sportLabels[sport] || sport}
@@ -316,13 +329,20 @@ const SportQuiz = ({ tournamentId, sport, isAdmin = false }: { tournamentId: str
                 className="w-full max-w-xs mx-auto rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                 maxLength={30}
               />
-              <div>
+              <div className="flex flex-col gap-2 items-center">
                 <Button
                   onClick={startQuiz}
                   disabled={!playerName.trim()}
                   className="gap-2"
                 >
-                  <Gamepad2 className="h-4 w-4" /> Começar Quiz
+                  <Gamepad2 className="h-4 w-4" /> Jogar Solo
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setMode("battle")}
+                  className="gap-2 border-primary/40 text-primary hover:bg-primary/10"
+                >
+                  <Swords className="h-4 w-4" /> ⚔️ Quiz Battle (Multiplayer)
                 </Button>
               </div>
             </motion.div>
@@ -568,6 +588,7 @@ const SportQuiz = ({ tournamentId, sport, isAdmin = false }: { tournamentId: str
           )}
         </AnimatePresence>
       </section>
+      </>)}
     </div>
   );
 };

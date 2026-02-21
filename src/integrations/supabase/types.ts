@@ -1241,6 +1241,91 @@ export type Database = {
         }
         Relationships: []
       }
+      quiz_room_players: {
+        Row: {
+          created_at: string
+          id: string
+          is_host: boolean
+          player_name: string
+          room_id: string
+          score: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_host?: boolean
+          player_name: string
+          room_id: string
+          score?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_host?: boolean
+          player_name?: string
+          room_id?: string
+          score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_room_players_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_rooms: {
+        Row: {
+          code: string
+          created_at: string
+          current_question: number
+          host_name: string
+          id: string
+          question_answered_by: string | null
+          questions: Json
+          sport: string
+          status: string
+          total_questions: number
+          tournament_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          current_question?: number
+          host_name: string
+          id?: string
+          question_answered_by?: string | null
+          questions?: Json
+          sport: string
+          status?: string
+          total_questions?: number
+          tournament_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          current_question?: number
+          host_name?: string
+          id?: string
+          question_answered_by?: string | null
+          questions?: Json
+          sport?: string
+          status?: string
+          total_questions?: number
+          tournament_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_rooms_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quiz_scores: {
         Row: {
           created_at: string

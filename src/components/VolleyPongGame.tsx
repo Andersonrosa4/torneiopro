@@ -23,8 +23,8 @@ const NET_H = 85;
 const NET_TOP = GROUND_Y - NET_H;
 const BALL_R = 9;
 const GRAVITY = 0.26;
-const SERVE_VX = 5.0;
-const SERVE_VY = -4.8;
+const SERVE_VX = 4.0;
+const SERVE_VY = -6.5;
 const MAX_TOUCHES = 3;
 const MAX_SCORE = 5;
 const MIN_DIFF = 2;
@@ -1071,14 +1071,13 @@ const VolleyPongGame = ({
 
         ball.x = Math.max(BALL_R, Math.min(W - BALL_R, ball.x));
 
-        // Ball hits ground
-        if (ball.y + br >= GROUND_Y) {
+        // Ball hits ground — score point and start pause
+        if (ball.y + br >= GROUND_Y && pauseRef.current <= 0 && countdownRef.current <= 0) {
           ball.y = GROUND_Y - br; ball.vy = 0; ball.vx = 0;
           spawnParticles(ball.x, GROUND_Y - 5, 8, ["#F5D98E", "#E8C860"], false);
           if (ball.x < NET_X) scorePoint("ai");
           else scorePoint("player");
           if (isHostMulti) broadcastState();
-          return;
         }
 
         // Power-up collision

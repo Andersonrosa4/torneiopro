@@ -23,10 +23,10 @@ const NET_X = W / 2;
 const NET_H = 100;
 const NET_TOP = GROUND_Y - NET_H;
 const BALL_R = 10;
-const GRAVITY = 0.12;
-const MAX_TOUCHES = 5;
-const SERVE_VX = 1.8;
-const SERVE_VY = -4;
+const GRAVITY = 0.08;
+const MAX_TOUCHES = 8;
+const SERVE_VX = 1.2;
+const SERVE_VY = -3;
 const MAX_SCORE = 10;
 const MIN_DIFF = 2;
 
@@ -34,12 +34,12 @@ const MIN_DIFF = 2;
 const P_W = 22;
 const P_H = 52;
 const HEAD_R = 9;
-const JUMP_VY = -6.8;
-const MOVE_SPEED = 4.0;
-const AI_SPEED = 1.6;
-const ATTACK_BOOST = 1.2;
-const BALL_SPEED_CAP = 4.0;
-const BALL_VY_CAP = 5.0;
+const JUMP_VY = -7.5;
+const MOVE_SPEED = 5.5;
+const AI_SPEED = 1.2;
+const ATTACK_BOOST = 1.0;
+const BALL_SPEED_CAP = 3.0;
+const BALL_VY_CAP = 3.5;
 
 type Phase = "start" | "waiting" | "playing" | "gameover";
 type GameMode = "solo" | "multi";
@@ -557,7 +557,7 @@ const VolleyPongGame = ({
     };
 
     // Player (isLeft) gets bigger hitbox for easier contact
-    const hitBonus = isLeft ? 14 : 0;
+    const hitBonus = isLeft ? 20 : 0;
     if (applyHit(p.x, headY, HEAD_R + 3 + hitBonus, true)) return true;
     const bodyCenter = shoulderY + (p.y - shoulderY) * 0.4;
     if (applyHit(p.x, bodyCenter, 22 + hitBonus, false)) return true;
@@ -697,7 +697,7 @@ const VolleyPongGame = ({
     } else {
       // Solo: AI logic — simulate real ball trajectory to find landing point
       const ball_ = ballRef.current;
-      const aiSpeed = AI_SPEED + Math.min(rallyCountRef.current * 0.005, 0.2);
+      const aiSpeed = AI_SPEED + Math.min(rallyCountRef.current * 0.003, 0.15);
 
       // Simulate ball trajectory to predict where it will be at AI's height
       const simulateLanding = () => {
@@ -760,7 +760,7 @@ const VolleyPongGame = ({
         );
         
         if (shouldJump) {
-          ai.vy = JUMP_VY * 0.8;
+          ai.vy = JUMP_VY * 0.65;
         }
 
         // Attack when in air and close to ball
@@ -807,16 +807,18 @@ const VolleyPongGame = ({
     for (const t of ball.trail) { t.alpha -= 0.12; }
     ball.trail = ball.trail.filter(t => t.alpha > 0);
 
-    // Wall bounces — ALWAYS clamp and reflect before anything else
-    // Left wall
+    // Wall bounces — walls act like a teammate, ball bounces back into play with upward arc
+    // Left wall (player's side) — send ball up and back toward center
     if (ball.x - BALL_R <= 0) {
-      ball.x = BALL_R + 1;
-      ball.vx = Math.abs(ball.vx);
+      ball.x = BALL_R + 2;
+      ball.vx = Math.abs(ball.vx) + 0.5;
+      ball.vy = -Math.abs(ball.vy) - 1.5; // push ball upward so player can recover
     }
-    // Right wall
+    // Right wall (AI's side)
     if (ball.x + BALL_R >= W) {
-      ball.x = W - BALL_R - 1;
-      ball.vx = -Math.abs(ball.vx);
+      ball.x = W - BALL_R - 2;
+      ball.vx = -Math.abs(ball.vx) - 0.5;
+      ball.vy = -Math.abs(ball.vy) - 1.5;
     }
     // Ceiling
     if (ball.y - BALL_R <= 0) {

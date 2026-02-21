@@ -1066,9 +1066,20 @@ const MatchSequenceViewer = ({
     beach_volleyball: "Vôlei de Praia", futevolei: "Futevôlei", beach_tennis: "Beach Tennis",
   };
   const handleExport = (format: "pdf" | "xlsx" | "csv") => {
-    const meta = { tournamentName, sport: sportDisplayLabels[sport] || sport, date: eventDate };
-    const rows = sequence.map((m, idx) => ({
-      order: idx + 1,
+    // Export only the currently visible (filtered) matches
+    const filteredSeq = selectedBracket === "all"
+      ? sequence
+      : sequence.filter(m => m.bracket_number === parseInt(selectedBracket));
+    const bracketLabel = selectedBracket !== "all"
+      ? ` — Chave ${String.fromCharCode(64 + parseInt(selectedBracket))}`
+      : "";
+    const meta = {
+      tournamentName: tournamentName + bracketLabel,
+      sport: sportDisplayLabels[sport] || sport,
+      date: eventDate,
+    };
+    const rows = filteredSeq.map((m, idx) => ({
+      order: matchNumberMap.get(m.id) ?? (idx + 1),
       round: getRoundLabel(m.round),
       group: getMatchGroupId(m),
       team1: getTeamName(m.team1_id),

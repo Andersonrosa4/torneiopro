@@ -19,7 +19,7 @@ const W = 480;
 const H = 340;
 const GROUND_Y = H - 36;
 const NET_X = W / 2;
-const NET_H = 85;
+const NET_H = 60;
 const NET_TOP = GROUND_Y - NET_H;
 const BALL_R = 9;
 const GRAVITY = 0.18;
@@ -832,29 +832,29 @@ const VolleyPongGame = ({
       const inAir = p.y < GROUND_Y - 12;
       const isSpike = inAir && p.attackCooldown <= 0;
 
-      // ALL hits = inverted U arc — realistic speed
+      // ALL hits = HIGH arc that clears the net easily
       if (isSpike) {
-        ball.vx = dir * 3.8 * ball.speedMultiplier;
-        ball.vy = -3.8;
+        ball.vx = dir * 3.5 * ball.speedMultiplier;
+        ball.vy = -6.0;
         p.attackCooldown = 18;
         p.expression = "determined";
         playSpikeSound();
         spawnParticles(ball.x, ball.y, 6, ["#FFD700", "#FF6B6B"], false);
       } else if (inAir) {
-        ball.vx = dir * 2.8 * ball.speedMultiplier;
-        ball.vy = -4.5;
+        ball.vx = dir * 3.0 * ball.speedMultiplier;
+        ball.vy = -6.5;
         p.expression = "happy";
         playHitSound();
       } else if (p.touches === 1) {
-        // MANCHETE: high gentle arc
-        ball.vx = dir * 2.2 * ball.speedMultiplier;
-        ball.vy = -5.5;
+        // MANCHETE: very high, reaches other side
+        ball.vx = dir * 3.0 * ball.speedMultiplier;
+        ball.vy = -7.5;
         p.expression = "surprised";
         playHitSound();
       } else {
-        // LEVANTAMENTO: controlled arc
-        ball.vx = dir * 2.5 * ball.speedMultiplier;
-        ball.vy = -5.0;
+        // LEVANTAMENTO: high controlled arc
+        ball.vx = dir * 3.2 * ball.speedMultiplier;
+        ball.vy = -7.0;
         p.expression = "happy";
         playHitSound();
       }
@@ -1051,14 +1051,12 @@ const VolleyPongGame = ({
 
         // Net collision
         const br = BALL_R * ball.sizeMultiplier;
-        if (ball.y + br > NET_TOP && ball.y - br < GROUND_Y && Math.abs(ball.x - NET_X) < br + 3) {
-          if (ball.x < NET_X) ball.x = NET_X - br - 4;
-          else ball.x = NET_X + br + 4;
-          ball.vx = -ball.vx * 0.6;
-          ball.vy *= 0.85;
-          if (ball.y + br > NET_TOP && ball.y < NET_TOP + 8 && Math.abs(ball.vy) < 1) {
-            ball.vy = 1.5; ball.vx += (Math.random() - 0.5) * 2;
-          }
+        // Ball only collides with net BELOW the top — if ball is above net, it passes freely
+        if (ball.y + br > NET_TOP && ball.y > NET_TOP && ball.y - br < GROUND_Y && Math.abs(ball.x - NET_X) < br + 2) {
+          if (ball.x < NET_X) ball.x = NET_X - br - 3;
+          else ball.x = NET_X + br + 3;
+          ball.vx = -ball.vx * 0.5;
+          ball.vy *= 0.8;
         }
 
         // Player hits

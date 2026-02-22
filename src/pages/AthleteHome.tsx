@@ -9,6 +9,7 @@ import LogoImage from "@/components/LogoImage";
 import NotificationBell from "@/components/NotificationBell";
 import SystemAdsBanner from "@/components/SystemAdsBanner";
 import AmbassadorFunnel from "@/components/AmbassadorFunnel";
+import PromoPopup from "@/components/PromoPopup";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
@@ -102,6 +103,7 @@ const AthleteHome = () => {
   return (
     <div className="min-h-screen relative overflow-hidden">
       <div className="fixed inset-0 bg-gradient-to-b from-[hsl(220_25%_4%)] via-[hsl(15_15%_7%)] to-[hsl(20_20%_6%)]" />
+      <PromoPopup />
       <AmbassadorFunnel onClose={() => setShowAmbassadorFunnel(false)} />
       {showAmbassadorFunnel && <AmbassadorFunnel forceOpen onClose={() => setShowAmbassadorFunnel(false)} />}
 

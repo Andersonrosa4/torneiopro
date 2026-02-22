@@ -777,7 +777,24 @@ const NormalKnockout = ({
   slotMap: Map<string, "A" | "B">;
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const knockoutMatches = matches.filter((m) => m.round > 0 && m.bracket_type !== 'third_place');
+
+  // Filter out phantom matches created after the final by cascade logic
+  const allKnockout = matches.filter((m) => m.round > 0 && m.bracket_type !== 'third_place');
+  const knockoutMatches = useMemo(() => {
+    // Find the "final" round: the first round where there's exactly 1 winners-bracket match
+    const roundCounts: Record<number, number> = {};
+    allKnockout.forEach(m => { roundCounts[m.round] = (roundCounts[m.round] || 0) + 1; });
+    const sortedRounds = Object.keys(roundCounts).map(Number).sort((a, b) => a - b);
+    let finalRound = -1;
+    for (const r of sortedRounds) {
+      if (roundCounts[r] === 1) { finalRound = r; break; }
+    }
+    // If we found a final round, exclude any rounds after it (phantom matches)
+    if (finalRound > 0) {
+      return allKnockout.filter(m => m.round <= finalRound);
+    }
+    return allKnockout;
+  }, [allKnockout]);
 
   if (knockoutMatches.length === 0) return null;
 
@@ -1028,7 +1045,11 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
 
       {/* 3rd Place Match */}
       {(() => {
-        const thirdPlaceMatches = matches.filter(m => m.bracket_type === 'third_place');
+        // Only show the first (real) third place match, not phantom cascade matches
+        const allThirdPlace = matches.filter(m => m.bracket_type === 'third_place');
+        const thirdPlaceMatches = allThirdPlace.length > 0
+          ? [allThirdPlace.reduce((earliest, m) => m.round < earliest.round ? m : earliest, allThirdPlace[0])]
+          : [];
         if (thirdPlaceMatches.length === 0) return null;
         return (
           <div className="rounded-xl border border-primary/40 bg-gradient-to-r from-primary/10 to-accent/10 p-4 space-y-3">

@@ -762,6 +762,12 @@ const MatchCard = ({
                   </Button>
                 </>
               )}
+              <ManualMatchOverride
+                match={match}
+                matchNumber={index}
+                teams={teams}
+                onSaved={onOverrideSaved}
+              />
             </div>
           </div>
         </div>

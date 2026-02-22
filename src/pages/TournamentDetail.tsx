@@ -1044,7 +1044,7 @@ const TournamentDetail = () => {
        const modalityMatchesForCheck = match.modality_id
          ? matches.filter(m => m.modality_id === match.modality_id)
          : matches;
-       const isDE = modalityMatchesForCheck.some(m => m.bracket_type === 'losers' || m.bracket_type === 'final' || m.bracket_type === 'semi_final');
+       const isDE = modalityMatchesForCheck.some(m => m.bracket_type === 'losers');
        
        // Fetch fresh data for cascade
        const { data: freshForCascade } = await organizerQuery({

@@ -130,9 +130,10 @@ describe("aggressiveCascadeReset", () => {
       const edited = matches[0]; // Edit R1 match
       const plan = computePartialCascadeResetSE(edited, matches);
 
-      // Should delete R2 and R3 (only keep R1)
-      expect(plan.toDelete).toContain("R2_P1");
-      expect(plan.toDelete).toContain("R3_P1");
+      // Should RESET (not delete) R2 and R3
+      expect(plan.toDelete.length).toBe(0);
+      expect(plan.toUpdate.find(u => u.matchId === "R2_P1")).toBeDefined();
+      expect(plan.toUpdate.find(u => u.matchId === "R3_P1")).toBeDefined();
     });
 
     it("should not delete matches when editing semifinal/final", () => {

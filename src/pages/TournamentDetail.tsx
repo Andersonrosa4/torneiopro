@@ -869,11 +869,8 @@ const TournamentDetail = () => {
     const numGroups = brackets.length;
     
     // First, collect raw intended matchups (before chapéu adjustments)
-    // SEPARAÇÃO DE METADES: 1º lugar crossovers na metade superior,
-    // 2º lugar crossovers na metade inferior (ordem reversa para máxima separação).
-    // Isso garante que equipes do mesmo grupo SÓ se encontrem na FINAL.
-    const firstPlacePairings: { team1: string; team2: string }[] = [];
-    const secondPlacePairings: { team1: string; team2: string }[] = [];
+    // Oitavas na ordem lógica: 1A×2H, 2A×1H, 1B×2G, 2B×1G, 1C×2F, 2C×1F, 1D×2E, 2D×1E
+    const rawPairings: { team1: string; team2: string }[] = [];
 
     for (let i = 0; i < Math.ceil(numGroups / 2); i++) {
       const rightIdx = numGroups - 1 - i;
@@ -881,27 +878,48 @@ const TournamentDetail = () => {
       const groupRight = rightIdx !== i ? groupRankings[String(brackets[rightIdx])] : null;
 
       if (groupRight) {
-        // 1st of group[i] vs 2nd of group[rightIdx] → TOP HALF
+        // 1st of group[i] vs 2nd of group[rightIdx]
         if (groupI[0] && groupRight[1]) {
-          firstPlacePairings.push({ team1: groupI[0].teamId, team2: groupRight[1].teamId });
+          rawPairings.push({ team1: groupI[0].teamId, team2: groupRight[1].teamId });
         }
-        // 2nd of group[i] vs 1st of group[rightIdx] → BOTTOM HALF
+        // 2nd of group[i] vs 1st of group[rightIdx]
         if (groupI[1] && groupRight[0]) {
-          secondPlacePairings.push({ team1: groupI[1].teamId, team2: groupRight[0].teamId });
+          rawPairings.push({ team1: groupI[1].teamId, team2: groupRight[0].teamId });
         }
       } else {
         // Odd number of groups: middle group plays within itself
         if (groupI[0] && groupI[1]) {
-          firstPlacePairings.push({ team1: groupI[0].teamId, team2: groupI[1].teamId });
+          rawPairings.push({ team1: groupI[0].teamId, team2: groupI[1].teamId });
         }
       }
     }
 
-    // Reverse second-place pairings for maximum group separation in quarterfinals
-    secondPlacePairings.reverse();
+    // ═══════════════════════════════════════════════════════════════
+    // CRUZAMENTO ESPELHADO NAS QUARTAS (modelo oficial):
+    // Quartas: V1×V8, V2×V7, V3×V6, V4×V5
+    // Para que o bracket tree padrão (adjacente: pos1+pos2→Q1, pos3+pos4→Q2)
+    // produza esse cruzamento, reordenamos os slots das oitavas:
+    // Posição no bracket: [match1, match8, match2, match7, match3, match6, match4, match5]
+    // ═══════════════════════════════════════════════════════════════
+    const n = rawPairings.length;
+    const mirroredPairings: typeof rawPairings = [];
+    if (n >= 4) {
+      // Interleave: first with last, second with second-to-last, etc.
+      for (let i = 0; i < Math.floor(n / 2); i++) {
+        mirroredPairings.push(rawPairings[i]);
+        mirroredPairings.push(rawPairings[n - 1 - i]);
+      }
+      // If odd number, add middle element
+      if (n % 2 === 1) {
+        mirroredPairings.push(rawPairings[Math.floor(n / 2)]);
+      }
+    } else {
+      mirroredPairings.push(...rawPairings);
+    }
 
-    // Combine: top half first, then bottom half
-    const rawPairings: { team1: string; team2: string }[] = [...firstPlacePairings, ...secondPlacePairings];
+    // Replace rawPairings with mirrored order
+    rawPairings.length = 0;
+    rawPairings.push(...mirroredPairings);
 
     // Add index teams as raw pairings
     if (indexTeamIds.length > 0) {

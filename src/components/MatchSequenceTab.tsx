@@ -110,9 +110,9 @@ const MatchRow = ({
             }`}>
               {team1Name}
             </span>
-            {match.team1_id && match.bracket_number && (
+            {match.team1_id && match.bracket_number && match.round === 0 && (
               <span className="text-[8px] font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 rounded px-1 py-0 leading-tight shrink-0">
-                {match.round === 0 ? `Grp ${String.fromCharCode(64 + (match.bracket_number || 1))}` : `Chave ${String.fromCharCode(64 + (match.bracket_number || 1))}`}
+                {`Grp ${String.fromCharCode(64 + (match.bracket_number || 1))}`}
               </span>
             )}
             <span className="text-[10px] text-muted-foreground/60 shrink-0 font-bold">vs</span>
@@ -121,9 +121,9 @@ const MatchRow = ({
             }`}>
               {team2Name}
             </span>
-            {match.team2_id && match.bracket_number && (
+            {match.team2_id && match.bracket_number && match.round === 0 && (
               <span className="text-[8px] font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 rounded px-1 py-0 leading-tight shrink-0">
-                {match.round === 0 ? `Grp ${String.fromCharCode(64 + (match.bracket_number || 1))}` : `Chave ${String.fromCharCode(64 + (match.bracket_number || 1))}`}
+                {`Grp ${String.fromCharCode(64 + (match.bracket_number || 1))}`}
               </span>
             )}
           </div>

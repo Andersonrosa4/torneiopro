@@ -573,11 +573,22 @@ const TournamentDetail = () => {
               if (m.bracket_type === 'third_place') continue; // skip 3rd place from normal linking
               if (m.round < totalKORounds) {
                 let nextPos: number;
+                const matchesInRound = nextPow / Math.pow(2, m.round);
+                const nextRoundMatchCount = nextPow / Math.pow(2, m.round + 1);
+                
                 // Cup-style crossing: in quarter-finals, pair extremes (1↔4, 2↔3)
                 if (m.round === quarterRound && numQuarterMatches === 4) {
                   // Map: pos 1→semi 1, pos 2→semi 2, pos 3→semi 2, pos 4→semi 1
                   const cupMap: Record<number, number> = { 1: 1, 2: 2, 3: 2, 4: 1 };
                   nextPos = cupMap[m.position] || Math.ceil(m.position / 2);
+                } else if (matchesInRound >= 8 && nextRoundMatchCount >= 4) {
+                  // Extremity pairing for rounds feeding into quarter-finals (Oitavas, etc.)
+                  // pos1→Q1, pos8→Q1, pos2→Q2, pos7→Q2, pos3→Q3, pos6→Q3, pos4→Q4, pos5→Q4
+                  if (m.position <= matchesInRound / 2) {
+                    nextPos = m.position;
+                  } else {
+                    nextPos = matchesInRound + 1 - m.position;
+                  }
                 } else {
                   nextPos = Math.ceil(m.position / 2);
                 }

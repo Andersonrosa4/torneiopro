@@ -58,11 +58,7 @@ const SportQuiz = ({ tournamentId, sport, isAdmin = false }: { tournamentId: str
   const deleteScore = async (scoreId: string, playerName: string) => {
     if (!confirm(`Excluir a pontuação de "${playerName}" do ranking?`)) return;
     setDeletingId(scoreId);
-    const token = sessionStorage.getItem("organizer_token");
-    const organizerId = sessionStorage.getItem("organizer_id");
-    const { error } = await supabase.functions.invoke("organizer-api", {
-      body: { token, organizerId, table: "quiz_scores", operation: "delete", filters: { id: scoreId } },
-    });
+    const { error } = await supabase.from("quiz_scores").delete().eq("id", scoreId) as { error: any };
     if (error) {
       toast({ title: "Erro ao excluir", description: "Não foi possível excluir a pontuação.", variant: "destructive" });
     } else {
@@ -183,18 +179,12 @@ const SportQuiz = ({ tournamentId, sport, isAdmin = false }: { tournamentId: str
     setPhase("result");
     const totalAnswered = QUIZ_SIZE + bonus;
     const totalCorrect = finalScore + bonus;
-    await supabase.functions.invoke("organizer-api", {
-      body: {
-        table: "quiz_scores",
-        operation: "insert",
-        data: {
-          tournament_id: tournamentId,
-          player_name: playerName.trim(),
-          sport,
-          score: totalCorrect,
-          total_questions: totalAnswered,
-        },
-      },
+    await supabase.from("quiz_scores").insert({
+      tournament_id: tournamentId,
+      player_name: playerName.trim(),
+      sport,
+      score: totalCorrect,
+      total_questions: totalAnswered,
     });
     await fetchRanking();
     setSubmitting(false);

@@ -23,6 +23,7 @@ interface Match {
   score2: number | null;
   bracket_type?: string;
   bracket_half?: string | null;
+  next_win_match_id?: string | null;
 }
 
 interface Team {
@@ -438,7 +439,7 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
           // Group paired matches (same next_win_match_id) together for bracket order
           const byNextMatch = new Map<string, Match[]>();
           for (const m of rMatches) {
-            const key = (m as any).next_win_match_id || `solo_${m.id}`;
+            const key = m.next_win_match_id || `solo_${m.id}`;
             if (!byNextMatch.has(key)) byNextMatch.set(key, []);
             byNextMatch.get(key)!.push(m);
           }

@@ -64,14 +64,9 @@ export function ManualMatchOverride({ match, matchNumber, teams, onSaved }: Manu
     const t2 = team2 === NONE ? null : team2;
     const w = winner === NONE ? null : winner;
 
-    // Validações básicas
+    // Aviso suave, mas NÃO bloqueia — o organizador tem liberdade total
     if (t1 && t2 && t1 === t2) {
-      toast.error("❌ Time 1 e Time 2 não podem ser a mesma dupla.");
-      return;
-    }
-    if (w && w !== t1 && w !== t2) {
-      toast.error("❌ O vencedor precisa ser um dos dois times da partida.");
-      return;
+      toast.warning("⚠️ Atenção: Time 1 e Time 2 são a mesma dupla.");
     }
 
     setSaving(true);
@@ -79,19 +74,13 @@ export function ManualMatchOverride({ match, matchNumber, teams, onSaved }: Manu
       const updateData: Record<string, string | null> = {
         team1_id: t1,
         team2_id: t2,
+        winner_team_id: w,
       };
 
       if (w) {
-        updateData.winner_team_id = w;
         updateData.status = "completed";
       } else {
-        // Se não há vencedor, resetar para pendente
-        updateData.winner_team_id = null;
-        if (!t1 || !t2) {
-          updateData.status = "pending";
-        } else {
-          updateData.status = "pending";
-        }
+        updateData.status = "pending";
       }
 
       const { error } = await organizerQuery({
@@ -150,7 +139,7 @@ export function ManualMatchOverride({ match, matchNumber, teams, onSaved }: Manu
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
               {bracketLabel && <Badge variant="outline" className="text-[9px] mr-2">{bracketLabel}</Badge>}
-              Use somente para corrigir erros de propagação automática.
+              Liberdade total: altere duplas, vencedor ou remova tudo sem bloqueios.
             </DialogDescription>
           </DialogHeader>
 
@@ -211,16 +200,11 @@ export function ManualMatchOverride({ match, matchNumber, teams, onSaved }: Manu
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE} className="text-xs text-muted-foreground italic">— Sem vencedor (partida pendente) —</SelectItem>
-                  {team1 !== NONE && (
-                    <SelectItem value={team1} className="text-xs text-success font-medium">
-                      🏆 {teamName(team1)} (Slot 1)
+                  {teams.map(t => (
+                    <SelectItem key={t.id} value={t.id} className="text-xs text-success font-medium">
+                      🏆 {t.player1_name} / {t.player2_name}
                     </SelectItem>
-                  )}
-                  {team2 !== NONE && (
-                    <SelectItem value={team2} className="text-xs text-success font-medium">
-                      🏆 {teamName(team2)} (Slot 2)
-                    </SelectItem>
-                  )}
+                  ))}
                 </SelectContent>
               </Select>
             </div>

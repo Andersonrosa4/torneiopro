@@ -905,47 +905,9 @@ const TournamentDetail = () => {
       }
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // CRUZAMENTO COPA NAS SEMIFINAIS:
-    // 1) Quartas por extremos: QG0=(raw0,rawN-1), QG1=(raw1,rawN-2), etc.
-    // 2) Semis Copa: Q1×Q4 no top half, Q2×Q3 no bottom half
-    // Para bracket tree adjacente produzir isso, organizamos:
-    //   Top half:    QG[0], QG[last]   → Semi1 = V(Q1) × V(Q4)
-    //   Bottom half: QG[1], QG[last-1] → Semi2 = V(Q2) × V(Q3)
-    // ═══════════════════════════════════════════════════════════════
-    const n = rawPairings.length;
-    const mirroredPairings: typeof rawPairings = [];
-    if (n >= 4) {
-      // Step 1: Create quarter-final groups by pairing extremes
-      const quarterGroups: (typeof rawPairings)[] = [];
-      for (let i = 0; i < Math.floor(n / 2); i++) {
-        quarterGroups.push([rawPairings[i], rawPairings[n - 1 - i]]);
-      }
-      // Step 2: Arrange quarter groups for Copa semis (extremes of QG array adjacent)
-      const copaOrder: (typeof rawPairings)[] = [];
-      const qLen = quarterGroups.length;
-      for (let i = 0; i < Math.floor(qLen / 2); i++) {
-        copaOrder.push(quarterGroups[i]);
-        copaOrder.push(quarterGroups[qLen - 1 - i]);
-      }
-      if (qLen % 2 === 1) {
-        copaOrder.push(quarterGroups[Math.floor(qLen / 2)]);
-      }
-      // Flatten
-      for (const qg of copaOrder) {
-        mirroredPairings.push(...qg);
-      }
-      // If odd raw pairings, add middle
-      if (n % 2 === 1) {
-        mirroredPairings.push(rawPairings[Math.floor(n / 2)]);
-      }
-    } else {
-      mirroredPairings.push(...rawPairings);
-    }
-
-    // Replace rawPairings with mirrored order
-    rawPairings.length = 0;
-    rawPairings.push(...mirroredPairings);
+    // NOTE: Copa-style crossing is already handled by next_win_match_id links
+    // in the pre-generated knockout shells. Do NOT reorder positions here —
+    // just keep the natural mirrored crossover order (1A×2H, 2A×1H, 1B×2G, etc.).
 
     // Add index teams as raw pairings
     if (indexTeamIds.length > 0) {

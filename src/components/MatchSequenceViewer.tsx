@@ -887,7 +887,35 @@ const MatchSequenceViewer = ({
     return brackets as number[];
   }, [matches]);
 
-  const sequence = useMemo(() => generateSequence(matches, tournamentFormat), [matches, tournamentFormat]);
+  // Filter out phantom matches: matches created after the real final by cascade logic
+  const cleanMatches = useMemo(() => {
+    if (tournamentFormat === 'double_elimination') return matches;
+    // Find the final round: first round where there's exactly 1 non-third-place knockout match
+    const knockoutNonTP = matches.filter(m => m.round > 0 && (m as any).bracket_type !== 'third_place');
+    const roundCounts: Record<number, number> = {};
+    knockoutNonTP.forEach(m => { roundCounts[m.round] = (roundCounts[m.round] || 0) + 1; });
+    const sortedRounds = Object.keys(roundCounts).map(Number).sort((a, b) => a - b);
+    let finalRound = -1;
+    for (const r of sortedRounds) {
+      if (roundCounts[r] === 1) { finalRound = r; break; }
+    }
+    if (finalRound > 0) {
+      // Keep group matches + knockout up to final + only the first third_place match
+      const thirdPlaceMatches = matches.filter(m => (m as any).bracket_type === 'third_place');
+      const realThirdPlace = thirdPlaceMatches.length > 0
+        ? [thirdPlaceMatches.reduce((earliest, m) => m.round < earliest.round ? m : earliest, thirdPlaceMatches[0])]
+        : [];
+      const realThirdPlaceIds = new Set(realThirdPlace.map(m => m.id));
+      return matches.filter(m => {
+        if (m.round === 0) return true; // group stage
+        if ((m as any).bracket_type === 'third_place') return realThirdPlaceIds.has(m.id);
+        return m.round <= finalRound;
+      });
+    }
+    return matches;
+  }, [matches, tournamentFormat]);
+
+  const sequence = useMemo(() => generateSequence(cleanMatches, tournamentFormat), [cleanMatches, tournamentFormat]);
   const displaySequence = useMemo(() => sequence, [sequence]);
 
   // ╔══════════════════════════════════════════════════════════════════════╗
@@ -958,18 +986,18 @@ const MatchSequenceViewer = ({
       }
     }
     // Safety net: qualquer jogo não coberto
-    for (const m of matches) {
+    for (const m of cleanMatches) {
       if (!map.has(m.id)) map.set(m.id, num++);
     }
     return map;
-  }, [matches, displaySequence, tournamentFormat]);
+  }, [cleanMatches, displaySequence, tournamentFormat]);
 
   const matchCountByRound = useMemo(() => {
     const counts: Record<number, number> = {};
     // Exclude third_place matches from round count so labels remain correct (e.g. "Final" not "Semifinal")
-    matches.filter(m => (m as any).bracket_type !== 'third_place').forEach(m => { counts[m.round] = (counts[m.round] || 0) + 1; });
+    cleanMatches.filter(m => (m as any).bracket_type !== 'third_place').forEach(m => { counts[m.round] = (counts[m.round] || 0) + 1; });
     return counts;
-  }, [matches]);
+  }, [cleanMatches]);
 
   const getRoundLabel = (round: number) => {
     return getEliminationRoundLabel(round, matchCountByRound[round] || 0);
@@ -1112,10 +1140,10 @@ const MatchSequenceViewer = ({
       g.matches.sort((a, b) => a.globalIndex - b.globalIndex);
     }
     return groups;
-  }, [displaySequence, matches, matchCountByRound, matchNumberMap, tournamentFormat]);
+  }, [displaySequence, cleanMatches, matchCountByRound, matchNumberMap, tournamentFormat]);
 
   // Stats
-  const realMatches = useMemo(() => matches.filter(m => m.team1_id && m.team2_id), [matches]);
+  const realMatches = useMemo(() => cleanMatches.filter(m => m.team1_id && m.team2_id), [cleanMatches]);
   const completedCount = useMemo(() => realMatches.filter(m => m.status === "completed").length, [realMatches]);
   const pendingCount = useMemo(() => realMatches.filter(m => m.status !== "completed").length, [realMatches]);
 

@@ -412,15 +412,29 @@ const MatchCard = ({
 
   const isCompleted = match.status === "completed";
 
-  // Build team -> group letter map from group-stage matches
+  // Build team -> group info map from group-stage matches (letter + position)
   const teamGroupMap = useMemo(() => {
-    const map: Record<string, string> = {};
+    const map: Record<string, { group: string; pos: number }> = {};
+    // Collect teams per group
+    const groupTeams: Record<number, Set<string>> = {};
+    const teamWins: Record<string, number> = {};
+    const teamPoints: Record<string, number> = {};
     for (const m of allMatches) {
       if (m.round === 0 && m.bracket_number) {
-        const letter = String.fromCharCode(64 + m.bracket_number);
-        if (m.team1_id) map[m.team1_id] = letter;
-        if (m.team2_id) map[m.team2_id] = letter;
+        if (!groupTeams[m.bracket_number]) groupTeams[m.bracket_number] = new Set();
+        if (m.team1_id) { groupTeams[m.bracket_number].add(m.team1_id); teamWins[m.team1_id] = teamWins[m.team1_id] || 0; teamPoints[m.team1_id] = teamPoints[m.team1_id] || 0; }
+        if (m.team2_id) { groupTeams[m.bracket_number].add(m.team2_id); teamWins[m.team2_id] = teamWins[m.team2_id] || 0; teamPoints[m.team2_id] = teamPoints[m.team2_id] || 0; }
+        if (m.status === 'completed' && m.winner_team_id) {
+          teamWins[m.winner_team_id] = (teamWins[m.winner_team_id] || 0) + 1;
+          teamPoints[m.winner_team_id] = (teamPoints[m.winner_team_id] || 0) + 3;
+        }
       }
+    }
+    // Sort teams in each group by points/wins desc → assign position
+    for (const [bn, teamSet] of Object.entries(groupTeams)) {
+      const letter = String.fromCharCode(64 + Number(bn));
+      const sorted = [...teamSet].sort((a, b) => (teamPoints[b] || 0) - (teamPoints[a] || 0) || (teamWins[b] || 0) - (teamWins[a] || 0));
+      sorted.forEach((tid, idx) => { map[tid] = { group: letter, pos: idx + 1 }; });
     }
     return map;
   }, [allMatches]);
@@ -608,7 +622,7 @@ const MatchCard = ({
           )}
           {match.team1_id && match.round > 0 && teamGroupMap[match.team1_id] && (
             <span className="text-[8px] font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 rounded px-1 py-0 leading-tight shrink-0 ml-1">
-              {`Grupo ${teamGroupMap[match.team1_id]}`}
+              {`${teamGroupMap[match.team1_id].pos}º Grupo ${teamGroupMap[match.team1_id].group}`}
             </span>
           )}
           {isOwner && hasTeams && !isCompleted && !isEditing && match.team1_id && (
@@ -632,7 +646,7 @@ const MatchCard = ({
           )}
           {match.team2_id && match.round > 0 && teamGroupMap[match.team2_id] && (
             <span className="text-[8px] font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 rounded px-1 py-0 leading-tight shrink-0 ml-1">
-              {`Grupo ${teamGroupMap[match.team2_id]}`}
+              {`${teamGroupMap[match.team2_id].pos}º Grupo ${teamGroupMap[match.team2_id].group}`}
             </span>
           )}
           {isOwner && hasTeams && !isCompleted && !isEditing && match.team2_id && (

@@ -76,7 +76,7 @@ const MatchRow = ({
   idx: number;
   getTeamName: (id: string | null) => string;
   getRoundLabel: (round: number) => string;
-  teamGroupMap: Record<string, string>;
+  teamGroupMap: Record<string, { group: string; pos: number }>;
 }) => {
   const isCompleted = match.status === "completed";
   const team1Name = getTeamName(match.team1_id);
@@ -119,7 +119,7 @@ const MatchRow = ({
             )}
             {match.team1_id && match.round > 0 && teamGroupMap[match.team1_id] && (
               <span className="text-[8px] font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 rounded px-1 py-0 leading-tight shrink-0">
-                {`Grupo ${teamGroupMap[match.team1_id]}`}
+                {`${teamGroupMap[match.team1_id].pos}º Grupo ${teamGroupMap[match.team1_id].group}`}
               </span>
             )}
             <span className="text-[10px] text-muted-foreground/60 shrink-0 font-bold">vs</span>
@@ -135,7 +135,7 @@ const MatchRow = ({
             )}
             {match.team2_id && match.round > 0 && teamGroupMap[match.team2_id] && (
               <span className="text-[8px] font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 rounded px-1 py-0 leading-tight shrink-0">
-                {`Grupo ${teamGroupMap[match.team2_id]}`}
+                {`${teamGroupMap[match.team2_id].pos}º Grupo ${teamGroupMap[match.team2_id].group}`}
               </span>
             )}
           </div>
@@ -200,7 +200,7 @@ const BlockSection = ({
   isDE: boolean;
   getTeamName: (id: string | null) => string;
   getRoundLabel: (round: number) => string;
-  teamGroupMap: Record<string, string>;
+  teamGroupMap: Record<string, { group: string; pos: number }>;
 }) => {
   const completedCount = items.filter(i => i.match.status === "completed").length;
   const totalCount = items.length;
@@ -268,15 +268,27 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
     return team ? `${team.player1_name} / ${team.player2_name}` : "A definir";
   };
 
-  // Build team -> group letter map from group-stage matches
+  // Build team -> group info map from group-stage matches (letter + position)
   const teamGroupMap = useMemo(() => {
-    const map: Record<string, string> = {};
+    const map: Record<string, { group: string; pos: number }> = {};
+    const groupTeams: Record<number, Set<string>> = {};
+    const teamWins: Record<string, number> = {};
+    const teamPoints: Record<string, number> = {};
     for (const m of matches) {
       if (m.round === 0 && m.bracket_number) {
-        const letter = String.fromCharCode(64 + m.bracket_number);
-        if (m.team1_id) map[m.team1_id] = letter;
-        if (m.team2_id) map[m.team2_id] = letter;
+        if (!groupTeams[m.bracket_number]) groupTeams[m.bracket_number] = new Set();
+        if (m.team1_id) { groupTeams[m.bracket_number].add(m.team1_id); teamWins[m.team1_id] = teamWins[m.team1_id] || 0; teamPoints[m.team1_id] = teamPoints[m.team1_id] || 0; }
+        if (m.team2_id) { groupTeams[m.bracket_number].add(m.team2_id); teamWins[m.team2_id] = teamWins[m.team2_id] || 0; teamPoints[m.team2_id] = teamPoints[m.team2_id] || 0; }
+        if (m.status === 'completed' && m.winner_team_id) {
+          teamWins[m.winner_team_id] = (teamWins[m.winner_team_id] || 0) + 1;
+          teamPoints[m.winner_team_id] = (teamPoints[m.winner_team_id] || 0) + 3;
+        }
       }
+    }
+    for (const [bn, teamSet] of Object.entries(groupTeams)) {
+      const letter = String.fromCharCode(64 + Number(bn));
+      const sorted = [...teamSet].sort((a, b) => (teamPoints[b] || 0) - (teamPoints[a] || 0) || (teamWins[b] || 0) - (teamWins[a] || 0));
+      sorted.forEach((tid, idx) => { map[tid] = { group: letter, pos: idx + 1 }; });
     }
     return map;
   }, [matches]);

@@ -603,12 +603,12 @@ const MatchCard = ({
           </span>
           {match.team1_id && match.round === 0 && match.bracket_number && (
             <span className="text-[8px] font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 rounded px-1 py-0 leading-tight shrink-0 ml-1">
-              {`G${String.fromCharCode(64 + (match.bracket_number || 1))}`}
+              {`Grupo ${String.fromCharCode(64 + (match.bracket_number || 1))}`}
             </span>
           )}
           {match.team1_id && match.round > 0 && teamGroupMap[match.team1_id] && (
             <span className="text-[8px] font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 rounded px-1 py-0 leading-tight shrink-0 ml-1">
-              {`G${teamGroupMap[match.team1_id]}`}
+              {`Grupo ${teamGroupMap[match.team1_id]}`}
             </span>
           )}
           {isOwner && hasTeams && !isCompleted && !isEditing && match.team1_id && (
@@ -627,12 +627,12 @@ const MatchCard = ({
           </span>
           {match.team2_id && match.round === 0 && match.bracket_number && (
             <span className="text-[8px] font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 rounded px-1 py-0 leading-tight shrink-0 ml-1">
-              {`G${String.fromCharCode(64 + (match.bracket_number || 1))}`}
+              {`Grupo ${String.fromCharCode(64 + (match.bracket_number || 1))}`}
             </span>
           )}
           {match.team2_id && match.round > 0 && teamGroupMap[match.team2_id] && (
             <span className="text-[8px] font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 rounded px-1 py-0 leading-tight shrink-0 ml-1">
-              {`G${teamGroupMap[match.team2_id]}`}
+              {`Grupo ${teamGroupMap[match.team2_id]}`}
             </span>
           )}
           {isOwner && hasTeams && !isCompleted && !isEditing && match.team2_id && (

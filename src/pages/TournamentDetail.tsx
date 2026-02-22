@@ -1124,7 +1124,7 @@ const TournamentDetail = () => {
     setMatches(prev => prev.map(m => m.id === matchId ? { ...m, winner_team_id: winnerId, status: 'completed' as any } : m));
 
     // AWAIT the winner save — critical to avoid race condition on fresh fetch
-    await organizerQuery({
+    const { error: winnerError } = await organizerQuery({
       table: "matches",
       operation: "update",
       data: {
@@ -1133,6 +1133,13 @@ const TournamentDetail = () => {
       },
       filters: { id: matchId },
     });
+    if (winnerError) {
+      toast.error("Erro ao salvar vencedor: " + winnerError.message);
+      // Revert optimistic update
+      setMatches(prev => prev.map(m => m.id === matchId ? { ...m, winner_team_id: match.winner_team_id, status: match.status } : m));
+      declareWinnerMutex.current.delete(matchId);
+      return;
+    }
 
     // Determine if this is a double elimination bracket — filter by SAME modality
     const modalityMatchesForDE = match.modality_id
@@ -1606,12 +1613,15 @@ const TournamentDetail = () => {
   };
 
   const updateScore = async (matchId: string, score1: number, score2: number) => {
-    await organizerQuery({
+    const { error } = await organizerQuery({
       table: "matches",
       operation: "update",
       data: { score1, score2 },
       filters: { id: matchId },
     });
+    if (error) {
+      toast.error("Erro ao salvar placar: " + error.message);
+    }
   };
 
   const deleteTournament = async () => {

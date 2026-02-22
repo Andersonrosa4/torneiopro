@@ -139,7 +139,6 @@ export function computePartialCascadeResetSE(
   allMatches: Match[],
 ): CascadeResetPlan {
   const log: string[] = [];
-  const toDelete: Set<string> = new Set();
   const toUpdate: Map<string, Record<string, any>> = new Map();
 
   // Find the latest round (final) and second-to-last (semifinal)
@@ -147,7 +146,6 @@ export function computePartialCascadeResetSE(
   const roundNumbers = new Set(eliminationMatches.map(m => m.round));
   const sortedRounds = Array.from(roundNumbers).sort((a, b) => b - a); // descending
   
-  const finalRound = sortedRounds[0];
   const semiRound = sortedRounds[1];
 
   // Only allow reset if edited match is in round < semifinal
@@ -156,14 +154,21 @@ export function computePartialCascadeResetSE(
     return { toDelete: [], toUpdate: [], log };
   }
 
-  // Delete all semifinal and final matches
+  // RESET (not delete!) all semifinal, final, and third_place matches
   const toRecalculate = allMatches.filter(m =>
-    m.round >= semiRound && m.round !== editedMatch.round
+    m.round >= semiRound && m.id !== editedMatch.id
   );
 
   for (const m of toRecalculate) {
-    toDelete.add(m.id);
-    log.push(`[Delete-SE] Round ${m.round} Position ${m.position} (recalculate semifinal/final)`);
+    toUpdate.set(m.id, {
+      team1_id: null,
+      team2_id: null,
+      winner_team_id: null,
+      status: 'pending',
+      score1: 0,
+      score2: 0,
+    });
+    log.push(`[Reset-SE] Round ${m.round} Position ${m.position} ${m.bracket_type || 'winners'} (reset semifinal/final/3rd)`);
   }
 
   // Reset the edited match
@@ -175,7 +180,7 @@ export function computePartialCascadeResetSE(
   });
 
   return {
-    toDelete: Array.from(toDelete),
+    toDelete: [],
     toUpdate: Array.from(toUpdate.entries()).map(([matchId, data]) => ({ matchId, data })),
     log,
   };

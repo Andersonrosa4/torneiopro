@@ -141,23 +141,23 @@ function generateInterleavedSequence(matches: Match[]): Match[] {
     ? buildGroupStageInterleaved(groupStage).sequence
     : [];
 
-  // Knockout: original interleaving by bracket
+  // Knockout: group paired matches (same next_win_match_id) together for bracket order
   const kRounds = [...new Set(knockout.map(m => m.round))].sort((a, b) => a - b);
-  const kBrackets = [...new Set(knockout.map(m => m.bracket_number || 1))].sort((a, b) => a - b);
   const knockoutInterleaved: Match[] = [];
   for (const round of kRounds) {
     const roundMatches = knockout.filter(m => m.round === round);
-    const byBracket: Record<number, Match[]> = {};
-    for (const b of kBrackets) {
-      byBracket[b] = roundMatches
-        .filter(m => (m.bracket_number || 1) === b)
-        .sort((a, b2) => a.position - b2.position);
+    // Group by next_win_match_id so paired matches are adjacent (e.g. pos 1 & 8 both feed Q1)
+    const byNextMatch = new Map<string, Match[]>();
+    for (const m of roundMatches) {
+      const key = m.next_win_match_id || `solo_${m.id}`;
+      if (!byNextMatch.has(key)) byNextMatch.set(key, []);
+      byNextMatch.get(key)!.push(m);
     }
-    const maxLen = Math.max(...Object.values(byBracket).map(a => a.length), 0);
-    for (let i = 0; i < maxLen; i++) {
-      for (const b of kBrackets) {
-        if (byBracket[b]?.[i]) knockoutInterleaved.push(byBracket[b][i]);
-      }
+    // Sort each group internally by position, then sort groups by min position
+    const groups = [...byNextMatch.values()].map(g => g.sort((a, b) => a.position - b.position));
+    groups.sort((a, b) => a[0].position - b[0].position);
+    for (const group of groups) {
+      knockoutInterleaved.push(...group);
     }
   }
 

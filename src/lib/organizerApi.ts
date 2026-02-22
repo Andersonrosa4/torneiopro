@@ -1,23 +1,8 @@
-import { createClient } from "@supabase/supabase-js";
-import type { Database } from "@/integrations/supabase/types";
-import { getAccessToken } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
-
-/** Retorna um cliente Supabase com o token atual injetado no header */
+/** Retorna o cliente Supabase singleton */
 function getClient() {
-  const token = getAccessToken();
-  if (token) {
-    return createClient<Database>(SUPABASE_URL, SUPABASE_KEY, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-  }
-  // Fallback: cliente padrão (usará sessão do localStorage)
-  return createClient<Database>(SUPABASE_URL, SUPABASE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  return supabase;
 }
 
 interface QueryOptions {

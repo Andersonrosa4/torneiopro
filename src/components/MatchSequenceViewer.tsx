@@ -890,26 +890,28 @@ const MatchSequenceViewer = ({
   // Filter out phantom matches: matches created after the real final by cascade logic
   const cleanMatches = useMemo(() => {
     if (tournamentFormat === 'double_elimination') return matches;
-    // Find the final round: first round where there's exactly 1 non-third-place knockout match
-    const knockoutNonTP = matches.filter(m => m.round > 0 && (m as any).bracket_type !== 'third_place');
+    // Find the final round: first round where there's exactly 1 non-third-place knockout match WITH teams
+    const knockoutWithTeams = matches.filter(m => m.round > 0 && (m as any).bracket_type !== 'third_place' && m.team1_id && m.team2_id);
     const roundCounts: Record<number, number> = {};
-    knockoutNonTP.forEach(m => { roundCounts[m.round] = (roundCounts[m.round] || 0) + 1; });
+    knockoutWithTeams.forEach(m => { roundCounts[m.round] = (roundCounts[m.round] || 0) + 1; });
     const sortedRounds = Object.keys(roundCounts).map(Number).sort((a, b) => a - b);
     let finalRound = -1;
     for (const r of sortedRounds) {
       if (roundCounts[r] === 1) { finalRound = r; break; }
     }
     if (finalRound > 0) {
-      // Keep group matches + knockout up to final + only the first third_place match
-      const thirdPlaceMatches = matches.filter(m => (m as any).bracket_type === 'third_place');
-      const realThirdPlace = thirdPlaceMatches.length > 0
-        ? [thirdPlaceMatches.reduce((earliest, m) => m.round < earliest.round ? m : earliest, thirdPlaceMatches[0])]
-        : [];
-      const realThirdPlaceIds = new Set(realThirdPlace.map(m => m.id));
+      // Keep group matches + knockout up to final + only the earliest third_place match with teams
+      const thirdPlaceWithTeams = matches.filter(m => (m as any).bracket_type === 'third_place' && m.team1_id && m.team2_id);
+      const realThirdPlaceIds = new Set(
+        thirdPlaceWithTeams.length > 0
+          ? [thirdPlaceWithTeams.reduce((earliest, m) => m.round < earliest.round ? m : earliest, thirdPlaceWithTeams[0]).id]
+          : []
+      );
       return matches.filter(m => {
         if (m.round === 0) return true; // group stage
         if ((m as any).bracket_type === 'third_place') return realThirdPlaceIds.has(m.id);
-        return m.round <= finalRound;
+        if (m.round > finalRound) return false;
+        return true;
       });
     }
     return matches;

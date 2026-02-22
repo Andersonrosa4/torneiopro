@@ -51,32 +51,33 @@ function createMatch(
 
 describe("aggressiveCascadeReset", () => {
   describe("Double Elimination Cascade", () => {
-    it("should delete all downstream Winners matches when editing Winners R2", () => {
+    it("should RESET (not delete) all downstream Winners matches when editing Winners R1", () => {
       const matches: Match[] = [
         // Winners Upper R1
         createMatch("W_U_R1_P1", 1, 1, "winners", "upper", "T1", "T2", "T1", "completed"),
         createMatch("W_U_R1_P2", 1, 2, "winners", "upper", "T3", "T4", "T3", "completed"),
-        // Winners Upper R2 (to be deleted)
+        // Winners Upper R2 (should be RESET, not deleted)
         createMatch("W_U_R2_P1", 2, 1, "winners", "upper", "T1", "T3", "T1", "completed"),
-        // Winners Lower (different bracket, should NOT be deleted)
+        // Winners Lower (different bracket, should NOT be affected)
         createMatch("W_L_R1_P1", 1, 1, "winners", "lower", "T5", "T6", "T5", "completed"),
-        // Losers Upper (feeds from Winners Lower, should be deleted if Winners Lower R1 is edited)
+        // Losers Upper
         createMatch("LU_R1_P1", 1, 1, "losers", "upper", "T6", null, null, "pending"),
       ];
 
       const edited = matches[0]; // Edit W_U_R1_P1
       const plan = computeAggressiveCascadeReset(edited, matches);
 
-      // Should delete the R2 Winners match (same bracket_type + bracket_half + round >= 1)
-      expect(plan.toDelete).toContain("W_U_R2_P1");
-      // But NOT Losers (different bracket type), and NOT W_L_R1_P1 (different half)
-      expect(plan.toDelete).not.toContain("LU_R1_P1");
-      expect(plan.toDelete).not.toContain("W_L_R1_P1");
+      // Should NEVER delete any matches
+      expect(plan.toDelete.length).toBe(0);
+      // Should RESET the R2 Winners match
+      expect(plan.toUpdate.some(u => u.matchId === "W_U_R2_P1")).toBe(true);
+      // Should NOT affect W_L_R1_P1 (different half)
+      expect(plan.toUpdate.some(u => u.matchId === "W_L_R1_P1")).toBe(false);
       // Edited match gets reset
       expect(plan.toUpdate.some(u => u.matchId === "W_U_R1_P1")).toBe(true);
     });
 
-    it("should nullify references to deleted matches", () => {
+    it("should never delete matches, only reset them", () => {
       const matches: Match[] = [
         createMatch("W_U_R1_P1", 1, 1, "winners", "upper", "T1", "T2", "T1", "completed"),
         createMatch("W_U_R2_P1", 2, 1, "winners", "upper", "T1", null, null, "pending"),
@@ -86,17 +87,12 @@ describe("aggressiveCascadeReset", () => {
       const edited = matches[0];
       const plan = computeAggressiveCascadeReset(edited, matches);
 
-      // Should delete W_U_R2_P1
-      expect(plan.toDelete).toContain("W_U_R2_P1");
-      // Should add update for edited match to nullify the reference
-      const updateForEdited = plan.toUpdate.find(u => u.matchId === "W_U_R1_P1");
-      // The update for edited match should include nullifying next_win_match_id
-      if (updateForEdited) {
-        expect(updateForEdited.data.next_win_match_id).toBeNull();
-      } else {
-        // If no explicit update, it's okay since the match itself is being reset anyway
-        expect(true).toBe(true);
-      }
+      // Should NEVER delete
+      expect(plan.toDelete.length).toBe(0);
+      // Should reset downstream
+      expect(plan.toUpdate.some(u => u.matchId === "W_U_R2_P1")).toBe(true);
+      // Edited match also reset
+      expect(plan.toUpdate.some(u => u.matchId === "W_U_R1_P1")).toBe(true);
     });
 
     it("should clear scores and status on reset", () => {

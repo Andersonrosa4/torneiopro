@@ -1069,48 +1069,35 @@ const TournamentDetail = () => {
          // Log plan
          cascadePlan.log.forEach(msg => console.log(msg));
          
-         // Execute deletes and updates
-         if (cascadePlan.toDelete.length > 0) {
-           // Delete in batches to avoid foreign key issues
-           for (const matchIdToDel of cascadePlan.toDelete) {
-             await organizerQuery({
-               table: "matches",
-               operation: "update",
-               data: { next_win_match_id: null, next_lose_match_id: null },
-               filters: { id: matchIdToDel },
-             } as any);
-           }
-           // Now delete
-           await Promise.all(
-             cascadePlan.toDelete.map(mid =>
-               organizerQuery({
-                 table: "matches",
-                 operation: "delete",
-                 filters: { id: mid },
-               })
-             )
-           );
-         }
-         
-         // Execute updates
-         if (cascadePlan.toUpdate.length > 0) {
-           await Promise.all(
-             cascadePlan.toUpdate.map(async (reset) => {
-               const { error } = await organizerQuery({
-                 table: "matches",
-                 operation: "update",
-                 data: reset.data,
-                 filters: { id: reset.matchId },
-               });
-               if (error) console.error(`[CASCADE:Error] Match ${reset.matchId}:`, error);
-               else console.log(`[CASCADE:OK] Match ${reset.matchId} reset`);
-             })
-           );
-         }
-         
-         if (cascadePlan.toDelete.length > 0 || cascadePlan.toUpdate.length > 0) {
-           toast.info(`${cascadePlan.toDelete.length} partida(s) deletada(s), ${cascadePlan.toUpdate.length} resetada(s).`);
-         }
+          // SAFETY: Never delete matches during cascade — only reset them
+          // This preserves the bracket structure in all formats and modalities
+          if (cascadePlan.toDelete.length > 0) {
+            console.warn(`[CASCADE:BLOCKED] ${cascadePlan.toDelete.length} match deletions blocked — converting to resets`);
+            for (const mid of cascadePlan.toDelete) {
+              cascadePlan.toUpdate.push({
+                matchId: mid,
+                data: { team1_id: null, team2_id: null, winner_team_id: null, status: 'pending', score1: 0, score2: 0 },
+              });
+            }
+            cascadePlan.toDelete = [];
+          }
+          
+          // Execute resets
+          if (cascadePlan.toUpdate.length > 0) {
+            await Promise.all(
+              cascadePlan.toUpdate.map(async (reset) => {
+                const { error } = await organizerQuery({
+                  table: "matches",
+                  operation: "update",
+                  data: reset.data,
+                  filters: { id: reset.matchId },
+                });
+                if (error) console.error(`[CASCADE:Error] Match ${reset.matchId}:`, error);
+                else console.log(`[CASCADE:OK] Match ${reset.matchId} reset`);
+              })
+            );
+            toast.info(`${cascadePlan.toUpdate.length} partida(s) resetada(s).`);
+          }
        }
      }
 

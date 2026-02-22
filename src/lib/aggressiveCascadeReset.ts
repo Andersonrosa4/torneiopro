@@ -52,21 +52,19 @@ export function computeAggressiveCascadeReset(
   allMatches: Match[],
 ): CascadeResetPlan {
   const log: string[] = [];
-  const toDelete: Set<string> = new Set();
   const toUpdate: Map<string, Record<string, any>> = new Map();
 
-  // ── STEP 1: Identify matches to purge based on bracket type and round ──
+  // ── STEP 1: Identify downstream matches to RESET (never delete!) ──
 
-  // Same bracket type (winners/losers) + same half + same round or later
+  // Same bracket type (winners/losers) + same half + later rounds
   const sameBracketMatches = allMatches.filter(m => 
     m.bracket_type === editedMatch.bracket_type &&
     m.bracket_half === editedMatch.bracket_half &&
-    m.round >= editedMatch.round &&
+    m.round > editedMatch.round &&
     m.id !== editedMatch.id
   );
 
   // For edited Winners matches, also cascade to opposite Losers (mirror crossing)
-  // CRITICAL: Losers edits MUST NOT cascade to Winners (granular isolation)
   let mirrorLosersMatches: Match[] = [];
   if (editedMatch.bracket_type === 'winners' && editedMatch.bracket_half) {
     const oppositeSide = editedMatch.bracket_half === 'upper' ? 'lower' : 'upper';
@@ -80,49 +78,31 @@ export function computeAggressiveCascadeReset(
     log.push(`[Isolation] Losers ${editedMatch.bracket_half} R${editedMatch.round} edit isolated - NO cascade to Winners`);
   }
 
-  // Collect all matches to DELETE
-  const candidatesToDelete = [...sameBracketMatches, ...mirrorLosersMatches];
-  for (const m of candidatesToDelete) {
-    toDelete.add(m.id);
-    log.push(`[Delete] ${m.bracket_type} ${m.bracket_half} R${m.round}P${m.position} (cascade)`);
+  // RESET all downstream matches (clear teams, scores, status) — NEVER delete
+  const candidatesToReset = [...sameBracketMatches, ...mirrorLosersMatches];
+  for (const m of candidatesToReset) {
+    toUpdate.set(m.id, {
+      team1_id: null,
+      team2_id: null,
+      winner_team_id: null,
+      status: 'pending',
+      score1: 0,
+      score2: 0,
+    });
+    log.push(`[Reset] ${m.bracket_type} ${m.bracket_half} R${m.round}P${m.position} (cascade reset, preserved)`);
   }
 
-  // ── STEP 2: Nullify references to deleted matches ──
-  // Any match that links to a deleted match should have that link nullified
-  for (const m of allMatches) {
-    if (!toDelete.has(m.id)) {
-      const updates: Record<string, any> = {};
-      if (m.next_win_match_id && toDelete.has(m.next_win_match_id)) {
-        updates.next_win_match_id = null;
-      }
-      if (m.next_lose_match_id && toDelete.has(m.next_lose_match_id)) {
-        updates.next_lose_match_id = null;
-      }
-      if (Object.keys(updates).length > 0) {
-        toUpdate.set(m.id, updates);
-        log.push(`[Nullify] ${m.bracket_type} ${m.bracket_half} R${m.round}P${m.position} - clear refs to deleted`);
-      }
-    }
-  }
-
-  // ── STEP 3: Reset the edited match itself ──
+  // ── STEP 2: Reset the edited match itself ──
   toUpdate.set(editedMatch.id, {
     winner_team_id: null,
     status: 'pending',
     score1: 0,
     score2: 0,
-    // Also nullify any references to deleted matches
-    ...(editedMatch.next_win_match_id && toDelete.has(editedMatch.next_win_match_id) 
-      ? { next_win_match_id: null } 
-      : {}),
-    ...(editedMatch.next_lose_match_id && toDelete.has(editedMatch.next_lose_match_id) 
-      ? { next_lose_match_id: null } 
-      : {}),
   });
   log.push(`[Reset] Edited match ${editedMatch.id} cleared`);
 
   return {
-    toDelete: Array.from(toDelete),
+    toDelete: [], // NEVER delete matches — always preserve bracket structure
     toUpdate: Array.from(toUpdate.entries()).map(([matchId, data]) => ({ matchId, data })),
     log,
   };

@@ -869,7 +869,11 @@ const TournamentDetail = () => {
     const numGroups = brackets.length;
     
     // First, collect raw intended matchups (before chapéu adjustments)
-    const rawPairings: { team1: string; team2: string }[] = [];
+    // SEPARAÇÃO DE METADES: 1º lugar crossovers na metade superior,
+    // 2º lugar crossovers na metade inferior (ordem reversa para máxima separação).
+    // Isso garante que equipes do mesmo grupo SÓ se encontrem na FINAL.
+    const firstPlacePairings: { team1: string; team2: string }[] = [];
+    const secondPlacePairings: { team1: string; team2: string }[] = [];
 
     for (let i = 0; i < Math.ceil(numGroups / 2); i++) {
       const rightIdx = numGroups - 1 - i;
@@ -877,21 +881,27 @@ const TournamentDetail = () => {
       const groupRight = rightIdx !== i ? groupRankings[String(brackets[rightIdx])] : null;
 
       if (groupRight) {
-        // 1st of group[i] vs 2nd of group[rightIdx]
+        // 1st of group[i] vs 2nd of group[rightIdx] → TOP HALF
         if (groupI[0] && groupRight[1]) {
-          rawPairings.push({ team1: groupI[0].teamId, team2: groupRight[1].teamId });
+          firstPlacePairings.push({ team1: groupI[0].teamId, team2: groupRight[1].teamId });
         }
-        // 2nd of group[i] vs 1st of group[rightIdx]
+        // 2nd of group[i] vs 1st of group[rightIdx] → BOTTOM HALF
         if (groupI[1] && groupRight[0]) {
-          rawPairings.push({ team1: groupI[1].teamId, team2: groupRight[0].teamId });
+          secondPlacePairings.push({ team1: groupI[1].teamId, team2: groupRight[0].teamId });
         }
       } else {
         // Odd number of groups: middle group plays within itself
         if (groupI[0] && groupI[1]) {
-          rawPairings.push({ team1: groupI[0].teamId, team2: groupI[1].teamId });
+          firstPlacePairings.push({ team1: groupI[0].teamId, team2: groupI[1].teamId });
         }
       }
     }
+
+    // Reverse second-place pairings for maximum group separation in quarterfinals
+    secondPlacePairings.reverse();
+
+    // Combine: top half first, then bottom half
+    const rawPairings: { team1: string; team2: string }[] = [...firstPlacePairings, ...secondPlacePairings];
 
     // Add index teams as raw pairings
     if (indexTeamIds.length > 0) {

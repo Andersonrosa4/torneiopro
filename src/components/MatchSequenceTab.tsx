@@ -435,9 +435,19 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
             });
           }
           const rMatches = knockoutNormal.filter(m => m.round === r);
+          // Group paired matches (same next_win_match_id) together for bracket order
+          const byNextMatch = new Map<string, Match[]>();
+          for (const m of rMatches) {
+            const key = (m as any).next_win_match_id || `solo_${m.id}`;
+            if (!byNextMatch.has(key)) byNextMatch.set(key, []);
+            byNextMatch.get(key)!.push(m);
+          }
+          const pairedGroups = [...byNextMatch.values()].map(g => g.sort((a, b) => a.position - b.position));
+          pairedGroups.sort((a, b) => a[0].position - b[0].position);
+          const orderedMatches = pairedGroups.flat();
           groups.push({
             label: getRoundLabel(r),
-            items: rMatches.map(m => ({ match: m, idx: 0 })),
+            items: orderedMatches.map(m => ({ match: m, idx: 0 })),
           });
         }
       }

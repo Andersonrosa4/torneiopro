@@ -70,11 +70,13 @@ const MatchRow = ({
   idx,
   getTeamName,
   getRoundLabel,
+  teamGroupMap,
 }: {
   match: Match;
   idx: number;
   getTeamName: (id: string | null) => string;
   getRoundLabel: (round: number) => string;
+  teamGroupMap: Record<string, string>;
 }) => {
   const isCompleted = match.status === "completed";
   const team1Name = getTeamName(match.team1_id);
@@ -112,7 +114,12 @@ const MatchRow = ({
             </span>
             {match.team1_id && match.bracket_number && match.round === 0 && (
               <span className="text-[8px] font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 rounded px-1 py-0 leading-tight shrink-0">
-                {`Grp ${String.fromCharCode(64 + (match.bracket_number || 1))}`}
+                {`G${String.fromCharCode(64 + (match.bracket_number || 1))}`}
+              </span>
+            )}
+            {match.team1_id && match.round > 0 && teamGroupMap[match.team1_id] && (
+              <span className="text-[8px] font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 rounded px-1 py-0 leading-tight shrink-0">
+                {`G${teamGroupMap[match.team1_id]}`}
               </span>
             )}
             <span className="text-[10px] text-muted-foreground/60 shrink-0 font-bold">vs</span>
@@ -123,7 +130,12 @@ const MatchRow = ({
             </span>
             {match.team2_id && match.bracket_number && match.round === 0 && (
               <span className="text-[8px] font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 rounded px-1 py-0 leading-tight shrink-0">
-                {`Grp ${String.fromCharCode(64 + (match.bracket_number || 1))}`}
+                {`G${String.fromCharCode(64 + (match.bracket_number || 1))}`}
+              </span>
+            )}
+            {match.team2_id && match.round > 0 && teamGroupMap[match.team2_id] && (
+              <span className="text-[8px] font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 rounded px-1 py-0 leading-tight shrink-0">
+                {`G${teamGroupMap[match.team2_id]}`}
               </span>
             )}
           </div>
@@ -178,6 +190,7 @@ const BlockSection = ({
   isDE,
   getTeamName,
   getRoundLabel,
+  teamGroupMap,
 }: {
   label: string;
   items: { match: Match; idx: number }[];
@@ -187,6 +200,7 @@ const BlockSection = ({
   isDE: boolean;
   getTeamName: (id: string | null) => string;
   getRoundLabel: (round: number) => string;
+  teamGroupMap: Record<string, string>;
 }) => {
   const completedCount = items.filter(i => i.match.status === "completed").length;
   const totalCount = items.length;
@@ -234,6 +248,7 @@ const BlockSection = ({
             idx={idx}
             getTeamName={getTeamName}
             getRoundLabel={getRoundLabel}
+            teamGroupMap={teamGroupMap}
           />
         ))}
       </div>
@@ -252,6 +267,19 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
     const team = teams.find((t) => t.id === teamId);
     return team ? `${team.player1_name} / ${team.player2_name}` : "A definir";
   };
+
+  // Build team -> group letter map from group-stage matches
+  const teamGroupMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const m of matches) {
+      if (m.round === 0 && m.bracket_number) {
+        const letter = String.fromCharCode(64 + m.bracket_number);
+        if (m.team1_id) map[m.team1_id] = letter;
+        if (m.team2_id) map[m.team2_id] = letter;
+      }
+    }
+    return map;
+  }, [matches]);
 
   // Available brackets for filter
   const availableBrackets = useMemo(() => {
@@ -457,6 +485,7 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
             isDE={isDE}
             getTeamName={getTeamName}
             getRoundLabel={getRoundLabel}
+            teamGroupMap={teamGroupMap}
           />
         </div>
       ))}

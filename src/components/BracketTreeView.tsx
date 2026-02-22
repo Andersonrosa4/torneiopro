@@ -727,6 +727,39 @@ function buildKnockoutTreePositions(knockoutMatches: Match[]) {
         positions.set(match.id, mi * slotH);
       }
     }
+
+    // Fix overlapping: when extremity pairing causes matches to share same Y position, spread them out
+    if (roundMatches.length > 1) {
+      const roundPositions = roundMatches.map(m => ({ id: m.id, y: positions.get(m.id) ?? 0 }));
+      roundPositions.sort((a, b) => a.y - b.y);
+      
+      // Check if any matches overlap (same or too-close Y position)
+      let hasOverlap = false;
+      for (let i = 1; i < roundPositions.length; i++) {
+        if (roundPositions[i].y - roundPositions[i - 1].y < slotH * 0.8) {
+          hasOverlap = true;
+          break;
+        }
+      }
+
+      if (hasOverlap) {
+        // Redistribute evenly within the range defined by feeders
+        const allFeederYs = roundMatches.flatMap(m => {
+          const feeders = knockoutMatches.filter(f => f.next_win_match_id === m.id);
+          return feeders.map(f => positions.get(f.id)).filter((p): p is number => p !== undefined);
+        });
+        const minY = allFeederYs.length > 0 ? Math.min(...allFeederYs) : 0;
+        const maxY = allFeederYs.length > 0 ? Math.max(...allFeederYs) : (roundMatches.length - 1) * slotH;
+        const totalSpan = Math.max(maxY - minY, (roundMatches.length - 1) * slotH);
+        const step = roundMatches.length > 1 ? totalSpan / (roundMatches.length - 1) : 0;
+        
+        // Sort by position to maintain correct order
+        const sortedByPos = [...roundMatches].sort((a, b) => a.position - b.position);
+        sortedByPos.forEach((m, i) => {
+          positions.set(m.id, minY + i * step);
+        });
+      }
+    }
   }
 
   return { rounds, roundGroups, positions };

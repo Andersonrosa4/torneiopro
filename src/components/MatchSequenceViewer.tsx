@@ -419,21 +419,40 @@ const MatchCard = ({
     const groupTeams: Record<number, Set<string>> = {};
     const teamWins: Record<string, number> = {};
     const teamPoints: Record<string, number> = {};
+    const teamPointsFor: Record<string, number> = {};
+    const teamPointsAgainst: Record<string, number> = {};
     for (const m of allMatches) {
       if (m.round === 0 && m.bracket_number) {
         if (!groupTeams[m.bracket_number]) groupTeams[m.bracket_number] = new Set();
-        if (m.team1_id) { groupTeams[m.bracket_number].add(m.team1_id); teamWins[m.team1_id] = teamWins[m.team1_id] || 0; teamPoints[m.team1_id] = teamPoints[m.team1_id] || 0; }
-        if (m.team2_id) { groupTeams[m.bracket_number].add(m.team2_id); teamWins[m.team2_id] = teamWins[m.team2_id] || 0; teamPoints[m.team2_id] = teamPoints[m.team2_id] || 0; }
-        if (m.status === 'completed' && m.winner_team_id) {
-          teamWins[m.winner_team_id] = (teamWins[m.winner_team_id] || 0) + 1;
-          teamPoints[m.winner_team_id] = (teamPoints[m.winner_team_id] || 0) + 3;
+        if (m.team1_id) { groupTeams[m.bracket_number].add(m.team1_id); teamWins[m.team1_id] = teamWins[m.team1_id] || 0; teamPoints[m.team1_id] = teamPoints[m.team1_id] || 0; teamPointsFor[m.team1_id] = teamPointsFor[m.team1_id] || 0; teamPointsAgainst[m.team1_id] = teamPointsAgainst[m.team1_id] || 0; }
+        if (m.team2_id) { groupTeams[m.bracket_number].add(m.team2_id); teamWins[m.team2_id] = teamWins[m.team2_id] || 0; teamPoints[m.team2_id] = teamPoints[m.team2_id] || 0; teamPointsFor[m.team2_id] = teamPointsFor[m.team2_id] || 0; teamPointsAgainst[m.team2_id] = teamPointsAgainst[m.team2_id] || 0; }
+        if (m.status === 'completed') {
+          if (m.winner_team_id) {
+            teamWins[m.winner_team_id] = (teamWins[m.winner_team_id] || 0) + 1;
+            teamPoints[m.winner_team_id] = (teamPoints[m.winner_team_id] || 0) + 3;
+          }
+          // Track point differential
+          if (m.team1_id && m.score1 != null && m.score2 != null) {
+            teamPointsFor[m.team1_id] = (teamPointsFor[m.team1_id] || 0) + m.score1;
+            teamPointsAgainst[m.team1_id] = (teamPointsAgainst[m.team1_id] || 0) + m.score2;
+          }
+          if (m.team2_id && m.score1 != null && m.score2 != null) {
+            teamPointsFor[m.team2_id] = (teamPointsFor[m.team2_id] || 0) + m.score2;
+            teamPointsAgainst[m.team2_id] = (teamPointsAgainst[m.team2_id] || 0) + m.score1;
+          }
         }
       }
     }
-    // Sort teams in each group by points/wins desc → assign position
+    // Sort teams in each group by points desc → point differential desc → assign position
     for (const [bn, teamSet] of Object.entries(groupTeams)) {
       const letter = String.fromCharCode(64 + Number(bn));
-      const sorted = [...teamSet].sort((a, b) => (teamPoints[b] || 0) - (teamPoints[a] || 0) || (teamWins[b] || 0) - (teamWins[a] || 0));
+      const sorted = [...teamSet].sort((a, b) => {
+        const ptDiff = (teamPoints[b] || 0) - (teamPoints[a] || 0);
+        if (ptDiff !== 0) return ptDiff;
+        const diffA = (teamPointsFor[a] || 0) - (teamPointsAgainst[a] || 0);
+        const diffB = (teamPointsFor[b] || 0) - (teamPointsAgainst[b] || 0);
+        return diffB - diffA;
+      });
       sorted.forEach((tid, idx) => { map[tid] = { group: letter, pos: idx + 1 }; });
     }
     return map;

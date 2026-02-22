@@ -9,12 +9,16 @@ const PromoPopup = () => {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const alreadyShown = localStorage.getItem(STORAGE_KEY);
-    if (alreadyShown) return;
+    const lastShown = localStorage.getItem(STORAGE_KEY);
+    // Show again if never shown or if last shown more than 24h ago
+    if (lastShown) {
+      const elapsed = Date.now() - Number(lastShown);
+      if (elapsed < 24 * 60 * 60 * 1000) return;
+    }
 
     const timer = setTimeout(() => {
       setVisible(true);
-      localStorage.setItem(STORAGE_KEY, "true");
+      localStorage.setItem(STORAGE_KEY, String(Date.now()));
     }, 5000);
 
     return () => clearTimeout(timer);

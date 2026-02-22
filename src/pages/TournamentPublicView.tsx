@@ -107,7 +107,7 @@ const TournamentPublicView = () => {
 
     try {
       const [tRes, teamsRes, mRes] = await Promise.all([
-        publicQuery({ table: "tournaments", filters: { id }, single: true }),
+        publicQuery({ table: "tournaments", filters: { id }, maybeSingle: true }),
         publicQuery({ table: "teams", filters: { tournament_id: id }, order: { column: "seed", ascending: true } }),
         publicQuery({ table: "matches", filters: { tournament_id: id }, order: [{ column: "round", ascending: true }, { column: "position", ascending: true }] }),
       ]);

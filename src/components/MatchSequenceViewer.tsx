@@ -452,8 +452,30 @@ const MatchCard = ({
     const isFirstKnockoutRound = match.round === firstKnockoutRound;
 
     // If there's a group stage AND this is the first knockout round,
-    // teams come from classification — no feeder labels possible
+    // show group origin labels (e.g. "1º A", "2º H") using Mirrored Crossover
     if (hasGroupStage && isFirstKnockoutRound && tournamentFormat !== 'double_elimination') {
+      const groupNumbers = [...new Set(allMatches.filter(m => m.round === 0 && m.bracket_number).map(m => m.bracket_number!))].sort((a, b) => a - b);
+      const numGroups = groupNumbers.length;
+      if (numGroups > 0) {
+        const pos = match.position; // 1-indexed
+        const groupIdx = Math.ceil(pos / 2) - 1; // 0, 0, 1, 1, 2, 2, ...
+        const mirrorIdx = numGroups - 1 - groupIdx;
+        const groupLetter = String.fromCharCode(65 + groupIdx);
+        const mirrorLetter = String.fromCharCode(65 + mirrorIdx);
+        if (pos % 2 === 1) {
+          // Odd position: 1º from group vs 2º from mirror group
+          return {
+            team1: match.team1_id ? null : `1º ${groupLetter}`,
+            team2: match.team2_id ? null : `2º ${mirrorLetter}`,
+          };
+        } else {
+          // Even position: 2º from group vs 1º from mirror group
+          return {
+            team1: match.team1_id ? null : `2º ${groupLetter}`,
+            team2: match.team2_id ? null : `1º ${mirrorLetter}`,
+          };
+        }
+      }
       return { team1: null, team2: null };
     }
     

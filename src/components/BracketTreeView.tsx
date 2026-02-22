@@ -268,7 +268,7 @@ const MatchCard = ({
       <div className="space-y-0.5">
         <div className={`flex items-center justify-between px-2 py-1.5 ${topWin ? "bg-success/10" : ""}`}>
           <span className={`truncate flex-1 ${topWin ? "font-bold text-success" : isWaiting && !topTeamId ? "text-muted-foreground/50 italic" : "team-name"}`}>
-            {getName(topTeamId)}
+            {topTeamId ? getName(topTeamId) : (topFeeder ? topFeeder.label : getName(null))}
           </span>
           {topTeamId && match.bracket_number && (
             <span className="ml-1 text-[7px] font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 rounded px-1 py-0 leading-tight shrink-0">
@@ -281,11 +281,6 @@ const MatchCard = ({
             </span>
           )}
         </div>
-        {topFeeder && (
-          <div className="px-2 pb-1 text-[7px] text-muted-foreground/60 font-medium">
-            ({topFeeder.label})
-          </div>
-        )}
       </div>
 
       <div className="border-t border-border/30" />
@@ -293,7 +288,7 @@ const MatchCard = ({
       <div className="space-y-0.5">
         <div className={`flex items-center justify-between px-2 py-1.5 ${bottomWin ? "bg-success/10" : ""}`}>
           <span className={`truncate flex-1 ${bottomWin ? "font-bold text-success" : isWaiting && !bottomTeamId ? "text-muted-foreground/50 italic" : "team-name"}`}>
-            {getName(bottomTeamId)}
+            {bottomTeamId ? getName(bottomTeamId) : (bottomFeeder ? bottomFeeder.label : getName(null))}
           </span>
           {bottomTeamId && match.bracket_number && (
             <span className="ml-1 text-[7px] font-bold text-cyan-300 bg-cyan-500/20 border border-cyan-400/40 rounded px-1 py-0 leading-tight shrink-0">
@@ -306,11 +301,6 @@ const MatchCard = ({
             </span>
           )}
         </div>
-        {bottomFeeder && (
-          <div className="px-2 pb-1 text-[7px] text-muted-foreground/60 font-medium">
-            ({bottomFeeder.label})
-          </div>
-        )}
       </div>
 
       <div className="flex justify-center border-t border-border/20 px-2 py-1">

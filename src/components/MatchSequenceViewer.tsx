@@ -161,9 +161,10 @@ function generateInterleavedSequence(matches: Match[]): Match[] {
     }
   }
 
-  // Apply conflict resolution across the ENTIRE sequence (groups + knockout)
-  // This ensures no team plays their last group match and first knockout match back-to-back
-  return resolveConsecutiveConflicts([...groupSequence, ...knockoutInterleaved]);
+  // Apply conflict resolution ONLY within group stage
+  // Knockout matches must maintain their natural position order (bracket integrity)
+  const resolvedGroups = resolveConsecutiveConflicts(groupSequence);
+  return [...resolvedGroups, ...knockoutInterleaved];
 }
 
 function resolveConsecutiveConflicts(sequence: Match[]): Match[] {

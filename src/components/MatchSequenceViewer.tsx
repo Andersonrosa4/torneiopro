@@ -6,6 +6,7 @@ import { Trophy, Save, Download, FileText, Sheet, Pencil, Lock, CheckCircle2, Cl
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { exportMatchSequence } from "@/lib/exportUtils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { getSlotFeeders } from "@/lib/feederLabels";
 import { getEliminationRoundLabel, getEliminationRoundShortLabel } from "@/lib/roundLabels";
 import { buildSchedulerBlocks, schedulerSequence, getSchedulerBlockColor, getSchedulerBadgeColor, type SchedulerBlock } from "@/lib/roundScheduler";
 import { buildMatchNumberMap } from "@/lib/matchNumbering";
@@ -500,55 +501,46 @@ const MatchCard = ({
       return { team1: null, team2: null };
     }
     
-    // Method 1: Find feeders via next_win_match_id and next_lose_match_id
-    let winFeeders = allMatches.filter(m => m.next_win_match_id === match.id);
-    let loseFeeders = allMatches.filter(m => m.next_lose_match_id === match.id);
-    
-    // Method 2: Structural fallback — if no feeders found via links,
-    // use positional logic: round R, pos P ← round R-1, pos (2P-1) and (2P)
-    if (winFeeders.length === 0 && loseFeeders.length === 0 && match.round > 0 && (match as any).bracket_type !== 'third_place') {
-      const prevRound = match.round - 1;
-      // Only use structural fallback if previous round is knockout (not groups)
-      if (prevRound > 0) {
-        const pos1 = match.position * 2 - 1;
-        const pos2 = match.position * 2;
-        winFeeders = allMatches.filter(m => 
-          m.round === prevRound && 
-          (m.bracket_number || 1) === (match.bracket_number || 1) &&
-          (m.position === pos1 || m.position === pos2)
-        );
-      }
-    }
+    // Use unified slot feeder logic (same as BracketTreeView) for correct slot assignment
+    const slotFeeders = getSlotFeeders(match as any, allMatches as any, matchNumberMap);
     
     let team1Label: string | null = null;
     let team2Label: string | null = null;
 
-    // Winner feeders
-    for (const f of winFeeders) {
-      const fNum = matchNumberMap.get(f.id);
-      if (!fNum) continue;
-      if (f.position % 2 === 1) {
-        team1Label = `Venc. Jogo ${fNum}`;
-      } else {
-        team2Label = `Venc. Jogo ${fNum}`;
-      }
+    if (slotFeeders.team1) {
+      const prefix = slotFeeders.team1.type === 'winner' ? 'Venc.' : 'Perd.';
+      const num = matchNumberMap.get(slotFeeders.team1.matchNumber) ?? '';
+      team1Label = num ? `${prefix} Jogo ${num}` : slotFeeders.team1.label;
+    }
+    if (slotFeeders.team2) {
+      const prefix = slotFeeders.team2.type === 'winner' ? 'Venc.' : 'Perd.';
+      const num = matchNumberMap.get(slotFeeders.team2.matchNumber) ?? '';
+      team2Label = num ? `${prefix} Jogo ${num}` : slotFeeders.team2.label;
     }
 
-    // Loser feeders (for 3rd place matches)
-    for (const f of loseFeeders) {
-      const fNum = matchNumberMap.get(f.id);
-      if (!fNum) continue;
-      if (f.position % 2 === 1) {
-        if (!team1Label) team1Label = `Perd. Jogo ${fNum}`;
-        else if (!team2Label) team2Label = `Perd. Jogo ${fNum}`;
-      } else {
-        if (!team2Label) team2Label = `Perd. Jogo ${fNum}`;
-        else if (!team1Label) team1Label = `Perd. Jogo ${fNum}`;
+    // Structural fallback: if no feeders found via links, use positional logic
+    if (!team1Label && !team2Label && match.round > 0 && (match as any).bracket_type !== 'third_place') {
+      const prevRound = match.round - 1;
+      if (prevRound > 0) {
+        const pos1 = match.position * 2 - 1;
+        const pos2 = match.position * 2;
+        const structuralFeeders = allMatches.filter(m => 
+          m.round === prevRound && 
+          (m.bracket_number || 1) === (match.bracket_number || 1) &&
+          (m.position === pos1 || m.position === pos2)
+        );
+        for (const f of structuralFeeders) {
+          const fNum = matchNumberMap.get(f.id);
+          if (!fNum) continue;
+          const label = `Venc. Jogo ${fNum}`;
+          if (!team1Label) team1Label = label;
+          else if (!team2Label) team2Label = label;
+        }
       }
     }
 
     return { team1: team1Label, team2: team2Label };
-  }, [match.id, match.round, match.position, match.bracket_number, allMatches, matchNumberMap, tournamentFormat]);
+  }, [match.id, match.round, match.position, match.bracket_number, match.team1_id, match.team2_id, allMatches, matchNumberMap, tournamentFormat]);
 
   const team1Name = match.team1_id ? getTeamName(match.team1_id) : (feederLabels.team1 || "A definir");
   const team2Name = match.team2_id ? getTeamName(match.team2_id) : (feederLabels.team2 || "A definir");

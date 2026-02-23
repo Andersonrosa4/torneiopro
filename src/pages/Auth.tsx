@@ -98,6 +98,9 @@ const Auth = () => {
     beach_volleyball: "from-[hsl(35_20%_10%)] via-[hsl(35_15%_14%)] to-[hsl(48_20%_12%)]",
     futevolei: "from-[hsl(155_20%_10%)] via-[hsl(195_15%_14%)] to-[hsl(155_20%_12%)]",
     beach_tennis: "from-[hsl(180_20%_10%)] via-[hsl(195_15%_14%)] to-[hsl(22_20%_12%)]",
+    tennis: "from-[hsl(120_20%_10%)] via-[hsl(100_15%_14%)] to-[hsl(120_20%_12%)]",
+    padel: "from-[hsl(270_20%_10%)] via-[hsl(280_15%_14%)] to-[hsl(270_20%_12%)]",
+    futsal: "from-[hsl(0_20%_10%)] via-[hsl(15_15%_14%)] to-[hsl(0_20%_12%)]",
   };
 
   const sportBg = sport ? sportBgMap[sport] : "from-[hsl(220_15%_10%)] via-[hsl(220_12%_14%)] to-[hsl(25_15%_12%)]";

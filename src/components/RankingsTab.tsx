@@ -6,10 +6,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Trash2, TrendingUp, Download, FileText, Sheet, Pencil, Check, X } from "lucide-react";
+import { Plus, Trash2, TrendingUp, Download, FileText, Sheet, Pencil, Check, X, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 
 import { exportRankings } from "@/lib/exportUtils";
+
+/** Points table based on classification position */
+const getPointsForPosition = (position: number): number => {
+  if (position === 1) return 20;
+  if (position === 2) return 18;
+  if (position === 3) return 16;
+  if (position === 4) return 14;
+  if (position >= 5 && position <= 8) return 10;
+  if (position >= 9 && position <= 16) return 8;
+  if (position >= 17 && position <= 24) return 6;
+  if (position >= 25 && position <= 32) return 4;
+  return 2;
+};
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -172,6 +185,164 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
     fetchRankings();
   };
 
+  const [generating, setGenerating] = useState(false);
+
+  /** Auto-generate ranking from classification positions */
+  const generateAutoRanking = async () => {
+    const createdBy = organizerId || user?.id || "";
+    if (!createdBy) {
+      toast.error("Você precisa estar logado");
+      return;
+    }
+
+    setGenerating(true);
+    try {
+      // Fetch matches for this tournament/modality
+      const matchFilters: Record<string, any> = { tournament_id: tournamentId };
+      if (modalityId) matchFilters.modality_id = modalityId;
+
+      const { data: matchesData } = await publicQuery<any[]>({
+        table: "matches",
+        filters: matchFilters,
+        order: { column: "round", ascending: true },
+      });
+
+      if (!matchesData || matchesData.length === 0) {
+        toast.error("Nenhuma partida encontrada para gerar o ranking");
+        setGenerating(false);
+        return;
+      }
+
+      // Build elimination ranking (same logic as ClassificationTab)
+      const elimMatches = matchesData.filter((m: any) => m.round >= 1 && m.bracket_type === "winners");
+      const groupMatches = matchesData.filter((m: any) => m.round === 0);
+
+      if (elimMatches.length === 0) {
+        toast.error("Nenhuma fase eliminatória encontrada");
+        setGenerating(false);
+        return;
+      }
+
+      const maxRound = Math.max(...elimMatches.map((m: any) => m.round));
+      const ranked: { teamId: string; position: number }[] = [];
+      const placedTeams = new Set<string>();
+
+      // Final
+      const finalMatches = elimMatches.filter((m: any) => m.round === maxRound && m.status === "completed");
+      finalMatches.forEach((f: any) => {
+        if (f.winner_team_id && !placedTeams.has(f.winner_team_id)) {
+          ranked.push({ teamId: f.winner_team_id, position: 1 });
+          placedTeams.add(f.winner_team_id);
+        }
+        const loserId = f.team1_id === f.winner_team_id ? f.team2_id : f.team1_id;
+        if (loserId && !placedTeams.has(loserId)) {
+          ranked.push({ teamId: loserId, position: 2 });
+          placedTeams.add(loserId);
+        }
+      });
+
+      // Walk backward through rounds
+      for (let round = maxRound - 1; round >= 1; round--) {
+        const roundMatches = elimMatches.filter((m: any) => m.round === round && m.status === "completed");
+        const startPos = ranked.length + 1;
+        const losers: { teamId: string; pointDiff: number }[] = [];
+
+        roundMatches.forEach((m: any) => {
+          if (m.winner_team_id) {
+            const loserId = m.team1_id === m.winner_team_id ? m.team2_id : m.team1_id;
+            if (loserId && !placedTeams.has(loserId)) {
+              const s1 = m.score1 ?? 0;
+              const s2 = m.score2 ?? 0;
+              const diff = m.team1_id === loserId ? s1 - s2 : s2 - s1;
+              losers.push({ teamId: loserId, pointDiff: diff });
+            }
+          }
+        });
+
+        losers.sort((a, b) => b.pointDiff - a.pointDiff);
+        losers.forEach((l, idx) => {
+          ranked.push({ teamId: l.teamId, position: startPos + idx });
+          placedTeams.add(l.teamId);
+        });
+      }
+
+      // Group stage unplaced teams
+      const groupTeamIds = new Set<string>();
+      groupMatches.forEach((m: any) => {
+        if (m.team1_id) groupTeamIds.add(m.team1_id);
+        if (m.team2_id) groupTeamIds.add(m.team2_id);
+      });
+
+      const unplaced: { teamId: string; wins: number; diff: number }[] = [];
+      groupTeamIds.forEach((tid) => {
+        if (placedTeams.has(tid)) return;
+        let wins = 0, pf = 0, pa = 0;
+        groupMatches.filter((m: any) => m.status === "completed" && (m.team1_id === tid || m.team2_id === tid))
+          .forEach((m: any) => {
+            if (m.winner_team_id === tid) wins++;
+            if (m.team1_id === tid) { pf += m.score1 ?? 0; pa += m.score2 ?? 0; }
+            else { pf += m.score2 ?? 0; pa += m.score1 ?? 0; }
+          });
+        unplaced.push({ teamId: tid, wins, diff: pf - pa });
+      });
+      unplaced.sort((a, b) => b.wins - a.wins || b.diff - a.diff);
+      const gStart = ranked.length + 1;
+      unplaced.forEach((t, idx) => {
+        ranked.push({ teamId: t.teamId, position: gStart + idx });
+        placedTeams.add(t.teamId);
+      });
+
+      // Now create ranking entries for each individual player
+      // First delete existing rankings for this tournament
+      const { data: existingRankings } = await publicQuery<any[]>({
+        table: "rankings",
+        filters: { tournament_id: tournamentId },
+      });
+
+      if (existingRankings && existingRankings.length > 0) {
+        for (const r of existingRankings) {
+          await organizerQuery({ table: "rankings", operation: "delete", filters: { id: r.id } });
+        }
+      }
+
+      // Build team map
+      const teamMap = new Map<string, Team>();
+      teams.forEach((t) => teamMap.set(t.id, t));
+
+      // Insert individual player rankings
+      let inserted = 0;
+      for (const entry of ranked) {
+        const team = teamMap.get(entry.teamId);
+        if (!team) continue;
+        const pts = getPointsForPosition(entry.position);
+
+        // Insert for each player AND for the pair
+        const names = [team.player1_name, team.player2_name, `${team.player1_name} / ${team.player2_name}`];
+        for (const name of names) {
+          await organizerQuery({
+            table: "rankings",
+            operation: "insert",
+            data: {
+              athlete_name: name,
+              points: pts,
+              sport: sport as any,
+              tournament_id: tournamentId,
+              created_by: createdBy,
+            },
+          });
+          inserted++;
+        }
+      }
+
+      toast.success(`Ranking gerado! ${inserted} entradas criadas.`);
+      fetchRankings();
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao gerar ranking");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   // Rankings are already sorted by points desc from the query
   const sortedRankings = useMemo(
     () => [...rankings].sort((a, b) => b.points - a.points),
@@ -224,6 +395,21 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
             <Button onClick={addAthletePoints} className="gap-1 shrink-0">
               <Plus className="h-4 w-4" /> Adicionar
             </Button>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-border">
+            <Button
+              onClick={generateAutoRanking}
+              disabled={generating}
+              variant="outline"
+              className="w-full gap-2"
+            >
+              <Zap className="h-4 w-4" />
+              {generating ? "Gerando..." : "Gerar Ranking Automático pela Classificação"}
+            </Button>
+            <p className="text-xs text-muted-foreground mt-2 text-center">
+              1º=20pts · 2º=18pts · 3º=16pts · 4º=14pts · 5º–8º=10pts · 9º–16º=8pts · 17º–24º=6pts · 25º–32º=4pts
+            </p>
           </div>
         </motion.section>
       )}

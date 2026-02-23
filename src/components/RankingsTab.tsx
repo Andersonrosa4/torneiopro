@@ -475,18 +475,16 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: idx * 0.05 }}
-                  className="flex items-center justify-between rounded-lg border border-border bg-secondary/50 px-4 py-3 hover:border-primary/40 transition-colors"
+                  className="flex items-center justify-between rounded-lg border border-border bg-secondary/50 px-4 py-3 hover:border-primary/40 transition-colors overflow-hidden"
                 >
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-primary text-sm font-bold text-primary-foreground">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-primary text-sm font-bold text-primary-foreground">
                       {idx + 1}
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate team-name">{ranking.athlete_name}</p>
-                    </div>
+                    <p className="truncate team-name text-sm">{ranking.athlete_name}</p>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
                     {editingId === ranking.id ? (
                       <div className="flex items-center gap-1">
                         <Input
@@ -509,7 +507,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                         </Button>
                       </div>
                     ) : (
-                      <Badge variant="secondary" className="text-base font-bold tabular-nums">
+                      <Badge variant="secondary" className="text-sm font-bold tabular-nums whitespace-nowrap">
                         {ranking.points} pts
                       </Badge>
                     )}

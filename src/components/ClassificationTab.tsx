@@ -27,11 +27,6 @@ interface ClassificationTabProps {
   teams: Team[];
 }
 
-/**
- * CLASSIFICATION TAB - Rankings based on elimination round position
- * For single/double elimination: Champion > Runner-up > Semi losers > Quarter losers > etc.
- * For round-robin (round 0): uses wins + point differential as tiebreak
- */
 const ClassificationTab = ({ matches, teams }: ClassificationTabProps) => {
   const getTeamName = (teamId: string | null) => {
     if (!teamId) return "A definir";
@@ -42,11 +37,9 @@ const ClassificationTab = ({ matches, teams }: ClassificationTabProps) => {
   const standings = useMemo(() => {
     if (matches.length === 0) return [];
 
-    // Separate elimination matches (round >= 1) from group/round-robin (round 0)
     const eliminationMatches = matches.filter((m) => m.round >= 1 && m.bracket_type === "winners");
     const groupMatches = matches.filter((m) => m.round === 0);
 
-    // If no elimination matches, fall back to group/round-robin ranking
     if (eliminationMatches.length === 0) {
       return buildGroupRanking(groupMatches);
     }
@@ -54,7 +47,6 @@ const ClassificationTab = ({ matches, teams }: ClassificationTabProps) => {
     return buildEliminationRanking(eliminationMatches, groupMatches);
   }, [matches, teams]);
 
-  /** Build ranking from elimination bracket position */
   function buildEliminationRanking(
     elimMatches: Match[],
     groupMatches: Match[]
@@ -63,7 +55,6 @@ const ClassificationTab = ({ matches, teams }: ClassificationTabProps) => {
     const ranked: { id: string; name: string; position: number; label: string }[] = [];
     const placedTeams = new Set<string>();
 
-    // 1. Final match — Champion & Runner-up
     const finalMatches = elimMatches.filter((m) => m.round === maxRound && m.status === "completed");
     finalMatches.forEach((finalMatch) => {
       if (finalMatch.winner_team_id) {
@@ -76,7 +67,6 @@ const ClassificationTab = ({ matches, teams }: ClassificationTabProps) => {
           });
           placedTeams.add(finalMatch.winner_team_id);
         }
-
         const loserId =
           finalMatch.team1_id === finalMatch.winner_team_id
             ? finalMatch.team2_id
@@ -93,13 +83,10 @@ const ClassificationTab = ({ matches, teams }: ClassificationTabProps) => {
       }
     });
 
-    // 2. Walk backward through rounds: losers of each round get placed
     for (let round = maxRound - 1; round >= 1; round--) {
       const roundMatches = elimMatches.filter(
         (m) => m.round === round && m.status === "completed"
       );
-
-      // Position label based on how many remain after this round
       const startPos = ranked.length + 1;
       const losersInRound: { id: string; name: string; pointDiff: number }[] = [];
 
@@ -112,16 +99,11 @@ const ClassificationTab = ({ matches, teams }: ClassificationTabProps) => {
             const score2 = m.score2 ?? 0;
             const pointDiff =
               m.team1_id === loserId ? score1 - score2 : score2 - score1;
-            losersInRound.push({
-              id: loserId,
-              name: getTeamName(loserId),
-              pointDiff,
-            });
+            losersInRound.push({ id: loserId, name: getTeamName(loserId), pointDiff });
           }
         }
       });
 
-      // Sort losers within same round by point differential (descending)
       losersInRound.sort((a, b) => b.pointDiff - a.pointDiff);
 
       const endPos = startPos + losersInRound.length - 1;
@@ -131,17 +113,11 @@ const ClassificationTab = ({ matches, teams }: ClassificationTabProps) => {
           : `${startPos}º–${endPos}º lugar`;
 
       losersInRound.forEach((loser, idx) => {
-        ranked.push({
-          id: loser.id,
-          name: loser.name,
-          position: startPos + idx,
-          label,
-        });
+        ranked.push({ id: loser.id, name: loser.name, position: startPos + idx, label });
         placedTeams.add(loser.id);
       });
     }
 
-    // 3. Teams eliminated in round 0 (group stage) that never entered elimination
     const groupTeamIds = new Set<string>();
     groupMatches.forEach((m) => {
       if (m.team1_id) groupTeamIds.add(m.team1_id);
@@ -151,51 +127,31 @@ const ClassificationTab = ({ matches, teams }: ClassificationTabProps) => {
     const unplacedFromGroups: { id: string; name: string; wins: number; pointDiff: number }[] = [];
     groupTeamIds.forEach((teamId) => {
       if (placedTeams.has(teamId)) return;
-      let wins = 0;
-      let pointsFor = 0;
-      let pointsAgainst = 0;
+      let wins = 0, pointsFor = 0, pointsAgainst = 0;
       groupMatches
         .filter((m) => m.status === "completed" && (m.team1_id === teamId || m.team2_id === teamId))
         .forEach((m) => {
           if (m.winner_team_id === teamId) wins++;
-          if (m.team1_id === teamId) {
-            pointsFor += m.score1 ?? 0;
-            pointsAgainst += m.score2 ?? 0;
-          } else {
-            pointsFor += m.score2 ?? 0;
-            pointsAgainst += m.score1 ?? 0;
-          }
+          if (m.team1_id === teamId) { pointsFor += m.score1 ?? 0; pointsAgainst += m.score2 ?? 0; }
+          else { pointsFor += m.score2 ?? 0; pointsAgainst += m.score1 ?? 0; }
         });
-      unplacedFromGroups.push({
-        id: teamId,
-        name: getTeamName(teamId),
-        wins,
-        pointDiff: pointsFor - pointsAgainst,
-      });
+      unplacedFromGroups.push({ id: teamId, name: getTeamName(teamId), wins, pointDiff: pointsFor - pointsAgainst });
     });
 
     unplacedFromGroups.sort((a, b) => b.wins - a.wins || b.pointDiff - a.pointDiff);
-
     const groupStart = ranked.length + 1;
     unplacedFromGroups.forEach((t, idx) => {
-      ranked.push({
-        id: t.id,
-        name: t.name,
-        position: groupStart + idx,
-        label: `${groupStart + idx}º lugar`,
-      });
+      ranked.push({ id: t.id, name: t.name, position: groupStart + idx, label: `${groupStart + idx}º lugar` });
       placedTeams.add(t.id);
     });
 
     return ranked;
   }
 
-  /** Fallback: pure round-robin ranking by wins + point differential */
   function buildGroupRanking(
     groupMatches: Match[]
   ): { id: string; name: string; position: number; label: string }[] {
     const stats: Record<string, { id: string; wins: number; played: number; pf: number; pa: number }> = {};
-
     groupMatches
       .filter((m) => m.status === "completed")
       .forEach((m) => {
@@ -244,15 +200,29 @@ const ClassificationTab = ({ matches, teams }: ClassificationTabProps) => {
   }
 
   const getIcon = (pos: number) => {
-    if (pos === 1) return <Trophy className="h-4 w-4 text-yellow-500" />;
-    if (pos === 2) return <Medal className="h-4 w-4 text-gray-400" />;
-    if (pos === 3) return <Award className="h-4 w-4 text-amber-600" />;
+    if (pos === 1) return <Trophy className="h-5 w-5 text-yellow-500 drop-shadow-lg" />;
+    if (pos === 2) return <Medal className="h-5 w-5 text-gray-300 drop-shadow-lg" />;
+    if (pos === 3) return <Award className="h-5 w-5 text-amber-600 drop-shadow-lg" />;
     return null;
+  };
+
+  const getPositionStyle = (pos: number) => {
+    if (pos === 1) return "border-yellow-500/60 bg-yellow-500/15";
+    if (pos === 2) return "border-gray-400/50 bg-gray-400/10";
+    if (pos === 3) return "border-amber-600/50 bg-amber-600/10";
+    return "border-border bg-card/60";
+  };
+
+  const getBadgeStyle = (pos: number) => {
+    if (pos === 1) return "bg-yellow-500 text-black font-black";
+    if (pos === 2) return "bg-gray-400 text-black font-black";
+    if (pos === 3) return "bg-amber-600 text-black font-black";
+    return "bg-muted text-muted-foreground font-bold";
   };
 
   return (
     <section className="space-y-4">
-      <div className="rounded-xl border border-border bg-card p-6 shadow-card">
+      <div className="rounded-xl border border-border bg-card p-4 sm:p-6 shadow-card">
         <h3 className="mb-4 text-lg font-semibold flex items-center gap-2">
           <Trophy className="h-5 w-5" /> Classificação Geral
         </h3>
@@ -262,38 +232,35 @@ const ClassificationTab = ({ matches, teams }: ClassificationTabProps) => {
               key={team.id}
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: idx * 0.05 }}
-              className={`flex items-center justify-between rounded-lg border px-4 py-3 ${
-                team.position === 1
-                  ? "border-yellow-500/50 bg-yellow-500/10"
-                  : team.position === 2
-                  ? "border-gray-400/50 bg-gray-400/10"
-                  : team.position === 3
-                  ? "border-amber-600/50 bg-amber-600/10"
-                  : "border-border bg-secondary/50"
-              }`}
+              transition={{ delay: idx * 0.03 }}
+              className={`flex items-center gap-3 rounded-lg border px-3 py-3 sm:px-4 ${getPositionStyle(team.position)}`}
             >
-              <div className="flex items-center gap-3 flex-1">
-                <span
-                  className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold shrink-0 ${
-                    team.position === 1
-                      ? "bg-yellow-500 text-white"
-                      : team.position === 2
-                      ? "bg-gray-400 text-white"
-                      : team.position === 3
-                      ? "bg-amber-600 text-white"
-                      : "bg-muted text-muted-foreground"
-                  }`}
+              {/* Position badge */}
+              <span
+                className={`flex h-10 w-10 min-w-[2.5rem] items-center justify-center rounded-full text-sm shrink-0 ${getBadgeStyle(team.position)}`}
+              >
+                {team.position}
+              </span>
+
+              {/* Divider */}
+              <div className="w-px h-10 bg-border/60 shrink-0" />
+
+              {/* Team name — NO truncate, break-words, full visibility */}
+              <div className="flex-1 min-w-0">
+                <p
+                  className="font-black leading-snug break-words"
+                  style={{
+                    color: "#F5F7FA",
+                    textShadow: "0 1px 3px rgba(0,0,0,0.6)",
+                  }}
                 >
-                  {team.position}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate team-name font-medium">{team.name}</p>
-                  <p className="text-xs text-muted-foreground">{team.label}</p>
-                </div>
+                  {team.name}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">{team.label}</p>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0 ml-2">
+              {/* Icon for top 3 */}
+              <div className="shrink-0 ml-1">
                 {getIcon(team.position)}
               </div>
             </motion.div>

@@ -624,7 +624,11 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
           transition={{ delay: 0.2 }}
           className="rounded-xl border border-border bg-gradient-to-b from-primary/10 to-transparent p-6"
         >
-          <h3 className="mb-4 text-lg font-semibold">Pódio{modalityName ? ` — ${modalityName}` : ""}</h3>
+          <h3 className="mb-4 text-lg font-semibold">
+            Pódio
+            {modalityName ? ` — ${modalityName}` : ""}
+            {viewFilter === "male" ? " — Masculino" : viewFilter === "female" ? " — Feminino" : viewFilter === "individual" ? " — Individual" : viewFilter === "pair" ? " — Dupla" : ""}
+          </h3>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {sortedRankings[1] && (
               <div className="flex flex-col items-center rounded-lg border border-border bg-card p-4 shadow-card order-first sm:order-none">

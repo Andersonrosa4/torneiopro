@@ -1409,6 +1409,7 @@ export type Database = {
           created_at: string
           created_by: string
           id: string
+          modality_id: string | null
           points: number
           sport: Database["public"]["Enums"]["sport_type"]
           tournament_id: string | null
@@ -1418,6 +1419,7 @@ export type Database = {
           created_at?: string
           created_by: string
           id?: string
+          modality_id?: string | null
           points?: number
           sport: Database["public"]["Enums"]["sport_type"]
           tournament_id?: string | null
@@ -1427,11 +1429,19 @@ export type Database = {
           created_at?: string
           created_by?: string
           id?: string
+          modality_id?: string | null
           points?: number
           sport?: Database["public"]["Enums"]["sport_type"]
           tournament_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "rankings_modality_id_fkey"
+            columns: ["modality_id"]
+            isOneToOne: false
+            referencedRelation: "modalities"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "rankings_tournament_id_fkey"
             columns: ["tournament_id"]

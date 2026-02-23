@@ -104,16 +104,12 @@ const ClassificationTab = ({ matches, teams }: ClassificationTabProps) => {
         }
       });
 
+      // Sort by point diff descending — best loser gets higher position
       losersInRound.sort((a, b) => b.pointDiff - a.pointDiff);
 
-      const endPos = startPos + losersInRound.length - 1;
-      const label =
-        losersInRound.length === 1
-          ? `${startPos}º lugar`
-          : `${startPos}º–${endPos}º lugar`;
-
       losersInRound.forEach((loser, idx) => {
-        ranked.push({ id: loser.id, name: loser.name, position: startPos + idx, label });
+        const pos = startPos + idx;
+        ranked.push({ id: loser.id, name: loser.name, position: pos, label: `${pos}º lugar` });
         placedTeams.add(loser.id);
       });
     }

@@ -61,9 +61,12 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
   const [editPoints, setEditPoints] = useState("");
 
   const fetchRankings = async () => {
+    const filters: Record<string, any> = { tournament_id: tournamentId };
+    if (modalityId) filters.modality_id = modalityId;
+
     const { data, error } = await publicQuery<RankingEntry[]>({
       table: "rankings",
-      filters: { tournament_id: tournamentId },
+      filters,
       order: { column: "points", ascending: false },
     });
 
@@ -144,6 +147,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
         sport: sport as "beach_volleyball" | "futevolei" | "beach_tennis",
         tournament_id: tournamentId,
         created_by: createdBy,
+        ...(modalityId ? { modality_id: modalityId } : {}),
       },
     });
 
@@ -293,10 +297,13 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       });
 
       // Now create ranking entries for each individual player
-      // First delete existing rankings for this tournament
+      // First delete existing rankings for this tournament + modality
+      const delFilters: Record<string, any> = { tournament_id: tournamentId };
+      if (modalityId) delFilters.modality_id = modalityId;
+
       const { data: existingRankings } = await publicQuery<any[]>({
         table: "rankings",
-        filters: { tournament_id: tournamentId },
+        filters: delFilters,
       });
 
       if (existingRankings && existingRankings.length > 0) {
@@ -328,6 +335,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
               sport: sport as any,
               tournament_id: tournamentId,
               created_by: createdBy,
+              ...(modalityId ? { modality_id: modalityId } : {}),
             },
           });
           inserted++;

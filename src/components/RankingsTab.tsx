@@ -48,9 +48,10 @@ interface RankingsTabProps {
   tournamentName?: string;
   eventDate?: string;
   modalityId?: string | null;
+  modalityName?: string;
 }
 
-const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventDate, modalityId }: RankingsTabProps) => {
+const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventDate, modalityId, modalityName }: RankingsTabProps) => {
   const { user, organizerId } = useAuth();
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -428,7 +429,9 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
         transition={{ delay: 0.1 }}
         className="rounded-xl border border-border bg-card p-6 shadow-card"
       >
-        <h2 className="mb-4 text-xl font-semibold">Classificação Geral</h2>
+        <h2 className="mb-4 text-xl font-semibold">
+          Classificação Geral{modalityName ? ` — ${modalityName}` : ""}
+        </h2>
 
         {sortedRankings.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
@@ -546,7 +549,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
           transition={{ delay: 0.2 }}
           className="rounded-xl border border-border bg-gradient-to-b from-primary/10 to-transparent p-6"
         >
-          <h3 className="mb-4 text-lg font-semibold">Pódio</h3>
+          <h3 className="mb-4 text-lg font-semibold">Pódio{modalityName ? ` — ${modalityName}` : ""}</h3>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {sortedRankings[1] && (
               <div className="flex flex-col items-center rounded-lg border border-border bg-card p-4 shadow-card order-first sm:order-none">

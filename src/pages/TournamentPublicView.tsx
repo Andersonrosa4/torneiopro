@@ -346,6 +346,7 @@ const TournamentPublicView = () => {
                   tournamentName={tournament.name}
                   eventDate={tournament.event_date ? formatDateBR(tournament.event_date) : undefined}
                   modalityId={selectedModality?.id || null}
+                  modalityName={selectedModality?.name}
                 />
             </TabsContent>
 

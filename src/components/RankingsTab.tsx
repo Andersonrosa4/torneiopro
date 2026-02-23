@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Trash2, TrendingUp, Download, FileText, Sheet, Pencil, Check, X, Zap } from "lucide-react";
+import { Plus, Trash2, TrendingUp, Download, FileText, Sheet, Pencil, Check, X, Zap, Users, User } from "lucide-react";
 import { motion } from "framer-motion";
 
 import { exportRankings } from "@/lib/exportUtils";
@@ -60,6 +60,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
   const [points, setPoints] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPoints, setEditPoints] = useState("");
+  const [viewFilter, setViewFilter] = useState<"all" | "individual" | "pair">("all");
 
   const fetchRankings = async () => {
     const filters: Record<string, any> = { tournament_id: tournamentId };
@@ -353,10 +354,15 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
   };
 
   // Rankings are already sorted by points desc from the query
-  const sortedRankings = useMemo(
-    () => [...rankings].sort((a, b) => b.points - a.points),
-    [rankings]
-  );
+  const sortedRankings = useMemo(() => {
+    let filtered = [...rankings];
+    if (viewFilter === "individual") {
+      filtered = filtered.filter((r) => !r.athlete_name.includes(" / "));
+    } else if (viewFilter === "pair") {
+      filtered = filtered.filter((r) => r.athlete_name.includes(" / "));
+    }
+    return filtered.sort((a, b) => b.points - a.points);
+  }, [rankings, viewFilter]);
 
   if (loading) {
     return (
@@ -429,9 +435,37 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
         transition={{ delay: 0.1 }}
         className="rounded-xl border border-border bg-card p-6 shadow-card"
       >
-        <h2 className="mb-4 text-xl font-semibold">
-          Classificação Geral{modalityName ? ` — ${modalityName}` : ""}
-        </h2>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+          <h2 className="text-xl font-semibold">
+            Classificação Geral{modalityName ? ` — ${modalityName}` : ""}
+          </h2>
+          <div className="flex gap-1 rounded-lg border border-border p-1 bg-secondary/30">
+            <Button
+              size="sm"
+              variant={viewFilter === "all" ? "default" : "ghost"}
+              onClick={() => setViewFilter("all")}
+              className="h-7 text-xs px-3"
+            >
+              Todos
+            </Button>
+            <Button
+              size="sm"
+              variant={viewFilter === "individual" ? "default" : "ghost"}
+              onClick={() => setViewFilter("individual")}
+              className="h-7 text-xs px-3 gap-1"
+            >
+              <User className="h-3 w-3" /> Individual
+            </Button>
+            <Button
+              size="sm"
+              variant={viewFilter === "pair" ? "default" : "ghost"}
+              onClick={() => setViewFilter("pair")}
+              className="h-7 text-xs px-3 gap-1"
+            >
+              <Users className="h-3 w-3" /> Dupla
+            </Button>
+          </div>
+        </div>
 
         {sortedRankings.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">

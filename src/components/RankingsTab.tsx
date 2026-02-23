@@ -33,6 +33,7 @@ interface RankingEntry {
   sport: string;
   tournament_id: string;
   created_by: string;
+  entry_type: string;
 }
 
 interface Team {
@@ -60,7 +61,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
   const [points, setPoints] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPoints, setEditPoints] = useState("");
-  const [viewFilter, setViewFilter] = useState<"all" | "individual" | "pair">("all");
+  const [viewFilter, setViewFilter] = useState<"all" | "individual" | "pair" | "male" | "female">("all");
 
   const fetchRankings = async () => {
     const filters: Record<string, any> = { tournament_id: tournamentId };
@@ -94,6 +95,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
   };
 
   useEffect(() => {
+    setViewFilter("all");
     fetchRankings();
     fetchTeams();
 
@@ -149,6 +151,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
         sport: sport as "beach_volleyball" | "futevolei" | "beach_tennis",
         tournament_id: tournamentId,
         created_by: createdBy,
+        entry_type: selectedAthlete.includes(" / ") ? "pair" : "individual",
         ...(modalityId ? { modality_id: modalityId } : {}),
       },
     });
@@ -326,17 +329,23 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
         const pts = getPointsForPosition(entry.position);
 
         // Insert for each player AND for the pair
-        const names = [team.player1_name, team.player2_name, `${team.player1_name} / ${team.player2_name}`];
-        for (const name of names) {
+        const isMisto = modalityName?.toLowerCase().includes("misto");
+        const entries = [
+          { name: team.player1_name, type: isMisto ? "male" : "individual" },
+          { name: team.player2_name, type: isMisto ? "female" : "individual" },
+          { name: `${team.player1_name} / ${team.player2_name}`, type: "pair" },
+        ];
+        for (const e of entries) {
           await organizerQuery({
             table: "rankings",
             operation: "insert",
             data: {
-              athlete_name: name,
+              athlete_name: e.name,
               points: pts,
               sport: sport as any,
               tournament_id: tournamentId,
               created_by: createdBy,
+              entry_type: e.type,
               ...(modalityId ? { modality_id: modalityId } : {}),
             },
           });
@@ -353,13 +362,18 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
     }
   };
 
-  // Rankings are already sorted by points desc from the query
+  const isMisto = modalityName?.toLowerCase().includes("misto");
+
   const sortedRankings = useMemo(() => {
     let filtered = [...rankings];
     if (viewFilter === "individual") {
-      filtered = filtered.filter((r) => !r.athlete_name.includes(" / "));
+      filtered = filtered.filter((r) => r.entry_type !== "pair");
     } else if (viewFilter === "pair") {
-      filtered = filtered.filter((r) => r.athlete_name.includes(" / "));
+      filtered = filtered.filter((r) => r.entry_type === "pair");
+    } else if (viewFilter === "male") {
+      filtered = filtered.filter((r) => r.entry_type === "male");
+    } else if (viewFilter === "female") {
+      filtered = filtered.filter((r) => r.entry_type === "female");
     }
     return filtered.sort((a, b) => b.points - a.points);
   }, [rankings, viewFilter]);
@@ -439,7 +453,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
           <h2 className="text-xl font-semibold">
             Classificação Geral{modalityName ? ` — ${modalityName}` : ""}
           </h2>
-          <div className="flex gap-1 rounded-lg border border-border p-1 bg-secondary/30">
+          <div className="flex flex-wrap gap-1 rounded-lg border border-border p-1 bg-secondary/30">
             <Button
               size="sm"
               variant={viewFilter === "all" ? "default" : "ghost"}
@@ -448,14 +462,35 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
             >
               Todos
             </Button>
-            <Button
-              size="sm"
-              variant={viewFilter === "individual" ? "default" : "ghost"}
-              onClick={() => setViewFilter("individual")}
-              className="h-7 text-xs px-3 gap-1"
-            >
-              <User className="h-3 w-3" /> Individual
-            </Button>
+            {isMisto ? (
+              <>
+                <Button
+                  size="sm"
+                  variant={viewFilter === "male" ? "default" : "ghost"}
+                  onClick={() => setViewFilter("male")}
+                  className="h-7 text-xs px-3 gap-1"
+                >
+                  <User className="h-3 w-3" /> Masculino
+                </Button>
+                <Button
+                  size="sm"
+                  variant={viewFilter === "female" ? "default" : "ghost"}
+                  onClick={() => setViewFilter("female")}
+                  className="h-7 text-xs px-3 gap-1"
+                >
+                  <User className="h-3 w-3" /> Feminino
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                variant={viewFilter === "individual" ? "default" : "ghost"}
+                onClick={() => setViewFilter("individual")}
+                className="h-7 text-xs px-3 gap-1"
+              >
+                <User className="h-3 w-3" /> Individual
+              </Button>
+            )}
             <Button
               size="sm"
               variant={viewFilter === "pair" ? "default" : "ghost"}

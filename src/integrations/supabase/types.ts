@@ -1408,6 +1408,7 @@ export type Database = {
           athlete_name: string
           created_at: string
           created_by: string
+          entry_type: string
           id: string
           modality_id: string | null
           points: number
@@ -1418,6 +1419,7 @@ export type Database = {
           athlete_name: string
           created_at?: string
           created_by: string
+          entry_type?: string
           id?: string
           modality_id?: string | null
           points?: number
@@ -1428,6 +1430,7 @@ export type Database = {
           athlete_name?: string
           created_at?: string
           created_by?: string
+          entry_type?: string
           id?: string
           modality_id?: string | null
           points?: number

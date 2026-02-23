@@ -550,7 +550,15 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-primary text-sm font-bold text-primary-foreground">
                       {idx + 1}
                     </div>
-                    <p className="truncate team-name text-sm">{ranking.athlete_name}</p>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <p className="truncate team-name text-sm">{ranking.athlete_name}</p>
+                      {isMisto && ranking.entry_type === "female" && (
+                        <Badge variant="outline" className="shrink-0 text-[10px] px-1.5 py-0 border-pink-500/50 text-pink-400">♀</Badge>
+                      )}
+                      {isMisto && ranking.entry_type === "male" && (
+                        <Badge variant="outline" className="shrink-0 text-[10px] px-1.5 py-0 border-blue-500/50 text-blue-400">♂</Badge>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0 ml-2">

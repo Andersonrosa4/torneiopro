@@ -3,7 +3,7 @@ import { Trophy, ChevronRight, ChevronLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getSlotFeeders } from "@/lib/feederLabels";
-import { schedulerSequence } from "@/lib/roundScheduler";
+import { buildMatchNumberMap } from "@/lib/matchNumbering";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { getEliminationRoundLabel } from "@/lib/roundLabels";
 
@@ -966,16 +966,11 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
     return participants.find((p) => p.id === id)?.name || "A definir";
   };
 
-  // Numeração global dos jogos pela sequência do scheduler
+  // Numeração global: usa a MESMA lógica da aba Sequência (fonte da verdade)
   const matchNumberMap = useMemo(() => {
-    const seq = schedulerSequence(matches);
-    const map = new Map<string, number>();
-    seq.forEach((m, i) => map.set(m.id, i + 1));
-    let next = map.size + 1;
-    for (const m of matches) {
-      if (!map.has(m.id)) map.set(m.id, next++);
-    }
-    return map;
+    const isDE = matches.some(m => m.round > 0 && m.bracket_half);
+    const format = isDE ? 'double_elimination' : 'single_elimination';
+    return buildMatchNumberMap(matches as any, format);
   }, [matches]);
 
   // Mapa de slots: determina se cada match vai para slot A (top) ou B (bottom) do próximo

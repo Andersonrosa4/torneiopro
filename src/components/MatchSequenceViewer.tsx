@@ -8,6 +8,7 @@ import { exportMatchSequence } from "@/lib/exportUtils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getEliminationRoundLabel, getEliminationRoundShortLabel } from "@/lib/roundLabels";
 import { buildSchedulerBlocks, schedulerSequence, getSchedulerBlockColor, getSchedulerBadgeColor, type SchedulerBlock } from "@/lib/roundScheduler";
+import { buildMatchNumberMap } from "@/lib/matchNumbering";
 import { ManualMatchOverride } from "@/components/ManualMatchOverride";
 import LiveScoreBoard from "@/components/LiveScoreBoard";
 import FutsalLiveScoreBoard from "@/components/FutsalLiveScoreBoard";
@@ -943,76 +944,13 @@ const MatchSequenceViewer = ({
   // ╔══════════════════════════════════════════════════════════════════════╗
   // ║  BLINDAGEM: NUMERAÇÃO SEQUENCIAL ESTRITA (REGRA 12 — IMUTÁVEL)    ║
   // ║                                                                      ║
-  // ║  TODOS os jogos são numerados na ordem do scheduler, sem exceção.   ║
-  // ║  ⛔ PROIBIDO: filtrar por team1_id/team2_id antes de numerar.      ║
-  // ║  ⛔ PROIBIDO: numerar jogos com equipes primeiro e sem equipes     ║
-  // ║     depois — isso CAUSA SALTOS na numeração (bug histórico).       ║
-  // ║  ⛔ PROIBIDO: usar a ordem do banco de dados (matches array)       ║
-  // ║     para numerar — SEMPRE usar schedulerSequence().                  ║
-  // ║                                                                      ║
-  // ║  A numeração é: Grupos (round 0) → Eliminação (scheduler order).   ║
-  // ║  Resultado: 1, 2, 3, 4... sem saltos, SEMPRE.                      ║
-  // ║                                                                      ║
-  // ║  CHAVEAMENTO NORMAL: usa displaySequence (conflict-resolved) para   ║
-  // ║  garantir que equipes não joguem consecutivamente entre fases.       ║
+  // ║  Usa a função COMPARTILHADA buildMatchNumberMap para garantir que   ║
+  // ║  a numeração seja IDÊNTICA entre a aba Sequência e a árvore.       ║
+  // ║  A SEQUÊNCIA VISUAL É A FONTE DA VERDADE.                          ║
   // ╚══════════════════════════════════════════════════════════════════════╝
   const matchNumberMap = useMemo(() => {
-    const map = new Map<string, number>();
-    let num = 1;
-
-    if (tournamentFormat !== 'double_elimination') {
-      // Chaveamento Normal: use the conflict-resolved displaySequence for numbering
-      // This ensures no team plays back-to-back between group stage and knockout
-      // First: all non-third_place matches from displaySequence
-      for (const m of displaySequence) {
-        if (!map.has(m.id) && (m as any).bracket_type !== 'third_place') {
-          // Skip final matches for now — 3rd place comes before final
-          const isInFinalRound = displaySequence.filter(x => (x as any).bracket_type !== 'third_place' && x.round > 0);
-          const maxRound = isInFinalRound.length > 0 ? Math.max(...isInFinalRound.map(x => x.round)) : -1;
-          if (m.round === maxRound && m.round > 0) continue; // defer final
-          map.set(m.id, num++);
-        }
-      }
-      // Then: 3rd place matches
-      for (const m of matches) {
-        if (!map.has(m.id) && (m as any).bracket_type === 'third_place') {
-          map.set(m.id, num++);
-        }
-      }
-      // Then: final matches
-      for (const m of displaySequence) {
-        if (!map.has(m.id)) {
-          map.set(m.id, num++);
-        }
-      }
-      // Safety net
-      for (const m of matches) {
-        if (!map.has(m.id)) map.set(m.id, num++);
-      }
-      return map;
-    }
-
-    // Dupla Eliminação: original scheduler-based numbering (Regra 12)
-    const groupMatches = matches.filter(m => m.round === 0);
-    if (groupMatches.length > 0) {
-      const { sequence: gsSeq } = buildGroupStageInterleaved(groupMatches);
-      for (const m of gsSeq) {
-        map.set(m.id, num++);
-      }
-    }
-    // Eliminação — TODOS os jogos na ordem do scheduler, SEM filtro de equipes
-    const seq = schedulerSequence(matches as any);
-    for (const m of seq) {
-      if (!map.has(m.id)) {
-        map.set(m.id, num++);
-      }
-    }
-    // Safety net: qualquer jogo não coberto
-    for (const m of cleanMatches) {
-      if (!map.has(m.id)) map.set(m.id, num++);
-    }
-    return map;
-  }, [cleanMatches, displaySequence, tournamentFormat]);
+    return buildMatchNumberMap(cleanMatches as any, tournamentFormat);
+  }, [cleanMatches, tournamentFormat]);
 
   const matchCountByRound = useMemo(() => {
     const counts: Record<number, number> = {};

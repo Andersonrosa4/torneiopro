@@ -552,12 +552,6 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                     </div>
                     <div className="flex items-center gap-2 min-w-0">
                       <p className="truncate team-name text-sm">{ranking.athlete_name}</p>
-                      {isMisto && ranking.entry_type === "female" && (
-                        <Badge variant="outline" className="shrink-0 text-[10px] px-1.5 py-0 border-pink-500/50 text-pink-400">♀</Badge>
-                      )}
-                      {isMisto && ranking.entry_type === "male" && (
-                        <Badge variant="outline" className="shrink-0 text-[10px] px-1.5 py-0 border-blue-500/50 text-blue-400">♂</Badge>
-                      )}
                     </div>
                   </div>
 
@@ -617,6 +611,47 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
         )}
       </motion.section>
 
+      {isMisto && viewFilter === "all" && (() => {
+        const maleRankings = rankings.filter(r => r.entry_type === "male").sort((a, b) => b.points - a.points);
+        const femaleRankings = rankings.filter(r => r.entry_type === "female").sort((a, b) => b.points - a.points);
+        if (maleRankings.length === 0 && femaleRankings.length === 0) return null;
+        return (
+          <motion.section
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="rounded-xl border border-border bg-card p-6 shadow-card"
+          >
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h3 className="text-base font-semibold mb-3 text-center">Atleta 1 ({maleRankings.length})</h3>
+                <div className="space-y-2">
+                  {maleRankings.map((r, idx) => (
+                    <div key={r.id} className="flex items-center gap-2 rounded-lg border border-border bg-secondary/50 px-3 py-2">
+                      <span className="text-xs font-bold text-muted-foreground w-5 text-center">{idx + 1}</span>
+                      <p className="text-xs truncate team-name flex-1">{r.athlete_name}</p>
+                      <Badge variant="secondary" className="text-[10px] font-bold tabular-nums shrink-0">{r.points}pts</Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h3 className="text-base font-semibold mb-3 text-center">Atleta 2 ({femaleRankings.length})</h3>
+                <div className="space-y-2">
+                  {femaleRankings.map((r, idx) => (
+                    <div key={r.id} className="flex items-center gap-2 rounded-lg border border-border bg-secondary/50 px-3 py-2">
+                      <span className="text-xs font-bold text-muted-foreground w-5 text-center">{idx + 1}</span>
+                      <p className="text-xs truncate team-name flex-1">{r.athlete_name}</p>
+                      <Badge variant="secondary" className="text-[10px] font-bold tabular-nums shrink-0">{r.points}pts</Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </motion.section>
+        );
+      })()}
+
       {sortedRankings.length > 0 && (
         <motion.section
           initial={{ opacity: 0, y: 12 }}
@@ -632,21 +667,21 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {sortedRankings[1] && (
               <div className="flex flex-col items-center rounded-lg border border-border bg-card p-4 shadow-card order-first sm:order-none">
-                <div className="mb-2 text-3xl font-bold text-secondary">🥈</div>
+                <div className="mb-2 text-2xl font-bold text-muted-foreground">2º</div>
                 <p className="text-sm text-center truncate team-name">{sortedRankings[1].athlete_name}</p>
                 <p className="text-lg font-bold text-primary">{sortedRankings[1].points} pts</p>
               </div>
             )}
             {sortedRankings[0] && (
               <div className="flex flex-col items-center rounded-lg border-2 border-primary bg-gradient-primary p-4 shadow-lg order-none sm:order-first">
-                <div className="mb-2 text-4xl font-bold">🥇</div>
+                <div className="mb-2 text-3xl font-bold text-primary-foreground">1º</div>
                 <p className="text-sm text-center truncate team-name">{sortedRankings[0].athlete_name}</p>
                 <p className="text-xl font-bold text-primary-foreground">{sortedRankings[0].points} pts</p>
               </div>
             )}
             {sortedRankings[2] && (
               <div className="flex flex-col items-center rounded-lg border border-border bg-card p-4 shadow-card order-last">
-                <div className="mb-2 text-3xl font-bold text-muted">🥉</div>
+                <div className="mb-2 text-2xl font-bold text-muted-foreground">3º</div>
                 <p className="text-sm text-center truncate team-name">{sortedRankings[2].athlete_name}</p>
                 <p className="text-lg font-bold text-primary">{sortedRankings[2].points} pts</p>
               </div>

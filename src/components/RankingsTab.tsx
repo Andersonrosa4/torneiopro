@@ -628,7 +628,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
         )}
       </motion.section>
 
-      {sortedRankings.length > 0 && (
+      {sortedRankings.length > 0 && !isMisto && viewFilter !== "male" && viewFilter !== "female" && (
         <motion.section
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -638,7 +638,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
           <h3 className="mb-4 text-lg font-semibold">
             Pódio
             {modalityName ? ` — ${modalityName}` : ""}
-            {viewFilter === "male" ? " — Masculino" : viewFilter === "female" ? " — Feminino" : viewFilter === "individual" ? " — Individual" : viewFilter === "pair" ? " — Dupla" : ""}
+            {viewFilter === "individual" ? " — Individual" : viewFilter === "pair" ? " — Dupla" : ""}
           </h3>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {sortedRankings[1] && (

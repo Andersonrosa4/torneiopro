@@ -555,62 +555,54 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                   key={ranking.id}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: idx * 0.05 }}
-                  className="flex items-center gap-3 rounded-xl border border-border bg-secondary/50 px-4 py-3.5 hover:border-primary/40 transition-colors"
+                  transition={{ delay: Math.min(idx * 0.03, 0.5) }}
+                  className="rounded-xl border border-border bg-secondary/50 px-4 py-3 hover:border-primary/40 transition-colors"
                 >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-primary text-sm font-bold text-primary-foreground">
-                    {idx + 1}
-                  </div>
-                  <p className="flex-1 min-w-0 break-words text-sm font-medium leading-snug">{ranking.athlete_name}</p>
-
-                  <div className="flex items-center gap-2 shrink-0 ml-2">
-                    {editingId === ranking.id ? (
-                      <div className="flex items-center gap-1">
-                        <Input
-                          type="number"
-                          value={editPoints}
-                          onChange={(e) => setEditPoints(e.target.value)}
-                          className="h-8 w-20 text-center text-sm"
-                          min="0"
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") updatePoints(ranking.id, Number(editPoints) || 0);
-                            if (e.key === "Escape") setEditingId(null);
-                          }}
-                        />
-                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => updatePoints(ranking.id, Number(editPoints) || 0)}>
-                          <Check className="h-4 w-4 text-success" />
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditingId(null)}>
-                          <X className="h-4 w-4 text-destructive" />
-                        </Button>
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-primary text-sm font-bold text-primary-foreground mt-0.5">
+                      {idx + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-black leading-snug break-words" style={{ color: '#F5F7FA', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                        {ranking.athlete_name}
+                      </p>
+                      <div className="flex items-center justify-between mt-1.5">
+                        <Badge variant="secondary" className="text-xs font-bold tabular-nums whitespace-nowrap">
+                          {ranking.points} pts
+                        </Badge>
+                        {editingId === ranking.id ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              value={editPoints}
+                              onChange={(e) => setEditPoints(e.target.value)}
+                              className="h-7 w-16 text-center text-xs"
+                              min="0"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") updatePoints(ranking.id, Number(editPoints) || 0);
+                                if (e.key === "Escape") setEditingId(null);
+                              }}
+                            />
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => updatePoints(ranking.id, Number(editPoints) || 0)}>
+                              <Check className="h-4 w-4 text-success" />
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditingId(null)}>
+                              <X className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        ) : isOwner ? (
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="ghost" onClick={() => { setEditingId(ranking.id); setEditPoints(String(ranking.points)); }} className="h-7 w-7 p-0">
+                              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => deleteRanking(ranking.id)} className="h-7 w-7 p-0">
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </div>
+                        ) : null}
                       </div>
-                    ) : (
-                      <Badge variant="secondary" className="text-sm font-bold tabular-nums whitespace-nowrap">
-                        {ranking.points} pts
-                      </Badge>
-                    )}
-
-                    {isOwner && editingId !== ranking.id && (
-                      <div className="flex gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => { setEditingId(ranking.id); setEditPoints(String(ranking.points)); }}
-                          className="h-8 w-8 p-0"
-                        >
-                          <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => deleteRanking(ranking.id)}
-                          className="h-8 w-8 p-0"
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    )}
+                    </div>
                   </div>
                 </motion.div>
               ))}
@@ -635,22 +627,22 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
             {sortedRankings[1] && (
               <div className="flex flex-col items-center rounded-xl border border-border bg-card p-5 shadow-card order-first sm:order-none">
                 <div className="mb-2 text-2xl font-bold text-muted-foreground">2º</div>
-                <p className="text-sm text-center break-words font-medium leading-snug w-full">{sortedRankings[1].athlete_name}</p>
-                <p className="text-lg font-bold text-primary mt-1">{sortedRankings[1].points} pts</p>
+                <p className="text-sm text-center font-black leading-snug w-full break-words" style={{ color: '#F5F7FA', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>{sortedRankings[1].athlete_name}</p>
+                <p className="text-lg font-bold text-primary mt-1.5">{sortedRankings[1].points} pts</p>
               </div>
             )}
             {sortedRankings[0] && (
               <div className="flex flex-col items-center rounded-xl border-2 border-primary bg-gradient-primary p-5 shadow-lg order-none sm:order-first">
                 <div className="mb-2 text-3xl font-bold text-primary-foreground">1º</div>
-                <p className="text-sm text-center break-words font-medium leading-snug text-primary-foreground w-full">{sortedRankings[0].athlete_name}</p>
-                <p className="text-xl font-bold text-primary-foreground mt-1">{sortedRankings[0].points} pts</p>
+                <p className="text-sm text-center font-black leading-snug w-full break-words" style={{ color: '#F5F7FA', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>{sortedRankings[0].athlete_name}</p>
+                <p className="text-xl font-bold text-primary-foreground mt-1.5">{sortedRankings[0].points} pts</p>
               </div>
             )}
             {sortedRankings[2] && (
               <div className="flex flex-col items-center rounded-xl border border-border bg-card p-5 shadow-card order-last">
                 <div className="mb-2 text-2xl font-bold text-muted-foreground">3º</div>
-                <p className="text-sm text-center break-words font-medium leading-snug w-full">{sortedRankings[2].athlete_name}</p>
-                <p className="text-lg font-bold text-primary mt-1">{sortedRankings[2].points} pts</p>
+                <p className="text-sm text-center font-black leading-snug w-full break-words" style={{ color: '#F5F7FA', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>{sortedRankings[2].athlete_name}</p>
+                <p className="text-lg font-bold text-primary mt-1.5">{sortedRankings[2].points} pts</p>
               </div>
             )}
           </div>

@@ -502,6 +502,42 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
           </div>
         </div>
 
+        {isMisto && viewFilter === "all" && (() => {
+          const maleRankings = rankings.filter(r => r.entry_type === "male").sort((a, b) => b.points - a.points);
+          const femaleRankings = rankings.filter(r => r.entry_type === "female").sort((a, b) => b.points - a.points);
+          if (maleRankings.length === 0 && femaleRankings.length === 0) return null;
+          return (
+            <div className="rounded-lg border border-border bg-secondary/30 p-4 mb-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h3 className="text-sm font-semibold mb-2 text-center">Atleta 1 ({maleRankings.length})</h3>
+                  <div className="space-y-1">
+                    {maleRankings.map((r, idx) => (
+                      <div key={r.id} className="flex items-center gap-1.5 rounded border border-border bg-card px-2 py-1.5">
+                        <span className="text-[10px] font-bold text-muted-foreground w-4 text-center">{idx + 1}</span>
+                        <p className="text-[11px] truncate team-name flex-1">{r.athlete_name}</p>
+                        <span className="text-[10px] font-bold text-primary tabular-nums shrink-0">{r.points}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold mb-2 text-center">Atleta 2 ({femaleRankings.length})</h3>
+                  <div className="space-y-1">
+                    {femaleRankings.map((r, idx) => (
+                      <div key={r.id} className="flex items-center gap-1.5 rounded border border-border bg-card px-2 py-1.5">
+                        <span className="text-[10px] font-bold text-muted-foreground w-4 text-center">{idx + 1}</span>
+                        <p className="text-[11px] truncate team-name flex-1">{r.athlete_name}</p>
+                        <span className="text-[10px] font-bold text-primary tabular-nums shrink-0">{r.points}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {sortedRankings.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
             Nenhum atleta no ranking ainda.
@@ -610,47 +646,6 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
           </>
         )}
       </motion.section>
-
-      {isMisto && viewFilter === "all" && (() => {
-        const maleRankings = rankings.filter(r => r.entry_type === "male").sort((a, b) => b.points - a.points);
-        const femaleRankings = rankings.filter(r => r.entry_type === "female").sort((a, b) => b.points - a.points);
-        if (maleRankings.length === 0 && femaleRankings.length === 0) return null;
-        return (
-          <motion.section
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="rounded-xl border border-border bg-card p-6 shadow-card"
-          >
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <h3 className="text-base font-semibold mb-3 text-center">Atleta 1 ({maleRankings.length})</h3>
-                <div className="space-y-2">
-                  {maleRankings.map((r, idx) => (
-                    <div key={r.id} className="flex items-center gap-2 rounded-lg border border-border bg-secondary/50 px-3 py-2">
-                      <span className="text-xs font-bold text-muted-foreground w-5 text-center">{idx + 1}</span>
-                      <p className="text-xs truncate team-name flex-1">{r.athlete_name}</p>
-                      <Badge variant="secondary" className="text-[10px] font-bold tabular-nums shrink-0">{r.points}pts</Badge>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <h3 className="text-base font-semibold mb-3 text-center">Atleta 2 ({femaleRankings.length})</h3>
-                <div className="space-y-2">
-                  {femaleRankings.map((r, idx) => (
-                    <div key={r.id} className="flex items-center gap-2 rounded-lg border border-border bg-secondary/50 px-3 py-2">
-                      <span className="text-xs font-bold text-muted-foreground w-5 text-center">{idx + 1}</span>
-                      <p className="text-xs truncate team-name flex-1">{r.athlete_name}</p>
-                      <Badge variant="secondary" className="text-[10px] font-bold tabular-nums shrink-0">{r.points}pts</Badge>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </motion.section>
-        );
-      })()}
 
       {sortedRankings.length > 0 && (
         <motion.section

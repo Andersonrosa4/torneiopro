@@ -61,7 +61,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
   const [points, setPoints] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPoints, setEditPoints] = useState("");
-  const [viewFilter, setViewFilter] = useState<"all" | "individual" | "pair" | "male" | "female">("all");
+  const [viewFilter, setViewFilter] = useState<"all" | "individual" | "pair" | "male" | "female">("individual");
 
   const fetchRankings = async () => {
     const filters: Record<string, any> = { tournament_id: tournamentId };
@@ -95,7 +95,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
   };
 
   useEffect(() => {
-    setViewFilter("all");
+    setViewFilter("individual");
     fetchRankings();
     fetchTeams();
 
@@ -471,32 +471,24 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
           <h2 className="text-xl font-semibold">
             Classificação Geral{modalityName ? ` — ${modalityName}` : ""}
           </h2>
-          <div className="flex flex-wrap gap-1 rounded-lg border border-border p-1 bg-secondary/30">
-            <Button
-              size="sm"
-              variant={viewFilter === "all" ? "default" : "ghost"}
-              onClick={() => setViewFilter("all")}
-              className="h-7 text-xs px-3"
-            >
-              Todos
-            </Button>
+          <div className="flex flex-wrap gap-1.5 rounded-lg border border-border p-1 bg-secondary/30">
             {isMisto ? (
               <>
                 <Button
                   size="sm"
                   variant={viewFilter === "male" ? "default" : "ghost"}
                   onClick={() => setViewFilter("male")}
-                  className="h-7 text-xs px-3 gap-1"
+                  className="h-8 text-xs px-4 gap-1.5 rounded-md"
                 >
-                  <User className="h-3 w-3" /> Masculino
+                  <User className="h-3.5 w-3.5" /> Masculino
                 </Button>
                 <Button
                   size="sm"
                   variant={viewFilter === "female" ? "default" : "ghost"}
                   onClick={() => setViewFilter("female")}
-                  className="h-7 text-xs px-3 gap-1"
+                  className="h-8 text-xs px-4 gap-1.5 rounded-md"
                 >
-                  <User className="h-3 w-3" /> Feminino
+                  <User className="h-3.5 w-3.5" /> Feminino
                 </Button>
               </>
             ) : (
@@ -504,57 +496,23 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                 size="sm"
                 variant={viewFilter === "individual" ? "default" : "ghost"}
                 onClick={() => setViewFilter("individual")}
-                className="h-7 text-xs px-3 gap-1"
+                className="h-8 text-xs px-4 gap-1.5 rounded-md"
               >
-                <User className="h-3 w-3" /> Individual
+                <User className="h-3.5 w-3.5" /> Individual
               </Button>
             )}
             <Button
               size="sm"
               variant={viewFilter === "pair" ? "default" : "ghost"}
               onClick={() => setViewFilter("pair")}
-              className="h-7 text-xs px-3 gap-1"
+              className="h-8 text-xs px-4 gap-1.5 rounded-md"
             >
-              <Users className="h-3 w-3" /> Dupla
+              <Users className="h-3.5 w-3.5" /> Dupla
             </Button>
           </div>
         </div>
 
-        {isMisto && viewFilter === "all" && (() => {
-          const maleRankings = rankings.filter(r => r.entry_type === "male").sort((a, b) => b.points - a.points);
-          const femaleRankings = rankings.filter(r => r.entry_type === "female").sort((a, b) => b.points - a.points);
-          if (maleRankings.length === 0 && femaleRankings.length === 0) return null;
-          return (
-            <div className="rounded-lg border border-border bg-secondary/30 p-4 mb-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h3 className="text-sm font-semibold mb-2 text-center">Atleta 1 ({maleRankings.length})</h3>
-                  <div className="space-y-1">
-                    {maleRankings.map((r, idx) => (
-                      <div key={r.id} className="flex items-center gap-1.5 rounded border border-border bg-card px-2 py-1.5">
-                        <span className="text-[10px] font-bold text-muted-foreground w-4 text-center">{idx + 1}</span>
-                        <p className="text-[11px] break-words team-name flex-1 leading-snug">{r.athlete_name}</p>
-                        <span className="text-[10px] font-bold text-primary tabular-nums shrink-0">{r.points}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold mb-2 text-center">Atleta 2 ({femaleRankings.length})</h3>
-                  <div className="space-y-1">
-                    {femaleRankings.map((r, idx) => (
-                      <div key={r.id} className="flex items-center gap-1.5 rounded border border-border bg-card px-2 py-1.5">
-                        <span className="text-[10px] font-bold text-muted-foreground w-4 text-center">{idx + 1}</span>
-                        <p className="text-[11px] break-words team-name flex-1 leading-snug">{r.athlete_name}</p>
-                        <span className="text-[10px] font-bold text-primary tabular-nums shrink-0">{r.points}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
+        {/* Removed "Todos" split view - now using Individual/Dupla filters only */}
 
         {sortedRankings.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">
@@ -598,16 +556,12 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: idx * 0.05 }}
-                  className="flex items-center justify-between rounded-lg border border-border bg-secondary/50 px-4 py-3 hover:border-primary/40 transition-colors"
+                  className="flex items-center gap-3 rounded-xl border border-border bg-secondary/50 px-4 py-3.5 hover:border-primary/40 transition-colors"
                 >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-primary text-sm font-bold text-primary-foreground">
-                      {idx + 1}
-                    </div>
-                    <div className="flex items-center gap-2 min-w-0">
-                      <p className="break-words team-name text-sm leading-snug">{ranking.athlete_name}</p>
-                    </div>
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-primary text-sm font-bold text-primary-foreground">
+                    {idx + 1}
                   </div>
+                  <p className="flex-1 min-w-0 break-words text-sm font-medium leading-snug">{ranking.athlete_name}</p>
 
                   <div className="flex items-center gap-2 shrink-0 ml-2">
                     {editingId === ranking.id ? (
@@ -679,24 +633,24 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
           </h3>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {sortedRankings[1] && (
-              <div className="flex flex-col items-center rounded-lg border border-border bg-card p-4 shadow-card order-first sm:order-none">
+              <div className="flex flex-col items-center rounded-xl border border-border bg-card p-5 shadow-card order-first sm:order-none">
                 <div className="mb-2 text-2xl font-bold text-muted-foreground">2º</div>
-                <p className="text-sm text-center break-words team-name leading-snug">{sortedRankings[1].athlete_name}</p>
-                <p className="text-lg font-bold text-primary">{sortedRankings[1].points} pts</p>
+                <p className="text-sm text-center break-words font-medium leading-snug w-full">{sortedRankings[1].athlete_name}</p>
+                <p className="text-lg font-bold text-primary mt-1">{sortedRankings[1].points} pts</p>
               </div>
             )}
             {sortedRankings[0] && (
-              <div className="flex flex-col items-center rounded-lg border-2 border-primary bg-gradient-primary p-4 shadow-lg order-none sm:order-first">
+              <div className="flex flex-col items-center rounded-xl border-2 border-primary bg-gradient-primary p-5 shadow-lg order-none sm:order-first">
                 <div className="mb-2 text-3xl font-bold text-primary-foreground">1º</div>
-                <p className="text-sm text-center break-words team-name leading-snug">{sortedRankings[0].athlete_name}</p>
-                <p className="text-xl font-bold text-primary-foreground">{sortedRankings[0].points} pts</p>
+                <p className="text-sm text-center break-words font-medium leading-snug text-primary-foreground w-full">{sortedRankings[0].athlete_name}</p>
+                <p className="text-xl font-bold text-primary-foreground mt-1">{sortedRankings[0].points} pts</p>
               </div>
             )}
             {sortedRankings[2] && (
-              <div className="flex flex-col items-center rounded-lg border border-border bg-card p-4 shadow-card order-last">
+              <div className="flex flex-col items-center rounded-xl border border-border bg-card p-5 shadow-card order-last">
                 <div className="mb-2 text-2xl font-bold text-muted-foreground">3º</div>
-                <p className="text-sm text-center break-words team-name leading-snug">{sortedRankings[2].athlete_name}</p>
-                <p className="text-lg font-bold text-primary">{sortedRankings[2].points} pts</p>
+                <p className="text-sm text-center break-words font-medium leading-snug w-full">{sortedRankings[2].athlete_name}</p>
+                <p className="text-lg font-bold text-primary mt-1">{sortedRankings[2].points} pts</p>
               </div>
             )}
           </div>

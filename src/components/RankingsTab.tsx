@@ -330,9 +330,27 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
 
         // Insert for each player AND for the pair
         const isMisto = modalityName?.toLowerCase().includes("misto");
+        
+        // For Misto: detect gender by name patterns instead of assuming player1=male
+        const detectGender = (name: string): "male" | "female" => {
+          const first = name.trim().split(/\s+/)[0].toLowerCase();
+          // Common feminine endings in Portuguese
+          if (/^(ana|ane|aline|adriane|andressa|bianca|camila|carina|cláudia|claudia|danielly|deisi|dejanira|eduarda|elisandra|francieli|gabrielle|gabrielly|helen|helena|isadora|jaqueline|jessica|joana|julia|juliana|keyla|kethelin|laura|lillian|luana|luiza|maria|mariana|manoella|michele|nicoly|nicole|olga|paola|patrícia|rafaela|raquel|roshane|sabrina|samira|scheila|sheila|stefany|taicline|tauane|thais|vanessa|veronica|veronilce)$/i.test(first)) {
+            return "female";
+          }
+          // Common feminine name endings
+          if (/[aeiã]$/.test(first) && !/^(davi|edu|kairã|timóteo|simeão|juliano|mário|eydrian|halan|márcio|allyson|wallace|vinicius|leonardo|lucas|leandro|guilherme|pedro|arthur|renan|felipe|fernando|rafael|gabriel|luis|oswaldo|pietro|ian|daniel|joão|vitor|carlos|dirceu|silmar|dilamar)$/i.test(first)) {
+            return "female";
+          }
+          return "male";
+        };
+
+        const p1Gender = isMisto ? detectGender(team.player1_name) : "individual" as any;
+        const p2Gender = isMisto ? (p1Gender === "male" ? "female" : "male") : "individual" as any;
+
         const entries = [
-          { name: team.player1_name, type: isMisto ? "male" : "individual" },
-          { name: team.player2_name, type: isMisto ? "female" : "individual" },
+          { name: team.player1_name, type: isMisto ? p1Gender : "individual" },
+          { name: team.player2_name, type: isMisto ? p2Gender : "individual" },
           { name: `${team.player1_name} / ${team.player2_name}`, type: "pair" },
         ];
         for (const e of entries) {
@@ -515,7 +533,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                     {maleRankings.map((r, idx) => (
                       <div key={r.id} className="flex items-center gap-1.5 rounded border border-border bg-card px-2 py-1.5">
                         <span className="text-[10px] font-bold text-muted-foreground w-4 text-center">{idx + 1}</span>
-                        <p className="text-[11px] truncate team-name flex-1">{r.athlete_name}</p>
+                        <p className="text-[11px] break-words team-name flex-1 leading-snug">{r.athlete_name}</p>
                         <span className="text-[10px] font-bold text-primary tabular-nums shrink-0">{r.points}</span>
                       </div>
                     ))}
@@ -527,7 +545,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                     {femaleRankings.map((r, idx) => (
                       <div key={r.id} className="flex items-center gap-1.5 rounded border border-border bg-card px-2 py-1.5">
                         <span className="text-[10px] font-bold text-muted-foreground w-4 text-center">{idx + 1}</span>
-                        <p className="text-[11px] truncate team-name flex-1">{r.athlete_name}</p>
+                        <p className="text-[11px] break-words team-name flex-1 leading-snug">{r.athlete_name}</p>
                         <span className="text-[10px] font-bold text-primary tabular-nums shrink-0">{r.points}</span>
                       </div>
                     ))}
@@ -580,14 +598,14 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: idx * 0.05 }}
-                  className="flex items-center justify-between rounded-lg border border-border bg-secondary/50 px-4 py-3 hover:border-primary/40 transition-colors overflow-hidden"
+                  className="flex items-center justify-between rounded-lg border border-border bg-secondary/50 px-4 py-3 hover:border-primary/40 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-primary text-sm font-bold text-primary-foreground">
                       {idx + 1}
                     </div>
                     <div className="flex items-center gap-2 min-w-0">
-                      <p className="truncate team-name text-sm">{ranking.athlete_name}</p>
+                      <p className="break-words team-name text-sm leading-snug">{ranking.athlete_name}</p>
                     </div>
                   </div>
 
@@ -663,21 +681,21 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
             {sortedRankings[1] && (
               <div className="flex flex-col items-center rounded-lg border border-border bg-card p-4 shadow-card order-first sm:order-none">
                 <div className="mb-2 text-2xl font-bold text-muted-foreground">2º</div>
-                <p className="text-sm text-center truncate team-name">{sortedRankings[1].athlete_name}</p>
+                <p className="text-sm text-center break-words team-name leading-snug">{sortedRankings[1].athlete_name}</p>
                 <p className="text-lg font-bold text-primary">{sortedRankings[1].points} pts</p>
               </div>
             )}
             {sortedRankings[0] && (
               <div className="flex flex-col items-center rounded-lg border-2 border-primary bg-gradient-primary p-4 shadow-lg order-none sm:order-first">
                 <div className="mb-2 text-3xl font-bold text-primary-foreground">1º</div>
-                <p className="text-sm text-center truncate team-name">{sortedRankings[0].athlete_name}</p>
+                <p className="text-sm text-center break-words team-name leading-snug">{sortedRankings[0].athlete_name}</p>
                 <p className="text-xl font-bold text-primary-foreground">{sortedRankings[0].points} pts</p>
               </div>
             )}
             {sortedRankings[2] && (
               <div className="flex flex-col items-center rounded-lg border border-border bg-card p-4 shadow-card order-last">
                 <div className="mb-2 text-2xl font-bold text-muted-foreground">3º</div>
-                <p className="text-sm text-center truncate team-name">{sortedRankings[2].athlete_name}</p>
+                <p className="text-sm text-center break-words team-name leading-snug">{sortedRankings[2].athlete_name}</p>
                 <p className="text-lg font-bold text-primary">{sortedRankings[2].points} pts</p>
               </div>
             )}

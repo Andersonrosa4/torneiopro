@@ -37,7 +37,7 @@ const ClassificationTab = ({ matches, teams }: ClassificationTabProps) => {
   const standings = useMemo(() => {
     if (matches.length === 0) return [];
 
-    const eliminationMatches = matches.filter((m) => m.round >= 1 && m.bracket_type === "winners");
+    const eliminationMatches = matches.filter((m) => m.round >= 1 && (m.bracket_type === "winners" || m.bracket_type === "third_place"));
     const groupMatches = matches.filter((m) => m.round === 0);
 
     if (eliminationMatches.length === 0) {
@@ -51,11 +51,15 @@ const ClassificationTab = ({ matches, teams }: ClassificationTabProps) => {
     elimMatches: Match[],
     groupMatches: Match[]
   ): { id: string; name: string; position: number; label: string }[] {
-    const maxRound = Math.max(...elimMatches.map((m) => m.round));
+    const winnersMatches = elimMatches.filter((m) => m.bracket_type === "winners");
+    const thirdPlaceMatches = elimMatches.filter((m) => m.bracket_type === "third_place");
+    
+    const maxRound = Math.max(...winnersMatches.map((m) => m.round));
     const ranked: { id: string; name: string; position: number; label: string }[] = [];
     const placedTeams = new Set<string>();
 
-    const finalMatches = elimMatches.filter((m) => m.round === maxRound && m.status === "completed");
+    // 1st and 2nd from final
+    const finalMatches = winnersMatches.filter((m) => m.round === maxRound && m.status === "completed");
     finalMatches.forEach((finalMatch) => {
       if (finalMatch.winner_team_id) {
         if (!placedTeams.has(finalMatch.winner_team_id)) {
@@ -83,8 +87,35 @@ const ClassificationTab = ({ matches, teams }: ClassificationTabProps) => {
       }
     });
 
+    // 3rd and 4th from third_place match if completed
+    const completedThirdPlace = thirdPlaceMatches.filter((m) => m.status === "completed" && m.winner_team_id);
+    if (completedThirdPlace.length > 0) {
+      completedThirdPlace.forEach((m) => {
+        if (m.winner_team_id && !placedTeams.has(m.winner_team_id)) {
+          ranked.push({
+            id: m.winner_team_id,
+            name: getTeamName(m.winner_team_id),
+            position: ranked.length + 1,
+            label: `${ranked.length + 1}º lugar`,
+          });
+          placedTeams.add(m.winner_team_id);
+        }
+        const loserId = m.team1_id === m.winner_team_id ? m.team2_id : m.team1_id;
+        if (loserId && !placedTeams.has(loserId)) {
+          ranked.push({
+            id: loserId,
+            name: getTeamName(loserId),
+            position: ranked.length + 1,
+            label: `${ranked.length + 1}º lugar`,
+          });
+          placedTeams.add(loserId);
+        }
+      });
+    }
+
+    // Walk backward through remaining rounds for unplaced losers
     for (let round = maxRound - 1; round >= 1; round--) {
-      const roundMatches = elimMatches.filter(
+      const roundMatches = winnersMatches.filter(
         (m) => m.round === round && m.status === "completed"
       );
       const startPos = ranked.length + 1;

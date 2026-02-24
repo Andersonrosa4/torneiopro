@@ -223,21 +223,22 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       }
 
       // Build elimination ranking (same logic as ClassificationTab)
-      const elimMatches = matchesData.filter((m: any) => m.round >= 1 && m.bracket_type === "winners");
+      const winnersMatches = matchesData.filter((m: any) => m.round >= 1 && m.bracket_type === "winners");
+      const thirdPlaceMatches = matchesData.filter((m: any) => m.round >= 1 && m.bracket_type === "third_place");
       const groupMatches = matchesData.filter((m: any) => m.round === 0);
 
-      if (elimMatches.length === 0) {
+      if (winnersMatches.length === 0) {
         toast.error("Nenhuma fase eliminatória encontrada");
         setGenerating(false);
         return;
       }
 
-      const maxRound = Math.max(...elimMatches.map((m: any) => m.round));
+      const maxRound = Math.max(...winnersMatches.map((m: any) => m.round));
       const ranked: { teamId: string; position: number }[] = [];
       const placedTeams = new Set<string>();
 
-      // Final
-      const finalMatches = elimMatches.filter((m: any) => m.round === maxRound && m.status === "completed");
+      // Final — 1st and 2nd
+      const finalMatches = winnersMatches.filter((m: any) => m.round === maxRound && m.status === "completed");
       finalMatches.forEach((f: any) => {
         if (f.winner_team_id && !placedTeams.has(f.winner_team_id)) {
           ranked.push({ teamId: f.winner_team_id, position: 1 });
@@ -250,9 +251,25 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
         }
       });
 
-      // Walk backward through rounds
+      // 3rd place match — use actual result if completed
+      const completedThirdPlace = thirdPlaceMatches.filter((m: any) => m.status === "completed" && m.winner_team_id);
+      if (completedThirdPlace.length > 0) {
+        completedThirdPlace.forEach((m: any) => {
+          if (m.winner_team_id && !placedTeams.has(m.winner_team_id)) {
+            ranked.push({ teamId: m.winner_team_id, position: ranked.length + 1 });
+            placedTeams.add(m.winner_team_id);
+          }
+          const loserId = m.team1_id === m.winner_team_id ? m.team2_id : m.team1_id;
+          if (loserId && !placedTeams.has(loserId)) {
+            ranked.push({ teamId: loserId, position: ranked.length + 1 });
+            placedTeams.add(loserId);
+          }
+        });
+      }
+
+      // Walk backward through remaining rounds for unplaced losers
       for (let round = maxRound - 1; round >= 1; round--) {
-        const roundMatches = elimMatches.filter((m: any) => m.round === round && m.status === "completed");
+        const roundMatches = winnersMatches.filter((m: any) => m.round === round && m.status === "completed");
         const startPos = ranked.length + 1;
         const losers: { teamId: string; pointDiff: number }[] = [];
 

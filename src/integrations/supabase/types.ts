@@ -1605,6 +1605,7 @@ export type Database = {
       tournament_rules: {
         Row: {
           allow_draw: boolean
+          auto_advance_knockout: boolean
           created_at: string
           extra_time_halves: number
           extra_time_minutes: number
@@ -1642,6 +1643,7 @@ export type Database = {
         }
         Insert: {
           allow_draw?: boolean
+          auto_advance_knockout?: boolean
           created_at?: string
           extra_time_halves?: number
           extra_time_minutes?: number
@@ -1679,6 +1681,7 @@ export type Database = {
         }
         Update: {
           allow_draw?: boolean
+          auto_advance_knockout?: boolean
           created_at?: string
           extra_time_halves?: number
           extra_time_minutes?: number

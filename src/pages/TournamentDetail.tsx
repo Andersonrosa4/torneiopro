@@ -28,6 +28,7 @@ import { processDoubleEliminationAdvance, handleResetFinal } from "@/lib/doubleE
 import { computeAggressiveCascadeReset, computePartialCascadeResetSE } from "@/lib/aggressiveCascadeReset";
 import { distributeChapeus, getChapeuTeams, getRealTeams } from "@/lib/chapeuDistribution";
 import { generateSeeds } from "@/engine/seedingEngine";
+import { checkAutoAdvance } from "@/engine/autoAdvanceEngine";
 
 import BracketTreeView from "@/components/BracketTreeView";
 import MatchSequenceViewer from "@/components/MatchSequenceViewer";
@@ -1433,8 +1434,18 @@ const TournamentDetail = () => {
 
           if (allRoundDone) {
             if (currentRound === 0) {
-              // GROUP STAGE completed → auto-generate knockout
-              await generateKnockoutFromGroups();
+              // GROUP STAGE completed → check auto-advance engine
+              const autoAdvanceEnabled = tournamentRules?.auto_advance_knockout !== false;
+              const advanceCheck = checkAutoAdvance(
+                (postRelevant as any[]).map((m: any) => ({ id: m.id, round: m.round, status: m.status, modality_id: m.modality_id, team1_id: m.team1_id, team2_id: m.team2_id })),
+                autoAdvanceEnabled
+              );
+              if (advanceCheck.shouldAdvance) {
+                console.log(`[AutoAdvance] ${advanceCheck.reason} — gerando eliminatórias`);
+                await generateKnockoutFromGroups();
+              } else {
+                console.log(`[AutoAdvance:Skip] ${advanceCheck.reason}`);
+              }
             } else {
               // KNOCKOUT round completed → generate next round
               const nextRound = currentRound + 1;

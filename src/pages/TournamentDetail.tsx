@@ -1140,9 +1140,65 @@ const TournamentDetail = () => {
                 else console.log(`[CASCADE:OK] Match ${reset.matchId} reset`);
               })
             );
-            toast.info(`${cascadePlan.toUpdate.length} partida(s) resetada(s).`);
-          }
-       }
+             toast.info(`${cascadePlan.toUpdate.length} partida(s) resetada(s).`);
+           }
+
+           // ── RE-PROPAGATION: re-apply completed matches to fill cleared slots ──
+           if (isDE) {
+             const { data: postResetData } = await organizerQuery({
+               table: "matches",
+               operation: "select",
+               filters: { tournament_id: id },
+               order: [{ column: "round" }, { column: "position" }],
+             });
+             if (postResetData) {
+               let postResetMatches = match.modality_id
+                 ? (postResetData as typeof matches).filter(m => m.modality_id === match.modality_id)
+                 : (postResetData as typeof matches);
+
+               // Get all completed matches (excluding the one being re-declared)
+               const completedToReplay = postResetMatches
+                 .filter(m => m.status === 'completed' && m.winner_team_id && m.id !== matchId)
+                 .sort((a, b) => a.round - b.round || a.position - b.position);
+
+               console.log(`[RE-PROPAGATION] ${completedToReplay.length} completed matches to replay`);
+
+               for (const cm of completedToReplay) {
+                 // Refresh match state before each replay (slots may have been filled by previous iterations)
+                 const currentState = postResetMatches.find(m => m.id === cm.id);
+                 if (!currentState || !currentState.winner_team_id) continue;
+
+                 const cmLoserId = currentState.team1_id === currentState.winner_team_id
+                   ? currentState.team2_id
+                   : currentState.team1_id;
+
+                 const advResult = processDoubleEliminationAdvance(
+                   postResetMatches,
+                   currentState,
+                   currentState.winner_team_id,
+                   cmLoserId,
+                 );
+
+                 const allUpdates = [...advResult.winnerUpdates, ...advResult.loserUpdates];
+                 for (const upd of allUpdates) {
+                   await organizerQuery({
+                     table: "matches",
+                     operation: "update",
+                     data: upd.data,
+                     filters: { id: upd.matchId },
+                   });
+                   // Update local snapshot so subsequent iterations see correct state
+                   postResetMatches = postResetMatches.map(m =>
+                     m.id === upd.matchId ? { ...m, ...upd.data } : m
+                   );
+                 }
+                 if (allUpdates.length > 0) {
+                   console.log(`[RE-PROPAGATION] Match ${cm.id} (R${cm.round}P${cm.position}) → ${allUpdates.length} slot(s) filled`);
+                 }
+               }
+             }
+           }
+        }
      }
 
     // Round order validation removed — organizer can declare winners freely

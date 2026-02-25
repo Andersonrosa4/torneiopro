@@ -417,7 +417,7 @@ export function ManualMatchOverride({ match, matchNumber, teams, allMatches, tou
         const hasTeam2 = !!pm.team2_id;
         if (hasTeam1 === hasTeam2) continue;
 
-        // In DE, only auto-complete chapéu matches
+        // In DE, only auto-complete chapéu matches; in SE, any match with 1 team and no pending feeders
         if (isDoubleElimination && !pm.is_chapeu) continue;
 
         const pendingFeeders = matchList.filter(
@@ -427,7 +427,7 @@ export function ManualMatchOverride({ match, matchNumber, teams, allMatches, tou
 
         if (pendingFeeders.length === 0) {
           const byeWinner = pm.team1_id || pm.team2_id;
-          console.log(`[ManualOverride:BYE] Auto-completing match ${pm.id} (${pm.bracket_type} R${pm.round}P${pm.position}) → winner=${byeWinner}`);
+          console.log(`[ManualOverride:BYE] Auto-completing match ${pm.id} (${pm.bracket_type ?? 'se'} R${pm.round}P${pm.position}) → winner=${byeWinner}`);
 
           await organizerQuery({
             table: "matches",
@@ -450,6 +450,22 @@ export function ManualMatchOverride({ match, matchNumber, teams, allMatches, tou
               });
               const target = matchList.find(m => m.id === upd.matchId);
               if (target) Object.assign(target, upd.data);
+            }
+          } else {
+            // SE: propagate via next_win_match_id
+            if (pm.next_win_match_id && byeWinner) {
+              const nextMatch = matchList.find(m => m.id === pm.next_win_match_id);
+              if (nextMatch) {
+                const slot = !nextMatch.team1_id ? 'team1_id' : 'team2_id';
+                await organizerQuery({
+                  table: "matches",
+                  operation: "update",
+                  data: { [slot]: byeWinner },
+                  filters: { id: nextMatch.id },
+                });
+                (nextMatch as any)[slot] = byeWinner;
+                console.log(`[ManualOverride:BYE:SE] Propagated ${byeWinner} → ${nextMatch.id} slot ${slot}`);
+              }
             }
           }
           byeProcessed = true;

@@ -1348,6 +1348,71 @@ const TournamentDetail = () => {
                declareWinnerMutex.current.delete(matchId);
                return;
              }
+          } else {
+            // ── SE: BYE RECHECK pós-cascade ──
+            const { data: postSEData } = await organizerQuery({
+              table: "matches",
+              operation: "select",
+              filters: { tournament_id: id },
+              order: [{ column: "round" }, { column: "position" }],
+            });
+            if (postSEData) {
+              let seMatches = match.modality_id
+                ? (postSEData as typeof matches).filter(m => m.modality_id === match.modality_id)
+                : (postSEData as typeof matches);
+
+              let byeProcessed = true;
+              while (byeProcessed) {
+                byeProcessed = false;
+                for (const pm of seMatches) {
+                  if (pm.status !== 'pending') continue;
+                  const hasT1 = !!pm.team1_id;
+                  const hasT2 = !!pm.team2_id;
+                  if (hasT1 === hasT2) continue; // both filled or both empty
+
+                  const pendingFeeders = seMatches.filter(
+                    fm => fm.status !== 'completed' && fm.id !== pm.id &&
+                      (fm.next_win_match_id === pm.id || fm.next_lose_match_id === pm.id)
+                  );
+
+                  if (pendingFeeders.length === 0) {
+                    const byeWinner = pm.team1_id || pm.team2_id;
+                    console.log(`[BYE:PostCascade:SE] Auto-completing ${pm.id} R${pm.round}P${pm.position} → ${byeWinner}`);
+
+                    const { error: byeErr } = await organizerQuery({
+                      table: "matches",
+                      operation: "update",
+                      data: { winner_team_id: byeWinner, status: "completed", score1: 0, score2: 0 },
+                      filters: { id: pm.id },
+                    });
+                    if (byeErr) {
+                      console.error(`[BYE:SE:FAIL] ${byeErr.message}`);
+                      continue;
+                    }
+
+                    pm.status = 'completed' as any;
+                    pm.winner_team_id = byeWinner;
+
+                    // SE propagation via next_win_match_id
+                    if (pm.next_win_match_id && byeWinner) {
+                      const nextMatch = seMatches.find(m => m.id === pm.next_win_match_id);
+                      if (nextMatch) {
+                        const slot = !nextMatch.team1_id ? 'team1_id' : 'team2_id';
+                        await organizerQuery({
+                          table: "matches",
+                          operation: "update",
+                          data: { [slot]: byeWinner },
+                          filters: { id: nextMatch.id },
+                        });
+                        (nextMatch as any)[slot] = byeWinner;
+                        console.log(`[BYE:SE] Propagated ${byeWinner} → ${nextMatch.id} slot ${slot}`);
+                      }
+                    }
+                    byeProcessed = true;
+                  }
+                }
+              }
+            }
           }
          }
        }

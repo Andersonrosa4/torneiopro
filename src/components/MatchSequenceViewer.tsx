@@ -801,6 +801,9 @@ const MatchCard = ({
                 match={match}
                 matchNumber={index}
                 teams={teams}
+                allMatches={allMatches}
+                tournamentFormat={tournamentFormat}
+                tournamentId={tournamentId || ''}
                 onSaved={onOverrideSaved}
               />
             </div>
@@ -830,6 +833,9 @@ const MatchCard = ({
                 match={match}
                 matchNumber={index}
                 teams={teams}
+                allMatches={allMatches}
+                tournamentFormat={tournamentFormat}
+                tournamentId={tournamentId || ''}
                 onSaved={onOverrideSaved}
               />
             )}
@@ -846,6 +852,9 @@ const MatchCard = ({
               match={match}
               matchNumber={index}
               teams={teams}
+              allMatches={allMatches}
+              tournamentFormat={tournamentFormat}
+              tournamentId={tournamentId || ''}
               onSaved={onOverrideSaved}
             />
           )}
@@ -859,6 +868,9 @@ const MatchCard = ({
             match={match}
             matchNumber={index}
             teams={teams}
+            allMatches={allMatches}
+            tournamentFormat={tournamentFormat}
+            tournamentId={tournamentId || ''}
             onSaved={onOverrideSaved}
           />
         </div>

@@ -1185,6 +1185,18 @@ const TournamentDetail = () => {
 
            // ── RE-PROPAGATION: re-apply completed matches to fill cleared slots ──
            if (isDE) {
+             // Snapshot original state for rollback
+             const originalMatchState = {
+               id: match.id,
+               team1_id: match.team1_id,
+               team2_id: match.team2_id,
+               winner_team_id: match.winner_team_id,
+               status: match.status,
+               score1: match.score1,
+               score2: match.score2,
+             };
+
+             try {
              const { data: postResetData } = await organizerQuery({
                table: "matches",
                operation: "select",
@@ -1221,12 +1233,15 @@ const TournamentDetail = () => {
 
                  const allUpdates = [...advResult.winnerUpdates, ...advResult.loserUpdates];
                  for (const upd of allUpdates) {
-                   await organizerQuery({
+                   const { error: repropError } = await organizerQuery({
                      table: "matches",
                      operation: "update",
                      data: upd.data,
                      filters: { id: upd.matchId },
                    });
+                   if (repropError) {
+                     throw new Error(`Repropagation failed for match ${upd.matchId}: ${repropError.message}`);
+                   }
                    // Update local snapshot so subsequent iterations see correct state
                    postResetMatches = postResetMatches.map(m =>
                      m.id === upd.matchId ? { ...m, ...upd.data } : m
@@ -1235,6 +1250,55 @@ const TournamentDetail = () => {
                  if (allUpdates.length > 0) {
                    console.log(`[RE-PROPAGATION] Match ${cm.id} (R${cm.round}P${cm.position}) → ${allUpdates.length} slot(s) filled`);
                  }
+                }
+
+                // ── BYE RECHECK pós-cascade+repropagação ──
+                {
+                  let byeProcessed = true;
+                  while (byeProcessed) {
+                    byeProcessed = false;
+                    for (const pm of postResetMatches) {
+                      if (pm.status !== 'pending') continue;
+                      const hasT1 = !!pm.team1_id;
+                      const hasT2 = !!pm.team2_id;
+                      if (hasT1 === hasT2) continue;
+                      if (!pm.is_chapeu) continue; // DE: only chapéu matches
+
+                      const pendingFeeders = postResetMatches.filter(
+                        fm => fm.status !== 'completed' && fm.id !== pm.id &&
+                          (fm.next_win_match_id === pm.id || fm.next_lose_match_id === pm.id)
+                      );
+
+                      if (pendingFeeders.length === 0) {
+                        const byeWinner = pm.team1_id || pm.team2_id;
+                        console.log(`[BYE:PostCascade] Auto-completing ${pm.id} (${pm.bracket_type} R${pm.round}P${pm.position}) → ${byeWinner}`);
+
+                        const { error: byeErr } = await organizerQuery({
+                          table: "matches",
+                          operation: "update",
+                          data: { winner_team_id: byeWinner, status: "completed", score1: 0, score2: 0 },
+                          filters: { id: pm.id },
+                        });
+                        if (byeErr) throw new Error(`BYE completion failed: ${byeErr.message}`);
+
+                        pm.status = 'completed' as any;
+                        pm.winner_team_id = byeWinner;
+
+                        const byeAdv = processDoubleEliminationAdvance(postResetMatches, pm, byeWinner!, null);
+                        for (const upd of [...byeAdv.winnerUpdates, ...byeAdv.loserUpdates]) {
+                          await organizerQuery({
+                            table: "matches",
+                            operation: "update",
+                            data: upd.data,
+                            filters: { id: upd.matchId },
+                          });
+                          const target = postResetMatches.find(m => m.id === upd.matchId);
+                          if (target) Object.assign(target, upd.data);
+                        }
+                        byeProcessed = true;
+                      }
+                    }
+                  }
                 }
 
                 // ── SYSTEM RULES GUARD (post-cascade+repropagation) ──
@@ -1246,9 +1310,47 @@ const TournamentDetail = () => {
                   console.warn('[SystemRulesGuard] Violations detected after cascade+repropagation — continuing but state may be inconsistent');
                 }
               }
-            }
+             } catch (repropError: any) {
+               // ── ROLLBACK: cascade reset on failure ──
+               console.error("[RE-PROPAGATION:FAIL] Rolling back...", repropError);
+               toast.error(`❌ Falha na repropagação: ${repropError.message}. Executando rollback...`);
+
+               try {
+                 const rollbackPlan = computeAggressiveCascadeReset(match, matches.filter(m => m.modality_id === match.modality_id || !match.modality_id));
+                 // Also restore the original match
+                 rollbackPlan.toUpdate.push({
+                   matchId: match.id,
+                   data: {
+                     team1_id: originalMatchState.team1_id,
+                     team2_id: originalMatchState.team2_id,
+                     winner_team_id: originalMatchState.winner_team_id,
+                     status: originalMatchState.status,
+                     score1: originalMatchState.score1 ?? 0,
+                     score2: originalMatchState.score2 ?? 0,
+                   },
+                 });
+                 await Promise.all(
+                   rollbackPlan.toUpdate.map(reset =>
+                     organizerQuery({
+                       table: "matches",
+                       operation: "update",
+                       data: reset.data,
+                       filters: { id: reset.matchId },
+                     })
+                   )
+                 );
+                 toast.info("🔄 Rollback executado. Estado anterior restaurado.");
+               } catch (rollbackError) {
+                 console.error("[ROLLBACK:FAIL]", rollbackError);
+                 toast.error("❌ Rollback falhou. Use Desfazer Chaveamento para corrigir.");
+               }
+               fetchData();
+               declareWinnerMutex.current.delete(matchId);
+               return;
+             }
+          }
          }
-      }
+       }
 
     // Round order validation removed — organizer can declare winners freely
 

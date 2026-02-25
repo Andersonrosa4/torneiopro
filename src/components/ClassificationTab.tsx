@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Trophy, Medal, Award } from "lucide-react";
 import { motion } from "framer-motion";
+import { resolveTie, type TeamStats } from "@/engine/tiebreakEngine";
 
 interface Match {
   id: string;
@@ -179,23 +180,39 @@ const ClassificationTab = ({ matches, teams }: ClassificationTabProps) => {
     groupMatches: Match[]
   ): { id: string; name: string; position: number; label: string }[] {
     const stats: Record<string, { id: string; wins: number; played: number; pf: number; pa: number }> = {};
-    groupMatches
-      .filter((m) => m.status === "completed")
-      .forEach((m) => {
-        [m.team1_id, m.team2_id].forEach((tid, i) => {
-          if (!tid) return;
-          if (!stats[tid]) stats[tid] = { id: tid, wins: 0, played: 0, pf: 0, pa: 0 };
-          stats[tid].played++;
-          const myScore = i === 0 ? (m.score1 ?? 0) : (m.score2 ?? 0);
-          const oppScore = i === 0 ? (m.score2 ?? 0) : (m.score1 ?? 0);
-          stats[tid].pf += myScore;
-          stats[tid].pa += oppScore;
-          if (m.winner_team_id === tid) stats[tid].wins++;
-        });
+    const headToHeadMap: Record<string, { winnerId: string }> = {};
+
+    const completed = groupMatches.filter((m) => m.status === "completed");
+
+    completed.forEach((m) => {
+      [m.team1_id, m.team2_id].forEach((tid, i) => {
+        if (!tid) return;
+        if (!stats[tid]) stats[tid] = { id: tid, wins: 0, played: 0, pf: 0, pa: 0 };
+        stats[tid].played++;
+        const myScore = i === 0 ? (m.score1 ?? 0) : (m.score2 ?? 0);
+        const oppScore = i === 0 ? (m.score2 ?? 0) : (m.score1 ?? 0);
+        stats[tid].pf += myScore;
+        stats[tid].pa += oppScore;
+        if (m.winner_team_id === tid) stats[tid].wins++;
       });
 
-    const sorted = Object.values(stats).sort(
-      (a, b) => b.wins - a.wins || (b.pf - b.pa) - (a.pf - a.pa)
+      // Montar mapa de confronto direto
+      if (m.team1_id && m.team2_id && m.winner_team_id) {
+        const key = `${m.team1_id}_${m.team2_id}`;
+        headToHeadMap[key] = { winnerId: m.winner_team_id };
+      }
+    });
+
+    const teamStats: TeamStats[] = Object.values(stats).map((t) => ({
+      id: t.id,
+      wins: t.wins,
+      pointDiff: t.pf - t.pa,
+    }));
+
+    const sorted = resolveTie(
+      teamStats,
+      ["wins", "point_diff", "head_to_head"],
+      headToHeadMap
     );
 
     return sorted.map((t, idx) => ({

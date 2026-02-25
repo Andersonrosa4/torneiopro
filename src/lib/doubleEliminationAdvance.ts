@@ -260,16 +260,17 @@ export function processDoubleEliminationAdvance(
           const existingOpponent = nextLoseMatch[otherSlotL];
 
           if (existingOpponent && haveTeamsPlayedBefore(matches, loserId, existingOpponent)) {
-            const altSlot = findAntiRepetitionAlternative(
-              matches, nextLoseMatch, loserId, slot
-            );
-            if (altSlot) {
-              result.loserUpdates.push({
-                matchId: altSlot.matchId,
-                data: { [altSlot.field]: loserId },
-              });
+            // SAFE anti-repetition: try to swap opponents with a sibling match
+            const swapped = trySiblingSwap(matches, nextLoseMatch, loserId, slot, otherSlotL, existingOpponent);
+            if (swapped) {
+              result.loserUpdates.push(...swapped);
               return result;
             }
+            // If no safe swap found, place anyway (rematch is better than broken linkage)
+            console.warn(
+              `[⚠️ REMATCH ALLOWED] No safe swap available for ${loserId} vs ${existingOpponent} ` +
+              `in Losers R${nextLoseMatch.round}P${nextLoseMatch.position}. Placing anyway to preserve linkage.`
+            );
           }
         }
 
@@ -295,32 +296,67 @@ export function processDoubleEliminationAdvance(
 }
 
 /**
- * Find an alternative match slot to avoid anti-repetition conflict
+ * Safe anti-repetition: swap opponents between sibling matches in the same round.
+ * 
+ * If loser L would face opponent X (rematch) in match M1, and sibling match M2
+ * has opponent Y in its slot, swap X↔L between M1 and M2 — but ONLY if:
+ *   1) M2 is in the same round/bracket_type/bracket_half/bracket_number
+ *   2) The swap doesn't create a NEW rematch in M2
+ *   3) No match linkage (next_win/next_lose) is altered
+ * 
+ * Returns update array or null if no safe swap exists.
  */
-function findAntiRepetitionAlternative(
+function trySiblingSwap(
   matches: Match[],
-  originalMatch: Match,
+  targetMatch: Match,
   loserId: string,
-  originalSlot: 'team1_id' | 'team2_id',
-): { matchId: string; field: 'team1_id' | 'team2_id' } | null {
-  const sameRoundMatches = matches.filter(
+  loserSlot: 'team1_id' | 'team2_id',
+  opponentSlot: 'team1_id' | 'team2_id',
+  existingOpponent: string,
+): Array<{ matchId: string; data: Record<string, string> }> | null {
+  // Find sibling matches (same round, same bracket scope)
+  const siblings = matches.filter(
     m =>
-      m.bracket_type === originalMatch.bracket_type &&
-      m.bracket_half === originalMatch.bracket_half &&
-      m.bracket_number === originalMatch.bracket_number &&
-      m.round === originalMatch.round &&
-      m.id !== originalMatch.id
-  ).sort((a, b) => a.position - b.position);
+      m.bracket_type === targetMatch.bracket_type &&
+      m.bracket_half === targetMatch.bracket_half &&
+      m.bracket_number === targetMatch.bracket_number &&
+      m.round === targetMatch.round &&
+      m.id !== targetMatch.id
+  );
 
-  for (const m of sameRoundMatches) {
-    if (!m.team1_id) {
-      if (!m.team2_id || !haveTeamsPlayedBefore(matches, loserId, m.team2_id)) {
-        return { matchId: m.id, field: 'team1_id' };
-      }
-    }
-    if (!m.team2_id) {
-      if (!m.team1_id || !haveTeamsPlayedBefore(matches, loserId, m.team1_id)) {
-        return { matchId: m.id, field: 'team2_id' };
+  for (const sibling of siblings) {
+    // Check if sibling has an opponent we could swap with
+    const sibOpp1 = sibling.team1_id;
+    const sibOpp2 = sibling.team2_id;
+
+    // Try swapping: move existingOpponent to sibling, take sibling's occupant here
+    for (const [sibSlot, sibOccupant] of [['team1_id', sibOpp1], ['team2_id', sibOpp2]] as const) {
+      if (!sibOccupant) continue; // empty slot, can't swap
+      if (sibOccupant === loserId || sibOccupant === existingOpponent) continue;
+
+      // Would the swap create a rematch in either match?
+      const loserVsSibOccupant = haveTeamsPlayedBefore(matches, loserId, sibOccupant);
+      const existingOppVsSibPartner = (() => {
+        const otherSibSlot = sibSlot === 'team1_id' ? 'team2_id' : 'team1_id';
+        const sibPartner = sibling[otherSibSlot];
+        if (!sibPartner) return false;
+        return haveTeamsPlayedBefore(matches, existingOpponent, sibPartner);
+      })();
+
+      if (!loserVsSibOccupant && !existingOppVsSibPartner) {
+        // Safe swap found!
+        console.log(
+          `[ANTI-REMATCH SWAP] Swapping ${existingOpponent} (M${targetMatch.id.slice(0,6)}) ↔ ` +
+          `${sibOccupant} (M${sibling.id.slice(0,6)}) to avoid rematch with ${loserId}`
+        );
+        return [
+          // Place loser in target match (original slot)
+          { matchId: targetMatch.id, data: { [loserSlot]: loserId } },
+          // Move existing opponent to sibling's slot
+          { matchId: sibling.id, data: { [sibSlot]: existingOpponent } },
+          // Move sibling's occupant to target match's opponent slot
+          { matchId: targetMatch.id, data: { [opponentSlot]: sibOccupant } },
+        ];
       }
     }
   }

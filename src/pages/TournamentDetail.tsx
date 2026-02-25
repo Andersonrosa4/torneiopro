@@ -29,6 +29,7 @@ import { computeAggressiveCascadeReset, computePartialCascadeResetSE } from "@/l
 import { distributeChapeus, getChapeuTeams, getRealTeams } from "@/lib/chapeuDistribution";
 import { generateSeeds } from "@/engine/seedingEngine";
 import { checkAutoAdvance } from "@/engine/autoAdvanceEngine";
+import { isRoundLocked } from "@/engine/roundLockGuard";
 
 import BracketTreeView from "@/components/BracketTreeView";
 import MatchSequenceViewer from "@/components/MatchSequenceViewer";
@@ -1063,6 +1064,20 @@ const TournamentDetail = () => {
     try {
     const match = matches.find((m) => m.id === matchId);
     if (!match || !id) { declareWinnerMutex.current.delete(matchId); return; }
+
+    // ── ROUND LOCK GUARD ──
+    const modalityMatches = match.modality_id
+      ? matches.filter(m => m.modality_id === match.modality_id)
+      : matches.filter(m => m.round > 0);
+    const lockCheck = isRoundLocked(
+      { id: match.id, round: match.round, status: match.status, bracket_type: match.bracket_type, bracket_half: match.bracket_half, modality_id: match.modality_id },
+      modalityMatches.map(m => ({ id: m.id, round: m.round, status: m.status, bracket_type: m.bracket_type, bracket_half: m.bracket_half, modality_id: m.modality_id })),
+    );
+    if (lockCheck.locked) {
+      toast.error(lockCheck.reason);
+      declareWinnerMutex.current.delete(matchId);
+      return;
+    }
 
     // ── AGGRESSIVE CASCADE RESET ──
      // If match was already completed, reset ALL downstream matches before re-declaring

@@ -9,13 +9,12 @@
 
 // ── Tipos ────────────────────────────────────────────────────
 
-export type TiebreakCriteria = "wins" | "point_diff" | "head_to_head" | "elo";
+export type TiebreakCriteria = "wins" | "point_diff" | "head_to_head";
 
 export interface TeamStats {
   id: string;
   wins: number;
   pointDiff: number;
-  elo?: number;
 }
 
 // ── Comparadores por critério ────────────────────────────────
@@ -28,10 +27,6 @@ function byWins(a: TeamStats, b: TeamStats): number {
 
 function byPointDiff(a: TeamStats, b: TeamStats): number {
   return b.pointDiff - a.pointDiff;
-}
-
-function byElo(a: TeamStats, b: TeamStats): number {
-  return (b.elo ?? 0) - (a.elo ?? 0);
 }
 
 function byHeadToHead(
@@ -57,8 +52,6 @@ function getComparator(
       return byWins;
     case "point_diff":
       return byPointDiff;
-    case "elo":
-      return byElo;
     case "head_to_head":
       return byHeadToHead(headToHeadMap ?? {});
   }

@@ -36,7 +36,6 @@ const DB_TO_ENGINE: Record<string, TiebreakCriteria> = {
   SETS_DIFF: "point_diff",
   GAMES_DIFF: "point_diff",
   HEAD_TO_HEAD: "head_to_head",
-  ELO: "elo",
 };
 
 const DEFAULT_CRITERIA: TiebreakCriteria[] = ["wins", "point_diff", "head_to_head"];

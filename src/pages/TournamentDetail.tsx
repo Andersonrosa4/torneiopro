@@ -297,8 +297,9 @@ const TournamentDetail = () => {
   };
 
   const removeTeam = async (tid: string) => {
-    if (hasGroupStageGenerated) {
-      toast.error("❌ Fase de grupos já gerada. Faça o reset completo para remover equipes.");
+    const teamInMatch = matches.some(m => m.team1_id === tid || m.team2_id === tid);
+    if (teamInMatch) {
+      toast.error("Não é possível excluir equipe após geração de partidas.");
       return;
     }
     await organizerQuery({ table: "teams", operation: "delete", filters: { id: tid } });

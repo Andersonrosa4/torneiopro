@@ -413,8 +413,8 @@ const TournamentDetail = () => {
         const nonSeeds = arranged.filter(t => !config.seedTeamIds!.includes(t.id)).sort(() => Math.random() - 0.5);
         arranged = [...seeds, ...nonSeeds];
       } else if (config.useSeeds) {
-        // ELO-based seeding via engine
-        const seedResult = generateSeeds(arranged.map(t => ({ id: t.id, elo: t.seed ?? 0 })));
+        // Seed-based ordering via engine
+        const seedResult = generateSeeds(arranged.map(t => ({ id: t.id, seed: t.seed ?? 0 })));
         const seedMap = new Map(seedResult.map(s => [s.id, s.seed]));
         arranged.sort((a, b) => (seedMap.get(a.id) ?? 999) - (seedMap.get(b.id) ?? 999));
       } else {
@@ -648,10 +648,9 @@ const TournamentDetail = () => {
         result = generateDoubleEliminationBracket({
           tournamentId: id!,
           modalityId: currentModalityId || "",
-          teams: filteredTeams.map(t => {
-            const eloSeed = generateSeeds([{ id: t.id, elo: t.seed ?? 0 }]);
-            return { id: t.id, player1_name: t.player1_name, player2_name: t.player2_name, seed: eloSeed[0].seed };
-          }),
+          teams: filteredTeams.map(t => ({
+            id: t.id, player1_name: t.player1_name, player2_name: t.player2_name, seed: t.seed ?? 0,
+          })),
           useSeeds: config.useSeeds,
           seedTeamIds: config.seedTeamIds,
           sideATeamIds: (config as any).sideATeamIds,
@@ -715,8 +714,8 @@ const TournamentDetail = () => {
         const nonSeeds = arranged.filter(t => !config.seedTeamIds!.includes(t.id)).sort(() => Math.random() - 0.5);
         arranged = [...seeds, ...nonSeeds];
       } else if (config.useSeeds) {
-        // ELO-based seeding via engine
-        const seedResult = generateSeeds(arranged.map(t => ({ id: t.id, elo: t.seed ?? 0 })));
+        // Seed-based ordering via engine
+        const seedResult = generateSeeds(arranged.map(t => ({ id: t.id, seed: t.seed ?? 0 })));
         const seedMap = new Map(seedResult.map(s => [s.id, s.seed]));
         arranged.sort((a, b) => (seedMap.get(a.id) ?? 999) - (seedMap.get(b.id) ?? 999));
       } else {

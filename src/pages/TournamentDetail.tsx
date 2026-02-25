@@ -30,6 +30,7 @@ import { distributeChapeus, getChapeuTeams, getRealTeams } from "@/lib/chapeuDis
 import { generateSeeds } from "@/engine/seedingEngine";
 import { checkAutoAdvance } from "@/engine/autoAdvanceEngine";
 import { isRoundLocked } from "@/engine/roundLockGuard";
+import { validateSystemRules, type TournamentSnapshot, type GuardMatch } from "@/engine/systemRulesGuard";
 
 import BracketTreeView from "@/components/BracketTreeView";
 import MatchSequenceViewer from "@/components/MatchSequenceViewer";
@@ -126,6 +127,34 @@ const TournamentDetail = () => {
   const { modalities, selectedModality, setSelectedModality, updateModality, loading: modalitiesLoading } = useModalities(id);
 
   const isOwner = tournament?.created_by === organizerId || isAdmin || isAssociatedOrganizer;
+
+  // Helper: build snapshot and run system rules guard
+  const runSystemRulesGuard = useCallback((matchList: Match[], label: string): boolean => {
+    const snapshot: TournamentSnapshot = {
+      matches: matchList.map(m => ({
+        id: m.id,
+        round: m.round,
+        position: m.position,
+        status: m.status,
+        bracket_type: m.bracket_type,
+        bracket_half: m.bracket_half,
+        team1_id: m.team1_id,
+        team2_id: m.team2_id,
+        winner_team_id: m.winner_team_id,
+        is_chapeu: m.is_chapeu,
+        modality_id: m.modality_id,
+      })),
+      format: tournament?.format || 'single_elimination',
+    };
+    const violations = validateSystemRules(snapshot);
+    if (violations.length > 0) {
+      console.error(`[SystemRulesGuard:${label}] ${violations.length} violação(ões):`);
+      violations.forEach(v => console.error(`  → [${v.rule}] ${v.message}`));
+      toast.error(`⛔ Violação de regra: ${violations[0].message}`);
+      return false; // blocked
+    }
+    return true; // ok
+  }, [tournament?.format]);
 
   // Filtered data by selected modality — STRICT isolation, no fallback (MEMOIZED)
   // While modalities are still loading, return empty to prevent unfiltered data flash
@@ -362,6 +391,11 @@ const TournamentDetail = () => {
     numIndexTeams?: number;
   }) => {
     try {
+      // ── SYSTEM RULES GUARD (pre-bracket generation) ──
+      if (filteredMatches.length > 0 && !runSystemRulesGuard(filteredMatches, 'preBracketGeneration')) {
+        return;
+      }
+
       // VALIDATION: Check minimum team count
       if (filteredTeams.length < 2) {
         toast.error("❌ Erro: Cadastre pelo menos 2 duplas antes de gerar o chaveamento.");
@@ -1080,6 +1114,12 @@ const TournamentDetail = () => {
       return;
     }
 
+    // ── SYSTEM RULES GUARD (pre-declaration) ──
+    if (!runSystemRulesGuard(modalityMatches, 'preDeclareWinner')) {
+      declareWinnerMutex.current.delete(matchId);
+      return;
+    }
+
     // ── AGGRESSIVE CASCADE RESET ──
      // If match was already completed, reset ALL downstream matches before re-declaring
      const isReDeclaration = match.status === 'completed' && match.winner_team_id;
@@ -1195,11 +1235,20 @@ const TournamentDetail = () => {
                  if (allUpdates.length > 0) {
                    console.log(`[RE-PROPAGATION] Match ${cm.id} (R${cm.round}P${cm.position}) → ${allUpdates.length} slot(s) filled`);
                  }
-               }
-             }
-           }
-        }
-     }
+                }
+
+                // ── SYSTEM RULES GUARD (post-cascade+repropagation) ──
+                const postCascadeOk = runSystemRulesGuard(
+                  postResetMatches as Match[],
+                  'postCascadeRepropagation'
+                );
+                if (!postCascadeOk) {
+                  console.warn('[SystemRulesGuard] Violations detected after cascade+repropagation — continuing but state may be inconsistent');
+                }
+              }
+            }
+         }
+      }
 
     // Round order validation removed — organizer can declare winners freely
 

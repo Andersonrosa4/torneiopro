@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Trophy, Medal, Award } from "lucide-react";
 import { motion } from "framer-motion";
-import { resolveTie, type TeamStats } from "@/engine/tiebreakEngine";
+import { resolveTie, type TeamStats, type TiebreakCriteria } from "@/engine/tiebreakEngine";
 
 interface Match {
   id: string;
@@ -26,9 +26,33 @@ interface Team {
 interface ClassificationTabProps {
   matches: Match[];
   teams: Team[];
+  rankingCriteriaOrder?: string;
 }
 
-const ClassificationTab = ({ matches, teams }: ClassificationTabProps) => {
+const DB_TO_ENGINE: Record<string, TiebreakCriteria> = {
+  WINS: "wins",
+  POINT_DIFF: "point_diff",
+  POINTS_DIFF: "point_diff",
+  SETS_DIFF: "point_diff",
+  GAMES_DIFF: "point_diff",
+  HEAD_TO_HEAD: "head_to_head",
+  ELO: "elo",
+};
+
+const DEFAULT_CRITERIA: TiebreakCriteria[] = ["wins", "point_diff", "head_to_head"];
+
+function parseCriteriaOrder(raw?: string): TiebreakCriteria[] {
+  if (!raw) return DEFAULT_CRITERIA;
+  const parsed = raw
+    .split(",")
+    .map((s) => DB_TO_ENGINE[s.trim().toUpperCase()])
+    .filter((c): c is TiebreakCriteria => !!c);
+  // Deduplicate preserving order
+  return [...new Set(parsed)].length > 0 ? [...new Set(parsed)] : DEFAULT_CRITERIA;
+}
+
+const ClassificationTab = ({ matches, teams, rankingCriteriaOrder }: ClassificationTabProps) => {
+  const criteriaOrder = useMemo(() => parseCriteriaOrder(rankingCriteriaOrder), [rankingCriteriaOrder]);
   const getTeamName = (teamId: string | null) => {
     if (!teamId) return "A definir";
     const team = teams.find((t) => t.id === teamId);
@@ -211,7 +235,7 @@ const ClassificationTab = ({ matches, teams }: ClassificationTabProps) => {
 
     const sorted = resolveTie(
       teamStats,
-      ["wins", "point_diff", "head_to_head"],
+      criteriaOrder,
       headToHeadMap
     );
 

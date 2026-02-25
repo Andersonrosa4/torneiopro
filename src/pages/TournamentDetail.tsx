@@ -2255,7 +2255,7 @@ const TournamentDetail = () => {
                   <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
                     <Trophy className="h-5 w-5" /> Classificação
                   </h2>
-                  <ClassificationTab matches={filteredMatches} teams={filteredTeams} />
+                  <ClassificationTab matches={filteredMatches} teams={filteredTeams} rankingCriteriaOrder={tournamentRules?.ranking_criteria_order} />
                 </section>
               ) : (
                 <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">

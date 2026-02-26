@@ -47,7 +47,7 @@ async function verifyHmacToken(
 const PUBLIC_READ_TABLES = new Set([
   "tournaments", "teams", "matches", "participants", "modalities",
   "groups", "classificacao_grupos", "quiz_questions", "quiz_scores", "rankings",
-  "tournament_rules",
+  "tournament_rules", "ranking_points_history",
 ]);
 
 // Tables that require admin role for any write

@@ -1403,6 +1403,67 @@ export type Database = {
         }
         Relationships: []
       }
+      ranking_points_history: {
+        Row: {
+          athlete_name: string
+          badge: string | null
+          created_at: string
+          created_by: string
+          id: string
+          modality_id: string | null
+          points_added: number
+          ranking_id: string
+          reason: string | null
+          tournament_id: string
+        }
+        Insert: {
+          athlete_name: string
+          badge?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          modality_id?: string | null
+          points_added: number
+          ranking_id: string
+          reason?: string | null
+          tournament_id: string
+        }
+        Update: {
+          athlete_name?: string
+          badge?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          modality_id?: string | null
+          points_added?: number
+          ranking_id?: string
+          reason?: string | null
+          tournament_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ranking_points_history_modality_id_fkey"
+            columns: ["modality_id"]
+            isOneToOne: false
+            referencedRelation: "modalities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ranking_points_history_ranking_id_fkey"
+            columns: ["ranking_id"]
+            isOneToOne: false
+            referencedRelation: "rankings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ranking_points_history_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rankings: {
         Row: {
           athlete_name: string

@@ -36,6 +36,7 @@ import BracketTreeView from "@/components/BracketTreeView";
 import MatchSequenceViewer from "@/components/MatchSequenceViewer";
 import ClassificationTab from "@/components/ClassificationTab";
 import RankingsTab from "@/components/RankingsTab";
+import StageSelector from "@/components/StageSelector";
 
 const sportLabels: Record<string, string> = {
   beach_volleyball: "🏐 Vôlei de Praia",
@@ -123,6 +124,7 @@ const TournamentDetail = () => {
   const [editForm, setEditForm] = useState({ name: "", description: "", location: "", event_date: "", category: "", status: "", registration_value: "" });
   const [savingTournament, setSavingTournament] = useState(false);
   const [isAssociatedOrganizer, setIsAssociatedOrganizer] = useState(false);
+  const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
 
   const { modalities, selectedModality, setSelectedModality, updateModality, loading: modalitiesLoading } = useModalities(id);
 
@@ -160,18 +162,20 @@ const TournamentDetail = () => {
 
   // Filtered data by selected modality — STRICT isolation, no fallback (MEMOIZED)
   // While modalities are still loading, return empty to prevent unfiltered data flash
-  const filteredTeams = useMemo(() => 
-    modalitiesLoading ? [] :
-    selectedModality ? teams.filter(t => t.modality_id === selectedModality.id) 
-      : modalities.length > 0 ? [] : teams,
-    [teams, selectedModality, modalities.length, modalitiesLoading]
-  );
-  const filteredMatches = useMemo(() => 
-    modalitiesLoading ? [] :
-    selectedModality ? matches.filter(m => m.modality_id === selectedModality.id) 
-      : modalities.length > 0 ? [] : matches,
-    [matches, selectedModality, modalities.length, modalitiesLoading]
-  );
+  const filteredTeams = useMemo(() => {
+    if (modalitiesLoading) return [];
+    let result = selectedModality ? teams.filter(t => t.modality_id === selectedModality.id) 
+      : modalities.length > 0 ? [] : teams;
+    if (selectedStageId) result = result.filter((t: any) => t.stage_id === selectedStageId);
+    return result;
+  }, [teams, selectedModality, modalities.length, modalitiesLoading, selectedStageId]);
+  const filteredMatches = useMemo(() => {
+    if (modalitiesLoading) return [];
+    let result = selectedModality ? matches.filter(m => m.modality_id === selectedModality.id) 
+      : modalities.length > 0 ? [] : matches;
+    if (selectedStageId) result = result.filter((m: any) => m.stage_id === selectedStageId);
+    return result;
+  }, [matches, selectedModality, modalities.length, modalitiesLoading, selectedStageId]);
 
   // Detect if group stage exists for current modality (round=0 matches)
   const hasGroupStageGenerated = useMemo(() => 
@@ -252,6 +256,7 @@ const TournamentDetail = () => {
         player2_name: player2.trim(),
         seed: filteredTeams.length + 1,
         modality_id: selectedModality?.id || null,
+        stage_id: selectedStageId || null,
       },
     });
     if (error) { toast.error(error.message); return; }
@@ -315,6 +320,7 @@ const TournamentDetail = () => {
         seed: num,
         is_fictitious: true,
         modality_id: selectedModality?.id || null,
+        stage_id: selectedStageId || null,
       });
     }
     const { error } = await organizerQuery({
@@ -2202,6 +2208,14 @@ const TournamentDetail = () => {
             </div>
           )}
 
+          {/* Stage Selector */}
+          <StageSelector
+            tournamentId={tournament.id}
+            isOwner={canEdit}
+            selectedStageId={selectedStageId}
+            onSelectStage={setSelectedStageId}
+          />
+
           {/* Modality Tabs */}
           <ModalityTabs
             modalities={modalities}
@@ -2345,6 +2359,7 @@ const TournamentDetail = () => {
                                           player2_name: pair[1].toString().trim(),
                                           seed: baseIndex + batch + j + 1,
                                           modality_id: selectedModality?.id || null,
+                                          stage_id: selectedStageId || null,
                                         },
                                       })
                                     )
@@ -2597,6 +2612,7 @@ const TournamentDetail = () => {
                   eventDate={tournament.event_date ? formatDateBR(tournament.event_date) : undefined}
                   modalityId={selectedModality?.id || null}
                   modalityName={selectedModality?.name}
+                  stageId={selectedStageId}
                 />
             </TabsContent>
           </Tabs>

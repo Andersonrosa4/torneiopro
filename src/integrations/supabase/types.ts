@@ -868,6 +868,7 @@ export type Database = {
           round: number
           score1: number | null
           score2: number | null
+          stage_id: string | null
           status: Database["public"]["Enums"]["match_status"]
           team1_id: string | null
           team2_id: string | null
@@ -893,6 +894,7 @@ export type Database = {
           round: number
           score1?: number | null
           score2?: number | null
+          stage_id?: string | null
           status?: Database["public"]["Enums"]["match_status"]
           team1_id?: string | null
           team2_id?: string | null
@@ -918,6 +920,7 @@ export type Database = {
           round?: number
           score1?: number | null
           score2?: number | null
+          stage_id?: string | null
           status?: Database["public"]["Enums"]["match_status"]
           team1_id?: string | null
           team2_id?: string | null
@@ -959,6 +962,13 @@ export type Database = {
             columns: ["participant2_id"]
             isOneToOne: false
             referencedRelation: "participants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matches_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "tournament_stages"
             referencedColumns: ["id"]
           },
           {
@@ -1414,6 +1424,7 @@ export type Database = {
           points_added: number
           ranking_id: string
           reason: string | null
+          stage_id: string | null
           tournament_id: string
         }
         Insert: {
@@ -1426,6 +1437,7 @@ export type Database = {
           points_added: number
           ranking_id: string
           reason?: string | null
+          stage_id?: string | null
           tournament_id: string
         }
         Update: {
@@ -1438,6 +1450,7 @@ export type Database = {
           points_added?: number
           ranking_id?: string
           reason?: string | null
+          stage_id?: string | null
           tournament_id?: string
         }
         Relationships: [
@@ -1453,6 +1466,13 @@ export type Database = {
             columns: ["ranking_id"]
             isOneToOne: false
             referencedRelation: "rankings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ranking_points_history_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "tournament_stages"
             referencedColumns: ["id"]
           },
           {
@@ -1579,6 +1599,7 @@ export type Database = {
           player1_name: string
           player2_name: string
           seed: number | null
+          stage_id: string | null
           tournament_id: string
         }
         Insert: {
@@ -1590,6 +1611,7 @@ export type Database = {
           player1_name: string
           player2_name: string
           seed?: number | null
+          stage_id?: string | null
           tournament_id: string
         }
         Update: {
@@ -1601,6 +1623,7 @@ export type Database = {
           player1_name?: string
           player2_name?: string
           seed?: number | null
+          stage_id?: string | null
           tournament_id?: string
         }
         Relationships: [
@@ -1609,6 +1632,13 @@ export type Database = {
             columns: ["modality_id"]
             isOneToOne: false
             referencedRelation: "modalities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teams_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "tournament_stages"
             referencedColumns: ["id"]
           },
           {
@@ -1786,6 +1816,44 @@ export type Database = {
             foreignKeyName: "tournament_rules_tournament_id_fkey"
             columns: ["tournament_id"]
             isOneToOne: true
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tournament_stages: {
+        Row: {
+          created_at: string
+          event_date: string | null
+          id: string
+          name: string
+          stage_number: number
+          status: string
+          tournament_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_date?: string | null
+          id?: string
+          name: string
+          stage_number?: number
+          status?: string
+          tournament_id: string
+        }
+        Update: {
+          created_at?: string
+          event_date?: string | null
+          id?: string
+          name?: string
+          stage_number?: number
+          status?: string
+          tournament_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tournament_stages_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
             referencedRelation: "tournaments"
             referencedColumns: ["id"]
           },

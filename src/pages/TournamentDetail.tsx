@@ -2211,7 +2211,7 @@ const TournamentDetail = () => {
           {/* Stage Selector */}
           <StageSelector
             tournamentId={tournament.id}
-            isOwner={canEdit}
+            isOwner={isOwner}
             selectedStageId={selectedStageId}
             onSelectStage={setSelectedStageId}
           />

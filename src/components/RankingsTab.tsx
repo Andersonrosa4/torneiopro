@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Trash2, TrendingUp, Download, FileText, Sheet, Pencil, Check, X, Zap, Users, User, Star, Heart, Award } from "lucide-react";
+import { Plus, Trash2, TrendingUp, Download, FileText, Sheet, Pencil, Check, X, Zap, Users, User, Star, Heart, Award, History, ChevronDown, ChevronUp } from "lucide-react";
 import { motion } from "framer-motion";
 
 import { exportRankings } from "@/lib/exportUtils";
@@ -35,6 +35,16 @@ interface RankingEntry {
   created_by: string;
   entry_type: string;
   badge: string | null;
+}
+
+interface PointsHistoryEntry {
+  id: string;
+  ranking_id: string;
+  athlete_name: string;
+  points_added: number;
+  badge: string | null;
+  reason: string | null;
+  created_at: string;
 }
 
 interface Team {
@@ -87,6 +97,8 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
     return null;
   };
   const [viewFilter, setViewFilter] = useState<"all" | "individual" | "pair" | "male" | "female">("individual");
+  const [pointsHistory, setPointsHistory] = useState<PointsHistoryEntry[]>([]);
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
 
   const fetchRankings = async () => {
     const filters: Record<string, any> = { tournament_id: tournamentId };
@@ -119,14 +131,24 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
     if (data) setTeams(data);
   };
 
+  const fetchHistory = async () => {
+    const { data } = await publicQuery<PointsHistoryEntry[]>({
+      table: "ranking_points_history",
+      filters: { tournament_id: tournamentId, ...(modalityId ? { modality_id: modalityId } : {}) },
+      order: { column: "created_at", ascending: false },
+    });
+    setPointsHistory(data || []);
+  };
+
   useEffect(() => {
     setViewFilter("individual");
     fetchRankings();
     fetchTeams();
+    fetchHistory();
 
     const channel = supabase
       .channel(`rankings-${tournamentId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "rankings", filter: `tournament_id=eq.${tournamentId}` }, () => fetchRankings())
+      .on("postgres_changes", { event: "*", schema: "public", table: "rankings", filter: `tournament_id=eq.${tournamentId}` }, () => { fetchRankings(); fetchHistory(); })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -198,13 +220,35 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       return;
     }
 
+    const currentRanking = rankings.find((r) => r.id === id);
+    const oldPoints = currentRanking?.points || 0;
+    const pointsDiff = newPoints - oldPoints;
+
     const { error } = await organizerQuery({ table: "rankings", operation: "update", data: { points: newPoints, badge: badge || null }, filters: { id } });
 
     if (error) {
       toast.error("Erro ao atualizar pontos");
     } else {
+      // Log history entry if points changed
+      if (pointsDiff !== 0 && currentRanking) {
+        const createdBy = organizerId || user?.id || "";
+        await organizerQuery({
+          table: "ranking_points_history",
+          operation: "insert",
+          data: {
+            ranking_id: id,
+            athlete_name: currentRanking.athlete_name,
+            points_added: pointsDiff,
+            badge: badge || null,
+            tournament_id: tournamentId,
+            ...(modalityId ? { modality_id: modalityId } : {}),
+            created_by: createdBy,
+          },
+        });
+      }
       setEditingId(null);
       fetchRankings();
+      fetchHistory();
     }
   };
 
@@ -666,6 +710,47 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                           </div>
                         ) : null}
                       </div>
+                      {/* History toggle */}
+                      {(() => {
+                        const athleteHistory = pointsHistory.filter((h) => h.ranking_id === ranking.id);
+                        if (athleteHistory.length === 0) return null;
+                        const isExpanded = expandedHistoryId === ranking.id;
+                        return (
+                          <div className="mt-2">
+                            <button
+                              onClick={() => setExpandedHistoryId(isExpanded ? null : ranking.id)}
+                              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              <History className="h-3 w-3" />
+                              Histórico ({athleteHistory.length})
+                              {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                            </button>
+                            {isExpanded && (
+                              <div className="mt-1.5 space-y-1 pl-1 border-l-2 border-border ml-1">
+                                {athleteHistory.map((h) => (
+                                  <div key={h.id} className="flex items-center gap-2 text-[11px] py-0.5 pl-2">
+                                    {getBadgeIcon(h.badge)}
+                                    <span className={h.points_added >= 0 ? "text-emerald-400 font-bold" : "text-destructive font-bold"}>
+                                      {h.points_added >= 0 ? `+${h.points_added}` : h.points_added} pts
+                                    </span>
+                                    {h.badge && (
+                                      <span className="text-muted-foreground">
+                                        — {getBadgeLabel(h.badge)}
+                                      </span>
+                                    )}
+                                    {!h.badge && (
+                                      <span className="text-muted-foreground">— Classificação</span>
+                                    )}
+                                    <span className="text-muted-foreground/60 ml-auto text-[10px]">
+                                      {new Date(h.created_at).toLocaleDateString("pt-BR")}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 </motion.div>

@@ -26,6 +26,7 @@ import BracketTreeView from "@/components/BracketTreeView";
 import MatchSequenceViewer from "@/components/MatchSequenceViewer";
 import ClassificationTab from "@/components/ClassificationTab";
 import RankingsTab from "@/components/RankingsTab";
+import StageSelector from "@/components/StageSelector";
 import SportQuiz from "@/components/SportQuiz";
 import RallyGame from "@/components/RallyGame";
 import VolleyPongGame from "@/components/VolleyPongGame";
@@ -56,6 +57,7 @@ const TournamentPublicView = () => {
   const [tournament, setTournament] = useState<any>(null);
   const [teams, setTeams] = useState<any[]>([]);
   const [matches, setMatches] = useState<any[]>([]);
+  const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
   const [loading, setLoading] = useState(!dataCache.has(id ?? ""));
   const revalidatingRef = useRef(false);
 
@@ -63,18 +65,21 @@ const TournamentPublicView = () => {
 
   // Filtered data by selected modality — STRICT isolation, no fallback
   // While modalities are loading, return empty to prevent unfiltered data flash
-  const filteredTeams = useMemo(() =>
-    modalitiesLoading ? [] :
-    selectedModality ? teams.filter(t => t.modality_id === selectedModality.id) 
-      : modalities.length > 0 ? [] : teams,
-    [teams, selectedModality, modalities.length, modalitiesLoading]
-  );
-  const filteredMatches = useMemo(() =>
-    modalitiesLoading ? [] :
-    selectedModality ? matches.filter(m => m.modality_id === selectedModality.id) 
-      : modalities.length > 0 ? [] : matches,
-    [matches, selectedModality, modalities.length, modalitiesLoading]
-  );
+  const filteredTeams = useMemo(() => {
+    let result = modalitiesLoading ? [] :
+      selectedModality ? teams.filter(t => t.modality_id === selectedModality.id) 
+        : modalities.length > 0 ? [] : teams;
+    if (selectedStageId) result = result.filter(t => t.stage_id === selectedStageId);
+    return result;
+  }, [teams, selectedModality, modalities.length, modalitiesLoading, selectedStageId]);
+
+  const filteredMatches = useMemo(() => {
+    let result = modalitiesLoading ? [] :
+      selectedModality ? matches.filter(m => m.modality_id === selectedModality.id) 
+        : modalities.length > 0 ? [] : matches;
+    if (selectedStageId) result = result.filter(m => m.stage_id === selectedStageId);
+    return result;
+  }, [matches, selectedModality, modalities.length, modalitiesLoading, selectedStageId]);
 
   const fetchData = useCallback(async (background = false) => {
     if (!id) return;
@@ -233,6 +238,14 @@ const TournamentPublicView = () => {
               onSelect={setSelectedModality}
             />
           )}
+
+          {/* Stage selector — read-only for athletes */}
+          <StageSelector
+            tournamentId={id || ""}
+            isOwner={false}
+            selectedStageId={selectedStageId}
+            onSelectStage={setSelectedStageId}
+          />
 
           {/* All tabs — identical structure to organizer */}
           <Tabs defaultValue="teams" className="w-full">

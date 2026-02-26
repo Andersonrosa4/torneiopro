@@ -2591,7 +2591,7 @@ const TournamentDetail = () => {
             <TabsContent value="rankings">
               <RankingsTab
                   tournamentId={id || ""}
-                  isOwner={canEdit}
+                  isOwner={isOwner}
                   sport={tournament.sport}
                   tournamentName={tournament.name}
                   eventDate={tournament.event_date ? formatDateBR(tournament.event_date) : undefined}

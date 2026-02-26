@@ -45,6 +45,7 @@ interface PointsHistoryEntry {
   badge: string | null;
   reason: string | null;
   created_at: string;
+  stage_id: string | null;
 }
 
 interface Team {
@@ -61,9 +62,10 @@ interface RankingsTabProps {
   eventDate?: string;
   modalityId?: string | null;
   modalityName?: string;
+  stageId?: string | null;
 }
 
-const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventDate, modalityId, modalityName }: RankingsTabProps) => {
+const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventDate, modalityId, modalityName, stageId }: RankingsTabProps) => {
   const { user, organizerId } = useAuth();
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -132,9 +134,12 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
   };
 
   const fetchHistory = async () => {
+    const histFilters: Record<string, any> = { tournament_id: tournamentId };
+    if (modalityId) histFilters.modality_id = modalityId;
+    if (stageId) histFilters.stage_id = stageId;
     const { data } = await publicQuery<PointsHistoryEntry[]>({
       table: "ranking_points_history",
-      filters: { tournament_id: tournamentId, ...(modalityId ? { modality_id: modalityId } : {}) },
+      filters: histFilters,
       order: { column: "created_at", ascending: false },
     });
     setPointsHistory(data || []);
@@ -152,7 +157,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [tournamentId, modalityId]);
+  }, [tournamentId, modalityId, stageId]);
 
   // Build athlete options from teams (individual player names)
   const athleteOptions = useMemo(() => {
@@ -242,6 +247,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
             badge: badge || null,
             tournament_id: tournamentId,
             ...(modalityId ? { modality_id: modalityId } : {}),
+            ...(stageId ? { stage_id: stageId } : {}),
             created_by: createdBy,
           },
         });

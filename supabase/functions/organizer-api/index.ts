@@ -47,7 +47,7 @@ async function verifyHmacToken(
 const PUBLIC_READ_TABLES = new Set([
   "tournaments", "teams", "matches", "participants", "modalities",
   "groups", "classificacao_grupos", "quiz_questions", "quiz_scores", "rankings",
-  "tournament_rules", "ranking_points_history",
+  "tournament_rules", "ranking_points_history", "tournament_stages",
 ]);
 
 // Tables that require admin role for any write
@@ -56,7 +56,7 @@ const ADMIN_ONLY_TABLES = new Set(["organizers", "user_roles"]);
 // Tables that are linked to a tournament (ownership checked via tournament)
 const TOURNAMENT_TABLES = new Set([
   "teams", "matches", "participants", "modalities", "groups", "classificacao_grupos",
-  "tournament_rules",
+  "tournament_rules", "tournament_stages",
 ]);
 
 async function getOrganizer(supabase: any, organizerId: string) {

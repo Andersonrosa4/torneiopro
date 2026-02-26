@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Trash2, TrendingUp, Download, FileText, Sheet, Pencil, Check, X, Zap, Users, User } from "lucide-react";
+import { Plus, Trash2, TrendingUp, Download, FileText, Sheet, Pencil, Check, X, Zap, Users, User, Star, Heart, Award } from "lucide-react";
 import { motion } from "framer-motion";
 
 import { exportRankings } from "@/lib/exportUtils";
@@ -34,6 +34,7 @@ interface RankingEntry {
   tournament_id: string;
   created_by: string;
   entry_type: string;
+  badge: string | null;
 }
 
 interface Team {
@@ -61,6 +62,30 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
   const [points, setPoints] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPoints, setEditPoints] = useState("");
+  const [editBadge, setEditBadge] = useState<string | null>(null);
+
+  const BADGE_OPTIONS = [
+    { value: "", label: "Nenhum", icon: null },
+    { value: "destaque", label: "Destaque", icon: <Star className="h-4 w-4 text-amber-400" /> },
+    { value: "doacao", label: "Doação de Alimentos", icon: <Heart className="h-4 w-4 text-rose-400" /> },
+    { value: "mvp", label: "MVP", icon: <Award className="h-4 w-4 text-sky-400" /> },
+  ];
+
+  const getBadgeIcon = (badge: string | null) => {
+    if (!badge) return null;
+    if (badge === "destaque") return <Star className="h-4 w-4 text-amber-400 shrink-0" />;
+    if (badge === "doacao") return <Heart className="h-4 w-4 text-rose-400 shrink-0" />;
+    if (badge === "mvp") return <Award className="h-4 w-4 text-sky-400 shrink-0" />;
+    return null;
+  };
+
+  const getBadgeLabel = (badge: string | null) => {
+    if (!badge) return null;
+    if (badge === "destaque") return "Destaque";
+    if (badge === "doacao") return "Doação de Alimentos";
+    if (badge === "mvp") return "MVP";
+    return null;
+  };
   const [viewFilter, setViewFilter] = useState<"all" | "individual" | "pair" | "male" | "female">("individual");
 
   const fetchRankings = async () => {
@@ -167,13 +192,13 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
     fetchRankings();
   };
 
-  const updatePoints = async (id: string, newPoints: number) => {
+  const updatePoints = async (id: string, newPoints: number, badge: string | null) => {
     if (newPoints < 0) {
       toast.error("Pontos não podem ser negativos");
       return;
     }
 
-    const { error } = await organizerQuery({ table: "rankings", operation: "update", data: { points: newPoints }, filters: { id } });
+    const { error } = await organizerQuery({ table: "rankings", operation: "update", data: { points: newPoints, badge: badge || null }, filters: { id } });
 
     if (error) {
       toast.error("Erro ao atualizar pontos");
@@ -580,37 +605,59 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                       {idx + 1}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-black leading-snug break-words" style={{ color: '#F5F7FA', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
-                        {ranking.athlete_name}
-                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-black leading-snug break-words" style={{ color: '#F5F7FA', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                          {ranking.athlete_name}
+                        </p>
+                        {getBadgeIcon(ranking.badge)}
+                      </div>
+                      {ranking.badge && (
+                        <span className="text-[10px] text-muted-foreground">{getBadgeLabel(ranking.badge)}</span>
+                      )}
                       <div className="flex items-center justify-between mt-1.5">
                         <Badge variant="secondary" className="text-xs font-bold tabular-nums whitespace-nowrap">
                           {ranking.points} pts
                         </Badge>
                         {editingId === ranking.id ? (
-                          <div className="flex items-center gap-1">
-                            <Input
-                              type="number"
-                              value={editPoints}
-                              onChange={(e) => setEditPoints(e.target.value)}
-                              className="h-7 w-16 text-center text-xs"
-                              min="0"
-                              autoFocus
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") updatePoints(ranking.id, Number(editPoints) || 0);
-                                if (e.key === "Escape") setEditingId(null);
-                              }}
-                            />
-                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => updatePoints(ranking.id, Number(editPoints) || 0)}>
-                              <Check className="h-4 w-4 text-success" />
-                            </Button>
-                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditingId(null)}>
-                              <X className="h-4 w-4 text-destructive" />
-                            </Button>
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                value={editPoints}
+                                onChange={(e) => setEditPoints(e.target.value)}
+                                className="h-7 w-16 text-center text-xs"
+                                min="0"
+                                autoFocus
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") updatePoints(ranking.id, Number(editPoints) || 0, editBadge);
+                                  if (e.key === "Escape") setEditingId(null);
+                                }}
+                              />
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => updatePoints(ranking.id, Number(editPoints) || 0, editBadge)}>
+                                <Check className="h-4 w-4 text-success" />
+                              </Button>
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditingId(null)}>
+                                <X className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                            <Select value={editBadge || "__none"} onValueChange={(v) => setEditBadge(v === "__none" ? null : v)}>
+                              <SelectTrigger className="h-7 text-xs">
+                                <SelectValue placeholder="Ícone (opcional)" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {BADGE_OPTIONS.map((opt) => (
+                                  <SelectItem key={opt.value} value={opt.value || "__none"}>
+                                    <span className="flex items-center gap-2">
+                                      {opt.icon} {opt.label}
+                                    </span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                         ) : isOwner ? (
                           <div className="flex gap-1">
-                            <Button size="sm" variant="ghost" onClick={() => { setEditingId(ranking.id); setEditPoints(String(ranking.points)); }} className="h-7 w-7 p-0">
+                            <Button size="sm" variant="ghost" onClick={() => { setEditingId(ranking.id); setEditPoints(String(ranking.points)); setEditBadge(ranking.badge || null); }} className="h-7 w-7 p-0">
                               <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                             </Button>
                             <Button size="sm" variant="ghost" onClick={() => deleteRanking(ranking.id)} className="h-7 w-7 p-0">

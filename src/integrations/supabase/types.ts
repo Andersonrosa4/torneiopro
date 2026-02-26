@@ -1406,6 +1406,7 @@ export type Database = {
       rankings: {
         Row: {
           athlete_name: string
+          badge: string | null
           created_at: string
           created_by: string
           entry_type: string
@@ -1417,6 +1418,7 @@ export type Database = {
         }
         Insert: {
           athlete_name: string
+          badge?: string | null
           created_at?: string
           created_by: string
           entry_type?: string
@@ -1428,6 +1430,7 @@ export type Database = {
         }
         Update: {
           athlete_name?: string
+          badge?: string | null
           created_at?: string
           created_by?: string
           entry_type?: string

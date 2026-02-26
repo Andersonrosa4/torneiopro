@@ -127,6 +127,8 @@ const TournamentDetail = () => {
   const { modalities, selectedModality, setSelectedModality, updateModality, loading: modalitiesLoading } = useModalities(id);
 
   const isOwner = tournament?.created_by === organizerId || isAdmin || isAssociatedOrganizer;
+  const isTournamentCompleted = tournament?.status === 'completed' || tournament?.status === 'cancelled';
+  const canEdit = isOwner && !isTournamentCompleted;
 
   // Helper: build snapshot and run system rules guard
   const runSystemRulesGuard = useCallback((matchList: Match[], label: string): boolean => {
@@ -235,6 +237,7 @@ const TournamentDetail = () => {
 
   // All writes go through organizerQuery
   const addTeam = async () => {
+    if (isTournamentCompleted) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
     if (!player1.trim() || !player2.trim() || !id) return;
     if (hasGroupStageGenerated) {
       toast.error("❌ Fase de grupos já gerada. Faça o reset completo para alterar equipes.");
@@ -391,6 +394,7 @@ const TournamentDetail = () => {
     numIndexTeams?: number;
   }) => {
     try {
+      if (isTournamentCompleted) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
       // ── SYSTEM RULES GUARD (pre-bracket generation) ──
       if (filteredMatches.length > 0 && !runSystemRulesGuard(filteredMatches, 'preBracketGeneration')) {
         return;
@@ -810,6 +814,7 @@ const TournamentDetail = () => {
   };
 
   const undoBracket = async () => {
+    if (isTournamentCompleted) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
     if (!id) return;
     const token = sessionStorage.getItem("organizer_token");
     const organizerId = sessionStorage.getItem("organizer_id");
@@ -1089,6 +1094,7 @@ const TournamentDetail = () => {
   };
 
   const declareWinner = async (matchId: string, winnerId: string) => {
+    if (isTournamentCompleted) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
     // MUTEX: Per-match lock to allow concurrent declarations on different matches
     if (declareWinnerMutex.current.has(matchId)) {
       toast.info("Aguarde a operação anterior desta partida...");
@@ -1914,6 +1920,7 @@ const TournamentDetail = () => {
 
   // Combined handler: save score + declare winner in one action
   const handleAutoResult = async (matchId: string, score1: number, score2: number, winnerId: string) => {
+    if (isTournamentCompleted) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
     // Update local state BEFORE calling declareWinner so it reads the correct scores
     setMatches(prev => prev.map(m => m.id === matchId ? { ...m, score1, score2 } : m));
     await organizerQuery({
@@ -1926,6 +1933,7 @@ const TournamentDetail = () => {
   };
 
   const updateScore = async (matchId: string, score1: number, score2: number) => {
+    if (isTournamentCompleted) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
     const { error } = await organizerQuery({
       table: "matches",
       operation: "update",
@@ -2051,7 +2059,7 @@ const TournamentDetail = () => {
                 ) : (
                   <>
                     <h1 className="text-xl sm:text-3xl font-bold tracking-tight break-words">{tournament.name}</h1>
-                    {isOwner && (
+                    {canEdit && (
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setNewName(tournament.name); setEditingName(true); }}>
                         <Pencil className="h-4 w-4 text-muted-foreground" />
                       </Button>
@@ -2074,8 +2082,13 @@ const TournamentDetail = () => {
                 </span>
               </div>
             </div>
+            {isTournamentCompleted && isOwner && (
+              <div className="w-full rounded-lg border border-success/30 bg-success/10 px-4 py-2.5 text-sm text-success flex items-center gap-2">
+                🔒 Torneio finalizado — todas as alterações estão bloqueadas para preservar o histórico.
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-2 sm:gap-2 self-start">
-              {isOwner && (
+              {canEdit && (
                 <>
                   <Button variant="outline" size="sm" className="gap-1" onClick={openEditTournament}>
                     <Settings2 className="h-4 w-4" /> Editar Torneio
@@ -2194,7 +2207,7 @@ const TournamentDetail = () => {
             modalities={modalities}
             selectedModality={selectedModality}
             onSelect={setSelectedModality}
-            isOwner={isOwner}
+            isOwner={canEdit}
             onUpdateModality={updateModality}
           />
 
@@ -2210,7 +2223,7 @@ const TournamentDetail = () => {
 
             {/* Duplas Tab */}
             <TabsContent value="teams">
-              {isOwner && (
+              {canEdit && (
                 <section className="rounded-xl border border-border bg-card p-3 sm:p-6 shadow-card">
                   <h2 className="mb-3 sm:mb-4 text-lg sm:text-xl font-semibold">Cadastrar Dupla</h2>
                   <div className="mb-4 flex flex-col gap-2 sm:flex-row">
@@ -2359,7 +2372,7 @@ const TournamentDetail = () => {
                 <section className="mt-4 rounded-xl border border-border bg-card p-6 shadow-card">
                   <div className="mb-4 flex items-center justify-between">
                     <h2 className="text-xl font-semibold">Duplas ({filteredTeams.length})</h2>
-                    {isOwner && filteredTeams.length > 0 && (
+                    {canEdit && filteredTeams.length > 0 && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="outline" size="sm" className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive">
@@ -2428,7 +2441,7 @@ const TournamentDetail = () => {
                             </div>
                           )}
                         </div>
-                        {isOwner && editingTeamId !== t.id && (
+                        {canEdit && editingTeamId !== t.id && (
                           <div className="flex items-center gap-1 shrink-0">
                             <Button variant="ghost" size="sm" onClick={() => startEdit(t)} className="h-7 w-7 p-0">
                               <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
@@ -2447,7 +2460,7 @@ const TournamentDetail = () => {
 
             {/* Chaveamento Tab - Structural view only (no scores/results) */}
             <TabsContent value="bracket">
-              {isOwner && filteredMatches.length === 0 && filteredTeams.length >= 2 && (
+              {canEdit && filteredMatches.length === 0 && filteredTeams.length >= 2 && (
                 <div className="mb-4">
                   <GenerateBracketDialog
                     onGenerate={generateBracket}
@@ -2459,7 +2472,7 @@ const TournamentDetail = () => {
                 </div>
               )}
 
-              {isOwner && filteredMatches.length > 0 && (
+              {canEdit && filteredMatches.length > 0 && (
                 <div className="mb-4 flex justify-end gap-2">
                   {(() => {
                     const groupMatches = filteredMatches.filter((m: any) => m.round === 0);
@@ -2508,7 +2521,7 @@ const TournamentDetail = () => {
 
             {/* Sequência Tab - Match sequence with group identification */}
             <TabsContent value="sequence">
-              {isOwner && filteredMatches.length > 0 && (
+              {canEdit && filteredMatches.length > 0 && (
                 <div className="mb-4 flex justify-end gap-2">
                   {/* Show "Generate Knockout" button when all groups are done but no knockout exists */}
                   {(() => {
@@ -2537,7 +2550,7 @@ const TournamentDetail = () => {
                   <MatchSequenceViewer
                       matches={filteredMatches}
                       teams={filteredTeams}
-                      isOwner={isOwner}
+                      isOwner={canEdit}
                       numSets={tournament?.num_sets || 3}
                       tournamentName={tournament?.name || ""}
                       sport={tournament?.sport || ""}
@@ -2578,7 +2591,7 @@ const TournamentDetail = () => {
             <TabsContent value="rankings">
               <RankingsTab
                   tournamentId={id || ""}
-                  isOwner={isOwner}
+                  isOwner={canEdit}
                   sport={tournament.sport}
                   tournamentName={tournament.name}
                   eventDate={tournament.event_date ? formatDateBR(tournament.event_date) : undefined}

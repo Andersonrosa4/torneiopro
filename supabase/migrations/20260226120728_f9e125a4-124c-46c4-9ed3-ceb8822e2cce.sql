@@ -1,0 +1,1 @@
+ALTER TABLE public.rankings ADD COLUMN IF NOT EXISTS badge text DEFAULT null;

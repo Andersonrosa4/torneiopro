@@ -628,43 +628,6 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
         )}
       </motion.section>
 
-      {sortedRankings.length > 0 && !isMisto && viewFilter !== "male" && viewFilter !== "female" && (
-        <motion.section
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="rounded-xl border border-border bg-gradient-to-b from-primary/10 to-transparent p-6"
-        >
-          <h3 className="mb-4 text-lg font-semibold">
-            Pódio
-            {modalityName ? ` — ${modalityName}` : ""}
-            {viewFilter === "individual" ? " — Individual" : viewFilter === "pair" ? " — Dupla" : ""}
-          </h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {sortedRankings[1] && (
-              <div className="flex flex-col items-center rounded-xl border border-border bg-card p-5 shadow-card order-first sm:order-none">
-                <div className="mb-2 text-2xl font-bold text-muted-foreground">2º</div>
-                <p className="text-sm text-center font-black leading-snug w-full break-words" style={{ color: '#F5F7FA', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>{sortedRankings[1].athlete_name}</p>
-                <p className="text-lg font-bold text-primary mt-1.5">{sortedRankings[1].points} pts</p>
-              </div>
-            )}
-            {sortedRankings[0] && (
-              <div className="flex flex-col items-center rounded-xl border-2 border-primary bg-gradient-primary p-5 shadow-lg order-none sm:order-first">
-                <div className="mb-2 text-3xl font-bold text-primary-foreground">1º</div>
-                <p className="text-sm text-center font-black leading-snug w-full break-words" style={{ color: '#F5F7FA', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>{sortedRankings[0].athlete_name}</p>
-                <p className="text-xl font-bold text-primary-foreground mt-1.5">{sortedRankings[0].points} pts</p>
-              </div>
-            )}
-            {sortedRankings[2] && (
-              <div className="flex flex-col items-center rounded-xl border border-border bg-card p-5 shadow-card order-last">
-                <div className="mb-2 text-2xl font-bold text-muted-foreground">3º</div>
-                <p className="text-sm text-center font-black leading-snug w-full break-words" style={{ color: '#F5F7FA', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>{sortedRankings[2].athlete_name}</p>
-                <p className="text-lg font-bold text-primary mt-1.5">{sortedRankings[2].points} pts</p>
-              </div>
-            )}
-          </div>
-        </motion.section>
-      )}
     </div>
   );
 };

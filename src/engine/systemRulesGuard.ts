@@ -176,10 +176,12 @@ function checkAllStartInWinners(matches: GuardMatch[], violations: RuleViolation
 
 function checkMaxLosses(matches: GuardMatch[], violations: RuleViolation[]) {
   // In DE, a team is eliminated after 2 losses max (1 in winners, 1 in losers)
+  // Excludes third_place matches — they are classification, not elimination
   const lossCount = new Map<string, number>();
 
   for (const m of matches) {
     if (m.status !== 'completed' || !m.winner_team_id) continue;
+    if (m.bracket_type === 'third_place') continue; // Partida classificatória
     const loserId = m.team1_id === m.winner_team_id ? m.team2_id : m.team1_id;
     if (!loserId) continue;
     lossCount.set(loserId, (lossCount.get(loserId) ?? 0) + 1);

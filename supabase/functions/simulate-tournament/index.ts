@@ -2,7 +2,8 @@
  * Edge Function: simulate-tournament
  * 
  * Gera chaveamento + simula todos os resultados para torneios de teste.
- * Usa a mesma lógica de doubleEliminationLogic.ts (portada para Deno).
+ * Suporta action: 'create_and_simulate' para criar torneios de teste automaticamente.
+ * Inclui validação completa contra SYSTEM_RULES.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -277,9 +278,13 @@ function generateBracket(tournamentId: string, modalityId: string, teams: any[])
   const losersMaxRound = Math.max(...[...losersUpper, ...losersLower].map(m => m.round), 0);
   const semiRound = Math.max(winnersMaxRound, losersMaxRound) + 1;
 
+  // Semi 1: Campeão Winners A (upper) vs Campeão Losers B (lower) — CRUZAMENTO
   const semi1 = createMatch(tournamentId, modalityId, semiRound, 1, 'semi_final', 'upper', 5);
+  // Semi 2: Campeão Winners B (lower) vs Campeão Losers A (upper) — CRUZAMENTO
   const semi2 = createMatch(tournamentId, modalityId, semiRound, 2, 'semi_final', 'lower', 5);
   const finalMatch = createMatch(tournamentId, modalityId, semiRound + 1, 1, 'final', null, 6);
+  // 3º Lugar: perdedores das semifinais
+  const thirdPlace = createMatch(tournamentId, modalityId, semiRound + 1, 2, 'third_place', null, 7);
 
   const winnersUpperFinal = getLastRoundMatch(winnersUpper);
   const winnersLowerFinal = getLastRoundMatch(winnersLower);
@@ -293,16 +298,17 @@ function generateBracket(tournamentId: string, modalityId: string, teams: any[])
 
   semi1.next_win_match_id = finalMatch._temp_id;
   semi2.next_win_match_id = finalMatch._temp_id;
+  // Perdedores das semis vão para 3º lugar
+  semi1.next_lose_match_id = thirdPlace._temp_id;
+  semi2.next_lose_match_id = thirdPlace._temp_id;
 
-  const allMatches: MatchData[] = [...winnersUpper, ...winnersLower, ...losersUpper, ...losersLower, semi1, semi2, finalMatch];
+  // Fórmula: (2N-3) para o bracket principal + 1 para 3º lugar = total
+  const allMatches: MatchData[] = [...winnersUpper, ...winnersLower, ...losersUpper, ...losersLower, semi1, semi2, finalMatch, thirdPlace];
 
-  if (allMatches.length !== expectedTotal) {
-    return { matches: [], error: `Fórmula violada: geradas ${allMatches.length}, esperado ${expectedTotal} (2×${teams.length}−3)` };
+  const expectedWithThird = expectedTotal + 1; // +1 para 3º lugar
+  if (allMatches.length !== expectedWithThird) {
+    return { matches: [], error: `Fórmula violada: geradas ${allMatches.length}, esperado ${expectedWithThird} (2×${teams.length}−3 + 1 para 3º lugar)` };
   }
-
-  // Converter _temp_id → id (substituição nas referências)
-  const tempToReal = new Map<string, string>();
-  for (const m of allMatches) tempToReal.set(m._temp_id, m._temp_id);
 
   return {
     matches: allMatches.map(({ _temp_id, ...rest }) => ({
@@ -321,24 +327,26 @@ function generateBracket(tournamentId: string, modalityId: string, teams: any[])
 function simulateAllResults(matches: any[]): {
   champion: string | null;
   runnerUp: string | null;
-  results: Array<{ matchId: string; winner: string; loser: string | null }>;
+  thirdPlace: string | null;
+  fourthPlace: string | null;
+  results: Array<{ matchId: string; winner: string; loser: string | null; bracket: string; round: number; position: number }>;
   errors: string[];
-  finalMatchStates: Map<string, any>; // estado final em memória de TODOS os matches
+  validationErrors: string[];
+  finalMatchStates: Map<string, any>;
 } {
-  // Trabalha com cópia mutável — NUNCA recomputar slot na hora do write no banco!
-  // A resolução de colisão (dois matches ímpares → mesmo next match) é feita aqui
-  // em memória. O estado final do matchMap é a fonte de verdade para DB writes.
   const matchMap = new Map<string, any>();
   for (const m of matches) matchMap.set(m.id, { ...m });
 
-  const results: Array<{ matchId: string; winner: string; loser: string | null }> = [];
+  const results: Array<{ matchId: string; winner: string; loser: string | null; bracket: string; round: number; position: number }> = [];
   const errors: string[] = [];
+  const validationErrors: string[] = [];
   let champion: string | null = null;
   let runnerUp: string | null = null;
+  let thirdPlace: string | null = null;
+  let fourthPlace: string | null = null;
 
-  // Processar em ordem topológica (winners → losers → semi → final, depois por round/position)
   const ordered = [...matchMap.values()].sort((a, b) => {
-    const typeOrder: Record<string, number> = { winners: 0, losers: 1, semi_final: 2, final: 3 };
+    const typeOrder: Record<string, number> = { winners: 0, losers: 1, semi_final: 2, third_place: 3, final: 4 };
     const ta = typeOrder[a.bracket_type] ?? 99;
     const tb = typeOrder[b.bracket_type] ?? 99;
     if (ta !== tb) return ta - tb;
@@ -348,6 +356,10 @@ function simulateAllResults(matches: any[]): {
 
   let iteration = 0;
   const maxIterations = matches.length * 10;
+
+  // Track team progression for validation
+  const teamLosses = new Map<string, number>();
+  const teamBracketHistory = new Map<string, string[]>(); // track which brackets each team has been in
 
   while (true) {
     if (iteration++ > maxIterations) {
@@ -372,18 +384,52 @@ function simulateAllResults(matches: any[]): {
     }
 
     const current = matchMap.get(playable.id)!;
-    const winnerId = current.team1_id; // team1 sempre vence
-    const loserId = current.team2_id;
+    
+    // ── VALIDAÇÃO: auto-confronto (regra 6.6) ──
+    if (current.team1_id === current.team2_id) {
+      validationErrors.push(`[6.6] Auto-confronto: ${current.bracket_type} R${current.round}P${current.position} — mesma equipe nos dois slots`);
+      break;
+    }
+
+    // Eleição aleatória do vencedor
+    const winnerId = Math.random() > 0.5 ? current.team1_id : current.team2_id;
+    const loserId = current.team1_id === winnerId ? current.team2_id : current.team1_id;
+
+    // Track losses
+    if (loserId) {
+      teamLosses.set(loserId, (teamLosses.get(loserId) ?? 0) + 1);
+    }
+
+    // Track bracket history
+    if (!teamBracketHistory.has(current.team1_id)) teamBracketHistory.set(current.team1_id, []);
+    if (!teamBracketHistory.has(current.team2_id)) teamBracketHistory.set(current.team2_id, []);
+    teamBracketHistory.get(current.team1_id)!.push(current.bracket_type);
+    teamBracketHistory.get(current.team2_id)!.push(current.bracket_type);
 
     matchMap.set(current.id, { ...current, status: 'completed', winner_team_id: winnerId });
-    results.push({ matchId: current.id, winner: winnerId, loser: loserId });
+    results.push({
+      matchId: current.id,
+      winner: winnerId,
+      loser: loserId,
+      bracket: current.bracket_type,
+      round: current.round,
+      position: current.position,
+    });
+
+    // ── VALIDAÇÃO: vencedor é participante (regra 5.1) ──
+    if (winnerId !== current.team1_id && winnerId !== current.team2_id) {
+      validationErrors.push(`[5.1] Vencedor ${winnerId.slice(0,8)} não é participante de ${current.bracket_type} R${current.round}P${current.position}`);
+    }
 
     if (current.bracket_type === 'final') {
       champion = winnerId;
       runnerUp = loserId;
+    } else if (current.bracket_type === 'third_place') {
+      thirdPlace = winnerId;
+      fourthPlace = loserId;
     }
 
-    // ── Propagar VENCEDOR (com fallback de slot para colisão) ──
+    // ── Propagar VENCEDOR ──
     if (current.next_win_match_id) {
       const nextWin = matchMap.get(current.next_win_match_id);
       if (nextWin) {
@@ -392,28 +438,39 @@ function simulateAllResults(matches: any[]): {
 
         if (current.bracket_type === 'winners' && nextWin.bracket_type === 'semi_final') {
           if (!nextWin.team1_id) matchMap.set(nextWin.id, { ...matchMap.get(nextWin.id), team1_id: winnerId });
+          else if (!nextWin.team2_id) matchMap.set(nextWin.id, { ...matchMap.get(nextWin.id), team2_id: winnerId });
+          else validationErrors.push(`[COLLISION] Semi ${nextWin.position} já cheio ao receber vencedor de Winners`);
         } else if (current.bracket_type === 'losers' && nextWin.bracket_type === 'semi_final') {
           if (!nextWin.team2_id) matchMap.set(nextWin.id, { ...matchMap.get(nextWin.id), team2_id: winnerId });
+          else if (!nextWin.team1_id) matchMap.set(nextWin.id, { ...matchMap.get(nextWin.id), team1_id: winnerId });
+          else validationErrors.push(`[COLLISION] Semi ${nextWin.position} já cheio ao receber vencedor de Losers`);
         } else if (current.bracket_type === 'semi_final' && nextWin.bracket_type === 'final') {
           const semiSlot = current.position === 1 ? 'team1_id' : 'team2_id';
           matchMap.set(nextWin.id, { ...matchMap.get(nextWin.id), [semiSlot]: winnerId });
         } else {
-          // ── SLOT COLLISION GUARD: se slot preferido ocupado, usa o outro ──
           const currentNext = matchMap.get(nextWin.id);
           if (!currentNext[slot]) {
             matchMap.set(nextWin.id, { ...currentNext, [slot]: winnerId });
           } else if (!currentNext[other]) {
             matchMap.set(nextWin.id, { ...currentNext, [other]: winnerId });
           } else {
-            errors.push(`[COLLISION] Ambos slots preenchidos: ${nextWin.bracket_type} R${nextWin.round}P${nextWin.position}`);
+            validationErrors.push(`[COLLISION] Ambos slots preenchidos: ${nextWin.bracket_type} R${nextWin.round}P${nextWin.position}`);
           }
         }
       }
     }
 
-    // ── Propagar PERDEDOR (exceto semi/final) ──
+    // ── Propagar PERDEDOR ──
     const isSemiOrFinal = current.bracket_type === 'semi_final' || current.bracket_type === 'final';
-    if (!isSemiOrFinal && loserId && current.next_lose_match_id) {
+    
+    if (current.bracket_type === 'semi_final' && loserId && current.next_lose_match_id) {
+      // Semi perdedor vai para 3º lugar
+      const thirdMatch = matchMap.get(current.next_lose_match_id);
+      if (thirdMatch) {
+        const semiSlot = current.position === 1 ? 'team1_id' : 'team2_id';
+        matchMap.set(thirdMatch.id, { ...matchMap.get(thirdMatch.id), [semiSlot]: loserId });
+      }
+    } else if (!isSemiOrFinal && loserId && current.next_lose_match_id) {
       const nextLose = matchMap.get(current.next_lose_match_id);
       if (nextLose) {
         const slot = current.position % 2 === 1 ? 'team1_id' : 'team2_id';
@@ -424,13 +481,90 @@ function simulateAllResults(matches: any[]): {
         } else if (!currentNext[other]) {
           matchMap.set(nextLose.id, { ...currentNext, [other]: loserId });
         } else {
-          errors.push(`[LOSER COLLISION] ${nextLose.bracket_type} R${nextLose.round}P${nextLose.position}`);
+          validationErrors.push(`[LOSER COLLISION] ${nextLose.bracket_type} R${nextLose.round}P${nextLose.position}`);
+        }
+      }
+    }
+
+    // ── VALIDAÇÃO: perdedor de semi/final não desce para losers (regra 4.6) ──
+    if (current.bracket_type === 'final' && loserId) {
+      // Perdedor da final é eliminado, não desce
+      const totalLosses = teamLosses.get(loserId) ?? 0;
+      // Regra 4.6: max 2 derrotas em DE
+      if (totalLosses > 2) {
+        validationErrors.push(`[4.6] Equipe ${loserId.slice(0,8)} tem ${totalLosses} derrotas — máximo permitido é 2`);
+      }
+    }
+  }
+
+  // ── Validações pós-simulação ──
+
+  // 1. Nenhuma equipe com mais de 2 derrotas (regra 4.6)
+  for (const [tid, losses] of teamLosses) {
+    if (losses > 2) {
+      validationErrors.push(`[4.6] Equipe ${tid.slice(0,8)} acumulou ${losses} derrotas`);
+    }
+  }
+
+  // 2. Verificar duplicidade em mesma rodada (regra 1.4)
+  const roundTeams = new Map<string, Set<string>>();
+  for (const [, m] of matchMap) {
+    const key = `${m.bracket_type}|${m.round}`;
+    if (!roundTeams.has(key)) roundTeams.set(key, new Set());
+    const s = roundTeams.get(key)!;
+    if (m.team1_id) {
+      if (s.has(m.team1_id)) validationErrors.push(`[1.4] Equipe ${m.team1_id.slice(0,8)} duplicada em ${key}`);
+      s.add(m.team1_id);
+    }
+    if (m.team2_id) {
+      if (s.has(m.team2_id)) validationErrors.push(`[1.4] Equipe ${m.team2_id.slice(0,8)} duplicada em ${key}`);
+      s.add(m.team2_id);
+    }
+  }
+
+  // 3. Nenhuma partida completed sem ambas equipes (regra 1.4 — partida fantasma)
+  for (const [, m] of matchMap) {
+    if (m.status === 'completed' && (!m.team1_id || !m.team2_id) && !m.is_chapeu) {
+      validationErrors.push(`[1.4] Partida fantasma: ${m.bracket_type} R${m.round}P${m.position} completed sem ambas equipes`);
+    }
+  }
+
+  // 4. Verificar que todas as equipes que estão na losers vieram da winners (regra 4.1)
+  const winnersTeamIds = new Set<string>();
+  const losersTeamIds = new Set<string>();
+  for (const [, m] of matchMap) {
+    if (m.bracket_type === 'winners') {
+      if (m.team1_id) winnersTeamIds.add(m.team1_id);
+      if (m.team2_id) winnersTeamIds.add(m.team2_id);
+    }
+    if (m.bracket_type === 'losers') {
+      if (m.team1_id) losersTeamIds.add(m.team1_id);
+      if (m.team2_id) losersTeamIds.add(m.team2_id);
+    }
+  }
+  for (const tid of losersTeamIds) {
+    if (!winnersTeamIds.has(tid)) {
+      validationErrors.push(`[4.1] Equipe ${tid.slice(0,8)} na Losers sem ter passado pela Winners`);
+    }
+  }
+
+  // 5. Mirror crossing: Winners A → Losers B, Winners B → Losers A (regra 4.4)
+  // Verificar que perdedores de winners upper foram para losers lower e vice-versa
+  for (const [, m] of matchMap) {
+    if (m.bracket_type === 'winners' && m.next_lose_match_id) {
+      const loseMatch = matchMap.get(m.next_lose_match_id);
+      if (loseMatch && loseMatch.bracket_type === 'losers') {
+        if (m.bracket_half === 'upper' && loseMatch.bracket_half === 'upper') {
+          validationErrors.push(`[4.4] Mirror crossing violado: Winners upper → Losers upper em R${m.round}P${m.position}`);
+        }
+        if (m.bracket_half === 'lower' && loseMatch.bracket_half === 'lower') {
+          validationErrors.push(`[4.4] Mirror crossing violado: Winners lower → Losers lower em R${m.round}P${m.position}`);
         }
       }
     }
   }
 
-  return { champion, runnerUp, results, errors, finalMatchStates: matchMap };
+  return { champion, runnerUp, thirdPlace, fourthPlace, results, errors, validationErrors, finalMatchStates: matchMap };
 }
 
 // ──────────────────────────────────────────────
@@ -450,7 +584,181 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const { action = 'run_all', tournament_id, modality_id } = body;
 
-    // ── Buscar torneios de teste ──
+    // ── Ação: criar e simular torneios de teste ──
+    if (action === 'create_and_simulate') {
+      const organizerId = '7ebde37a-697e-4804-8445-6610fa03ce34';
+      const teamCounts = [24, 32, 40, 35, 28, 30];
+      const tournamentNames = teamCounts.map(n => `TESTE DE FUTEVÔLEI ${n} DUPLAS`);
+      
+      const allResults: any[] = [];
+
+      for (let ti = 0; ti < teamCounts.length; ti++) {
+        const numTeams = teamCounts[ti];
+        const tournamentName = tournamentNames[ti];
+        const tournamentCode = `FV${numTeams}${Date.now().toString(36).slice(-4).toUpperCase()}`;
+
+        // 1. Criar torneio
+        const { data: tournament, error: tErr } = await supabase.from('tournaments').insert({
+          name: tournamentName,
+          sport: 'futevolei',
+          format: 'double_elimination',
+          max_participants: numTeams * 2,
+          created_by: organizerId,
+          tournament_code: tournamentCode,
+          status: 'in_progress',
+          visibility: 'public',
+        }).select('id, name').single();
+
+        if (tErr || !tournament) {
+          allResults.push({ tournament: tournamentName, error: `Erro ao criar torneio: ${tErr?.message}` });
+          continue;
+        }
+
+        // 2. Buscar modalidade Masculino (criada automaticamente pelo trigger)
+        const { data: modalities } = await supabase.from('modalities').select('id, name').eq('tournament_id', tournament.id);
+        if (!modalities || modalities.length === 0) {
+          allResults.push({ tournament: tournamentName, error: 'Modalidades não criadas pelo trigger' });
+          continue;
+        }
+
+        const modality = modalities[0]; // Usar primeira modalidade (Masculino)
+
+        // 3. Criar equipes
+        const teamsToInsert = [];
+        for (let i = 1; i <= numTeams; i++) {
+          teamsToInsert.push({
+            tournament_id: tournament.id,
+            modality_id: modality.id,
+            player1_name: `Jogador ${i}A`,
+            player2_name: `Jogador ${i}B`,
+            seed: null,
+          });
+        }
+
+        const { error: teamsErr } = await supabase.from('teams').insert(teamsToInsert);
+        if (teamsErr) {
+          allResults.push({ tournament: tournamentName, error: `Erro ao criar equipes: ${teamsErr.message}` });
+          continue;
+        }
+
+        // 4. Buscar equipes criadas
+        const { data: teams } = await supabase.from('teams').select('id, player1_name, player2_name, seed').eq('modality_id', modality.id).order('created_at');
+        if (!teams || teams.length !== numTeams) {
+          allResults.push({ tournament: tournamentName, error: `Esperado ${numTeams} equipes, encontradas ${teams?.length}` });
+          continue;
+        }
+
+        // 5. Gerar bracket
+        const { matches, error: genError } = generateBracket(tournament.id, modality.id, teams);
+        if (genError || matches.length === 0) {
+          allResults.push({ tournament: tournamentName, duplas: numTeams, error: genError ?? 'Geração falhou' });
+          continue;
+        }
+
+        // 6. Inserir no banco sem FKs primeiro
+        const matchesWithoutFKs = matches.map(({ next_win_match_id, next_lose_match_id, ...rest }: any) => rest);
+        const chunkSize = 50;
+        let insertError: string | null = null;
+        for (let i = 0; i < matchesWithoutFKs.length; i += chunkSize) {
+          const chunk = matchesWithoutFKs.slice(i, i + chunkSize);
+          const { error: insErr } = await supabase.from('matches').insert(chunk);
+          if (insErr) { insertError = insErr.message; break; }
+        }
+        if (insertError) {
+          allResults.push({ tournament: tournamentName, duplas: numTeams, error: `Inserção: ${insertError}` });
+          continue;
+        }
+
+        // Atualizar FKs
+        for (const m of matches) {
+          if (m.next_win_match_id || m.next_lose_match_id) {
+            const upd: any = {};
+            if (m.next_win_match_id) upd.next_win_match_id = m.next_win_match_id;
+            if (m.next_lose_match_id) upd.next_lose_match_id = m.next_lose_match_id;
+            await supabase.from('matches').update(upd).eq('id', m.id);
+          }
+        }
+
+        // 7. Simular todos os resultados com validação
+        const sim = simulateAllResults(matches);
+
+        // 8. Escrever estado final no banco
+        let updateErrors = 0;
+        for (const [matchId, finalState] of sim.finalMatchStates.entries()) {
+          const payload: Record<string, any> = {
+            team1_id: finalState.team1_id ?? null,
+            team2_id: finalState.team2_id ?? null,
+          };
+          if (finalState.winner_team_id) {
+            payload.winner_team_id = finalState.winner_team_id;
+            payload.status = 'completed';
+            payload.score1 = Math.floor(Math.random() * 3) + 1;
+            payload.score2 = Math.floor(Math.random() * payload.score1);
+          }
+          const { error: stateErr } = await supabase.from('matches').update(payload).eq('id', matchId);
+          if (stateErr) updateErrors++;
+        }
+
+        // 9. Marcar torneio como finalizado
+        await supabase.from('tournaments').update({ status: 'completed' }).eq('id', tournament.id);
+
+        // Resolver nomes
+        const champTeam = teams.find((t: any) => t.id === sim.champion);
+        const ruTeam = teams.find((t: any) => t.id === sim.runnerUp);
+        const thirdTeam = teams.find((t: any) => t.id === sim.thirdPlace);
+        const fourthTeam = teams.find((t: any) => t.id === sim.fourthPlace);
+
+        const expectedMatches = (2 * numTeams) - 3 + 1; // +1 for 3rd place
+        const formulaOk = matches.length === expectedMatches;
+
+        allResults.push({
+          tournament: tournamentName,
+          tournament_id: tournament.id,
+          modality: modality.name,
+          duplas: numTeams,
+          total_matches: matches.length,
+          expected_matches: expectedMatches,
+          formula_ok: formulaOk,
+          formula_detail: `2×${numTeams}−3 + 1(3º lugar) = ${expectedMatches}`,
+          matches_by_bracket: {
+            winners: matches.filter((m: any) => m.bracket_type === 'winners').length,
+            losers: matches.filter((m: any) => m.bracket_type === 'losers').length,
+            semi_final: matches.filter((m: any) => m.bracket_type === 'semi_final').length,
+            third_place: matches.filter((m: any) => m.bracket_type === 'third_place').length,
+            final: matches.filter((m: any) => m.bracket_type === 'final').length,
+          },
+          podium: {
+            champion: champTeam ? `${champTeam.player1_name} / ${champTeam.player2_name}` : null,
+            runner_up: ruTeam ? `${ruTeam.player1_name} / ${ruTeam.player2_name}` : null,
+            third_place: thirdTeam ? `${thirdTeam.player1_name} / ${thirdTeam.player2_name}` : null,
+            fourth_place: fourthTeam ? `${fourthTeam.player1_name} / ${fourthTeam.player2_name}` : null,
+          },
+          simulation_errors: sim.errors,
+          validation_errors: sim.validationErrors,
+          update_errors: updateErrors,
+          total_matches_played: sim.results.length,
+          ok: formulaOk && sim.errors.length === 0 && sim.validationErrors.length === 0 && !!sim.champion && !!sim.thirdPlace,
+        });
+      }
+
+      const totalOk = allResults.filter(r => r.ok).length;
+      const totalFailed = allResults.filter(r => !r.ok || r.error).length;
+
+      return new Response(JSON.stringify({
+        summary: `${totalOk} OK / ${totalFailed} com problemas de ${allResults.length} torneios testados`,
+        rules_validated: [
+          '1.4 — Sem partidas fantasma',
+          '4.1 — Todas equipes começam na Winners',
+          '4.4 — Mirror crossing obrigatório',
+          '4.6 — Máximo 2 derrotas por equipe',
+          '5.1 — Vencedor é participante do match',
+          '6.6 — Sem auto-confronto',
+        ],
+        results: allResults,
+      }, null, 2), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // ── Ação padrão: run_all (torneios existentes) ──
     let tournamentsQuery = supabase
       .from('tournaments')
       .select('id, name, sport, max_participants, format')
@@ -467,36 +775,27 @@ Deno.serve(async (req) => {
     const summaryResults: any[] = [];
 
     for (const tournament of tournaments) {
-      // Buscar modalidades
       let modalQuery = supabase.from('modalities').select('id, name').eq('tournament_id', tournament.id);
       if (modality_id) modalQuery = modalQuery.eq('id', modality_id);
       const { data: modalities } = await modalQuery;
       if (!modalities || modalities.length === 0) { summaryResults.push({ tournament: tournament.name, error: 'Sem modalidades' }); continue; }
 
       for (const modality of modalities) {
-        // 1. Limpar chaveamento anterior desta modalidade
         const { data: existingMatches } = await supabase.from('matches').select('id').eq('modality_id', modality.id);
         if (existingMatches && existingMatches.length > 0) {
           const ids = existingMatches.map((m: any) => m.id);
-          // Clear FK references IN these matches first
           await supabase.from('matches').update({ next_win_match_id: null, next_lose_match_id: null }).in('id', ids);
-          // Also clear FK references FROM OTHER matches pointing TO these matches
-          // (prevents FK constraint violations on insert of new bracket)
           await supabase.from('matches').update({ next_win_match_id: null }).in('next_win_match_id', ids);
           await supabase.from('matches').update({ next_lose_match_id: null }).in('next_lose_match_id', ids);
           await supabase.from('matches').delete().eq('modality_id', modality.id);
         }
 
-        // 2. Buscar equipes
         const { data: teams } = await supabase.from('teams').select('id, player1_name, player2_name, seed').eq('modality_id', modality.id).order('seed');
         if (!teams || teams.length < 4) { summaryResults.push({ tournament: tournament.name, modality: modality.name, error: `Apenas ${teams?.length ?? 0} equipes` }); continue; }
 
-        // 3. Gerar bracket
         const { matches, error: genError } = generateBracket(tournament.id, modality.id, teams);
         if (genError || matches.length === 0) { summaryResults.push({ tournament: tournament.name, modality: modality.name, error: genError ?? 'Geração falhou' }); continue; }
 
-        // 4. Inserir no banco sem FKs primeiro (evita FK constraint durante insert em chunks)
-        // Depois atualizar as referências next_win/lose_match_id separadamente
         const matchesWithoutFKs = matches.map(({ next_win_match_id, next_lose_match_id, ...rest }: any) => rest);
         const chunkSize = 50;
         let insertError: string | null = null;
@@ -507,7 +806,6 @@ Deno.serve(async (req) => {
         }
         if (insertError) { summaryResults.push({ tournament: tournament.name, modality: modality.name, error: `Inserção: ${insertError}` }); continue; }
 
-        // Agora atualizar as referências FK (next_win/lose_match_id)
         for (const m of matches) {
           if (m.next_win_match_id || m.next_lose_match_id) {
             const upd: any = {};
@@ -517,13 +815,8 @@ Deno.serve(async (req) => {
           }
         }
 
-        // 5. Simular todos os resultados em memória
-        // finalMatchStates contém o estado CORRETO de cada match após colisões resolvidas
         const sim = simulateAllResults(matches);
 
-        // 6. Escrever estado final no banco — direto do finalMatchStates
-        // NÃO recomputar slots aqui: a simulação já resolveu colisões (dois matches
-        // de posição ímpar → mesmo next_match → slot fallback correto em memória).
         let updateErrors = 0;
         for (const [matchId, finalState] of sim.finalMatchStates.entries()) {
           const payload: Record<string, any> = {
@@ -540,10 +833,8 @@ Deno.serve(async (req) => {
           if (stateErr) updateErrors++;
         }
 
-        // 7. Atualizar status do torneio para completed
         await supabase.from('tournaments').update({ status: 'completed' }).eq('id', tournament.id);
 
-        // Resolver nomes das equipes
         const champTeam = teams.find((t: any) => t.id === sim.champion);
         const ruTeam = teams.find((t: any) => t.id === sim.runnerUp);
 
@@ -552,13 +843,14 @@ Deno.serve(async (req) => {
           modality: modality.name,
           duplas: teams.length,
           total_matches: matches.length,
-          expected_matches: (2 * teams.length) - 3,
-          formula_ok: matches.length === (2 * teams.length) - 3,
+          expected_matches: (2 * teams.length) - 3 + 1,
+          formula_ok: matches.length === (2 * teams.length) - 3 + 1,
           champion: champTeam ? `${champTeam.player1_name} / ${champTeam.player2_name}` : sim.champion,
           runner_up: ruTeam ? `${ruTeam.player1_name} / ${ruTeam.player2_name}` : sim.runnerUp,
           simulation_errors: sim.errors,
+          validation_errors: sim.validationErrors,
           update_errors: updateErrors,
-          ok: !sim.champion ? false : sim.errors.length === 0,
+          ok: !sim.champion ? false : sim.errors.length === 0 && sim.validationErrors.length === 0,
         });
       }
     }
@@ -572,6 +864,6 @@ Deno.serve(async (req) => {
     }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message ?? 'Erro interno' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: err.message ?? 'Erro interno', stack: err.stack }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });

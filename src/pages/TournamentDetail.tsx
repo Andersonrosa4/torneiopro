@@ -126,7 +126,7 @@ const TournamentDetail = () => {
   const [isAssociatedOrganizer, setIsAssociatedOrganizer] = useState(false);
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
 
-  const { modalities, selectedModality, setSelectedModality, updateModality, loading: modalitiesLoading } = useModalities(id);
+  const { modalities, selectedModality, setSelectedModality, updateModality, createModality, deleteModality, loading: modalitiesLoading } = useModalities(id);
 
   const isOwner = tournament?.created_by === organizerId || isAdmin || isAssociatedOrganizer;
   const isTournamentCompleted = tournament?.status === 'completed' || tournament?.status === 'cancelled';

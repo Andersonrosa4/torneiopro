@@ -2222,7 +2222,17 @@ const TournamentDetail = () => {
             selectedModality={selectedModality}
             onSelect={setSelectedModality}
             isOwner={canEdit}
-            onUpdateModality={updateModality}
+            onAddModality={async (name: string) => {
+              if (!id || !tournament?.sport) return { error: { message: "Torneio inválido" } };
+              const { error } = await createModality(name, id, tournament.sport);
+              return { error };
+            }}
+            onRenameModality={async (modalityId: string, name: string) => {
+              return updateModality(modalityId, { name });
+            }}
+            onDeleteModality={async (modalityId: string) => {
+              return deleteModality(modalityId);
+            }}
           />
 
           {/* All tabs always visible */}

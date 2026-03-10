@@ -115,7 +115,7 @@ const ModalityTabs = ({
                         if (e.key === "Escape") setEditingId(null);
                       }}
                     />
-                    <button onClick={() => handleRename(mod.id)} className="text-green-500 hover:text-green-700">
+                    <button onClick={() => handleRename(mod.id)} className="text-primary hover:opacity-80">
                       <Check className="h-3 w-3" />
                     </button>
                     <button onClick={() => setEditingId(null)} className="text-destructive hover:opacity-80">

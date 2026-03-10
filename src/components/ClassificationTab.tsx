@@ -130,7 +130,8 @@ const ClassificationTab = ({ matches, teams, rankingCriteriaOrder }: Classificat
       });
 
     // Walk backward through remaining rounds for unplaced losers
-    for (let round = maxRound - 1; round >= 1; round--) {
+    const maxWinnersRound = winnersMatches.length > 0 ? Math.max(...winnersMatches.map((m) => m.round)) : 0;
+    for (let round = maxWinnersRound; round >= 1; round--) {
       const roundMatches = winnersMatches.filter(
         (m) => m.round === round && m.status === "completed"
       );

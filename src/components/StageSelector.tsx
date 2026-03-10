@@ -3,10 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { organizerQuery, publicQuery } from "@/lib/organizerApi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Calendar, Layers } from "lucide-react";
+import { Plus, Calendar, Layers, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface Stage {
   id: string;
@@ -31,6 +31,7 @@ const StageSelector = ({ tournamentId, isOwner, selectedStageId, onSelectStage }
   const [newStageName, setNewStageName] = useState("");
   const [newStageDate, setNewStageDate] = useState("");
   const [creating, setCreating] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Stage | null>(null);
 
   const fetchStages = useCallback(async () => {
     const { data } = await publicQuery<Stage[]>({
@@ -80,6 +81,50 @@ const StageSelector = ({ tournamentId, isOwner, selectedStageId, onSelectStage }
     fetchStages();
   };
 
+  const deleteStage = async () => {
+    if (!deleteTarget) return;
+
+    // Delete matches, teams, and related data for this stage first
+    const { error: matchErr } = await organizerQuery({
+      table: "matches",
+      operation: "delete",
+      filters: { tournament_id: tournamentId, stage_id: deleteTarget.id },
+    });
+    if (matchErr) {
+      toast.error("Erro ao excluir jogos da etapa: " + matchErr.message);
+      setDeleteTarget(null);
+      return;
+    }
+
+    const { error: teamErr } = await organizerQuery({
+      table: "teams",
+      operation: "delete",
+      filters: { tournament_id: tournamentId, stage_id: deleteTarget.id },
+    });
+    if (teamErr) {
+      toast.error("Erro ao excluir duplas da etapa: " + teamErr.message);
+      setDeleteTarget(null);
+      return;
+    }
+
+    const { error } = await organizerQuery({
+      table: "tournament_stages",
+      operation: "delete",
+      filters: { id: deleteTarget.id },
+    });
+
+    if (error) {
+      toast.error("Erro ao excluir etapa: " + error.message);
+    } else {
+      toast.success(`Etapa "${deleteTarget.name}" excluída.`);
+      if (selectedStageId === deleteTarget.id) {
+        onSelectStage(null);
+      }
+      fetchStages();
+    }
+    setDeleteTarget(null);
+  };
+
   if (stages.length === 0 && !isOwner) return null;
 
   return (
@@ -98,20 +143,30 @@ const StageSelector = ({ tournamentId, isOwner, selectedStageId, onSelectStage }
           Geral
         </Button>
         {stages.map((stage) => (
-          <Button
-            key={stage.id}
-            size="sm"
-            variant={selectedStageId === stage.id ? "default" : "outline"}
-            onClick={() => onSelectStage(stage.id)}
-            className="h-8 text-xs rounded-lg gap-1.5"
-          >
-            {stage.name}
-            {stage.event_date && (
-              <span className="text-[10px] text-muted-foreground/70">
-                {new Date(stage.event_date + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
-              </span>
+          <div key={stage.id} className="flex items-center gap-0.5 group">
+            <Button
+              size="sm"
+              variant={selectedStageId === stage.id ? "default" : "outline"}
+              onClick={() => onSelectStage(stage.id)}
+              className="h-8 text-xs rounded-lg gap-1.5"
+            >
+              {stage.name}
+              {stage.event_date && (
+                <span className="text-[10px] text-muted-foreground/70">
+                  {new Date(stage.event_date + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                </span>
+              )}
+            </Button>
+            {isOwner && (
+              <button
+                onClick={() => setDeleteTarget(stage)}
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive p-1"
+                title="Excluir etapa"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
             )}
-          </Button>
+          </div>
         ))}
         {isOwner && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -156,6 +211,24 @@ const StageSelector = ({ tournamentId, isOwner, selectedStageId, onSelectStage }
           </Dialog>
         )}
       </div>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir etapa "{deleteTarget?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Todos os jogos e duplas desta etapa serão excluídos permanentemente. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={deleteStage} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -126,7 +126,7 @@ const TournamentDetail = () => {
   const [isAssociatedOrganizer, setIsAssociatedOrganizer] = useState(false);
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
 
-  const { modalities, selectedModality, setSelectedModality, updateModality, loading: modalitiesLoading } = useModalities(id);
+  const { modalities, selectedModality, setSelectedModality, updateModality, createModality, deleteModality, loading: modalitiesLoading } = useModalities(id);
 
   const isOwner = tournament?.created_by === organizerId || isAdmin || isAssociatedOrganizer;
   const isTournamentCompleted = tournament?.status === 'completed' || tournament?.status === 'cancelled';
@@ -2222,7 +2222,17 @@ const TournamentDetail = () => {
             selectedModality={selectedModality}
             onSelect={setSelectedModality}
             isOwner={canEdit}
-            onUpdateModality={updateModality}
+            onAddModality={async (name: string) => {
+              if (!id || !tournament?.sport) return { error: { message: "Torneio inválido" } };
+              const { error } = await createModality(name, id, tournament.sport);
+              return { error };
+            }}
+            onRenameModality={async (modalityId: string, name: string) => {
+              return updateModality(modalityId, { name });
+            }}
+            onDeleteModality={async (modalityId: string) => {
+              return deleteModality(modalityId);
+            }}
           />
 
           {/* All tabs always visible */}

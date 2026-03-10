@@ -50,7 +50,7 @@ export function useModalities(tournamentId: string | undefined) {
     return () => { supabase.removeChannel(channel); };
   }, [tournamentId, fetchModalities]);
 
-  const updateModality = async (modalityId: string, updates: Partial<Pick<Modality, 'sport' | 'game_system'>>) => {
+  const updateModality = async (modalityId: string, updates: Partial<Pick<Modality, 'sport' | 'game_system' | 'name'>>) => {
     const { error } = await organizerQuery({
       table: "modalities",
       operation: "update",
@@ -61,6 +61,42 @@ export function useModalities(tournamentId: string | undefined) {
     return { error };
   };
 
+  const createModality = async (name: string, tournamentId: string, sport: string) => {
+    const { data, error } = await organizerQuery({
+      table: "modalities",
+      operation: "insert",
+      data: {
+        tournament_id: tournamentId,
+        name,
+        sport,
+        game_system: "single_elimination",
+      },
+      select: "*",
+      single: true,
+    });
+    if (!error && data) {
+      await fetchModalities();
+      setSelectedModality(data as Modality);
+    }
+    return { data, error };
+  };
+
+  const deleteModality = async (modalityId: string) => {
+    const { error } = await organizerQuery({
+      table: "modalities",
+      operation: "delete",
+      filters: { id: modalityId },
+    });
+    if (!error) {
+      const remaining = modalities.filter(m => m.id !== modalityId);
+      if (selectedModality?.id === modalityId) {
+        setSelectedModality(remaining[0] || null);
+      }
+      await fetchModalities();
+    }
+    return { error };
+  };
+
   return {
     modalities,
     selectedModality,
@@ -68,5 +104,7 @@ export function useModalities(tournamentId: string | undefined) {
     loading,
     fetchModalities,
     updateModality,
+    createModality,
+    deleteModality,
   };
 }

@@ -587,8 +587,9 @@ Deno.serve(async (req) => {
     // ── Ação: criar e simular torneios de teste ──
     if (action === 'create_and_simulate') {
       const organizerId = '7ebde37a-697e-4804-8445-6610fa03ce34';
-      const teamCounts = [24, 32, 40, 35, 28, 30];
-      const tournamentNames = teamCounts.map(n => `TESTE DE FUTEVÔLEI ${n} DUPLAS`);
+      const { team_count } = body;
+      const teamCounts = team_count ? [team_count] : [24, 32, 40, 35, 28, 30];
+      const tournamentNames = teamCounts.map((n: number) => `TESTE DE FUTEVÔLEI ${n} DUPLAS`);
       
       const allResults: any[] = [];
 

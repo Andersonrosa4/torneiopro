@@ -61,7 +61,7 @@ const ClassificationTab = ({ matches, teams, rankingCriteriaOrder }: Classificat
   const standings = useMemo(() => {
     if (matches.length === 0) return [];
 
-    const eliminationMatches = matches.filter((m) => m.round >= 1 && (m.bracket_type === "winners" || m.bracket_type === "third_place"));
+    const eliminationMatches = matches.filter((m) => m.round >= 1 && (m.bracket_type === "winners" || m.bracket_type === "third_place" || m.bracket_type === "semi_final" || m.bracket_type === "final"));
     const groupMatches = matches.filter((m) => m.round === 0);
 
     if (eliminationMatches.length === 0) {
@@ -77,68 +77,61 @@ const ClassificationTab = ({ matches, teams, rankingCriteriaOrder }: Classificat
   ): { id: string; name: string; position: number; label: string }[] {
     const winnersMatches = elimMatches.filter((m) => m.bracket_type === "winners");
     const thirdPlaceMatches = elimMatches.filter((m) => m.bracket_type === "third_place");
+    const actualFinalMatches = elimMatches.filter((m) => m.bracket_type === "final");
+    const semiMatches = elimMatches.filter((m) => m.bracket_type === "semi_final");
     
-    const maxRound = Math.max(...winnersMatches.map((m) => m.round));
     const ranked: { id: string; name: string; position: number; label: string }[] = [];
     const placedTeams = new Set<string>();
 
-    // 1st and 2nd from final
-    const finalMatches = winnersMatches.filter((m) => m.round === maxRound && m.status === "completed");
-    finalMatches.forEach((finalMatch) => {
-      if (finalMatch.winner_team_id) {
-        if (!placedTeams.has(finalMatch.winner_team_id)) {
-          ranked.push({
-            id: finalMatch.winner_team_id,
-            name: getTeamName(finalMatch.winner_team_id),
-            position: 1,
-            label: "🏆 Campeão",
-          });
-          placedTeams.add(finalMatch.winner_team_id);
-        }
-        const loserId =
-          finalMatch.team1_id === finalMatch.winner_team_id
-            ? finalMatch.team2_id
-            : finalMatch.team1_id;
-        if (loserId && !placedTeams.has(loserId)) {
-          ranked.push({
-            id: loserId,
-            name: getTeamName(loserId),
-            position: 2,
-            label: "🥈 Vice-Campeão",
-          });
-          placedTeams.add(loserId);
+    // Helper to place winner + loser from a match
+    const placeFromMatch = (m: Match, winPos: number, winLabel: string, losePos: number, loseLabel: string) => {
+      if (m.winner_team_id && !placedTeams.has(m.winner_team_id)) {
+        ranked.push({ id: m.winner_team_id, name: getTeamName(m.winner_team_id), position: winPos, label: winLabel });
+        placedTeams.add(m.winner_team_id);
+      }
+      const loserId = m.team1_id === m.winner_team_id ? m.team2_id : m.team1_id;
+      if (loserId && !placedTeams.has(loserId)) {
+        ranked.push({ id: loserId, name: getTeamName(loserId), position: losePos, label: loseLabel });
+        placedTeams.add(loserId);
+      }
+    };
+
+    // 1st and 2nd: from bracket_type "final" (DE) or max round of winners (SE)
+    const completedFinals = actualFinalMatches.filter((m) => m.status === "completed" && m.winner_team_id);
+    if (completedFinals.length > 0) {
+      placeFromMatch(completedFinals[0], 1, "🏆 Campeão", 2, "🥈 Vice-Campeão");
+    } else {
+      // Fallback for single elimination: use max round of winners
+      if (winnersMatches.length > 0) {
+        const maxRound = Math.max(...winnersMatches.map((m) => m.round));
+        const fallbackFinals = winnersMatches.filter((m) => m.round === maxRound && m.status === "completed");
+        if (fallbackFinals.length === 1) {
+          placeFromMatch(fallbackFinals[0], 1, "🏆 Campeão", 2, "🥈 Vice-Campeão");
         }
       }
-    });
+    }
 
-    // 3rd and 4th from third_place match if completed
-    const completedThirdPlace = thirdPlaceMatches.filter((m) => m.status === "completed" && m.winner_team_id);
-    if (completedThirdPlace.length > 0) {
-      completedThirdPlace.forEach((m) => {
-        if (m.winner_team_id && !placedTeams.has(m.winner_team_id)) {
-          ranked.push({
-            id: m.winner_team_id,
-            name: getTeamName(m.winner_team_id),
-            position: ranked.length + 1,
-            label: `${ranked.length + 1}º lugar`,
-          });
-          placedTeams.add(m.winner_team_id);
-        }
+    // 3rd and 4th from third_place match
+    const completedTP = thirdPlaceMatches.filter((m) => m.status === "completed" && m.winner_team_id);
+    if (completedTP.length > 0) {
+      placeFromMatch(completedTP[0], 3, "🥉 3º lugar", 4, "4º lugar");
+    }
+
+    // Semi-final losers (if not already placed by third_place)
+    semiMatches
+      .filter((m) => m.status === "completed" && m.winner_team_id)
+      .forEach((m) => {
         const loserId = m.team1_id === m.winner_team_id ? m.team2_id : m.team1_id;
         if (loserId && !placedTeams.has(loserId)) {
-          ranked.push({
-            id: loserId,
-            name: getTeamName(loserId),
-            position: ranked.length + 1,
-            label: `${ranked.length + 1}º lugar`,
-          });
+          const pos = ranked.length + 1;
+          ranked.push({ id: loserId, name: getTeamName(loserId), position: pos, label: `${pos}º lugar` });
           placedTeams.add(loserId);
         }
       });
-    }
 
     // Walk backward through remaining rounds for unplaced losers
-    for (let round = maxRound - 1; round >= 1; round--) {
+    const maxWinnersRound = winnersMatches.length > 0 ? Math.max(...winnersMatches.map((m) => m.round)) : 0;
+    for (let round = maxWinnersRound; round >= 1; round--) {
       const roundMatches = winnersMatches.filter(
         (m) => m.round === round && m.status === "completed"
       );

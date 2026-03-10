@@ -395,8 +395,8 @@ function simulateAllResults(matches: any[]): {
     const winnerId = Math.random() > 0.5 ? current.team1_id : current.team2_id;
     const loserId = current.team1_id === winnerId ? current.team2_id : current.team1_id;
 
-    // Track losses
-    if (loserId) {
+    // Track losses (excluindo 3º lugar — partida classificatória, não elimina)
+    if (loserId && current.bracket_type !== 'third_place') {
       teamLosses.set(loserId, (teamLosses.get(loserId) ?? 0) + 1);
     }
 

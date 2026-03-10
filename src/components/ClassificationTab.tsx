@@ -61,7 +61,7 @@ const ClassificationTab = ({ matches, teams, rankingCriteriaOrder }: Classificat
   const standings = useMemo(() => {
     if (matches.length === 0) return [];
 
-    const eliminationMatches = matches.filter((m) => m.round >= 1 && (m.bracket_type === "winners" || m.bracket_type === "third_place"));
+    const eliminationMatches = matches.filter((m) => m.round >= 1 && (m.bracket_type === "winners" || m.bracket_type === "third_place" || m.bracket_type === "semi_final" || m.bracket_type === "final"));
     const groupMatches = matches.filter((m) => m.round === 0);
 
     if (eliminationMatches.length === 0) {

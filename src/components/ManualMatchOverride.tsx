@@ -142,7 +142,11 @@ export function ManualMatchOverride({ match, matchNumber, teams, allMatches, tou
       }
 
       // ── PRE-CHECK: System Rules Guard ──
-      if (!runSystemRulesGuard(modalityMatches, 'preOverride')) {
+      // Skip pre-check if this is a re-declaration (editing existing result)
+      // because the state may already be in violation due to the bad result.
+      // The post-cascade guard will validate the final state.
+      const isReDeclarationPreCheck = match.status === 'completed' && match.winner_team_id;
+      if (!isReDeclarationPreCheck && !runSystemRulesGuard(modalityMatches, 'preOverride')) {
         return;
       }
 

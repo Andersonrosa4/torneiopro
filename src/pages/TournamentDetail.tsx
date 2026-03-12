@@ -1127,7 +1127,11 @@ const TournamentDetail = () => {
     }
 
     // ── SYSTEM RULES GUARD (pre-declaration) ──
-    if (!runSystemRulesGuard(modalityMatches, 'preDeclareWinner')) {
+    // Skip pre-check if this is a re-declaration (editing existing result)
+    // because the state may already be in violation due to the bad result.
+    // The post-cascade guard will validate the final state.
+    const isPreReDeclaration = match.status === 'completed' && match.winner_team_id;
+    if (!isPreReDeclaration && !runSystemRulesGuard(modalityMatches, 'preDeclareWinner')) {
       declareWinnerMutex.current.delete(matchId);
       return;
     }

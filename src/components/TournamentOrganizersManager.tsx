@@ -83,6 +83,7 @@ const TournamentOrganizersManager = ({ tournamentId, createdBy }: Props) => {
       data: {
         tournament_id: tournamentId,
         organizer_id: selectedOrganizerId,
+        granted_by: organizerId,
       },
     });
     if (error) {

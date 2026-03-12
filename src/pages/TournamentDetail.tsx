@@ -1954,15 +1954,12 @@ const TournamentDetail = () => {
 
   const deleteTournament = async () => {
     if (!id) return;
-    // Use bulk operations for speed
-    const token = sessionStorage.getItem("organizer_token");
-    const orgId = sessionStorage.getItem("organizer_id");
     await organizerQuery({ table: "rankings", operation: "delete", filters: { tournament_id: id } });
-    if (token && orgId) {
-      await supabase.functions.invoke("organizer-api", {
-        body: { token, organizerId: orgId, operation: "undo_bracket", tournament_id: id },
-      });
-    }
+    await organizerQuery({
+      table: "matches",
+      operation: "undo_bracket",
+      tournament_id: id,
+    });
     await organizerQuery({ table: "teams", operation: "delete", filters: { tournament_id: id } });
     await organizerQuery({ table: "tournaments", operation: "delete", filters: { id } });
     toast.success("Torneio excluído com sucesso!");

@@ -141,20 +141,14 @@ const Dashboard = () => {
 
   const deleteTournament = async (tournamentId: string) => {
     try {
-      const token = sessionStorage.getItem("organizer_token");
-      const orgId = sessionStorage.getItem("organizer_id");
-
-      if (!token || !orgId) {
-        toast.error("Sessão expirada. Faça login novamente.");
-        return;
-      }
-
       // 1. Delete rankings
       await organizerQuery({ table: "rankings", operation: "delete", filters: { tournament_id: tournamentId } });
 
       // 2. Nullify FK refs + delete matches + classificacao_grupos + groups (undo_bracket handles all)
-      await supabase.functions.invoke("organizer-api", {
-        body: { token, organizerId: orgId, table: "matches", operation: "undo_bracket", tournament_id: tournamentId },
+      await organizerQuery({
+        table: "matches",
+        operation: "undo_bracket",
+        tournament_id: tournamentId,
       });
 
       // 3. Delete participants

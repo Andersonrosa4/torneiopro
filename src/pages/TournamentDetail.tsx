@@ -420,14 +420,13 @@ const TournamentDetail = () => {
           data: { next_win_match_id: null, next_lose_match_id: null },
           filters: { tournament_id: id, modality_id: selectedModality.id },
         } as any);
-        // Then delete via edge function bulk op
-        const token = sessionStorage.getItem("organizer_token");
-        const orgId = sessionStorage.getItem("organizer_id");
-        if (token && orgId) {
-          await supabase.functions.invoke("organizer-api", {
-            body: { token, organizerId: orgId, operation: "undo_bracket", tournament_id: id, modality_id: selectedModality.id },
-          });
-        }
+        // Then delete matches for this modality
+        await organizerQuery({
+          table: "matches",
+          operation: "undo_bracket",
+          tournament_id: id,
+          modality_id: selectedModality.id,
+        });
       } else {
         await organizerQuery({
           table: "matches",

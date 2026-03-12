@@ -108,9 +108,11 @@ function checkNullSlots(knockoutMatches: GuardMatch[], violations: RuleViolation
 }
 
 function checkDuplicateInRound(matches: GuardMatch[], violations: RuleViolation[]) {
+  // Group by round + bracket_type + modality to avoid false positives in DE
+  // (a team can appear in Winners R1 completed AND Losers R1 pending — that's valid)
   const scopes = new Map<string, GuardMatch[]>();
   for (const m of matches) {
-    const key = `${m.round}|${m.modality_id ?? 'null'}`;
+    const key = `${m.round}|${m.bracket_type ?? 'null'}|${m.modality_id ?? 'null'}`;
     if (!scopes.has(key)) scopes.set(key, []);
     scopes.get(key)!.push(m);
   }

@@ -839,13 +839,12 @@ const TournamentDetail = () => {
   // Reset only match results (scores, winners, status) — keeps bracket structure intact
   const undoSequence = async () => {
     if (!id) return;
-    const token = sessionStorage.getItem("organizer_token");
-    const organizerId = sessionStorage.getItem("organizer_id");
-    if (!token || !organizerId) { toast.error("Não autenticado"); return; }
-    const { data: result, error: invokeErr } = await supabase.functions.invoke("organizer-api", {
-      body: { token, organizerId, operation: "reset_results", tournament_id: id, modality_id: selectedModality?.id || null },
+    const { error } = await organizerQuery({
+      table: "matches",
+      operation: "reset_results",
+      tournament_id: id,
+      modality_id: selectedModality?.id || undefined,
     });
-    const error = invokeErr || (result?.error ? { message: result.error } : null);
     if (error) {
       toast.error("Erro ao resetar resultados: " + error.message);
       return;

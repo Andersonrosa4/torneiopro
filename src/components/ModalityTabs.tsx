@@ -135,7 +135,7 @@ const ModalityTabs = ({
                           <Pencil className="h-3 w-3" />
                         </button>
                         <button
-                          onClick={e => { e.stopPropagation(); setDeleteTarget(mod); }}
+                          onClick={e => { e.stopPropagation(); setDeleteTarget(mod); setConfirmStep(1); }}
                           className="text-muted-foreground hover:text-destructive"
                         >
                           <Trash2 className="h-3 w-3" />

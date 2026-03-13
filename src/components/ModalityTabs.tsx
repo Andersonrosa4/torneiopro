@@ -41,7 +41,7 @@ const ModalityTabs = ({
   const [editName, setEditName] = useState("");
 
   const [deleteTarget, setDeleteTarget] = useState<Modality | null>(null);
-
+  const [confirmStep, setConfirmStep] = useState<1 | 2>(1);
   const handleAdd = async () => {
     const trimmed = newName.trim();
     if (!trimmed) return;
@@ -135,7 +135,7 @@ const ModalityTabs = ({
                           <Pencil className="h-3 w-3" />
                         </button>
                         <button
-                          onClick={e => { e.stopPropagation(); setDeleteTarget(mod); }}
+                          onClick={e => { e.stopPropagation(); setDeleteTarget(mod); setConfirmStep(1); }}
                           className="text-muted-foreground hover:text-destructive"
                         >
                           <Trash2 className="h-3 w-3" />
@@ -177,19 +177,37 @@ const ModalityTabs = ({
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
+      {/* Delete Confirmation - Step 1 */}
+      <AlertDialog open={!!deleteTarget && confirmStep === 1} onOpenChange={open => { if (!open) setDeleteTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir categoria "{deleteTarget?.name}"?</AlertDialogTitle>
             <AlertDialogDescription>
-              Todas as duplas e jogos desta categoria serão perdidos. Esta ação não pode ser desfeita.
+              Todas as duplas e jogos desta categoria serão perdidos. Deseja continuar?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setDeleteTarget(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => setConfirmStep(2)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Sim, excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirmation - Step 2 (final) */}
+      <AlertDialog open={!!deleteTarget && confirmStep === 2} onOpenChange={open => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>⚠️ Confirmação final</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem CERTEZA ABSOLUTA que deseja excluir a categoria "{deleteTarget?.name}"? Esta ação NÃO pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteTarget(null)}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Excluir
+              Sim, tenho certeza — Excluir
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

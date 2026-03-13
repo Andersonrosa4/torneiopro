@@ -91,7 +91,7 @@ const ModalityTabs = ({
   if (modalities.length === 0 && !isOwner) return null;
 
   return (
-    <div className="mb-4 flex items-center gap-2 flex-wrap">
+    <div className="mb-4 flex items-center gap-2">
       {modalities.length > 0 && (
         <Tabs
           value={selectedModality?.id || ""}
@@ -100,7 +100,7 @@ const ModalityTabs = ({
             if (mod) onSelect(mod);
           }}
         >
-          <TabsList>
+          <TabsList className="overflow-x-auto max-w-[calc(100vw-6rem)] flex-nowrap justify-start scrollbar-thin">
             {modalities.map(mod => (
               <TabsTrigger key={mod.id} value={mod.id} className="gap-1 group relative">
                 {editingId === mod.id ? (

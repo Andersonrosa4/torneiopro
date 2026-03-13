@@ -41,7 +41,7 @@ const ModalityTabs = ({
   const [editName, setEditName] = useState("");
 
   const [deleteTarget, setDeleteTarget] = useState<Modality | null>(null);
-
+  const [confirmStep, setConfirmStep] = useState<1 | 2>(1);
   const handleAdd = async () => {
     const trimmed = newName.trim();
     if (!trimmed) return;

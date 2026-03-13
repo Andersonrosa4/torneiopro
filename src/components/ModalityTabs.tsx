@@ -100,7 +100,7 @@ const ModalityTabs = ({
             if (mod) onSelect(mod);
           }}
         >
-          <TabsList>
+          <TabsList className="overflow-x-auto max-w-[calc(100vw-6rem)] flex-nowrap justify-start scrollbar-thin">
             {modalities.map(mod => (
               <TabsTrigger key={mod.id} value={mod.id} className="gap-1 group relative">
                 {editingId === mod.id ? (

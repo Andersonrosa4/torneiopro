@@ -91,7 +91,7 @@ const ModalityTabs = ({
   if (modalities.length === 0 && !isOwner) return null;
 
   return (
-    <div className="mb-4 flex items-center gap-2 flex-wrap">
+    <div className="mb-4 flex items-center gap-2">
       {modalities.length > 0 && (
         <Tabs
           value={selectedModality?.id || ""}

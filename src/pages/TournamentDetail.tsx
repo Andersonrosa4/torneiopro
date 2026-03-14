@@ -31,6 +31,7 @@ import { generateSeeds } from "@/engine/seedingEngine";
 import { checkAutoAdvance } from "@/engine/autoAdvanceEngine";
 import { isRoundLocked } from "@/engine/roundLockGuard";
 import { validateSystemRules, type TournamentSnapshot, type GuardMatch } from "@/engine/systemRulesGuard";
+import { validatePostGeneration, type ValidationMatch } from "@/engine/postGenerationValidator";
 
 import BracketTreeView from "@/components/BracketTreeView";
 import MatchSequenceViewer from "@/components/MatchSequenceViewer";

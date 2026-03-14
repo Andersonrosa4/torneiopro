@@ -40,9 +40,15 @@ const CreateTournament = () => {
   const showRules = SPORTS_WITH_RULES.includes(form.sport);
 
   const handleSportChange = (sport: string) => {
-    setForm({ ...form, sport });
-    if (SPORTS_WITH_RULES.includes(sport)) {
-      setRules(getDefaultRules(sport));
+    console.log("[CreateTournament] handleSportChange called with:", sport);
+    try {
+      setForm({ ...form, sport });
+      if (SPORTS_WITH_RULES.includes(sport)) {
+        setRules(getDefaultRules(sport));
+      }
+      console.log("[CreateTournament] sport changed successfully to:", sport);
+    } catch (err) {
+      console.error("[CreateTournament] Error changing sport:", err);
     }
   };
 

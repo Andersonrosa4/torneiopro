@@ -574,7 +574,7 @@ const MatchCard = ({
     }
 
     return { team1: team1Label, team2: team2Label };
-  }, [match.id, match.round, match.position, match.bracket_number, match.team1_id, match.team2_id, allMatches, matchNumberMap, tournamentFormat]);
+  }, [match.id, match.round, match.position, match.bracket_number, match.team1_id, match.team2_id, match.is_chapeu, allMatches, matchNumberMap, tournamentFormat]);
 
   const team1Name = match.team1_id ? getTeamName(match.team1_id) : (feederLabels.team1 || "A definir");
   const team2Name = match.team2_id ? getTeamName(match.team2_id) : (feederLabels.team2 || "A definir");

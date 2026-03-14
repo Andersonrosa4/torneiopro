@@ -1710,8 +1710,7 @@ const TournamentDetail = () => {
         // Non-blocking — don't prevent the rest of the flow
       }
 
-      // Always refresh UI after DE advancement
-      fetchData();
+      // UI refresh handled by finally block — no duplicate fetchData() here
       toast.success("Avanço automático realizado!");
     } else {
       // Normal bracket: IMMEDIATE propagation via next_win_match_id
@@ -1976,9 +1975,14 @@ const TournamentDetail = () => {
           if (knockout.length > 0) modalitiesWithBrackets.add(modId);
         }
 
-        // Only auto-finalize if EVERY modality has a bracket generated AND all are completed
-        const allModalitiesHaveBrackets = allModalities.length > 0 
-          && allModalities.every((mod: any) => modalitiesWithBrackets.has(mod.id));
+        // Only auto-finalize if EVERY modality WITH TEAMS has a bracket generated AND all are completed
+        // Skip modalities with 0 teams — they don't need brackets
+        const modalitiesWithTeams = allModalities.filter((mod: any) => {
+          const modTeams = teams.filter(t => t.modality_id === mod.id);
+          return modTeams.length > 0;
+        });
+        const allModalitiesHaveBrackets = modalitiesWithTeams.length > 0 
+          && modalitiesWithTeams.every((mod: any) => modalitiesWithBrackets.has(mod.id));
 
         let allModalitiesDone = false;
         if (allModalitiesHaveBrackets) {

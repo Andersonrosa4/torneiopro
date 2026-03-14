@@ -1710,8 +1710,7 @@ const TournamentDetail = () => {
         // Non-blocking — don't prevent the rest of the flow
       }
 
-      // Always refresh UI after DE advancement
-      fetchData();
+      // UI refresh handled by finally block — no duplicate fetchData() here
       toast.success("Avanço automático realizado!");
     } else {
       // Normal bracket: IMMEDIATE propagation via next_win_match_id

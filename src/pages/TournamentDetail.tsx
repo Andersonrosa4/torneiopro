@@ -31,7 +31,7 @@ import { generateSeeds } from "@/engine/seedingEngine";
 import { checkAutoAdvance } from "@/engine/autoAdvanceEngine";
 import { isRoundLocked } from "@/engine/roundLockGuard";
 import { validateSystemRules, type TournamentSnapshot, type GuardMatch } from "@/engine/systemRulesGuard";
-import { validatePostGeneration, type ValidationMatch } from "@/engine/postGenerationValidator";
+import { validatePostGeneration, type ValidationMatch, type RepairAction } from "@/engine/postGenerationValidator";
 
 import BracketTreeView from "@/components/BracketTreeView";
 import MatchSequenceViewer from "@/components/MatchSequenceViewer";
@@ -829,16 +829,69 @@ const TournamentDetail = () => {
         const postTeamCount = filteredTeams.length;
         const result = validatePostGeneration(postGenMatches, postFormat, postTeamCount);
 
-        if (!result.valid) {
-          console.error(`[PostGenValidator] ❌ ${result.errors.length} erro(s) detectado(s):`);
+        // ── AUTO-REPAIR: aplicar correções automaticamente ──
+        if (result.repairs.length > 0) {
+          console.warn(`[PostGenValidator:AutoRepair] 🔧 ${result.repairs.length} reparação(ões) detectada(s). Aplicando...`);
+          
+          // Consolidar repairs por matchId (merge updates)
+          const repairsByMatch = new Map<string, Record<string, string | null>>();
+          for (const repair of result.repairs) {
+            console.warn(`  🔧 ${repair.reason}`);
+            const existing = repairsByMatch.get(repair.matchId) || {};
+            repairsByMatch.set(repair.matchId, { ...existing, ...repair.updates });
+          }
+
+          // Aplicar todas as reparações em paralelo
+          const repairPromises = Array.from(repairsByMatch.entries()).map(([matchId, updates]) =>
+            organizerQuery({
+              table: "matches",
+              operation: "update",
+              data: updates,
+              filters: { id: matchId },
+            })
+          );
+          const repairResults = await Promise.all(repairPromises);
+          const failedRepairs = repairResults.filter(r => r.error);
+
+          if (failedRepairs.length > 0) {
+            console.error(`[PostGenValidator:AutoRepair] ❌ ${failedRepairs.length} reparação(ões) falharam`);
+            toast.error(`⚠️ ${failedRepairs.length} reparação(ões) automática(s) falharam. Verifique o chaveamento.`);
+          } else {
+            console.log(`[PostGenValidator:AutoRepair] ✅ ${result.repairs.length} reparação(ões) aplicada(s) com sucesso`);
+            toast.success(`🔧 ${result.repairs.length} correção(ões) automática(s) aplicada(s) ao chaveamento.`);
+          }
+
+          // Re-validate after repairs
+          const { data: revalidateMatches } = await publicQuery<ValidationMatch[]>({
+            table: "matches",
+            select: "id,round,position,status,bracket_type,bracket_half,team1_id,team2_id,winner_team_id,is_chapeu,modality_id,next_win_match_id,next_lose_match_id",
+            filters: selectedModality
+              ? { tournament_id: id, modality_id: selectedModality.id }
+              : { tournament_id: id },
+          });
+
+          if (revalidateMatches && revalidateMatches.length > 0) {
+            const reResult = validatePostGeneration(revalidateMatches, postFormat, postTeamCount);
+            if (reResult.errors.length > 0 && reResult.repairs.length === 0) {
+              console.error(`[PostGenValidator:ReValidation] ❌ ${reResult.errors.length} erro(s) persistem após reparação:`);
+              reResult.errors.forEach(e => console.error(`  → ${e}`));
+              toast.error(`⛔ ${reResult.errors.length} problema(s) não reparável(is) detectado(s). Verifique o chaveamento.`);
+            } else if (reResult.valid) {
+              console.log(`[PostGenValidator:ReValidation] ✅ Chaveamento 100% íntegro após auto-reparo`);
+            }
+          }
+        } else if (!result.valid) {
+          // Errors with no possible repairs
+          console.error(`[PostGenValidator] ❌ ${result.errors.length} erro(s) não reparável(is):`);
           result.errors.forEach(e => console.error(`  → ${e}`));
-          toast.error(`⛔ Verificação pós-geração falhou: ${result.errors[0]}`);
+          toast.error(`⛔ Verificação pós-geração: ${result.errors[0]}`);
         } else {
           console.log(`[PostGenValidator] ✅ Chaveamento íntegro — ${result.stats.totalMatches} partidas, 0 erros`);
-          if (result.warnings.length > 0) {
-            console.warn(`[PostGenValidator] ⚠️ ${result.warnings.length} aviso(s):`);
-            result.warnings.forEach(w => console.warn(`  → ${w}`));
-          }
+        }
+
+        if (result.warnings.length > 0) {
+          console.warn(`[PostGenValidator] ⚠️ ${result.warnings.length} aviso(s):`);
+          result.warnings.forEach(w => console.warn(`  → ${w}`));
         }
       }
 

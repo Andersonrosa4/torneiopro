@@ -518,7 +518,26 @@ const MatchCard = ({
       team2Label = num ? `${prefix} Jogo ${num}` : slotFeeders.team2.label;
     }
 
-    // Structural fallback: if no feeders found via links, use positional logic
+    // ── FALLBACK 1: Direct link search (cross-bracket safe) ──
+    // If getSlotFeeders returned nothing, re-scan allMatches for any match
+    // whose next_win_match_id or next_lose_match_id points to this match.
+    // This catches cases where bracket_type/bracket_half filtering might miss feeders.
+    if (!team1Label && !team2Label && match.round > 0 && (match as any).bracket_type !== 'third_place') {
+      const directFeeders = allMatches.filter(m => 
+        m.id !== match.id && (m.next_win_match_id === match.id || m.next_lose_match_id === match.id)
+      );
+      for (const f of directFeeders) {
+        const fNum = matchNumberMap.get(f.id);
+        if (!fNum) continue;
+        const isWin = f.next_win_match_id === match.id;
+        const prefix = isWin ? 'Venc.' : 'Perd.';
+        const label = `${prefix} Jogo ${fNum}`;
+        if (!team1Label) team1Label = label;
+        else if (!team2Label) team2Label = label;
+      }
+    }
+
+    // ── FALLBACK 2: Positional (same bracket_number + prev round) ──
     if (!team1Label && !team2Label && match.round > 0 && (match as any).bracket_type !== 'third_place') {
       const prevRound = match.round - 1;
       if (prevRound > 0) {
@@ -536,6 +555,21 @@ const MatchCard = ({
           if (!team1Label) team1Label = label;
           else if (!team2Label) team2Label = label;
         }
+      }
+    }
+
+    // ── FALLBACK 3: Chapéu seed slot label ──
+    // If only ONE slot has a feeder label and the match is chapéu,
+    // the other slot is the pre-seeded team → show "Semente (Chapéu)"
+    if (match.is_chapeu) {
+      if (team1Label && !team2Label && !match.team2_id) {
+        team2Label = 'Semente (Chapéu)';
+      } else if (!team1Label && team2Label && !match.team1_id) {
+        team1Label = 'Semente (Chapéu)';
+      } else if (!team1Label && !team2Label) {
+        // Chapéu match with no feeders found at all — label both descriptively
+        if (!match.team1_id) team1Label = 'Semente (Chapéu)';
+        if (!match.team2_id) team2Label = 'Aguardando classificação';
       }
     }
 

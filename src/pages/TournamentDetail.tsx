@@ -813,6 +813,35 @@ const TournamentDetail = () => {
       toast.success(`✅ Chaveamento gerado! ${newMatches.length} partidas criadas.`);
       fetchData();
     }
+
+      // ═══ POST-GENERATION INTEGRITY CHECK ═══
+      // Re-fetch all matches for this modality and run full validation
+      const { data: postGenMatches } = await publicQuery<ValidationMatch[]>({
+        table: "matches",
+        select: "id,round,position,status,bracket_type,bracket_half,team1_id,team2_id,winner_team_id,is_chapeu,modality_id,next_win_match_id,next_lose_match_id",
+        filters: selectedModality
+          ? { tournament_id: id, modality_id: selectedModality.id }
+          : { tournament_id: id },
+      });
+
+      if (postGenMatches && postGenMatches.length > 0) {
+        const postFormat = config.bracketMode === 'double_elimination' ? 'double_elimination' : (tournament?.format || 'single_elimination');
+        const postTeamCount = filteredTeams.length;
+        const result = validatePostGeneration(postGenMatches, postFormat, postTeamCount);
+
+        if (!result.valid) {
+          console.error(`[PostGenValidator] ❌ ${result.errors.length} erro(s) detectado(s):`);
+          result.errors.forEach(e => console.error(`  → ${e}`));
+          toast.error(`⛔ Verificação pós-geração falhou: ${result.errors[0]}`);
+        } else {
+          console.log(`[PostGenValidator] ✅ Chaveamento íntegro — ${result.stats.totalMatches} partidas, 0 erros`);
+          if (result.warnings.length > 0) {
+            console.warn(`[PostGenValidator] ⚠️ ${result.warnings.length} aviso(s):`);
+            result.warnings.forEach(w => console.warn(`  → ${w}`));
+          }
+        }
+      }
+
     } catch (error: any) {
       console.error("[generateBracket] Error:", error);
       toast.error(`❌ Erro ao gerar chaveamento: ${error?.message || "Erro desconhecido"}`);

@@ -1941,62 +1941,58 @@ const TournamentDetail = () => {
     });
 
     if (freshMatches) {
-      // ── STRICT TOURNAMENT END RULE (Double Elimination) ──
-      const isDE_final = freshMatches.some((m: any) => m.bracket_type === 'final');
+      // ── AUTO-FINALIZATION: Only finalize when ALL modalities are done ──
+      // Group matches by modality to check each one independently
+      const matchesByModality = new Map<string, any[]>();
+      freshMatches.forEach((m: any) => {
+        const modId = m.modality_id || '__none__';
+        if (!matchesByModality.has(modId)) matchesByModality.set(modId, []);
+        matchesByModality.get(modId)!.push(m);
+      });
+
+      // Check if current modality is done (for toast feedback)
+      const currentModalityId = selectedModality?.id || '__none__';
+      const currentModalityMatches = matchesByModality.get(currentModalityId) || [];
+      const currentKnockout = currentModalityMatches.filter((m: any) => m.round > 0);
+      const isCurrentDE = currentKnockout.some((m: any) => m.bracket_type === 'final');
       
-      if (isDE_final) {
-        // Double Elimination: Only complete when FINAL match is done + 2N-3 validation
-        const modalityFreshMatches = selectedModality
-          ? freshMatches.filter((m: any) => m.modality_id === selectedModality.id && m.round > 0)
-          : freshMatches.filter((m: any) => m.round > 0);
-        
-        const finalMatch = modalityFreshMatches.find((m: any) => m.bracket_type === 'final');
-        const isFinalCompleted = finalMatch?.status === 'completed';
-        
-        // Count teams for 2N-3 formula
-        const allTeamIds = new Set<string>();
-        modalityFreshMatches.forEach((m: any) => {
-          if (m.team1_id) allTeamIds.add(m.team1_id);
-          if (m.team2_id) allTeamIds.add(m.team2_id);
-        });
-        const totalTeams = allTeamIds.size;
-        const expectedTotalMatches = (2 * totalTeams) - 3;
-        const completedMatches = modalityFreshMatches.filter((m: any) => m.status === 'completed').length;
-
-        console.log(`[DE:EndCheck] Final completed=${isFinalCompleted}, Completed=${completedMatches}/${expectedTotalMatches}`);
-
-        if (isFinalCompleted && completedMatches >= expectedTotalMatches) {
-          // All conditions met - tournament is complete
-          await organizerQuery({
-            table: "tournaments",
-            operation: "update",
-            data: { status: "completed" },
-            filters: { id },
-          });
-          toast.success("🏆 Torneio finalizado! Campeão definido na Grande Final!");
-        } else if (completedMatches < expectedTotalMatches) {
-          // NOT all matches done - do NOT finalize
-          console.log(`[DE:EndBlock] Finalization blocked: ${completedMatches}/${expectedTotalMatches} matches completed`);
-        }
+      let currentModalityDone = false;
+      if (isCurrentDE) {
+        const finalMatch = currentKnockout.find((m: any) => m.bracket_type === 'final');
+        currentModalityDone = finalMatch?.status === 'completed';
       } else {
-        // Non-DE: Original logic for groups + normal knockout
-        const groupMatches = freshMatches.filter((m: any) => m.round === 0);
-        
-        const groupBrackets = new Map<number, any[]>();
-        groupMatches.forEach((m: any) => {
-          const bracket = m.bracket_number || 1;
-          if (!groupBrackets.has(bracket)) groupBrackets.set(bracket, []);
-          groupBrackets.get(bracket)!.push(m);
-        });
+        currentModalityDone = currentModalityMatches.length > 0 
+          && currentKnockout.length > 0
+          && currentModalityMatches.every((m: any) => m.status === 'completed');
+      }
 
-        const allDone = freshMatches.every((m: any) => m.status === "completed");
-        if (allDone && freshMatches.some((m: any) => m.round > 0)) {
+      if (currentModalityDone) {
+        // Check if ALL modalities are done before finalizing tournament
+        let allModalitiesDone = true;
+        for (const [modId, modMatches] of matchesByModality) {
+          const knockout = modMatches.filter((m: any) => m.round > 0);
+          if (knockout.length === 0) continue; // Modality without bracket - skip
+          
+          const hasDE = knockout.some((m: any) => m.bracket_type === 'final');
+          if (hasDE) {
+            const finalM = knockout.find((m: any) => m.bracket_type === 'final');
+            if (!finalM || finalM.status !== 'completed') { allModalitiesDone = false; break; }
+          } else {
+            if (!modMatches.every((m: any) => m.status === 'completed')) { allModalitiesDone = false; break; }
+          }
+        }
+
+        if (allModalitiesDone) {
           await organizerQuery({
             table: "tournaments",
             operation: "update",
             data: { status: "completed" },
             filters: { id },
           });
+          toast.success("🏆 Torneio finalizado! Todas as modalidades concluídas!");
+        } else {
+          toast.success("🏅 Modalidade concluída! Continue com as demais categorias.");
+          console.log(`[AutoFinalize] Modalidade ${currentModalityId} concluída, mas ainda há modalidades pendentes.`);
         }
       }
     }

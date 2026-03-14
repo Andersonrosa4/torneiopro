@@ -425,32 +425,49 @@ Deno.serve(async (req) => {
             );
           }
 
-          const [{ data: mods, error: modsErr }, { data: allMatches, error: matchesErr }] = await Promise.all([
+          const [{ data: mods, error: modsErr }, { data: allMatches, error: matchesErr }, { data: teamCounts, error: teamsErr }] = await Promise.all([
             supabase.from("modalities").select("id").eq("tournament_id", tournamentId),
             supabase
               .from("matches")
               .select("modality_id, round, status, bracket_type")
               .eq("tournament_id", tournamentId),
+            supabase.from("teams").select("modality_id").eq("tournament_id", tournamentId),
           ]);
 
-          if (modsErr || matchesErr) {
+          if (modsErr || matchesErr || teamsErr) {
             return new Response(
-              JSON.stringify({ error: (modsErr || matchesErr)?.message || "Falha ao validar finalização" }),
+              JSON.stringify({ error: (modsErr || matchesErr || teamsErr)?.message || "Falha ao validar finalização" }),
               { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
           }
 
           const modalityIds = (mods || []).map((m: any) => m.id);
           const matchList = allMatches || [];
+          const teamsList = teamCounts || [];
+
+          // Count teams per modality to skip empty ones
+          const teamsPerModality = new Map<string, number>();
+          for (const t of teamsList) {
+            const modId = t.modality_id;
+            if (modId) teamsPerModality.set(modId, (teamsPerModality.get(modId) || 0) + 1);
+          }
 
           let canComplete = true;
 
           if (modalityIds.length > 0) {
-            for (const modId of modalityIds) {
+            // Only consider modalities that have teams registered
+            const modalitiesWithTeams = modalityIds.filter((modId: string) => (teamsPerModality.get(modId) || 0) > 0);
+            
+            // Must have at least one modality with teams
+            if (modalitiesWithTeams.length === 0) {
+              canComplete = false;
+            }
+
+            for (const modId of modalitiesWithTeams) {
               const modalityMatches = matchList.filter((m: any) => m.modality_id === modId);
               const knockoutMatches = modalityMatches.filter((m: any) => Number(m.round) > 0);
 
-              // Modalidade sem chave gerada ainda => não pode finalizar torneio
+              // Modalidade com duplas mas sem chave gerada => não pode finalizar
               if (knockoutMatches.length === 0) {
                 canComplete = false;
                 break;

@@ -1627,6 +1627,89 @@ const TournamentDetail = () => {
         }
       }
 
+      // ══════════════════════════════════════════════════════════════
+      // POST-PROPAGATION AUTO-REPAIR — Safety net that guarantees
+      // NO pending propagations exist after any result declaration.
+      // Scans all completed matches and fills any slots that the
+      // primary propagation missed (e.g. due to guard failures,
+      // race conditions, or stale frontend data).
+      // ══════════════════════════════════════════════════════════════
+      try {
+        const { data: repairMatches } = await organizerQuery({
+          table: "matches",
+          operation: "select",
+          filters: match.modality_id ? { modality_id: match.modality_id } : { tournament_id: id },
+          order: [{ column: "round" }, { column: "position" }],
+        });
+
+        if (repairMatches) {
+          const repairList = repairMatches as typeof matches;
+          let repairCount = 0;
+
+          for (const cm of repairList) {
+            if (cm.status !== 'completed' || !cm.winner_team_id) continue;
+            const cmLoserId = cm.team1_id === cm.winner_team_id ? cm.team2_id : cm.team1_id;
+            const isSemiOrFinal = cm.bracket_type === 'semi_final' || cm.bracket_type === 'final';
+
+            // ── Check winner propagation ──
+            if (cm.next_win_match_id) {
+              const dest = repairList.find(m => m.id === cm.next_win_match_id);
+              if (dest && dest.status !== 'completed' &&
+                  dest.team1_id !== cm.winner_team_id && dest.team2_id !== cm.winner_team_id) {
+                const slot = !dest.team1_id ? 'team1_id' : (!dest.team2_id ? 'team2_id' : null);
+                if (slot) {
+                  console.log(`[AUTO-REPAIR] Winner ${cm.winner_team_id} → ${dest.bracket_type} R${dest.round}P${dest.position} ${slot}`);
+                  const { error: repErr } = await organizerQuery({
+                    table: "matches",
+                    operation: "update",
+                    data: { [slot]: cm.winner_team_id },
+                    filters: { id: dest.id },
+                  });
+                  if (!repErr) {
+                    (dest as any)[slot] = cm.winner_team_id;
+                    repairCount++;
+                  } else {
+                    console.error(`[AUTO-REPAIR:FAIL] ${repErr.message}`);
+                  }
+                }
+              }
+            }
+
+            // ── Check loser propagation ──
+            if (!isSemiOrFinal && cm.next_lose_match_id && cmLoserId) {
+              const dest = repairList.find(m => m.id === cm.next_lose_match_id);
+              if (dest && dest.status !== 'completed' &&
+                  dest.team1_id !== cmLoserId && dest.team2_id !== cmLoserId) {
+                const slot = !dest.team1_id ? 'team1_id' : (!dest.team2_id ? 'team2_id' : null);
+                if (slot) {
+                  console.log(`[AUTO-REPAIR] Loser ${cmLoserId} → ${dest.bracket_type} R${dest.round}P${dest.position} ${slot}`);
+                  const { error: repErr } = await organizerQuery({
+                    table: "matches",
+                    operation: "update",
+                    data: { [slot]: cmLoserId },
+                    filters: { id: dest.id },
+                  });
+                  if (!repErr) {
+                    (dest as any)[slot] = cmLoserId;
+                    repairCount++;
+                  } else {
+                    console.error(`[AUTO-REPAIR:FAIL] ${repErr.message}`);
+                  }
+                }
+              }
+            }
+          }
+
+          if (repairCount > 0) {
+            console.log(`[AUTO-REPAIR] Corrigidos ${repairCount} avanço(s) pendente(s)`);
+            toast.info(`🔧 ${repairCount} avanço(s) corrigido(s) automaticamente`);
+          }
+        }
+      } catch (repairError) {
+        console.error("[AUTO-REPAIR:ERROR]", repairError);
+        // Non-blocking — don't prevent the rest of the flow
+      }
+
       // Always refresh UI after DE advancement
       fetchData();
       toast.success("Avanço automático realizado!");

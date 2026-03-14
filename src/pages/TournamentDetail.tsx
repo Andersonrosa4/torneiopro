@@ -1967,18 +1967,33 @@ const TournamentDetail = () => {
       }
 
       if (currentModalityDone) {
-        // Check if ALL modalities are done before finalizing tournament
-        let allModalitiesDone = true;
-        for (const [modId, modMatches] of matchesByModality) {
-          const knockout = modMatches.filter((m: any) => m.round > 0);
-          if (knockout.length === 0) continue; // Modality without bracket - skip
-          
-          const hasDE = knockout.some((m: any) => m.bracket_type === 'final');
-          if (hasDE) {
-            const finalM = knockout.find((m: any) => m.bracket_type === 'final');
-            if (!finalM || finalM.status !== 'completed') { allModalitiesDone = false; break; }
-          } else {
-            if (!modMatches.every((m: any) => m.status === 'completed')) { allModalitiesDone = false; break; }
+        // Check if ALL modalities have brackets AND are done before finalizing
+        // First, fetch all modalities for this tournament to know the total count
+        const allModalities = modalities || [];
+        const modalitiesWithBrackets = new Set<string>();
+        for (const [modId] of matchesByModality) {
+          const knockout = (matchesByModality.get(modId) || []).filter((m: any) => m.round > 0);
+          if (knockout.length > 0) modalitiesWithBrackets.add(modId);
+        }
+
+        // Only auto-finalize if EVERY modality has a bracket generated AND all are completed
+        const allModalitiesHaveBrackets = allModalities.length > 0 
+          && allModalities.every((mod: any) => modalitiesWithBrackets.has(mod.id));
+
+        let allModalitiesDone = false;
+        if (allModalitiesHaveBrackets) {
+          allModalitiesDone = true;
+          for (const [modId, modMatches] of matchesByModality) {
+            const knockout = modMatches.filter((m: any) => m.round > 0);
+            if (knockout.length === 0) { allModalitiesDone = false; break; }
+            
+            const hasDE = knockout.some((m: any) => m.bracket_type === 'final');
+            if (hasDE) {
+              const finalM = knockout.find((m: any) => m.bracket_type === 'final');
+              if (!finalM || finalM.status !== 'completed') { allModalitiesDone = false; break; }
+            } else {
+              if (!modMatches.every((m: any) => m.status === 'completed')) { allModalitiesDone = false; break; }
+            }
           }
         }
 
@@ -1992,7 +2007,7 @@ const TournamentDetail = () => {
           toast.success("🏆 Torneio finalizado! Todas as modalidades concluídas!");
         } else {
           toast.success("🏅 Modalidade concluída! Continue com as demais categorias.");
-          console.log(`[AutoFinalize] Modalidade ${currentModalityId} concluída, mas ainda há modalidades pendentes.`);
+          console.log(`[AutoFinalize] Modalidade ${currentModalityId} concluída, mas ainda há modalidades pendentes. Brackets gerados: ${modalitiesWithBrackets.size}/${allModalities.length}`);
         }
       }
     }

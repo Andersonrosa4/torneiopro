@@ -415,6 +415,75 @@ Deno.serve(async (req) => {
         break;
       }
       case "update": {
+        // Server-side guard: tournament can only be completed when ALL modalities are fully finished
+        if (table === "tournaments" && data?.status === "completed") {
+          const tournamentId = filters?.id ?? data?.id;
+          if (!tournamentId) {
+            return new Response(
+              JSON.stringify({ error: "ID do torneio é obrigatório para finalizar" }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          const [{ data: mods, error: modsErr }, { data: allMatches, error: matchesErr }] = await Promise.all([
+            supabase.from("modalities").select("id").eq("tournament_id", tournamentId),
+            supabase
+              .from("matches")
+              .select("modality_id, round, status, bracket_type")
+              .eq("tournament_id", tournamentId),
+          ]);
+
+          if (modsErr || matchesErr) {
+            return new Response(
+              JSON.stringify({ error: (modsErr || matchesErr)?.message || "Falha ao validar finalização" }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          const modalityIds = (mods || []).map((m: any) => m.id);
+          const matchList = allMatches || [];
+
+          let canComplete = true;
+
+          if (modalityIds.length > 0) {
+            for (const modId of modalityIds) {
+              const modalityMatches = matchList.filter((m: any) => m.modality_id === modId);
+              const knockoutMatches = modalityMatches.filter((m: any) => Number(m.round) > 0);
+
+              // Modalidade sem chave gerada ainda => não pode finalizar torneio
+              if (knockoutMatches.length === 0) {
+                canComplete = false;
+                break;
+              }
+
+              const isDoubleElimination = knockoutMatches.some((m: any) => m.bracket_type === "final");
+              if (isDoubleElimination) {
+                const finalMatch = knockoutMatches.find((m: any) => m.bracket_type === "final");
+                if (!finalMatch || finalMatch.status !== "completed") {
+                  canComplete = false;
+                  break;
+                }
+              } else {
+                if (!modalityMatches.every((m: any) => m.status === "completed")) {
+                  canComplete = false;
+                  break;
+                }
+              }
+            }
+          } else {
+            // Fallback para torneios legados sem modalidades explícitas
+            const knockoutMatches = matchList.filter((m: any) => Number(m.round) > 0);
+            canComplete = knockoutMatches.length > 0 && knockoutMatches.every((m: any) => m.status === "completed");
+          }
+
+          if (!canComplete) {
+            return new Response(
+              JSON.stringify({ error: "Torneio não pode ser finalizado antes de concluir todas as modalidades" }),
+              { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        }
+
         // Hash password if updating organizers table
         if (table === "organizers" && data?.password_hash) {
           data.password_hash = await bcrypt.hash(data.password_hash);

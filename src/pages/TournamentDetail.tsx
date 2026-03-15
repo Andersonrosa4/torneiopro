@@ -32,6 +32,7 @@ import { checkAutoAdvance } from "@/engine/autoAdvanceEngine";
 import { isRoundLocked } from "@/engine/roundLockGuard";
 import { validateSystemRules, type TournamentSnapshot, type GuardMatch } from "@/engine/systemRulesGuard";
 import { validatePostGeneration, type ValidationMatch, type RepairAction } from "@/engine/postGenerationValidator";
+import { evaluateLateInsertion, type LateInsertionMatch } from "@/engine/lateTeamInsertion";
 
 import BracketTreeView from "@/components/BracketTreeView";
 import MatchSequenceViewer from "@/components/MatchSequenceViewer";
@@ -241,6 +242,23 @@ const TournamentDetail = () => {
   }, [id, fetchData]);
 
   // All writes go through organizerQuery
+  // Check if bracket exists for current modality (knockout matches with round > 0)
+  const hasBracketGenerated = useMemo(() =>
+    filteredMatches.some(m => m.round > 0),
+    [filteredMatches]
+  );
+
+  // Check if late insertion is still allowed (no completed matches beyond R1 winners)
+  const lateInsertionAllowed = useMemo(() => {
+    if (!hasBracketGenerated) return false;
+    const result = evaluateLateInsertion(
+      filteredMatches as LateInsertionMatch[],
+      selectedModality?.id || null,
+      tournament?.format || 'single_elimination'
+    );
+    return result.allowed;
+  }, [filteredMatches, selectedModality, tournament?.format, hasBracketGenerated]);
+
   const addTeam = async () => {
     if (isTournamentCompleted) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
     if (!player1.trim() || !player2.trim() || !id) return;
@@ -248,6 +266,13 @@ const TournamentDetail = () => {
       toast.error("❌ Fase de grupos já gerada. Faça o reset completo para alterar equipes.");
       return;
     }
+
+    // If bracket is already generated, attempt late insertion
+    if (hasBracketGenerated) {
+      await executeLateInsertion(player1.trim(), player2.trim());
+      return;
+    }
+
     const { error } = await organizerQuery({
       table: "teams",
       operation: "insert",
@@ -261,6 +286,112 @@ const TournamentDetail = () => {
       },
     });
     if (error) { toast.error(error.message); return; }
+    setPlayer1("");
+    setPlayer2("");
+    fetchData();
+  };
+
+  const executeLateInsertion = async (p1: string, p2: string) => {
+    if (!id) return;
+    const evaluation = evaluateLateInsertion(
+      filteredMatches as LateInsertionMatch[],
+      selectedModality?.id || null,
+      tournament?.format || 'single_elimination'
+    );
+
+    if (!evaluation.allowed) {
+      toast.error(`❌ ${evaluation.reason}`);
+      return;
+    }
+
+    // Step 1: Create the new team
+    const { data: newTeamData, error: teamErr } = await organizerQuery<{ id: string }[]>({
+      table: "teams",
+      operation: "insert",
+      data: {
+        tournament_id: id,
+        player1_name: p1,
+        player2_name: p2,
+        seed: filteredTeams.length + 1,
+        modality_id: selectedModality?.id || null,
+        stage_id: selectedStageId || null,
+      },
+      select: "id",
+    });
+    if (teamErr || !newTeamData || newTeamData.length === 0) {
+      toast.error(teamErr?.message || "Erro ao criar dupla.");
+      return;
+    }
+    const newTeamId = newTeamData[0].id;
+
+    if (evaluation.strategy === 'fill_chapeu') {
+      // Simply fill the empty slot in the chapéu match
+      const chapeuMatch = filteredMatches.find(m => m.id === evaluation.chapeuMatchId);
+      if (!chapeuMatch) { toast.error("Erro: match chapéu não encontrado."); return; }
+      const emptySlot = !chapeuMatch.team2_id ? 'team2_id' : 'team1_id';
+      const { error } = await organizerQuery({
+        table: "matches",
+        operation: "update",
+        data: { [emptySlot]: newTeamId },
+        filters: { id: evaluation.chapeuMatchId },
+      });
+      if (error) { toast.error(error.message); return; }
+      toast.success(`✅ Dupla ${p1}/${p2} inserida no chapéu da chave B!`);
+
+    } else if (evaluation.strategy === 'create_preliminary') {
+      // Step 2: Remove displaced team from R2 match
+      const { error: clearErr } = await organizerQuery({
+        table: "matches",
+        operation: "update",
+        data: { [evaluation.targetSlot!]: null, is_chapeu: false },
+        filters: { id: evaluation.targetMatchId },
+      });
+      if (clearErr) { toast.error(clearErr.message); return; }
+
+      // Step 3: Create new R1 match with new team vs displaced team
+      const isDE = tournament?.format === 'double_elimination';
+      const { data: newMatchData, error: matchErr } = await organizerQuery<{ id: string }[]>({
+        table: "matches",
+        operation: "insert",
+        data: {
+          tournament_id: id,
+          round: evaluation.newMatchRound,
+          position: evaluation.newMatchPosition!,
+          team1_id: newTeamId,
+          team2_id: evaluation.displacedTeamId,
+          status: "pending",
+          bracket_type: isDE ? "winners" : null,
+          bracket_half: isDE ? "lower" : null,
+          bracket_number: 1,
+          modality_id: selectedModality?.id || null,
+          next_win_match_id: evaluation.targetMatchId,
+          next_lose_match_id: null,
+          is_chapeu: false,
+        },
+        select: "id",
+      });
+      if (matchErr || !newMatchData) { toast.error(matchErr?.message || "Erro ao criar partida."); return; }
+      const newMatchId = newMatchData[0].id;
+
+      // Step 4: For DE, find the corresponding losers match that the target R2 match feeds into
+      // and create a losers entry for the new R1 match loser
+      if (isDE) {
+        // Find the losers match that the target R2 match feeds losers to
+        const targetMatch = filteredMatches.find(m => m.id === evaluation.targetMatchId);
+        if (targetMatch?.next_lose_match_id) {
+          // Link the new R1 match loser to the same losers destination
+          await organizerQuery({
+            table: "matches",
+            operation: "update",
+            data: { next_lose_match_id: targetMatch.next_lose_match_id },
+            filters: { id: newMatchId },
+          });
+        }
+      }
+
+      toast.success(`✅ Dupla ${p1}/${p2} inserida! Nova partida criada na chave B.`);
+    }
+
     setPlayer1("");
     setPlayer2("");
     fetchData();
@@ -2428,22 +2559,45 @@ const TournamentDetail = () => {
             <TabsContent value="teams">
               {canEdit && (
                 <section className="rounded-xl border border-border bg-card p-3 sm:p-6 shadow-card">
-                  <h2 className="mb-3 sm:mb-4 text-lg sm:text-xl font-semibold">Cadastrar Dupla</h2>
+                  <h2 className="mb-3 sm:mb-4 text-lg sm:text-xl font-semibold">
+                    {hasBracketGenerated && lateInsertionAllowed
+                      ? "Inserção Tardia de Dupla"
+                      : "Cadastrar Dupla"}
+                  </h2>
+                  {hasBracketGenerated && lateInsertionAllowed && (
+                    <div className="mb-3 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+                      ⚠️ Chaveamento já gerado. A nova dupla será inserida na <strong>Chave B dos Vencedores</strong>.
+                      {' '}Permitido até o fim da 1ª rodada.
+                    </div>
+                  )}
+                  {hasBracketGenerated && !lateInsertionAllowed && (
+                    <div className="mb-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                      🔒 Inserção tardia bloqueada — já existem partidas concluídas além da 1ª rodada.
+                    </div>
+                  )}
                   <div className="mb-4 flex flex-col gap-2 sm:flex-row">
                     <Input
                       value={player1}
                       onChange={(e) => setPlayer1(e.target.value)}
                       placeholder="Nome do Jogador 1"
+                      disabled={hasBracketGenerated && !lateInsertionAllowed}
                       onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTeam())}
                     />
                     <Input
                       value={player2}
                       onChange={(e) => setPlayer2(e.target.value)}
                       placeholder="Nome do Jogador 2"
+                      disabled={hasBracketGenerated && !lateInsertionAllowed}
                       onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTeam())}
                     />
-                    <Button onClick={addTeam} size="sm" className="gap-1 shrink-0">
-                      <Plus className="h-4 w-4" /> Adicionar
+                    <Button
+                      onClick={addTeam}
+                      size="sm"
+                      className="gap-1 shrink-0"
+                      disabled={hasBracketGenerated && !lateInsertionAllowed}
+                    >
+                      <Plus className="h-4 w-4" />
+                      {hasBracketGenerated ? "Inserir na Chave" : "Adicionar"}
                     </Button>
                   </div>
                   <div className="flex gap-2 mb-4">

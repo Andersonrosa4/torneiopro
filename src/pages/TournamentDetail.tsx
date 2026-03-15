@@ -2559,22 +2559,45 @@ const TournamentDetail = () => {
             <TabsContent value="teams">
               {canEdit && (
                 <section className="rounded-xl border border-border bg-card p-3 sm:p-6 shadow-card">
-                  <h2 className="mb-3 sm:mb-4 text-lg sm:text-xl font-semibold">Cadastrar Dupla</h2>
+                  <h2 className="mb-3 sm:mb-4 text-lg sm:text-xl font-semibold">
+                    {hasBracketGenerated && lateInsertionAllowed
+                      ? "Inserção Tardia de Dupla"
+                      : "Cadastrar Dupla"}
+                  </h2>
+                  {hasBracketGenerated && lateInsertionAllowed && (
+                    <div className="mb-3 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+                      ⚠️ Chaveamento já gerado. A nova dupla será inserida na <strong>Chave B dos Vencedores</strong>.
+                      {' '}Permitido até o fim da 1ª rodada.
+                    </div>
+                  )}
+                  {hasBracketGenerated && !lateInsertionAllowed && (
+                    <div className="mb-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                      🔒 Inserção tardia bloqueada — já existem partidas concluídas além da 1ª rodada.
+                    </div>
+                  )}
                   <div className="mb-4 flex flex-col gap-2 sm:flex-row">
                     <Input
                       value={player1}
                       onChange={(e) => setPlayer1(e.target.value)}
                       placeholder="Nome do Jogador 1"
+                      disabled={hasBracketGenerated && !lateInsertionAllowed}
                       onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTeam())}
                     />
                     <Input
                       value={player2}
                       onChange={(e) => setPlayer2(e.target.value)}
                       placeholder="Nome do Jogador 2"
+                      disabled={hasBracketGenerated && !lateInsertionAllowed}
                       onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTeam())}
                     />
-                    <Button onClick={addTeam} size="sm" className="gap-1 shrink-0">
-                      <Plus className="h-4 w-4" /> Adicionar
+                    <Button
+                      onClick={addTeam}
+                      size="sm"
+                      className="gap-1 shrink-0"
+                      disabled={hasBracketGenerated && !lateInsertionAllowed}
+                    >
+                      <Plus className="h-4 w-4" />
+                      {hasBracketGenerated ? "Inserir na Chave" : "Adicionar"}
                     </Button>
                   </div>
                   <div className="flex gap-2 mb-4">

@@ -1,5 +1,4 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,47 +28,27 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Find organizer by email or username
-    let query = adminClient
-      .from("organizers")
-      .select("id, username, email, password_hash, role, user_id");
+    // Verify credentials via Postgres pgcrypto (avoids unreliable Deno bcrypt lib)
+    const { data: verifyData, error: verifyError } = await adminClient.rpc(
+      "verify_organizer_password",
+      {
+        _username: username ?? null,
+        _email: email ?? null,
+        _password: password,
+      }
+    );
 
-    if (email) {
-      query = query.eq("email", email.trim().toLowerCase());
-    } else {
-      query = query.eq("username", username.trim());
-    }
-
-    const { data: organizer, error: selectError } = await query.single();
-
-    if (selectError || !organizer) {
+    if (verifyError) {
+      console.error("verify_organizer_password error:", verifyError);
       return new Response(
-        JSON.stringify({ success: false, error: "Usuário ou senha incorretos" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ success: false, error: "Erro ao verificar credenciais" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Verify password using bcrypt
-    let passwordMatch = false;
-    if (organizer.password_hash.startsWith("$2")) {
-      try {
-        passwordMatch = await bcrypt.compare(password, organizer.password_hash);
-      } catch {
-        passwordMatch = false;
-      }
-    } else {
-      // Legacy plain text comparison
-      passwordMatch = password === organizer.password_hash;
-    }
+    const organizer = Array.isArray(verifyData) ? verifyData[0] : verifyData;
 
-    // Migrate plain text password to bcrypt (fire-and-forget, outside main flow)
-    if (passwordMatch && !organizer.password_hash.startsWith("$2")) {
-      bcrypt.hash(password).then((hashed) => {
-        adminClient.from("organizers").update({ password_hash: hashed }).eq("id", organizer.id).then(() => {});
-      }).catch(() => {});
-    }
-
-    if (!passwordMatch) {
+    if (!organizer || !organizer.password_valid) {
       return new Response(
         JSON.stringify({ success: false, error: "Usuário ou senha incorretos" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -166,6 +145,7 @@ Deno.serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
+    console.error("organizer-login error:", error);
     return new Response(
       JSON.stringify({ success: false, error: "Erro interno: " + (error as Error).message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

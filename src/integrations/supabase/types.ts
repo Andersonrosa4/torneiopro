@@ -2042,6 +2042,17 @@ export type Database = {
         Args: { _tournament_id: string }
         Returns: boolean
       }
+      verify_organizer_password: {
+        Args: { _email: string; _password: string; _username: string }
+        Returns: {
+          email: string
+          id: string
+          password_valid: boolean
+          role: string
+          user_id: string
+          username: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "organizer" | "athlete"

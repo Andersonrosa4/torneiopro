@@ -117,7 +117,7 @@ const TournamentDetail = () => {
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [editP1, setEditP1] = useState("");
   const [editP2, setEditP2] = useState("");
-  const [fictitiousCount, setFictitiousCount] = useState("4");
+  const [fictitiousCount, setFictitiousCount] = useState("");
   const declareWinnerMutex = useRef(new Set<string>());
   const [fictitiousDialogOpen, setFictitiousDialogOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);

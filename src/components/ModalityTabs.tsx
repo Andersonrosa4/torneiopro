@@ -115,12 +115,26 @@ const ModalityTabs = ({
                         if (e.key === "Escape") setEditingId(null);
                       }}
                     />
-                    <button onClick={() => handleRename(mod.id)} className="text-primary hover:opacity-80">
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => { e.stopPropagation(); handleRename(mod.id); }}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); handleRename(mod.id); } }}
+                      className="text-primary hover:opacity-80 cursor-pointer inline-flex"
+                      aria-label="Confirmar"
+                    >
                       <Check className="h-3 w-3" />
-                    </button>
-                    <button onClick={() => setEditingId(null)} className="text-destructive hover:opacity-80">
+                    </span>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => { e.stopPropagation(); setEditingId(null); }}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); setEditingId(null); } }}
+                      className="text-destructive hover:opacity-80 cursor-pointer inline-flex"
+                      aria-label="Cancelar"
+                    >
                       <X className="h-3 w-3" />
-                    </button>
+                    </span>
                   </span>
                 ) : (
                   <>
@@ -128,18 +142,26 @@ const ModalityTabs = ({
                     {mod.name}
                     {isOwner && selectedModality?.id === mod.id && (
                       <span className="ml-1 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
+                        <span
+                          role="button"
+                          tabIndex={0}
                           onClick={e => { e.stopPropagation(); setEditingId(mod.id); setEditName(mod.name); }}
-                          className="text-muted-foreground hover:text-foreground"
+                          onKeyDown={e => { if (e.key === "Enter") { e.stopPropagation(); setEditingId(mod.id); setEditName(mod.name); } }}
+                          className="text-muted-foreground hover:text-foreground cursor-pointer inline-flex"
+                          aria-label="Renomear categoria"
                         >
                           <Pencil className="h-3 w-3" />
-                        </button>
-                        <button
+                        </span>
+                        <span
+                          role="button"
+                          tabIndex={0}
                           onClick={e => { e.stopPropagation(); setDeleteTarget(mod); setConfirmStep(1); }}
-                          className="text-muted-foreground hover:text-destructive"
+                          onKeyDown={e => { if (e.key === "Enter") { e.stopPropagation(); setDeleteTarget(mod); setConfirmStep(1); } }}
+                          className="text-muted-foreground hover:text-destructive cursor-pointer inline-flex"
+                          aria-label="Excluir categoria"
                         >
                           <Trash2 className="h-3 w-3" />
-                        </button>
+                        </span>
                       </span>
                     )}
                   </>

@@ -15,6 +15,7 @@ import AppHeader from "@/components/AppHeader";
 import ThemedBackground from "@/components/ThemedBackground";
 import { organizerQuery, publicQuery } from "@/lib/organizerApi";
 import TournamentRulesForm, { TournamentRulesState, getDefaultRules } from "@/components/TournamentRulesForm";
+import SafeBoundary from "@/components/SafeBoundary";
 
 const SPORTS_WITH_RULES = ["tennis", "padel"];
 
@@ -40,15 +41,19 @@ const CreateTournament = () => {
   const showRules = SPORTS_WITH_RULES.includes(form.sport);
 
   const handleSportChange = (sport: string) => {
-    console.log("[CreateTournament] handleSportChange called with:", sport);
     try {
-      setForm({ ...form, sport });
+      setForm((prev) => ({ ...prev, sport }));
       if (SPORTS_WITH_RULES.includes(sport)) {
-        setRules(getDefaultRules(sport));
+        try {
+          setRules(getDefaultRules(sport));
+        } catch (rulesErr) {
+          console.error("[CreateTournament] Falha ao carregar regras padrão, mantendo regras atuais:", rulesErr);
+          // Mantém o rules atual como fallback seguro — nunca derruba a tela.
+        }
       }
-      console.log("[CreateTournament] sport changed successfully to:", sport);
     } catch (err) {
-      console.error("[CreateTournament] Error changing sport:", err);
+      console.error("[CreateTournament] Erro ao trocar esporte:", err);
+      toast.error("Não foi possível trocar o esporte. Tente novamente.");
     }
   };
 
@@ -202,7 +207,9 @@ const CreateTournament = () => {
             {showRules && (
               <div className="space-y-2">
                 <Label className="text-base font-semibold">⚙️ Configurações de Regras</Label>
-                <TournamentRulesForm sport={form.sport} rules={rules} onChange={setRules} />
+                <SafeBoundary label="TournamentRulesForm">
+                  <TournamentRulesForm sport={form.sport} rules={rules} onChange={setRules} />
+                </SafeBoundary>
               </div>
             )}
 

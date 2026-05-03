@@ -440,8 +440,8 @@ const TournamentDetail = () => {
       toast.error("❌ Fase de grupos já gerada. Faça o reset completo para alterar equipes.");
       return;
     }
-    const count = Number(fictitiousCount);
-    if (count < 1 || count > 64) { toast.error("Quantidade inválida"); return; }
+    const count = parseInt(fictitiousCount, 10);
+    if (!Number.isFinite(count) || count < 1 || count > 256) { toast.error("Quantidade inválida (1 a 256)"); return; }
     const newTeams = [];
     for (let i = 0; i < count; i++) {
       const num = filteredTeams.length + i + 1;

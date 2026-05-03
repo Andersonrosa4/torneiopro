@@ -35,6 +35,7 @@ import PublicFeed from "./pages/PublicFeed";
 
 import ScrollToTop from "@/components/ScrollToTop";
 import AiAssistant from "@/components/AiAssistant";
+import SafeBoundary from "@/components/SafeBoundary";
 
 const queryClient = new QueryClient(); // force rebuild
 
@@ -48,6 +49,7 @@ const App = () => (
           <AuthProvider>
             <ScrollToTop />
             <AiAssistant />
+            <SafeBoundary label="AppRoutes">
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
@@ -76,6 +78,7 @@ const App = () => (
               <Route path="/diagnostics" element={<ProtectedRoute><SystemDiagnostics /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </SafeBoundary>
           </AuthProvider>
         </SportProvider>
       </BrowserRouter>

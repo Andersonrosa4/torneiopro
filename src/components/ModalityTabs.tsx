@@ -141,13 +141,13 @@ const ModalityTabs = ({
                     {ICONS[mod.name] && <span>{ICONS[mod.name]}</span>}
                     {mod.name}
                     {isOwner && selectedModality?.id === mod.id && (
-                      <span className="ml-1 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="ml-1 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto focus-within:pointer-events-auto">
                         <span
                           role="button"
                           tabIndex={0}
-                          onClick={e => { e.stopPropagation(); setEditingId(mod.id); setEditName(mod.name); }}
+                          onClick={e => { e.stopPropagation(); e.preventDefault(); setEditingId(mod.id); setEditName(mod.name); }}
                           onKeyDown={e => { if (e.key === "Enter") { e.stopPropagation(); setEditingId(mod.id); setEditName(mod.name); } }}
-                          className="text-muted-foreground hover:text-foreground cursor-pointer inline-flex"
+                          className="text-muted-foreground hover:text-foreground cursor-pointer inline-flex p-0.5"
                           aria-label="Renomear categoria"
                         >
                           <Pencil className="h-3 w-3" />
@@ -155,9 +155,9 @@ const ModalityTabs = ({
                         <span
                           role="button"
                           tabIndex={0}
-                          onClick={e => { e.stopPropagation(); setDeleteTarget(mod); setConfirmStep(1); }}
+                          onClick={e => { e.stopPropagation(); e.preventDefault(); setDeleteTarget(mod); setConfirmStep(1); }}
                           onKeyDown={e => { if (e.key === "Enter") { e.stopPropagation(); setDeleteTarget(mod); setConfirmStep(1); } }}
-                          className="text-muted-foreground hover:text-destructive cursor-pointer inline-flex"
+                          className="text-muted-foreground hover:text-destructive cursor-pointer inline-flex p-0.5"
                           aria-label="Excluir categoria"
                         >
                           <Trash2 className="h-3 w-3" />

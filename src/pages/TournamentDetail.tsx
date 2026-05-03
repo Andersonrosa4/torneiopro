@@ -2601,7 +2601,7 @@ const TournamentDetail = () => {
                     </Button>
                   </div>
                   <div className="flex gap-2 mb-4">
-                    <Dialog open={fictitiousDialogOpen} onOpenChange={setFictitiousDialogOpen}>
+                    <Dialog open={fictitiousDialogOpen} onOpenChange={(open) => { setFictitiousDialogOpen(open); if (!open) setFictitiousCount(""); }}>
                       <DialogTrigger asChild>
                         <Button variant="outline" size="sm" className="gap-1">
                           <Plus className="h-4 w-4" /> Duplas Fictícias
@@ -2616,14 +2616,24 @@ const TournamentDetail = () => {
                             <label className="text-sm font-medium">Quantas duplas fictícias?</label>
                             <Input
                               type="number"
+                              inputMode="numeric"
                               min={1}
-                              max={64}
+                              max={256}
+                              placeholder="Ex: 38"
                               value={fictitiousCount}
-                              onChange={(e) => setFictitiousCount(e.target.value)}
+                              onChange={(e) => setFictitiousCount(e.target.value.replace(/[^0-9]/g, ""))}
+                              autoFocus
                             />
+                            <p className="text-xs text-muted-foreground">Digite de 1 a 256 duplas.</p>
                           </div>
-                          <Button onClick={addFictitiousTeams} className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90">
-                            Criar {fictitiousCount} dupla(s)
+                          <Button
+                            onClick={addFictitiousTeams}
+                            disabled={!fictitiousCount || parseInt(fictitiousCount, 10) < 1}
+                            className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90"
+                          >
+                            {fictitiousCount && parseInt(fictitiousCount, 10) >= 1
+                              ? `Criar ${parseInt(fictitiousCount, 10)} dupla(s)`
+                              : "Digite a quantidade"}
                           </Button>
                         </div>
                       </DialogContent>

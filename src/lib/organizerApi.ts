@@ -130,6 +130,61 @@ async function undoBracket(tournamentId?: string, modalityId?: string, stageId?:
   if (!tournamentId) return { data: null, error: { message: "tournament_id é obrigatório" } };
 
   const db = getClient();
+
+  // ═══ PROTEÇÃO 1: snapshot pré-destruição ═══
+  // Buscar EXATAMENTE o conjunto que será apagado para backup.
+  let scopeQuery: any = db.from("matches").select("*").eq("tournament_id", tournamentId);
+  if (modalityId) scopeQuery = scopeQuery.eq("modality_id", modalityId);
+  if (stageId !== undefined) scopeQuery = stageId === null ? scopeQuery.is("stage_id", null) : scopeQuery.eq("stage_id", stageId);
+  const { data: scopeMatches, error: scopeErr } = await scopeQuery;
+  if (scopeErr) return { data: null, error: { message: `Falha ao ler escopo: ${scopeErr.message}` } };
+
+  // ═══ PROTEÇÃO 2: guard de escopo cruzado ═══
+  // Se foi passado modality_id ou stage_id, garantir que NENHUMA partida fora desse escopo seja afetada.
+  if (modalityId || stageId !== undefined) {
+    const ids = (scopeMatches || []).map((m: any) => m.id);
+    const { data: allTournamentMatches } = await db.from("matches").select("id, modality_id, stage_id").eq("tournament_id", tournamentId);
+    const outOfScope = (allTournamentMatches || []).filter((m: any) =>
+      !ids.includes(m.id) && (
+        (modalityId && m.modality_id === modalityId && (stageId === undefined || m.stage_id === stageId)) ||
+        false
+      )
+    );
+    if (outOfScope.length > 0) {
+      return { data: null, error: { message: `[GUARD] Operação bloqueada: ${outOfScope.length} partidas fora do escopo seriam afetadas.` } };
+    }
+  }
+
+  // Snapshot dos grupos/classificacao só quando o escopo é amplo (sem modality/stage), pois essas tabelas não têm essas colunas.
+  const isWideScope = !modalityId && stageId === undefined;
+  let groupsSnap: any = null;
+  let classSnap: any = null;
+  if (isWideScope) {
+    const { data: g } = await db.from("groups").select("*").eq("tournament_id", tournamentId);
+    const { data: c } = await db.from("classificacao_grupos").select("*").eq("tournament_id", tournamentId);
+    groupsSnap = g;
+    classSnap = c;
+  }
+
+  // Persiste backup ANTES de qualquer delete.
+  if ((scopeMatches?.length ?? 0) > 0 || isWideScope) {
+    const { error: backupErr } = await db.from("bracket_backups").insert({
+      tournament_id: tournamentId,
+      modality_id: modalityId ?? null,
+      stage_id: stageId ?? null,
+      reason: "undo_bracket",
+      matches_snapshot: scopeMatches ?? [],
+      groups_snapshot: groupsSnap,
+      classificacao_snapshot: classSnap,
+      match_count: scopeMatches?.length ?? 0,
+    });
+    if (backupErr) {
+      console.warn("[BACKUP] Falha ao salvar snapshot:", backupErr.message);
+      return { data: null, error: { message: `Backup obrigatório falhou: ${backupErr.message}. Operação abortada para proteger seus dados.` } };
+    }
+  }
+
+  // Limpa referências de avanço para evitar FK violation.
   let updateQuery: any = db.from("matches").update({ next_win_match_id: null, next_lose_match_id: null }).eq("tournament_id", tournamentId);
   if (modalityId) updateQuery = updateQuery.eq("modality_id", modalityId);
   if (stageId !== undefined) updateQuery = stageId === null ? updateQuery.is("stage_id", null) : updateQuery.eq("stage_id", stageId);
@@ -142,13 +197,16 @@ async function undoBracket(tournamentId?: string, modalityId?: string, stageId?:
   const { error: deleteErr } = await deleteQuery;
   if (deleteErr) return { data: null, error: { message: deleteErr.message } };
 
-  const { error: classErr } = await db.from("classificacao_grupos").delete().eq("tournament_id", tournamentId);
-  if (classErr) return { data: null, error: { message: classErr.message } };
+  // ═══ PROTEÇÃO 3: groups/classificacao só são apagados em escopo amplo ═══
+  // (tabelas não têm modality_id/stage_id, então deletar com escopo limitado destruiria dados de outras modalidades/etapas).
+  if (isWideScope) {
+    const { error: classErr } = await db.from("classificacao_grupos").delete().eq("tournament_id", tournamentId);
+    if (classErr) return { data: null, error: { message: classErr.message } };
+    const { error: groupErr } = await db.from("groups").delete().eq("tournament_id", tournamentId);
+    if (groupErr) return { data: null, error: { message: groupErr.message } };
+  }
 
-  const { error: groupErr } = await db.from("groups").delete().eq("tournament_id", tournamentId);
-  if (groupErr) return { data: null, error: { message: groupErr.message } };
-
-  return { data: null, error: null };
+  return { data: { backed_up: scopeMatches?.length ?? 0 }, error: null };
 }
 
 async function resetResults(tournamentId?: string, modalityId?: string): Promise<{ data: any; error: any }> {

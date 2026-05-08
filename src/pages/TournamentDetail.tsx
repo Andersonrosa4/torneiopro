@@ -79,6 +79,7 @@ interface Team {
   is_fictitious: boolean;
   payment_status: string;
   modality_id: string | null;
+  stage_id?: string | null;
 }
 
 interface Match {
@@ -104,6 +105,7 @@ interface Match {
   is_chapeu?: boolean | null;
   live_score?: any;
   court_number?: number | null;
+  stage_id?: string | null;
 }
 
 const TournamentDetail = () => {

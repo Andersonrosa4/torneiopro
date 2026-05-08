@@ -139,7 +139,9 @@ const TournamentDetail = () => {
 
   const isOwner = tournament?.created_by === organizerId || isAdmin || isAssociatedOrganizer;
   const isTournamentCompleted = tournament?.status === 'completed' || tournament?.status === 'cancelled';
-  const canEdit = isOwner && !isTournamentCompleted;
+  const isFutevoleiTournament = tournament?.sport === 'futevolei';
+  const isWriteLocked = isTournamentCompleted && !isFutevoleiTournament;
+  const canEdit = isOwner && !isWriteLocked;
 
   // Helper: build snapshot and run system rules guard
   const runSystemRulesGuard = useCallback((matchList: Match[], label: string): boolean => {
@@ -269,7 +271,7 @@ const TournamentDetail = () => {
   }, [filteredMatches, selectedModality, tournament?.format, hasBracketGenerated]);
 
   const addTeam = async () => {
-    if (isTournamentCompleted) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
+    if (isWriteLocked) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
     if (!player1.trim() || !player2.trim() || !id) return;
     if (hasGroupStageGenerated) {
       toast.error("❌ Fase de grupos já gerada. Faça o reset completo para alterar equipes.");
@@ -541,7 +543,7 @@ const TournamentDetail = () => {
     numIndexTeams?: number;
   }) => {
     try {
-      if (isTournamentCompleted) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
+      if (isWriteLocked) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
       // ── SYSTEM RULES GUARD (pre-bracket generation) ──
       if (filteredMatches.length > 0 && !runSystemRulesGuard(filteredMatches, 'preBracketGeneration')) {
         return;
@@ -1042,7 +1044,7 @@ const TournamentDetail = () => {
   };
 
   const undoBracket = async () => {
-    if (isTournamentCompleted) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
+    if (isWriteLocked) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
     if (!id) return;
     const { error } = await organizerQuery({
       table: "matches",
@@ -1320,7 +1322,7 @@ const TournamentDetail = () => {
   };
 
   const declareWinner = async (matchId: string, winnerId: string) => {
-    if (isTournamentCompleted) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
+    if (isWriteLocked) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
     // MUTEX: Per-match lock to allow concurrent declarations on different matches
     if (declareWinnerMutex.current.has(matchId)) {
       toast.info("Aguarde a operação anterior desta partida...");
@@ -2248,7 +2250,7 @@ const TournamentDetail = () => {
 
   // Combined handler: save score + declare winner in one action
   const handleAutoResult = async (matchId: string, score1: number, score2: number, winnerId: string) => {
-    if (isTournamentCompleted) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
+    if (isWriteLocked) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
     // Update local state BEFORE calling declareWinner so it reads the correct scores
     setMatches(prev => prev.map(m => m.id === matchId ? { ...m, score1, score2 } : m));
     await organizerQuery({
@@ -2261,7 +2263,7 @@ const TournamentDetail = () => {
   };
 
   const updateScore = async (matchId: string, score1: number, score2: number) => {
-    if (isTournamentCompleted) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
+    if (isWriteLocked) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
     const { error } = await organizerQuery({
       table: "matches",
       operation: "update",

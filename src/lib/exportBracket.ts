@@ -25,18 +25,79 @@ interface MatchRow {
  * (escala 2x para permitir zoom no PDF sem perder qualidade).
  */
 async function captureElement(el: HTMLElement): Promise<HTMLCanvasElement> {
-  // Resolve a real background color from the element/ancestors
-  const bg = "#ffffff";
-  return html2canvas(el, {
-    scale: 2,
-    backgroundColor: bg,
-    useCORS: true,
-    logging: false,
-    windowWidth: el.scrollWidth,
-    windowHeight: el.scrollHeight,
-    width: el.scrollWidth,
-    height: el.scrollHeight,
-  });
+  // Temporarily expand all scrollable/overflow-clipped descendants so html2canvas
+  // captures the FULL bracket (not just the visible viewport slice).
+  const mutated: { node: HTMLElement; prev: { overflow: string; overflowX: string; overflowY: string; maxWidth: string; maxHeight: string; width: string; height: string; transform: string } }[] = [];
+  const all = [el, ...Array.from(el.querySelectorAll<HTMLElement>("*"))];
+  for (const node of all) {
+    const cs = window.getComputedStyle(node);
+    const clipsX = cs.overflowX === "auto" || cs.overflowX === "scroll" || cs.overflowX === "hidden";
+    const clipsY = cs.overflowY === "auto" || cs.overflowY === "scroll" || cs.overflowY === "hidden";
+    const hasTransform = cs.transform && cs.transform !== "none";
+    if (!clipsX && !clipsY && !hasTransform) continue;
+    mutated.push({
+      node,
+      prev: {
+        overflow: node.style.overflow,
+        overflowX: node.style.overflowX,
+        overflowY: node.style.overflowY,
+        maxWidth: node.style.maxWidth,
+        maxHeight: node.style.maxHeight,
+        width: node.style.width,
+        height: node.style.height,
+        transform: node.style.transform,
+      },
+    });
+    node.style.overflow = "visible";
+    node.style.overflowX = "visible";
+    node.style.overflowY = "visible";
+    node.style.maxWidth = "none";
+    node.style.maxHeight = "none";
+    if (clipsX && node.scrollWidth > node.clientWidth) {
+      node.style.width = `${node.scrollWidth}px`;
+    }
+    if (clipsY && node.scrollHeight > node.clientHeight) {
+      node.style.height = `${node.scrollHeight}px`;
+    }
+    if (hasTransform) {
+      // Remove zoom/scale transforms so the capture reflects natural size
+      node.style.transform = "none";
+    }
+  }
+
+  // Wait a frame so layout reflows
+  await new Promise((r) => requestAnimationFrame(() => r(null)));
+  await new Promise((r) => requestAnimationFrame(() => r(null)));
+
+  const fullW = el.scrollWidth;
+  const fullH = el.scrollHeight;
+
+  try {
+    return await html2canvas(el, {
+      scale: 2,
+      backgroundColor: "#ffffff",
+      useCORS: true,
+      logging: false,
+      windowWidth: fullW,
+      windowHeight: fullH,
+      width: fullW,
+      height: fullH,
+      scrollX: 0,
+      scrollY: 0,
+    });
+  } finally {
+    // Restore original styles
+    for (const { node, prev } of mutated) {
+      node.style.overflow = prev.overflow;
+      node.style.overflowX = prev.overflowX;
+      node.style.overflowY = prev.overflowY;
+      node.style.maxWidth = prev.maxWidth;
+      node.style.maxHeight = prev.maxHeight;
+      node.style.width = prev.width;
+      node.style.height = prev.height;
+      node.style.transform = prev.transform;
+    }
+  }
 }
 
 /** Adiciona cabeçalho padrão na primeira página do doc. */
@@ -115,25 +176,46 @@ function addSequenceTable(doc: jsPDF, matches: MatchRow[], startY: number) {
 }
 
 /**
- * Exporta APENAS o chaveamento (árvore) como PDF em alta resolução.
- * O PDF é gerado em A3 paisagem para caber a árvore inteira sem
- * perder qualidade ao dar zoom.
+ * Cria um PDF cuja página tem o tamanho EXATO da árvore capturada
+ * (proporcional ao canvas), garantindo que a chave aparece inteira,
+ * sem corte, e podendo ser ampliada com zoom no leitor de PDF.
  */
-export async function exportBracketPdf(
-  el: HTMLElement,
-  meta: BracketExportMeta,
-) {
+function buildBracketPdf(canvas: HTMLCanvasElement, meta: BracketExportMeta): jsPDF {
+  // Convert canvas pixels to mm at 96 DPI baseline.
+  // canvas was rendered at scale=2, so we divide by 2 to get CSS px,
+  // then convert px → mm (1 mm ≈ 3.7795 px).
+  const cssW = canvas.width / 2;
+  const cssH = canvas.height / 2;
+  const PX_PER_MM = 3.7795;
+  const HEADER_MM = 32; // espaço para cabeçalho
+  const MARGIN_MM = 6;
+
+  const imgWmm = cssW / PX_PER_MM;
+  const imgHmm = cssH / PX_PER_MM;
+
+  const pageW = imgWmm + MARGIN_MM * 2;
+  const pageH = imgHmm + HEADER_MM + MARGIN_MM;
+
+  const orientation = pageW >= pageH ? "landscape" : "portrait";
+  const doc = new jsPDF({
+    orientation,
+    unit: "mm",
+    format: [pageW, pageH],
+  });
+
+  drawHeader(doc, "Chaveamento — Árvore", meta);
+  const dataUrl = canvas.toDataURL("image/png");
+  doc.addImage(dataUrl, "PNG", MARGIN_MM, HEADER_MM, imgWmm, imgHmm, undefined, "FAST");
+  return doc;
+}
+
+export async function exportBracketPdf(el: HTMLElement, meta: BracketExportMeta) {
   const canvas = await captureElement(el);
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a3" });
-  const y = drawHeader(doc, "Chaveamento — Árvore", meta);
-  await addBracketImageToPdf(doc, canvas, y);
+  const doc = buildBracketPdf(canvas, meta);
   const base = sanitizeFileName(`chaveamento_${meta.tournamentName}`);
   doc.save(`${base}.pdf`);
 }
 
-/**
- * Exporta APENAS a sequência (tabela) como PDF.
- */
 export function exportSequencePdf(matches: MatchRow[], meta: BracketExportMeta) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const y = drawHeader(doc, "Sequência de Partidas", meta);
@@ -143,8 +225,7 @@ export function exportSequencePdf(matches: MatchRow[], meta: BracketExportMeta) 
 }
 
 /**
- * Exporta CHAVE + SEQUÊNCIA num único PDF.
- * Página 1 (A3 paisagem): árvore. Páginas seguintes: tabela de sequência.
+ * Exporta CHAVE (página 1, tamanho real) + SEQUÊNCIA (página A3) num PDF.
  */
 export async function exportBracketAndSequencePdf(
   el: HTMLElement,
@@ -152,15 +233,10 @@ export async function exportBracketAndSequencePdf(
   meta: BracketExportMeta,
 ) {
   const canvas = await captureElement(el);
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a3" });
-  const y = drawHeader(doc, "Chaveamento — Árvore", meta);
-  await addBracketImageToPdf(doc, canvas, y);
-
-  // Sequence on next page (a3 landscape too — mais espaço)
+  const doc = buildBracketPdf(canvas, meta);
   doc.addPage("a3", "landscape");
   const y2 = drawHeader(doc, "Sequência de Partidas", meta);
   addSequenceTable(doc, matches, y2);
-
   const base = sanitizeFileName(`torneio_${meta.tournamentName}`);
   doc.save(`${base}.pdf`);
 }

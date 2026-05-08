@@ -6,6 +6,13 @@ const STATIC_ASSETS = [
   "/favicon.ico",
 ];
 
+// Allow page to trigger immediate activation of a new SW version.
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
 // Install — pre-cache static assets and activate immediately
 self.addEventListener("install", (event) => {
   event.waitUntil(

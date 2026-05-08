@@ -240,13 +240,6 @@ export async function exportBracketAndSequencePdf(
   const base = sanitizeFileName(`torneio_${meta.tournamentName}`);
   doc.save(`${base}.pdf`);
 }
-  doc.addPage("a3", "landscape");
-  const y2 = drawHeader(doc, "Sequência de Partidas", meta);
-  addSequenceTable(doc, matches, y2);
-
-  const base = sanitizeFileName(`torneio_${meta.tournamentName}`);
-  doc.save(`${base}.pdf`);
-}
 
 function sanitizeFileName(s: string) {
   return s.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_\-]/g, "");

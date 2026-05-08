@@ -950,7 +950,7 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
     if (isMobile && zoomContainerRef.current) {
       const el = zoomContainerRef.current;
       requestAnimationFrame(() => {
-        el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
+        el.scrollLeft = 0;
       });
     }
   }, [isMobile, matches.length]);

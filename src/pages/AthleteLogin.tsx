@@ -319,8 +319,6 @@ const AthleteLogin = () => {
           )}
         </motion.div>
 
-        <FlowAppsBranding variant="login-cta" />
-
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

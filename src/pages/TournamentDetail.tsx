@@ -564,7 +564,7 @@ const TournamentDetail = () => {
           table: "matches",
           operation: "update",
           data: { next_win_match_id: null, next_lose_match_id: null },
-          filters: { tournament_id: id, modality_id: selectedModality.id },
+          filters: { tournament_id: id, modality_id: selectedModality.id, ...(currentStageId ? { stage_id: currentStageId } : { stage_id: null }) },
         } as any);
         // Then delete matches for this modality
         await organizerQuery({
@@ -572,6 +572,7 @@ const TournamentDetail = () => {
           operation: "undo_bracket",
           tournament_id: id,
           modality_id: selectedModality.id,
+          stage_id: currentStageId,
         });
       } else {
         await organizerQuery({
@@ -971,9 +972,11 @@ const TournamentDetail = () => {
       const { data: postGenMatches } = await publicQuery<ValidationMatch[]>({
         table: "matches",
         select: "id,round,position,status,bracket_type,bracket_half,team1_id,team2_id,winner_team_id,is_chapeu,modality_id,next_win_match_id,next_lose_match_id",
-        filters: selectedModality
-          ? { tournament_id: id, modality_id: selectedModality.id }
-          : { tournament_id: id },
+          filters: {
+            tournament_id: id,
+            ...(selectedModality ? { modality_id: selectedModality.id } : {}),
+            ...(currentStageId ? { stage_id: currentStageId } : { stage_id: null }),
+          },
       });
 
       if (postGenMatches && postGenMatches.length > 0) {
@@ -1017,9 +1020,11 @@ const TournamentDetail = () => {
           const { data: revalidateMatches } = await publicQuery<ValidationMatch[]>({
             table: "matches",
             select: "id,round,position,status,bracket_type,bracket_half,team1_id,team2_id,winner_team_id,is_chapeu,modality_id,next_win_match_id,next_lose_match_id",
-            filters: selectedModality
-              ? { tournament_id: id, modality_id: selectedModality.id }
-              : { tournament_id: id },
+            filters: {
+              tournament_id: id,
+              ...(selectedModality ? { modality_id: selectedModality.id } : {}),
+              ...(currentStageId ? { stage_id: currentStageId } : { stage_id: null }),
+            },
           });
 
           if (revalidateMatches && revalidateMatches.length > 0) {

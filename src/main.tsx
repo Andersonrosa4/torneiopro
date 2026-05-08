@@ -4,35 +4,15 @@ import "./index.css";
 
 createRoot(document.getElementById("root")!).render(<App />);
 
-// Register service worker + auto-reload on new version (prevents stale bug-fixes)
+// Limpeza definitiva de qualquer Service Worker antigo em QUALQUER dispositivo.
+// Sem SW = sem cache preso = código sempre fresco em PC, celular e tablet.
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("/service-worker.js")
-      .then((reg) => {
-        // When a new SW takes control, reload once so the user gets fresh code.
-        let refreshing = false;
-        navigator.serviceWorker.addEventListener("controllerchange", () => {
-          if (refreshing) return;
-          refreshing = true;
-          window.location.reload();
-        });
-        // Detect waiting worker (new version available) and activate it.
-        const promote = (sw: ServiceWorker | null) => {
-          if (sw && sw.state === "installed" && navigator.serviceWorker.controller) {
-            sw.postMessage({ type: "SKIP_WAITING" });
-          }
-        };
-        if (reg.waiting) promote(reg.waiting);
-        reg.addEventListener("updatefound", () => {
-          const nw = reg.installing;
-          nw?.addEventListener("statechange", () => promote(nw));
-        });
-        // Periodic update check (catches users with the tab open all day).
-        setInterval(() => reg.update().catch(() => {}), 60_000);
-      })
-      .catch(() => {
-        // SW registration failed — non-critical
-      });
-  });
+  navigator.serviceWorker
+    .getRegistrations()
+    .then((regs) => Promise.all(regs.map((r) => r.unregister())))
+    .catch(() => {});
+  // Limpa caches herdados de versões anteriores do app.
+  if (typeof caches !== "undefined") {
+    caches.keys().then((keys) => keys.forEach((k) => caches.delete(k))).catch(() => {});
+  }
 }

@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SportProvider } from "@/contexts/SportContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -39,48 +39,57 @@ import SafeBoundary from "@/components/SafeBoundary";
 
 const queryClient = new QueryClient(); // force rebuild
 
+const AppShell = () => {
+  const location = useLocation();
+  const hideAiAssistant = location.pathname.startsWith("/tournament-view/") || location.pathname.startsWith("/tournaments/");
+
+  return (
+    <SportProvider>
+      <AuthProvider>
+        <ScrollToTop />
+        {!hideAiAssistant && <AiAssistant />}
+        <SafeBoundary label="AppRoutes">
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/athlete-login" element={<AthleteLogin />} />
+          <Route path="/tournament-view/:id" element={<TournamentPublicView />} />
+          <Route path="/ranking/:code" element={<PublicRankingsView />} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/tournaments/new" element={<ProtectedRoute><CreateTournament /></ProtectedRoute>} />
+          <Route path="/tournaments/:id" element={<ProtectedRoute><TournamentDetail /></ProtectedRoute>} />
+          <Route path="/qrcode" element={<QRCodePage />} />
+          <Route path="/agendamentos" element={<CourtBooking />} />
+          <Route path="/arena-login" element={<ArenaLogin />} />
+          <Route path="/arena-dashboard" element={<ArenaDashboard />} />
+          <Route path="/atleta/cadastro" element={<AtletaCadastro />} />
+          <Route path="/atleta/login" element={<AtletaLoginPage />} />
+          <Route path="/atleta/recuperar-senha" element={<AtletaRecuperarSenha />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/atleta/meus-agendamentos" element={<MeusAgendamentos />} />
+          <Route path="/admin-arenas" element={<AdminArenaOwners />} />
+          <Route path="/comunidades" element={<RankingCommunities />} />
+          <Route path="/comunidade/:id" element={<CommunityDetail />} />
+          <Route path="/atleta/home" element={<AthleteHome />} />
+          <Route path="/atleta/notificacoes" element={<AthleteNotifications />} />
+          <Route path="/feed" element={<PublicFeed />} />
+          <Route path="/simulation-test" element={<SimulationTest />} />
+          <Route path="/diagnostics" element={<ProtectedRoute><SystemDiagnostics /></ProtectedRoute>} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+        </SafeBoundary>
+      </AuthProvider>
+    </SportProvider>
+  );
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <SportProvider>
-          <AuthProvider>
-            <ScrollToTop />
-            <AiAssistant />
-            <SafeBoundary label="AppRoutes">
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/athlete-login" element={<AthleteLogin />} />
-              <Route path="/tournament-view/:id" element={<TournamentPublicView />} />
-              <Route path="/ranking/:code" element={<PublicRankingsView />} />
-              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-              <Route path="/tournaments/new" element={<ProtectedRoute><CreateTournament /></ProtectedRoute>} />
-              <Route path="/tournaments/:id" element={<ProtectedRoute><TournamentDetail /></ProtectedRoute>} />
-              <Route path="/qrcode" element={<QRCodePage />} />
-              <Route path="/agendamentos" element={<CourtBooking />} />
-              <Route path="/arena-login" element={<ArenaLogin />} />
-              <Route path="/arena-dashboard" element={<ArenaDashboard />} />
-              <Route path="/atleta/cadastro" element={<AtletaCadastro />} />
-              <Route path="/atleta/login" element={<AtletaLoginPage />} />
-              <Route path="/atleta/recuperar-senha" element={<AtletaRecuperarSenha />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/atleta/meus-agendamentos" element={<MeusAgendamentos />} />
-              <Route path="/admin-arenas" element={<AdminArenaOwners />} />
-              <Route path="/comunidades" element={<RankingCommunities />} />
-              <Route path="/comunidade/:id" element={<CommunityDetail />} />
-              <Route path="/atleta/home" element={<AthleteHome />} />
-              <Route path="/atleta/notificacoes" element={<AthleteNotifications />} />
-              <Route path="/feed" element={<PublicFeed />} />
-              <Route path="/simulation-test" element={<SimulationTest />} />
-              <Route path="/diagnostics" element={<ProtectedRoute><SystemDiagnostics /></ProtectedRoute>} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            </SafeBoundary>
-          </AuthProvider>
-        </SportProvider>
+        <AppShell />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

@@ -286,6 +286,48 @@ export type Database = {
           },
         ]
       }
+      bracket_backups: {
+        Row: {
+          classificacao_snapshot: Json | null
+          created_at: string
+          created_by: string | null
+          groups_snapshot: Json | null
+          id: string
+          match_count: number
+          matches_snapshot: Json
+          modality_id: string | null
+          reason: string
+          stage_id: string | null
+          tournament_id: string
+        }
+        Insert: {
+          classificacao_snapshot?: Json | null
+          created_at?: string
+          created_by?: string | null
+          groups_snapshot?: Json | null
+          id?: string
+          match_count?: number
+          matches_snapshot: Json
+          modality_id?: string | null
+          reason?: string
+          stage_id?: string | null
+          tournament_id: string
+        }
+        Update: {
+          classificacao_snapshot?: Json | null
+          created_at?: string
+          created_by?: string | null
+          groups_snapshot?: Json | null
+          id?: string
+          match_count?: number
+          matches_snapshot?: Json
+          modality_id?: string | null
+          reason?: string
+          stage_id?: string | null
+          tournament_id?: string
+        }
+        Relationships: []
+      }
       challenge_notifications: {
         Row: {
           challenge_id: string

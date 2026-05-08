@@ -161,8 +161,8 @@ function buildBracketPdf(img: CapturedImage, meta: BracketExportMeta): jsPDF {
 }
 
 export async function exportBracketPdf(el: HTMLElement, meta: BracketExportMeta) {
-  const canvas = await captureElement(el);
-  const doc = buildBracketPdf(canvas, meta);
+  const img = await captureElement(el);
+  const doc = buildBracketPdf(img, meta);
   const base = sanitizeFileName(`chaveamento_${meta.tournamentName}`);
   doc.save(`${base}.pdf`);
 }
@@ -172,6 +172,20 @@ export function exportSequencePdf(matches: MatchRow[], meta: BracketExportMeta) 
   const y = drawHeader(doc, "Sequência de Partidas", meta);
   addSequenceTable(doc, matches, y);
   const base = sanitizeFileName(`sequencia_${meta.tournamentName}`);
+  doc.save(`${base}.pdf`);
+}
+
+export async function exportBracketAndSequencePdf(
+  el: HTMLElement,
+  matches: MatchRow[],
+  meta: BracketExportMeta,
+) {
+  const img = await captureElement(el);
+  const doc = buildBracketPdf(img, meta);
+  doc.addPage("a3", "landscape");
+  const y2 = drawHeader(doc, "Sequência de Partidas", meta);
+  addSequenceTable(doc, matches, y2);
+  const base = sanitizeFileName(`torneio_${meta.tournamentName}`);
   doc.save(`${base}.pdf`);
 }
 

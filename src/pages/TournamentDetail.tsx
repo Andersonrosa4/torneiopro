@@ -36,6 +36,11 @@ import { evaluateLateInsertion, type LateInsertionMatch } from "@/engine/lateTea
 
 import BracketTreeView from "@/components/BracketTreeView";
 import MatchSequenceViewer from "@/components/MatchSequenceViewer";
+import { exportBracketPdf, exportSequencePdf, exportBracketAndSequencePdf } from "@/lib/exportBracket";
+import { buildMatchNumberMap } from "@/lib/matchNumbering";
+import { getEliminationRoundLabel } from "@/lib/roundLabels";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { FileDown } from "lucide-react";
 import ClassificationTab from "@/components/ClassificationTab";
 import RankingsTab from "@/components/RankingsTab";
 import StageSelector from "@/components/StageSelector";

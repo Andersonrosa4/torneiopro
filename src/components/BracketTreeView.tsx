@@ -349,14 +349,14 @@ const BracketColumn = ({
   };
 
   return (
-    <div className={`rounded-xl border ${colorAccent} p-3 space-y-2`}>
+    <div className={`w-full min-w-0 rounded-xl border ${colorAccent} p-3 space-y-2`}>
       <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground flex items-center gap-1.5">
         <span>{icon}</span>
         <span>{label}</span>
         {reversed ? <ChevronLeft className="h-3 w-3 ml-auto opacity-50" /> : <ChevronRight className="h-3 w-3 ml-auto opacity-50" />}
       </div>
-      <div className="relative overflow-x-auto pb-2">
-        <div className="flex gap-6 relative" style={{ zIndex: 1 }}>
+      <div className="relative overflow-x-auto pb-2" style={{ WebkitOverflowScrolling: "touch" }}>
+        <div className="flex w-max min-w-full gap-6 relative" style={{ zIndex: 1 }}>
           {displayRounds.map((round) => {
             // Ordena pelo número global do jogo (sequência do scheduler) para exibição correta top→bottom
             const roundMatches = roundGroups[round].sort((a, b) => {
@@ -856,8 +856,6 @@ const NormalKnockout = ({
    ──────────────────────────────────────────────────── */
 const DEBracketLayout = ({
   zoomContainerRef,
-  isMobile,
-  mobileZoom,
   winnersA,
   winnersB,
   losersA,
@@ -870,8 +868,6 @@ const DEBracketLayout = ({
   slotMap,
 }: {
   zoomContainerRef: React.RefObject<HTMLDivElement>;
-  isMobile: boolean;
-  mobileZoom: number;
   winnersA: Match[];
   winnersB: Match[];
   losersA: Match[];
@@ -890,14 +886,12 @@ const DEBracketLayout = ({
   return (
     <div
       ref={zoomContainerRef}
-      className="overflow-x-auto pb-4"
+      className="w-full max-w-full overflow-x-auto overflow-y-visible pb-4"
       style={{ touchAction: "pan-x pinch-zoom", WebkitOverflowScrolling: "touch" }}
     >
-      <div
-        style={isMobile ? { transform: `scale(${mobileZoom})`, transformOrigin: 'top left', width: `${100 / mobileZoom}%` } : undefined}
-      >
-        <div ref={globalRef} className="relative min-w-[900px]">
-          <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-start relative" style={{ zIndex: 1 }}>
+      <div className="w-max min-w-full">
+        <div ref={globalRef} className="relative min-w-[1180px]">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-4 items-start relative" style={{ zIndex: 1 }}>
             {/* ── LEFT: Winners (L → R) ── */}
             <div className="space-y-4">
               <div className="text-center">
@@ -933,7 +927,7 @@ const DEBracketLayout = ({
         </div>
 
         {/* Legend */}
-        <div className="mt-4 rounded-lg bg-card/50 border border-border/50 p-3 text-[10px] flex flex-wrap gap-x-6 gap-y-1 justify-center text-muted-foreground/70">
+        <div className="mt-4 min-w-[1180px] rounded-lg bg-card/50 border border-border/50 p-3 text-[10px] flex flex-wrap gap-x-6 gap-y-1 justify-center text-muted-foreground/70">
           <span>← <strong className="text-primary/70">Vencedores</strong> crescem para o centro</span>
           <span><strong className="text-destructive/70">Perdedores</strong> crescem para o centro →</span>
           <span>🏆 <strong className="text-accent/70">Semifinais + Final</strong> no centro</span>
@@ -956,7 +950,7 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
     if (isMobile && zoomContainerRef.current) {
       const el = zoomContainerRef.current;
       requestAnimationFrame(() => {
-        el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
+        el.scrollLeft = 0;
       });
     }
   }, [isMobile, matches.length]);
@@ -1000,8 +994,6 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
     );
   }
 
-  const mobileZoom = 0.7;
-
   return (
     <div className="w-full space-y-4">
       {hasGroupStage && (
@@ -1012,8 +1004,6 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
       {isDoubleElimination && (
         <DEBracketLayout
           zoomContainerRef={zoomContainerRef}
-          isMobile={isMobile}
-          mobileZoom={mobileZoom}
           winnersA={winnersA}
           winnersB={winnersB}
           losersA={losersA}

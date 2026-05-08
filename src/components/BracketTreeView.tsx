@@ -888,9 +888,6 @@ const DEBracketLayout = ({
   if (isMobile) {
     return (
       <div ref={zoomContainerRef} className="w-full space-y-4 pb-4">
-        <div className="rounded-xl border border-border bg-card/50 p-3 text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
-          Arraste dentro de cada chave quando houver mais rodadas.
-        </div>
         <BracketColumn bracketMatches={winnersA} getName={getName} label="Vencedores A" icon="🏆" colorAccent="border-primary/40 bg-primary/[0.1]" reversed={false} allMatches={allMatches} matchNumberMap={matchNumberMap} />
         <BracketColumn bracketMatches={winnersB} getName={getName} label="Vencedores B" icon="🏆" colorAccent="border-primary/30 bg-primary/[0.08]" reversed={false} allMatches={allMatches} matchNumberMap={matchNumberMap} />
         <CenterColumn crossSemis={semiFinals} finalMatches={finalMatches} getName={getName} allMatches={allMatches} matchNumberMap={matchNumberMap} />

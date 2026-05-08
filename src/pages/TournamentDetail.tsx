@@ -139,7 +139,9 @@ const TournamentDetail = () => {
 
   const isOwner = tournament?.created_by === organizerId || isAdmin || isAssociatedOrganizer;
   const isTournamentCompleted = tournament?.status === 'completed' || tournament?.status === 'cancelled';
-  const canEdit = isOwner && !isTournamentCompleted;
+  const isFutevoleiTournament = tournament?.sport === 'futevolei';
+  const isWriteLocked = isTournamentCompleted && !isFutevoleiTournament;
+  const canEdit = isOwner && !isWriteLocked;
 
   // Helper: build snapshot and run system rules guard
   const runSystemRulesGuard = useCallback((matchList: Match[], label: string): boolean => {
@@ -269,7 +271,7 @@ const TournamentDetail = () => {
   }, [filteredMatches, selectedModality, tournament?.format, hasBracketGenerated]);
 
   const addTeam = async () => {
-    if (isTournamentCompleted) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
+    if (isWriteLocked) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
     if (!player1.trim() || !player2.trim() || !id) return;
     if (hasGroupStageGenerated) {
       toast.error("❌ Fase de grupos já gerada. Faça o reset completo para alterar equipes.");
@@ -541,7 +543,7 @@ const TournamentDetail = () => {
     numIndexTeams?: number;
   }) => {
     try {
-      if (isTournamentCompleted) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
+      if (isWriteLocked) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
       // ── SYSTEM RULES GUARD (pre-bracket generation) ──
       if (filteredMatches.length > 0 && !runSystemRulesGuard(filteredMatches, 'preBracketGeneration')) {
         return;

@@ -1006,8 +1006,6 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
       {isDoubleElimination && (
         <DEBracketLayout
           zoomContainerRef={zoomContainerRef}
-          isMobile={isMobile}
-          mobileZoom={mobileZoom}
           winnersA={winnersA}
           winnersB={winnersB}
           losersA={losersA}

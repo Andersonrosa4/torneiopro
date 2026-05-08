@@ -558,6 +558,9 @@ const TournamentDetail = () => {
         return;
       }
 
+      const currentModalityId = selectedModality?.id || null;
+      const currentStageId = selectedStageId || null;
+
       // Delete only matches for the current modality — use bulk API
       if (selectedModality) {
         await organizerQuery({
@@ -573,7 +576,7 @@ const TournamentDetail = () => {
           tournament_id: id,
           modality_id: selectedModality.id,
           stage_id: currentStageId,
-        });
+        } as any);
       } else {
         await organizerQuery({
           table: "matches",
@@ -590,9 +593,6 @@ const TournamentDetail = () => {
         data: { num_sets: config.numSets, games_per_set: config.gamesPerSet || null },
         filters: { id },
       });
-
-    const currentModalityId = selectedModality?.id || null;
-    const currentStageId = selectedStageId || null;
 
     if (config.useGroupStage) {
       // === GROUP STAGE ===

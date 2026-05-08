@@ -216,10 +216,10 @@ const MatchCard = ({
   const bottomWin = match.winner_team_id === bottomTeamId && isCompleted;
 
   const sizeClasses = {
-    small: "w-[130px] text-[9px]",
-    normal: "w-[130px] text-[9px]",
-    semi: "w-[130px] text-[9px]",
-    final: "w-[140px] text-[10px]",
+    small: "w-full min-w-0 sm:w-[130px] text-[9px]",
+    normal: "w-full min-w-0 sm:w-[130px] text-[9px]",
+    semi: "w-full min-w-0 sm:w-[130px] text-[9px]",
+    final: "w-full min-w-0 sm:w-[140px] text-[10px]",
   };
 
   const borderClasses = (() => {
@@ -320,6 +320,7 @@ const BracketColumn = ({
   icon,
   colorAccent,
   reversed,
+  stackRounds = false,
   allMatches,
   matchNumberMap,
 }: {
@@ -329,6 +330,7 @@ const BracketColumn = ({
   icon: string;
   colorAccent: string;
   reversed?: boolean;
+  stackRounds?: boolean;
   allMatches: Match[];
   matchNumberMap?: Map<string, number>;
 }) => {
@@ -355,8 +357,8 @@ const BracketColumn = ({
         <span>{label}</span>
         {reversed ? <ChevronLeft className="h-3 w-3 ml-auto opacity-50" /> : <ChevronRight className="h-3 w-3 ml-auto opacity-50" />}
       </div>
-      <div className="relative overflow-x-auto pb-2" style={{ WebkitOverflowScrolling: "touch" }}>
-        <div className="flex w-max min-w-full gap-6 relative" style={{ zIndex: 1 }}>
+      <div className={`relative pb-2 ${stackRounds ? "overflow-visible" : "overflow-x-auto"}`} style={{ WebkitOverflowScrolling: "touch" }}>
+        <div className={`${stackRounds ? "grid w-full grid-cols-1 gap-4" : "flex w-max min-w-full gap-6"} relative`} style={{ zIndex: 1 }}>
           {displayRounds.map((round) => {
             // Ordena pelo número global do jogo (sequência do scheduler) para exibição correta top→bottom
             const roundMatches = roundGroups[round].sort((a, b) => {
@@ -365,11 +367,11 @@ const BracketColumn = ({
               return aNum - bNum;
             });
             return (
-              <div key={round} className="flex flex-col items-center shrink-0" style={{ minWidth: 150 }}>
+              <div key={round} className={`${stackRounds ? "w-full rounded-lg border border-border/40 bg-card/30 p-2" : "flex flex-col items-center shrink-0"}`} style={stackRounds ? undefined : { minWidth: 150 }}>
                 <div className="text-[9px] uppercase font-semibold text-muted-foreground/60 mb-2 whitespace-nowrap">
                   Rodada {round}
                 </div>
-                <div className="flex flex-col justify-around gap-3 flex-1">
+                <div className={stackRounds ? "grid grid-cols-2 gap-2" : "flex flex-col justify-around gap-3 flex-1"}>
                   {roundMatches.map((match) => (
                     <MatchCard
                       key={match.id}
@@ -807,9 +809,9 @@ const NormalKnockout = ({
   knockoutMatches.forEach(m => { matchCountByRound[m.round] = (matchCountByRound[m.round] || 0) + 1; });
 
   return (
-    <div className="rounded-xl border border-border bg-card/50 p-4">
-      <div ref={containerRef} className="relative overflow-x-auto overflow-y-hidden pb-6" style={{ WebkitOverflowScrolling: "touch" }}>
-        <div className="flex gap-10 relative" style={{ zIndex: 1, minHeight: totalHeight }}>
+    <div className="w-full min-w-0 rounded-xl border border-border bg-card/50 p-4">
+      <div ref={containerRef} className="relative w-full max-w-full overflow-x-auto overflow-y-hidden pb-6" style={{ touchAction: "pan-x pinch-zoom", WebkitOverflowScrolling: "touch" }}>
+        <div className="flex w-max min-w-full gap-10 relative" style={{ zIndex: 1, minHeight: totalHeight }}>
           {rounds.map((round) => {
             const roundMatches = roundGroups[round];
             const matchCount = roundMatches.length;
@@ -856,6 +858,7 @@ const NormalKnockout = ({
    ──────────────────────────────────────────────────── */
 const DEBracketLayout = ({
   zoomContainerRef,
+  isMobile,
   winnersA,
   winnersB,
   losersA,
@@ -868,6 +871,7 @@ const DEBracketLayout = ({
   slotMap,
 }: {
   zoomContainerRef: React.RefObject<HTMLDivElement>;
+  isMobile: boolean;
   winnersA: Match[];
   winnersB: Match[];
   losersA: Match[];
@@ -882,6 +886,18 @@ const DEBracketLayout = ({
   // Ref interno que envolve todo o layout DE para o SVG de conectores globais
   const globalRef = useRef<HTMLDivElement>(null);
   const eliminationMatches = allMatches.filter(m => m.round > 0);
+
+  if (isMobile) {
+    return (
+      <div ref={zoomContainerRef} className="w-full space-y-4 pb-4">
+        <BracketColumn bracketMatches={winnersA} getName={getName} label="Vencedores A" icon="🏆" colorAccent="border-primary/40 bg-primary/[0.1]" reversed={false} stackRounds allMatches={allMatches} matchNumberMap={matchNumberMap} />
+        <BracketColumn bracketMatches={winnersB} getName={getName} label="Vencedores B" icon="🏆" colorAccent="border-primary/30 bg-primary/[0.08]" reversed={false} stackRounds allMatches={allMatches} matchNumberMap={matchNumberMap} />
+        <CenterColumn crossSemis={semiFinals} finalMatches={finalMatches} getName={getName} allMatches={allMatches} matchNumberMap={matchNumberMap} />
+        <BracketColumn bracketMatches={losersA} getName={getName} label="Perdedores Superiores" icon="⬇" colorAccent="border-destructive/40 bg-destructive/[0.1]" reversed={true} stackRounds allMatches={allMatches} matchNumberMap={matchNumberMap} />
+        <BracketColumn bracketMatches={losersB} getName={getName} label="Perdedores Inferiores" icon="⬇" colorAccent="border-destructive/30 bg-destructive/[0.08]" reversed={true} stackRounds allMatches={allMatches} matchNumberMap={matchNumberMap} />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -1004,6 +1020,7 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
       {isDoubleElimination && (
         <DEBracketLayout
           zoomContainerRef={zoomContainerRef}
+          isMobile={isMobile}
           winnersA={winnersA}
           winnersB={winnersB}
           losersA={losersA}

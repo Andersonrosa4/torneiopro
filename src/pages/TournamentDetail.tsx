@@ -79,6 +79,7 @@ interface Team {
   is_fictitious: boolean;
   payment_status: string;
   modality_id: string | null;
+  stage_id?: string | null;
 }
 
 interface Match {
@@ -104,6 +105,7 @@ interface Match {
   is_chapeu?: boolean | null;
   live_score?: any;
   court_number?: number | null;
+  stage_id?: string | null;
 }
 
 const TournamentDetail = () => {
@@ -258,6 +260,7 @@ const TournamentDetail = () => {
     filteredMatches.some(m => m.round > 0),
     [filteredMatches]
   );
+  const currentStageId = selectedStageId || null;
 
   // Check if late insertion is still allowed (no completed matches beyond R1 winners)
   const lateInsertionAllowed = useMemo(() => {
@@ -555,13 +558,16 @@ const TournamentDetail = () => {
         return;
       }
 
+      const currentModalityId = selectedModality?.id || null;
+      const currentStageId = selectedStageId || null;
+
       // Delete only matches for the current modality — use bulk API
       if (selectedModality) {
         await organizerQuery({
           table: "matches",
           operation: "update",
           data: { next_win_match_id: null, next_lose_match_id: null },
-          filters: { tournament_id: id, modality_id: selectedModality.id },
+          filters: { tournament_id: id, modality_id: selectedModality.id, ...(currentStageId ? { stage_id: currentStageId } : { stage_id: null }) },
         } as any);
         // Then delete matches for this modality
         await organizerQuery({
@@ -569,7 +575,8 @@ const TournamentDetail = () => {
           operation: "undo_bracket",
           tournament_id: id,
           modality_id: selectedModality.id,
-        });
+          stage_id: currentStageId,
+        } as any);
       } else {
         await organizerQuery({
           table: "matches",
@@ -586,8 +593,6 @@ const TournamentDetail = () => {
         data: { num_sets: config.numSets, games_per_set: config.gamesPerSet || null },
         filters: { id },
       });
-
-    const currentModalityId = selectedModality?.id || null;
 
     if (config.useGroupStage) {
       // === GROUP STAGE ===
@@ -697,6 +702,7 @@ const TournamentDetail = () => {
               status: "pending",
               bracket_number: g + 1,
               modality_id: currentModalityId,
+              stage_id: currentStageId,
             });
           }
         }
@@ -725,6 +731,7 @@ const TournamentDetail = () => {
               status: "pending",
               bracket_number: 1,
               modality_id: currentModalityId,
+              stage_id: currentStageId,
             });
           }
         }
@@ -740,6 +747,7 @@ const TournamentDetail = () => {
           bracket_number: 1,
           bracket_type: "third_place",
           modality_id: currentModalityId,
+          stage_id: currentStageId,
         });
 
         const { error: koErr } = await organizerQuery({ table: "matches", operation: "insert", data: koShells });
@@ -853,6 +861,7 @@ const TournamentDetail = () => {
       const matchesWithModality = result.matches.map(m => ({
         ...m,
         modality_id: currentModalityId,
+        stage_id: currentStageId,
       }));
 
       const matchCount = matchesWithModality.length;
@@ -925,6 +934,7 @@ const TournamentDetail = () => {
           team2_id: arranged[i * 2 + 1].id,
           status: "pending",
           modality_id: currentModalityId,
+          stage_id: currentStageId,
         });
       }
 
@@ -938,6 +948,7 @@ const TournamentDetail = () => {
           team2_id: null,
           status: "pending",
           modality_id: currentModalityId,
+          stage_id: currentStageId,
         });
       }
 
@@ -961,9 +972,11 @@ const TournamentDetail = () => {
       const { data: postGenMatches } = await publicQuery<ValidationMatch[]>({
         table: "matches",
         select: "id,round,position,status,bracket_type,bracket_half,team1_id,team2_id,winner_team_id,is_chapeu,modality_id,next_win_match_id,next_lose_match_id",
-        filters: selectedModality
-          ? { tournament_id: id, modality_id: selectedModality.id }
-          : { tournament_id: id },
+          filters: {
+            tournament_id: id,
+            ...(selectedModality ? { modality_id: selectedModality.id } : {}),
+            ...(currentStageId ? { stage_id: currentStageId } : { stage_id: null }),
+          },
       });
 
       if (postGenMatches && postGenMatches.length > 0) {
@@ -1007,9 +1020,11 @@ const TournamentDetail = () => {
           const { data: revalidateMatches } = await publicQuery<ValidationMatch[]>({
             table: "matches",
             select: "id,round,position,status,bracket_type,bracket_half,team1_id,team2_id,winner_team_id,is_chapeu,modality_id,next_win_match_id,next_lose_match_id",
-            filters: selectedModality
-              ? { tournament_id: id, modality_id: selectedModality.id }
-              : { tournament_id: id },
+            filters: {
+              tournament_id: id,
+              ...(selectedModality ? { modality_id: selectedModality.id } : {}),
+              ...(currentStageId ? { stage_id: currentStageId } : { stage_id: null }),
+            },
           });
 
           if (revalidateMatches && revalidateMatches.length > 0) {

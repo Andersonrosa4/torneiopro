@@ -994,8 +994,6 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
     );
   }
 
-  const mobileZoom = 0.7;
-
   return (
     <div className="w-full space-y-4">
       {hasGroupStage && (

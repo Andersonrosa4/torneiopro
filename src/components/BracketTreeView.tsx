@@ -856,8 +856,6 @@ const NormalKnockout = ({
    ──────────────────────────────────────────────────── */
 const DEBracketLayout = ({
   zoomContainerRef,
-  isMobile,
-  mobileZoom,
   winnersA,
   winnersB,
   losersA,
@@ -870,8 +868,6 @@ const DEBracketLayout = ({
   slotMap,
 }: {
   zoomContainerRef: React.RefObject<HTMLDivElement>;
-  isMobile: boolean;
-  mobileZoom: number;
   winnersA: Match[];
   winnersB: Match[];
   losersA: Match[];
@@ -890,14 +886,12 @@ const DEBracketLayout = ({
   return (
     <div
       ref={zoomContainerRef}
-      className="overflow-x-auto pb-4"
+      className="w-full max-w-full overflow-x-auto overflow-y-visible pb-4"
       style={{ touchAction: "pan-x pinch-zoom", WebkitOverflowScrolling: "touch" }}
     >
-      <div
-        style={isMobile ? { transform: `scale(${mobileZoom})`, transformOrigin: 'top left', width: `${100 / mobileZoom}%` } : undefined}
-      >
-        <div ref={globalRef} className="relative min-w-[900px]">
-          <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-start relative" style={{ zIndex: 1 }}>
+      <div className="w-max min-w-full">
+        <div ref={globalRef} className="relative min-w-[1180px]">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-4 items-start relative" style={{ zIndex: 1 }}>
             {/* ── LEFT: Winners (L → R) ── */}
             <div className="space-y-4">
               <div className="text-center">
@@ -933,7 +927,7 @@ const DEBracketLayout = ({
         </div>
 
         {/* Legend */}
-        <div className="mt-4 rounded-lg bg-card/50 border border-border/50 p-3 text-[10px] flex flex-wrap gap-x-6 gap-y-1 justify-center text-muted-foreground/70">
+        <div className="mt-4 min-w-[1180px] rounded-lg bg-card/50 border border-border/50 p-3 text-[10px] flex flex-wrap gap-x-6 gap-y-1 justify-center text-muted-foreground/70">
           <span>← <strong className="text-primary/70">Vencedores</strong> crescem para o centro</span>
           <span><strong className="text-destructive/70">Perdedores</strong> crescem para o centro →</span>
           <span>🏆 <strong className="text-accent/70">Semifinais + Final</strong> no centro</span>

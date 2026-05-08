@@ -320,6 +320,7 @@ const BracketColumn = ({
   icon,
   colorAccent,
   reversed,
+  stackRounds = false,
   allMatches,
   matchNumberMap,
 }: {
@@ -329,6 +330,7 @@ const BracketColumn = ({
   icon: string;
   colorAccent: string;
   reversed?: boolean;
+  stackRounds?: boolean;
   allMatches: Match[];
   matchNumberMap?: Map<string, number>;
 }) => {
@@ -355,8 +357,8 @@ const BracketColumn = ({
         <span>{label}</span>
         {reversed ? <ChevronLeft className="h-3 w-3 ml-auto opacity-50" /> : <ChevronRight className="h-3 w-3 ml-auto opacity-50" />}
       </div>
-      <div className="relative overflow-x-auto pb-2" style={{ WebkitOverflowScrolling: "touch" }}>
-        <div className="flex w-max min-w-full gap-6 relative" style={{ zIndex: 1 }}>
+      <div className={`relative pb-2 ${stackRounds ? "overflow-visible" : "overflow-x-auto"}`} style={{ WebkitOverflowScrolling: "touch" }}>
+        <div className={`${stackRounds ? "grid w-full grid-cols-1 gap-4" : "flex w-max min-w-full gap-6"} relative`} style={{ zIndex: 1 }}>
           {displayRounds.map((round) => {
             // Ordena pelo número global do jogo (sequência do scheduler) para exibição correta top→bottom
             const roundMatches = roundGroups[round].sort((a, b) => {
@@ -365,11 +367,11 @@ const BracketColumn = ({
               return aNum - bNum;
             });
             return (
-              <div key={round} className="flex flex-col items-center shrink-0" style={{ minWidth: 150 }}>
+              <div key={round} className={`${stackRounds ? "w-full rounded-lg border border-border/40 bg-card/30 p-2" : "flex flex-col items-center shrink-0"}`} style={stackRounds ? undefined : { minWidth: 150 }}>
                 <div className="text-[9px] uppercase font-semibold text-muted-foreground/60 mb-2 whitespace-nowrap">
                   Rodada {round}
                 </div>
-                <div className="flex flex-col justify-around gap-3 flex-1">
+                <div className={stackRounds ? "grid grid-cols-2 gap-2" : "flex flex-col justify-around gap-3 flex-1"}>
                   {roundMatches.map((match) => (
                     <MatchCard
                       key={match.id}

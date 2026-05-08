@@ -25,18 +25,79 @@ interface MatchRow {
  * (escala 2x para permitir zoom no PDF sem perder qualidade).
  */
 async function captureElement(el: HTMLElement): Promise<HTMLCanvasElement> {
-  // Resolve a real background color from the element/ancestors
-  const bg = "#ffffff";
-  return html2canvas(el, {
-    scale: 2,
-    backgroundColor: bg,
-    useCORS: true,
-    logging: false,
-    windowWidth: el.scrollWidth,
-    windowHeight: el.scrollHeight,
-    width: el.scrollWidth,
-    height: el.scrollHeight,
-  });
+  // Temporarily expand all scrollable/overflow-clipped descendants so html2canvas
+  // captures the FULL bracket (not just the visible viewport slice).
+  const mutated: { node: HTMLElement; prev: { overflow: string; overflowX: string; overflowY: string; maxWidth: string; maxHeight: string; width: string; height: string; transform: string } }[] = [];
+  const all = [el, ...Array.from(el.querySelectorAll<HTMLElement>("*"))];
+  for (const node of all) {
+    const cs = window.getComputedStyle(node);
+    const clipsX = cs.overflowX === "auto" || cs.overflowX === "scroll" || cs.overflowX === "hidden";
+    const clipsY = cs.overflowY === "auto" || cs.overflowY === "scroll" || cs.overflowY === "hidden";
+    const hasTransform = cs.transform && cs.transform !== "none";
+    if (!clipsX && !clipsY && !hasTransform) continue;
+    mutated.push({
+      node,
+      prev: {
+        overflow: node.style.overflow,
+        overflowX: node.style.overflowX,
+        overflowY: node.style.overflowY,
+        maxWidth: node.style.maxWidth,
+        maxHeight: node.style.maxHeight,
+        width: node.style.width,
+        height: node.style.height,
+        transform: node.style.transform,
+      },
+    });
+    node.style.overflow = "visible";
+    node.style.overflowX = "visible";
+    node.style.overflowY = "visible";
+    node.style.maxWidth = "none";
+    node.style.maxHeight = "none";
+    if (clipsX && node.scrollWidth > node.clientWidth) {
+      node.style.width = `${node.scrollWidth}px`;
+    }
+    if (clipsY && node.scrollHeight > node.clientHeight) {
+      node.style.height = `${node.scrollHeight}px`;
+    }
+    if (hasTransform) {
+      // Remove zoom/scale transforms so the capture reflects natural size
+      node.style.transform = "none";
+    }
+  }
+
+  // Wait a frame so layout reflows
+  await new Promise((r) => requestAnimationFrame(() => r(null)));
+  await new Promise((r) => requestAnimationFrame(() => r(null)));
+
+  const fullW = el.scrollWidth;
+  const fullH = el.scrollHeight;
+
+  try {
+    return await html2canvas(el, {
+      scale: 2,
+      backgroundColor: "#ffffff",
+      useCORS: true,
+      logging: false,
+      windowWidth: fullW,
+      windowHeight: fullH,
+      width: fullW,
+      height: fullH,
+      scrollX: 0,
+      scrollY: 0,
+    });
+  } finally {
+    // Restore original styles
+    for (const { node, prev } of mutated) {
+      node.style.overflow = prev.overflow;
+      node.style.overflowX = prev.overflowX;
+      node.style.overflowY = prev.overflowY;
+      node.style.maxWidth = prev.maxWidth;
+      node.style.maxHeight = prev.maxHeight;
+      node.style.width = prev.width;
+      node.style.height = prev.height;
+      node.style.transform = prev.transform;
+    }
+  }
 }
 
 /** Adiciona cabeçalho padrão na primeira página do doc. */

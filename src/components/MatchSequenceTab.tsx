@@ -342,7 +342,9 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
     // Pass ALL matches to the scheduler (including chapéu with only 1 team)
     // so it can correctly compute isUnlocked based on full match status
     const allEliminationMatches = filteredMatches.filter(m => m.round > 0);
-    const displayMatches = filteredMatches.filter(m => m.team1_id && m.team2_id);
+    // Show ALL knockout matches (even with TBD teams) so the full sequence is visible
+    // For group stage, only show matches that have both teams defined
+    const displayMatches = filteredMatches.filter(m => m.round > 0 || (m.team1_id && m.team2_id));
     if (displayMatches.length === 0) return [];
 
     const groups: { label: string; items: { match: Match; idx: number }[]; blockKey?: string; isUnlocked?: boolean; isCompleted?: boolean }[] = [];

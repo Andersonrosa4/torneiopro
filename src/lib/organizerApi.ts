@@ -126,17 +126,19 @@ export async function publicQuery<T = any>(options: Omit<QueryOptions, "operatio
   }
 }
 
-async function undoBracket(tournamentId?: string, modalityId?: string): Promise<{ data: any; error: any }> {
+async function undoBracket(tournamentId?: string, modalityId?: string, stageId?: string | null): Promise<{ data: any; error: any }> {
   if (!tournamentId) return { data: null, error: { message: "tournament_id é obrigatório" } };
 
   const db = getClient();
   let updateQuery: any = db.from("matches").update({ next_win_match_id: null, next_lose_match_id: null }).eq("tournament_id", tournamentId);
   if (modalityId) updateQuery = updateQuery.eq("modality_id", modalityId);
+  if (stageId !== undefined) updateQuery = stageId === null ? updateQuery.is("stage_id", null) : updateQuery.eq("stage_id", stageId);
   const { error: updateErr } = await updateQuery;
   if (updateErr) return { data: null, error: { message: updateErr.message } };
 
   let deleteQuery: any = db.from("matches").delete().eq("tournament_id", tournamentId);
   if (modalityId) deleteQuery = deleteQuery.eq("modality_id", modalityId);
+  if (stageId !== undefined) deleteQuery = stageId === null ? deleteQuery.is("stage_id", null) : deleteQuery.eq("stage_id", stageId);
   const { error: deleteErr } = await deleteQuery;
   if (deleteErr) return { data: null, error: { message: deleteErr.message } };
 

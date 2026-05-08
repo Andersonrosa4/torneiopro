@@ -807,9 +807,9 @@ const NormalKnockout = ({
   knockoutMatches.forEach(m => { matchCountByRound[m.round] = (matchCountByRound[m.round] || 0) + 1; });
 
   return (
-    <div className="rounded-xl border border-border bg-card/50 p-4">
-      <div ref={containerRef} className="relative overflow-x-auto overflow-y-hidden pb-6" style={{ WebkitOverflowScrolling: "touch" }}>
-        <div className="flex gap-10 relative" style={{ zIndex: 1, minHeight: totalHeight }}>
+    <div className="w-full min-w-0 rounded-xl border border-border bg-card/50 p-4">
+      <div ref={containerRef} className="relative w-full max-w-full overflow-x-auto overflow-y-hidden pb-6" style={{ touchAction: "pan-x pinch-zoom", WebkitOverflowScrolling: "touch" }}>
+        <div className="flex w-max min-w-full gap-10 relative" style={{ zIndex: 1, minHeight: totalHeight }}>
           {rounds.map((round) => {
             const roundMatches = roundGroups[round];
             const matchCount = roundMatches.length;

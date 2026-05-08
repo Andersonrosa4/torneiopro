@@ -286,6 +286,39 @@ export type Database = {
           },
         ]
       }
+      bracket_audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          detail: Json | null
+          id: string
+          modality_id: string | null
+          stage_id: string | null
+          tournament_id: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          detail?: Json | null
+          id?: string
+          modality_id?: string | null
+          stage_id?: string | null
+          tournament_id: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          detail?: Json | null
+          id?: string
+          modality_id?: string | null
+          stage_id?: string | null
+          tournament_id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       bracket_backups: {
         Row: {
           classificacao_snapshot: Json | null

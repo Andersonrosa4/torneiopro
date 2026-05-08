@@ -35,25 +35,30 @@ interface CapturedImage {
 async function captureElement(el: HTMLElement): Promise<CapturedImage> {
   const mutated: { node: HTMLElement; prev: Partial<CSSStyleDeclaration> }[] = [];
   const all = [el, ...Array.from(el.querySelectorAll<HTMLElement>("*"))];
+
+  const snapshot = (node: HTMLElement) => ({
+    node,
+    prev: {
+      overflow: node.style.overflow,
+      overflowX: node.style.overflowX,
+      overflowY: node.style.overflowY,
+      maxWidth: node.style.maxWidth,
+      maxHeight: node.style.maxHeight,
+      width: node.style.width,
+      height: node.style.height,
+      minWidth: node.style.minWidth,
+      transform: node.style.transform,
+    } as Partial<CSSStyleDeclaration>,
+  });
+
+  // 1ª passada: remover overflow / transform / max-width em qualquer elemento que esteja recortando.
   for (const node of all) {
     const cs = window.getComputedStyle(node);
     const clipsX = cs.overflowX === "auto" || cs.overflowX === "scroll" || cs.overflowX === "hidden";
     const clipsY = cs.overflowY === "auto" || cs.overflowY === "scroll" || cs.overflowY === "hidden";
     const hasTransform = cs.transform && cs.transform !== "none";
     if (!clipsX && !clipsY && !hasTransform) continue;
-    mutated.push({
-      node,
-      prev: {
-        overflow: node.style.overflow,
-        overflowX: node.style.overflowX,
-        overflowY: node.style.overflowY,
-        maxWidth: node.style.maxWidth,
-        maxHeight: node.style.maxHeight,
-        width: node.style.width,
-        height: node.style.height,
-        transform: node.style.transform,
-      } as Partial<CSSStyleDeclaration>,
-    });
+    mutated.push(snapshot(node));
     node.style.overflow = "visible";
     node.style.overflowX = "visible";
     node.style.overflowY = "visible";
@@ -71,8 +76,22 @@ async function captureElement(el: HTMLElement): Promise<CapturedImage> {
   await new Promise((r) => requestAnimationFrame(() => r(null)));
   await new Promise((r) => requestAnimationFrame(() => r(null)));
 
-  const fullW = el.scrollWidth;
-  const fullH = el.scrollHeight;
+  // 2ª passada: força a largura real do elemento raiz e de containers w-full
+  // para que o html-to-image rasterize o conteúdo inteiro (todas as rodadas), não apenas
+  // a largura visível do pai.
+  const rootFullW = Math.max(el.scrollWidth, el.offsetWidth);
+  const rootFullH = Math.max(el.scrollHeight, el.offsetHeight);
+  mutated.push(snapshot(el));
+  el.style.width = `${rootFullW}px`;
+  el.style.maxWidth = "none";
+  el.style.height = `${rootFullH}px`;
+  el.style.maxHeight = "none";
+  el.style.overflow = "visible";
+
+  await new Promise((r) => requestAnimationFrame(() => r(null)));
+
+  const fullW = Math.max(el.scrollWidth, rootFullW);
+  const fullH = Math.max(el.scrollHeight, rootFullH);
 
   try {
     const dataUrl = await toPng(el, {

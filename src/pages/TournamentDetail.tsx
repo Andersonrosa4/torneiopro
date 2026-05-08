@@ -232,7 +232,9 @@ const TournamentDetail = () => {
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const debouncedFetch = () => {
       if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => fetchData(), 300);
+      // 800ms gives time for cascade chains (declareWinner → multiple UPDATEs)
+      // to settle into a single refetch instead of N refetches.
+      debounceTimer = setTimeout(() => fetchData(), 800);
     };
     const channel = supabase
       .channel(`tournament-rt-${id}`)

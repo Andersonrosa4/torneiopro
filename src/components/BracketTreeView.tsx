@@ -856,6 +856,7 @@ const NormalKnockout = ({
    ──────────────────────────────────────────────────── */
 const DEBracketLayout = ({
   zoomContainerRef,
+  isMobile,
   winnersA,
   winnersB,
   losersA,
@@ -1020,6 +1021,7 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
       {isDoubleElimination && (
         <DEBracketLayout
           zoomContainerRef={zoomContainerRef}
+          isMobile={isMobile}
           winnersA={winnersA}
           winnersB={winnersB}
           losersA={losersA}

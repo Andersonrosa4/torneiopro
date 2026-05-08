@@ -342,7 +342,9 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
     // Pass ALL matches to the scheduler (including chapéu with only 1 team)
     // so it can correctly compute isUnlocked based on full match status
     const allEliminationMatches = filteredMatches.filter(m => m.round > 0);
-    const displayMatches = filteredMatches.filter(m => m.team1_id && m.team2_id);
+    // Show ALL knockout matches (even with TBD teams) so the full sequence is visible
+    // For group stage, only show matches that have both teams defined
+    const displayMatches = filteredMatches.filter(m => m.round > 0 || (m.team1_id && m.team2_id));
     if (displayMatches.length === 0) return [];
 
     const groups: { label: string; items: { match: Match; idx: number }[]; blockKey?: string; isUnlocked?: boolean; isCompleted?: boolean }[] = [];
@@ -411,7 +413,7 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
       if (tournamentFormat === "double_elimination" && hasDoubleElimStructure) {
         const schedulerBlocks = buildSchedulerBlocks(allEliminationMatches as any);
         for (const sb of schedulerBlocks) {
-          const blockMatches = (sb.matches as Match[]).filter(m => m.team1_id && m.team2_id);
+          const blockMatches = (sb.matches as Match[]);
           if (blockMatches.length === 0) continue;
           groups.push({
             label: sb.label,
@@ -465,7 +467,7 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
   }, [filteredMatches, tournamentFormat, matchCountByRound]);
 
   // Stats
-  const displayMatches = useMemo(() => filteredMatches.filter(m => m.team1_id && m.team2_id), [filteredMatches]);
+  const displayMatches = useMemo(() => filteredMatches.filter(m => m.round > 0 || (m.team1_id && m.team2_id)), [filteredMatches]);
   const completedCount = useMemo(() => displayMatches.filter(m => m.status === "completed").length, [displayMatches]);
   const pendingCount = useMemo(() => displayMatches.filter(m => m.status !== "completed" && m.team1_id && m.team2_id).length, [displayMatches]);
 

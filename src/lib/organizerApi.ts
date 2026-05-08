@@ -16,6 +16,7 @@ interface QueryOptions {
   maybeSingle?: boolean;
   tournament_id?: string;
   modality_id?: string;
+  stage_id?: string | null;
 }
 
 /**
@@ -26,7 +27,9 @@ export async function organizerQuery<T = any>(options: QueryOptions): Promise<{ 
 
   try {
     if (operation === "undo_bracket") {
-      return await undoBracket(options.tournament_id || options.filters?.tournament_id, options.modality_id || options.filters?.modality_id) as any;
+      const hasStageFilter = Object.prototype.hasOwnProperty.call(options, "stage_id") || Object.prototype.hasOwnProperty.call(options.filters ?? {}, "stage_id");
+      const stageId = Object.prototype.hasOwnProperty.call(options, "stage_id") ? options.stage_id : options.filters?.stage_id;
+      return await undoBracket(options.tournament_id || options.filters?.tournament_id, options.modality_id || options.filters?.modality_id, hasStageFilter ? stageId : undefined) as any;
     }
     if (operation === "reset_results") {
       return await resetResults(options.tournament_id || options.filters?.tournament_id, options.modality_id || options.filters?.modality_id) as any;
@@ -40,7 +43,7 @@ export async function organizerQuery<T = any>(options: QueryOptions): Promise<{ 
         query = (db.from as any)(table).select(selectStr || "*");
         if (filters) {
           for (const [key, value] of Object.entries(filters)) {
-            query = query.eq(key, value);
+            query = value === null ? query.is(key, null) : query.eq(key, value);
           }
         }
         if (order) {
@@ -63,7 +66,7 @@ export async function organizerQuery<T = any>(options: QueryOptions): Promise<{ 
         query = (db.from as any)(table).update(data);
         if (filters) {
           for (const [key, value] of Object.entries(filters)) {
-            query = query.eq(key, value);
+            query = value === null ? query.is(key, null) : query.eq(key, value);
           }
         }
         if (selectStr) query = query.select(selectStr);
@@ -74,7 +77,7 @@ export async function organizerQuery<T = any>(options: QueryOptions): Promise<{ 
         query = (db.from as any)(table).delete();
         if (filters) {
           for (const [key, value] of Object.entries(filters)) {
-            query = query.eq(key, value);
+            query = value === null ? query.is(key, null) : query.eq(key, value);
           }
         }
         break;
@@ -103,7 +106,7 @@ export async function publicQuery<T = any>(options: Omit<QueryOptions, "operatio
 
     if (filters) {
       for (const [key, value] of Object.entries(filters)) {
-        query = query.eq(key, value);
+        query = value === null ? query.is(key, null) : query.eq(key, value);
       }
     }
     if (order) {
@@ -123,17 +126,19 @@ export async function publicQuery<T = any>(options: Omit<QueryOptions, "operatio
   }
 }
 
-async function undoBracket(tournamentId?: string, modalityId?: string): Promise<{ data: any; error: any }> {
+async function undoBracket(tournamentId?: string, modalityId?: string, stageId?: string | null): Promise<{ data: any; error: any }> {
   if (!tournamentId) return { data: null, error: { message: "tournament_id é obrigatório" } };
 
   const db = getClient();
   let updateQuery: any = db.from("matches").update({ next_win_match_id: null, next_lose_match_id: null }).eq("tournament_id", tournamentId);
   if (modalityId) updateQuery = updateQuery.eq("modality_id", modalityId);
+  if (stageId !== undefined) updateQuery = stageId === null ? updateQuery.is("stage_id", null) : updateQuery.eq("stage_id", stageId);
   const { error: updateErr } = await updateQuery;
   if (updateErr) return { data: null, error: { message: updateErr.message } };
 
   let deleteQuery: any = db.from("matches").delete().eq("tournament_id", tournamentId);
   if (modalityId) deleteQuery = deleteQuery.eq("modality_id", modalityId);
+  if (stageId !== undefined) deleteQuery = stageId === null ? deleteQuery.is("stage_id", null) : deleteQuery.eq("stage_id", stageId);
   const { error: deleteErr } = await deleteQuery;
   if (deleteErr) return { data: null, error: { message: deleteErr.message } };
 

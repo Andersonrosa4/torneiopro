@@ -413,7 +413,7 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
       if (tournamentFormat === "double_elimination" && hasDoubleElimStructure) {
         const schedulerBlocks = buildSchedulerBlocks(allEliminationMatches as any);
         for (const sb of schedulerBlocks) {
-          const blockMatches = (sb.matches as Match[]).filter(m => m.team1_id && m.team2_id);
+          const blockMatches = (sb.matches as Match[]);
           if (blockMatches.length === 0) continue;
           groups.push({
             label: sb.label,

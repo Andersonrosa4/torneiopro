@@ -36,6 +36,11 @@ import { evaluateLateInsertion, type LateInsertionMatch } from "@/engine/lateTea
 
 import BracketTreeView from "@/components/BracketTreeView";
 import MatchSequenceViewer from "@/components/MatchSequenceViewer";
+import { exportBracketPdf, exportSequencePdf, exportBracketAndSequencePdf } from "@/lib/exportBracket";
+import { buildMatchNumberMap } from "@/lib/matchNumbering";
+import { getEliminationRoundLabel } from "@/lib/roundLabels";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { FileDown } from "lucide-react";
 import ClassificationTab from "@/components/ClassificationTab";
 import RankingsTab from "@/components/RankingsTab";
 import StageSelector from "@/components/StageSelector";
@@ -127,6 +132,8 @@ const TournamentDetail = () => {
   const [savingTournament, setSavingTournament] = useState(false);
   const [isAssociatedOrganizer, setIsAssociatedOrganizer] = useState(false);
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
+  const bracketExportRef = useRef<HTMLDivElement>(null);
+  const [exportingBracket, setExportingBracket] = useState(false);
 
   const { modalities, selectedModality, setSelectedModality, updateModality, createModality, deleteModality, loading: modalitiesLoading } = useModalities(id);
 
@@ -2863,18 +2870,142 @@ const TournamentDetail = () => {
 
               {filteredMatches.length > 0 ? (
                 <section>
-                  <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
-                    <Trophy className="h-5 w-5" /> Chaveamento
-                  </h2>
-                  <BracketTreeView
-                      matches={filteredMatches}
-                      participants={participants}
-                      isOwner={false}
-                      onDeclareWinner={() => {}}
-                      onUpdateScore={() => {}}
-                      structuralOnly
-                      tournamentFormat={tournament?.format === 'double_elimination' ? 'double_elimination' : (selectedModality?.game_system || tournament?.format)}
-                    />
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="text-xl font-semibold flex items-center gap-2">
+                      <Trophy className="h-5 w-5" /> Chaveamento
+                    </h2>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="gap-1.5" disabled={exportingBracket}>
+                          <FileDown className="h-4 w-4" />
+                          {exportingBracket ? "Exportando..." : "Exportar PDF"}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-64">
+                        <DropdownMenuItem
+                          onClick={async () => {
+                            if (!bracketExportRef.current) return;
+                            setExportingBracket(true);
+                            try {
+                              const meta = {
+                                tournamentName: tournament?.name || "Torneio",
+                                sport: sportLabels[tournament?.sport] || tournament?.sport || "",
+                                date: tournament?.event_date ? formatDateBR(tournament.event_date) : undefined,
+                                modalityName: selectedModality?.name,
+                              };
+                              await exportBracketPdf(bracketExportRef.current, meta);
+                              toast.success("Chave exportada em PDF!");
+                            } catch (err: any) {
+                              toast.error("Erro ao exportar chave: " + (err?.message || ""));
+                            } finally {
+                              setExportingBracket(false);
+                            }
+                          }}
+                        >
+                          🌳 Exportar Chave (árvore)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            try {
+                              const fmt = tournament?.format === 'double_elimination' ? 'double_elimination' : 'single_elimination';
+                              const numMap = buildMatchNumberMap(filteredMatches as any, fmt);
+                              const teamName = (tid: string | null) => {
+                                if (!tid) return "A definir";
+                                const t = filteredTeams.find((x: any) => x.id === tid);
+                                if (!t) return "A definir";
+                                return `${t.player1_name}${t.player2_name ? " / " + t.player2_name : ""}`;
+                              };
+                              const matchCountByRound = new Map<number, number>();
+                              for (const m of filteredMatches) {
+                                matchCountByRound.set(m.round, (matchCountByRound.get(m.round) || 0) + 1);
+                              }
+                              const rows = [...filteredMatches]
+                                .map((m) => ({
+                                  order: numMap.get(m.id) ?? 0,
+                                  round: m.round === 0 ? "Fase de Grupos" : getEliminationRoundLabel(m.round, matchCountByRound.get(m.round) || 0),
+                                  group: m.bracket_number ? `Chave ${String.fromCharCode(64 + (m.bracket_number || 1))}` : "-",
+                                  team1: teamName(m.team1_id),
+                                  team2: teamName(m.team2_id),
+                                  score: m.status === "completed" ? `${m.score1 ?? 0} × ${m.score2 ?? 0}` : "-",
+                                  winner: m.winner_team_id ? teamName(m.winner_team_id) : "-",
+                                  status: m.status === "completed" ? "Finalizado" : "Pendente",
+                                }))
+                                .sort((a, b) => a.order - b.order);
+                              const meta = {
+                                tournamentName: tournament?.name || "Torneio",
+                                sport: sportLabels[tournament?.sport] || tournament?.sport || "",
+                                date: tournament?.event_date ? formatDateBR(tournament.event_date) : undefined,
+                                modalityName: selectedModality?.name,
+                              };
+                              exportSequencePdf(rows, meta);
+                              toast.success("Sequência exportada em PDF!");
+                            } catch (err: any) {
+                              toast.error("Erro ao exportar sequência: " + (err?.message || ""));
+                            }
+                          }}
+                        >
+                          📋 Exportar Sequência
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={async () => {
+                            if (!bracketExportRef.current) return;
+                            setExportingBracket(true);
+                            try {
+                              const fmt = tournament?.format === 'double_elimination' ? 'double_elimination' : 'single_elimination';
+                              const numMap = buildMatchNumberMap(filteredMatches as any, fmt);
+                              const teamName = (tid: string | null) => {
+                                if (!tid) return "A definir";
+                                const t = filteredTeams.find((x: any) => x.id === tid);
+                                if (!t) return "A definir";
+                                return `${t.player1_name}${t.player2_name ? " / " + t.player2_name : ""}`;
+                              };
+                              const matchCountByRound = new Map<number, number>();
+                              for (const m of filteredMatches) {
+                                matchCountByRound.set(m.round, (matchCountByRound.get(m.round) || 0) + 1);
+                              }
+                              const rows = [...filteredMatches]
+                                .map((m) => ({
+                                  order: numMap.get(m.id) ?? 0,
+                                  round: m.round === 0 ? "Fase de Grupos" : getEliminationRoundLabel(m.round, matchCountByRound.get(m.round) || 0),
+                                  group: m.bracket_number ? `Chave ${String.fromCharCode(64 + (m.bracket_number || 1))}` : "-",
+                                  team1: teamName(m.team1_id),
+                                  team2: teamName(m.team2_id),
+                                  score: m.status === "completed" ? `${m.score1 ?? 0} × ${m.score2 ?? 0}` : "-",
+                                  winner: m.winner_team_id ? teamName(m.winner_team_id) : "-",
+                                  status: m.status === "completed" ? "Finalizado" : "Pendente",
+                                }))
+                                .sort((a, b) => a.order - b.order);
+                              const meta = {
+                                tournamentName: tournament?.name || "Torneio",
+                                sport: sportLabels[tournament?.sport] || tournament?.sport || "",
+                                date: tournament?.event_date ? formatDateBR(tournament.event_date) : undefined,
+                                modalityName: selectedModality?.name,
+                              };
+                              await exportBracketAndSequencePdf(bracketExportRef.current, rows, meta);
+                              toast.success("PDF completo exportado!");
+                            } catch (err: any) {
+                              toast.error("Erro ao exportar: " + (err?.message || ""));
+                            } finally {
+                              setExportingBracket(false);
+                            }
+                          }}
+                        >
+                          📦 Exportar Chave + Sequência
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  <div ref={bracketExportRef} className="bg-background p-2 rounded-lg">
+                    <BracketTreeView
+                        matches={filteredMatches}
+                        participants={participants}
+                        isOwner={false}
+                        onDeclareWinner={() => {}}
+                        onUpdateScore={() => {}}
+                        structuralOnly
+                        tournamentFormat={tournament?.format === 'double_elimination' ? 'double_elimination' : (selectedModality?.game_system || tournament?.format)}
+                      />
+                  </div>
                 </section>
               ) : (
                 <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">

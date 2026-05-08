@@ -216,10 +216,10 @@ const MatchCard = ({
   const bottomWin = match.winner_team_id === bottomTeamId && isCompleted;
 
   const sizeClasses = {
-    small: "w-[130px] text-[9px]",
-    normal: "w-[130px] text-[9px]",
-    semi: "w-[130px] text-[9px]",
-    final: "w-[140px] text-[10px]",
+    small: "w-full min-w-0 sm:w-[130px] text-[9px]",
+    normal: "w-full min-w-0 sm:w-[130px] text-[9px]",
+    semi: "w-full min-w-0 sm:w-[130px] text-[9px]",
+    final: "w-full min-w-0 sm:w-[140px] text-[10px]",
   };
 
   const borderClasses = (() => {

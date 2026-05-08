@@ -349,14 +349,14 @@ const BracketColumn = ({
   };
 
   return (
-    <div className={`rounded-xl border ${colorAccent} p-3 space-y-2`}>
+    <div className={`w-full min-w-0 rounded-xl border ${colorAccent} p-3 space-y-2`}>
       <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground flex items-center gap-1.5">
         <span>{icon}</span>
         <span>{label}</span>
         {reversed ? <ChevronLeft className="h-3 w-3 ml-auto opacity-50" /> : <ChevronRight className="h-3 w-3 ml-auto opacity-50" />}
       </div>
-      <div className="relative overflow-x-auto pb-2">
-        <div className="flex gap-6 relative" style={{ zIndex: 1 }}>
+      <div className="relative overflow-x-auto pb-2" style={{ WebkitOverflowScrolling: "touch" }}>
+        <div className="flex w-max min-w-full gap-6 relative" style={{ zIndex: 1 }}>
           {displayRounds.map((round) => {
             // Ordena pelo número global do jogo (sequência do scheduler) para exibição correta top→bottom
             const roundMatches = roundGroups[round].sort((a, b) => {

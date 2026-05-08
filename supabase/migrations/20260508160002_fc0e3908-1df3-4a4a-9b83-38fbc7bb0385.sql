@@ -1,0 +1,1 @@
+UPDATE public.tournaments SET status = 'in_progress', updated_at = now() WHERE id = '9bbfd4d9-7c3a-47f7-a6b6-87027e04bce9';

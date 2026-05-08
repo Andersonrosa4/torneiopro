@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import html2canvas from "html2canvas";
+import { toPng } from "html-to-image";
 
 interface BracketExportMeta {
   tournamentName: string;
@@ -20,14 +20,20 @@ interface MatchRow {
   status: string;
 }
 
+interface CapturedImage {
+  dataUrl: string;
+  width: number; // CSS px
+  height: number; // CSS px
+}
+
 /**
- * Captura um elemento DOM como imagem PNG em alta resolução
- * (escala 2x para permitir zoom no PDF sem perder qualidade).
+ * Captura o elemento DOM como PNG fiel ao layout (usa html-to-image,
+ * que serializa SVG e respeita CSS muito melhor que html2canvas).
+ * Expande temporariamente containers com overflow/transform para que
+ * a imagem contenha a árvore inteira.
  */
-async function captureElement(el: HTMLElement): Promise<HTMLCanvasElement> {
-  // Temporarily expand all scrollable/overflow-clipped descendants so html2canvas
-  // captures the FULL bracket (not just the visible viewport slice).
-  const mutated: { node: HTMLElement; prev: { overflow: string; overflowX: string; overflowY: string; maxWidth: string; maxHeight: string; width: string; height: string; transform: string } }[] = [];
+async function captureElement(el: HTMLElement): Promise<CapturedImage> {
+  const mutated: { node: HTMLElement; prev: Partial<CSSStyleDeclaration> }[] = [];
   const all = [el, ...Array.from(el.querySelectorAll<HTMLElement>("*"))];
   for (const node of all) {
     const cs = window.getComputedStyle(node);
@@ -46,7 +52,7 @@ async function captureElement(el: HTMLElement): Promise<HTMLCanvasElement> {
         width: node.style.width,
         height: node.style.height,
         transform: node.style.transform,
-      },
+      } as Partial<CSSStyleDeclaration>,
     });
     node.style.overflow = "visible";
     node.style.overflowX = "visible";
@@ -59,13 +65,9 @@ async function captureElement(el: HTMLElement): Promise<HTMLCanvasElement> {
     if (clipsY && node.scrollHeight > node.clientHeight) {
       node.style.height = `${node.scrollHeight}px`;
     }
-    if (hasTransform) {
-      // Remove zoom/scale transforms so the capture reflects natural size
-      node.style.transform = "none";
-    }
+    if (hasTransform) node.style.transform = "none";
   }
 
-  // Wait a frame so layout reflows
   await new Promise((r) => requestAnimationFrame(() => r(null)));
   await new Promise((r) => requestAnimationFrame(() => r(null)));
 
@@ -73,29 +75,22 @@ async function captureElement(el: HTMLElement): Promise<HTMLCanvasElement> {
   const fullH = el.scrollHeight;
 
   try {
-    return await html2canvas(el, {
-      scale: 2,
+    const dataUrl = await toPng(el, {
+      pixelRatio: 2,
       backgroundColor: "#ffffff",
-      useCORS: true,
-      logging: false,
-      windowWidth: fullW,
-      windowHeight: fullH,
+      cacheBust: true,
       width: fullW,
       height: fullH,
-      scrollX: 0,
-      scrollY: 0,
+      style: {
+        transform: "none",
+        transformOrigin: "top left",
+        margin: "0",
+      },
     });
+    return { dataUrl, width: fullW, height: fullH };
   } finally {
-    // Restore original styles
     for (const { node, prev } of mutated) {
-      node.style.overflow = prev.overflow;
-      node.style.overflowX = prev.overflowX;
-      node.style.overflowY = prev.overflowY;
-      node.style.maxWidth = prev.maxWidth;
-      node.style.maxHeight = prev.maxHeight;
-      node.style.width = prev.width;
-      node.style.height = prev.height;
-      node.style.transform = prev.transform;
+      Object.assign(node.style, prev);
     }
   }
 }
@@ -126,44 +121,11 @@ function drawHeader(doc: jsPDF, title: string, meta: BracketExportMeta, y = 14) 
   return line + 4;
 }
 
-/**
- * Insere a imagem do bracket no PDF. Usa landscape em A3 para caber a
- * árvore completa em alta resolução, permitindo zoom no leitor de PDF.
- */
-async function addBracketImageToPdf(doc: jsPDF, canvas: HTMLCanvasElement, startY: number) {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 8;
-
-  const availW = pageWidth - margin * 2;
-  const availH = pageHeight - startY - margin;
-
-  const imgRatio = canvas.width / canvas.height;
-  let drawW = availW;
-  let drawH = drawW / imgRatio;
-
-  if (drawH > availH) {
-    drawH = availH;
-    drawW = drawH * imgRatio;
-  }
-
-  const x = (pageWidth - drawW) / 2;
-  const dataUrl = canvas.toDataURL("image/png");
-  doc.addImage(dataUrl, "PNG", x, startY, drawW, drawH, undefined, "FAST");
-}
-
-/** Adiciona a sequência de partidas como tabela (para PDF combinado). */
+/** Adiciona a sequência de partidas como tabela. */
 function addSequenceTable(doc: jsPDF, matches: MatchRow[], startY: number) {
   const headers = ["#", "Fase", "Grupo/Chave", "Dupla 1", "Dupla 2", "Placar", "Vencedor", "Status"];
   const rows = matches.map((m) => [
-    String(m.order),
-    m.round,
-    m.group,
-    m.team1,
-    m.team2,
-    m.score,
-    m.winner,
-    m.status,
+    String(m.order), m.round, m.group, m.team1, m.team2, m.score, m.winner, m.status,
   ]);
   autoTable(doc, {
     head: [headers],
@@ -176,42 +138,31 @@ function addSequenceTable(doc: jsPDF, matches: MatchRow[], startY: number) {
 }
 
 /**
- * Cria um PDF cuja página tem o tamanho EXATO da árvore capturada
- * (proporcional ao canvas), garantindo que a chave aparece inteira,
- * sem corte, e podendo ser ampliada com zoom no leitor de PDF.
+ * Cria um PDF cuja página tem o tamanho exato da árvore capturada,
+ * garantindo que a chave aparece inteira sem corte.
  */
-function buildBracketPdf(canvas: HTMLCanvasElement, meta: BracketExportMeta): jsPDF {
-  // Convert canvas pixels to mm at 96 DPI baseline.
-  // canvas was rendered at scale=2, so we divide by 2 to get CSS px,
-  // then convert px → mm (1 mm ≈ 3.7795 px).
-  const cssW = canvas.width / 2;
-  const cssH = canvas.height / 2;
+function buildBracketPdf(img: CapturedImage, meta: BracketExportMeta): jsPDF {
   const PX_PER_MM = 3.7795;
-  const HEADER_MM = 32; // espaço para cabeçalho
+  const HEADER_MM = 32;
   const MARGIN_MM = 6;
 
-  const imgWmm = cssW / PX_PER_MM;
-  const imgHmm = cssH / PX_PER_MM;
+  const imgWmm = img.width / PX_PER_MM;
+  const imgHmm = img.height / PX_PER_MM;
 
   const pageW = imgWmm + MARGIN_MM * 2;
   const pageH = imgHmm + HEADER_MM + MARGIN_MM;
 
   const orientation = pageW >= pageH ? "landscape" : "portrait";
-  const doc = new jsPDF({
-    orientation,
-    unit: "mm",
-    format: [pageW, pageH],
-  });
+  const doc = new jsPDF({ orientation, unit: "mm", format: [pageW, pageH] });
 
   drawHeader(doc, "Chaveamento — Árvore", meta);
-  const dataUrl = canvas.toDataURL("image/png");
-  doc.addImage(dataUrl, "PNG", MARGIN_MM, HEADER_MM, imgWmm, imgHmm, undefined, "FAST");
+  doc.addImage(img.dataUrl, "PNG", MARGIN_MM, HEADER_MM, imgWmm, imgHmm, undefined, "FAST");
   return doc;
 }
 
 export async function exportBracketPdf(el: HTMLElement, meta: BracketExportMeta) {
-  const canvas = await captureElement(el);
-  const doc = buildBracketPdf(canvas, meta);
+  const img = await captureElement(el);
+  const doc = buildBracketPdf(img, meta);
   const base = sanitizeFileName(`chaveamento_${meta.tournamentName}`);
   doc.save(`${base}.pdf`);
 }
@@ -224,22 +175,20 @@ export function exportSequencePdf(matches: MatchRow[], meta: BracketExportMeta) 
   doc.save(`${base}.pdf`);
 }
 
-/**
- * Exporta CHAVE (página 1, tamanho real) + SEQUÊNCIA (página A3) num PDF.
- */
 export async function exportBracketAndSequencePdf(
   el: HTMLElement,
   matches: MatchRow[],
   meta: BracketExportMeta,
 ) {
-  const canvas = await captureElement(el);
-  const doc = buildBracketPdf(canvas, meta);
+  const img = await captureElement(el);
+  const doc = buildBracketPdf(img, meta);
   doc.addPage("a3", "landscape");
   const y2 = drawHeader(doc, "Sequência de Partidas", meta);
   addSequenceTable(doc, matches, y2);
   const base = sanitizeFileName(`torneio_${meta.tournamentName}`);
   doc.save(`${base}.pdf`);
 }
+
 
 function sanitizeFileName(s: string) {
   return s.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_\-]/g, "");

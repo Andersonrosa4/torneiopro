@@ -467,7 +467,7 @@ const MatchSequenceTab = ({ matches, teams, tournamentFormat = 'single_eliminati
   }, [filteredMatches, tournamentFormat, matchCountByRound]);
 
   // Stats
-  const displayMatches = useMemo(() => filteredMatches.filter(m => m.team1_id && m.team2_id), [filteredMatches]);
+  const displayMatches = useMemo(() => filteredMatches.filter(m => m.round > 0 || (m.team1_id && m.team2_id)), [filteredMatches]);
   const completedCount = useMemo(() => displayMatches.filter(m => m.status === "completed").length, [displayMatches]);
   const pendingCount = useMemo(() => displayMatches.filter(m => m.status !== "completed" && m.team1_id && m.team2_id).length, [displayMatches]);
 

@@ -189,22 +189,6 @@ export async function exportBracketAndSequencePdf(
   doc.save(`${base}.pdf`);
 }
 
-/**
- * Exporta CHAVE (página 1, tamanho real) + SEQUÊNCIA (página A3) num PDF.
- */
-export async function exportBracketAndSequencePdf(
-  el: HTMLElement,
-  matches: MatchRow[],
-  meta: BracketExportMeta,
-) {
-  const canvas = await captureElement(el);
-  const doc = buildBracketPdf(canvas, meta);
-  doc.addPage("a3", "landscape");
-  const y2 = drawHeader(doc, "Sequência de Partidas", meta);
-  addSequenceTable(doc, matches, y2);
-  const base = sanitizeFileName(`torneio_${meta.tournamentName}`);
-  doc.save(`${base}.pdf`);
-}
 
 function sanitizeFileName(s: string) {
   return s.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_\-]/g, "");

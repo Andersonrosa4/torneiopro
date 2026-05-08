@@ -1044,7 +1044,7 @@ const TournamentDetail = () => {
   };
 
   const undoBracket = async () => {
-    if (isTournamentCompleted) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
+    if (isWriteLocked) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
     if (!id) return;
     const { error } = await organizerQuery({
       table: "matches",
@@ -1322,7 +1322,7 @@ const TournamentDetail = () => {
   };
 
   const declareWinner = async (matchId: string, winnerId: string) => {
-    if (isTournamentCompleted) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
+    if (isWriteLocked) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
     // MUTEX: Per-match lock to allow concurrent declarations on different matches
     if (declareWinnerMutex.current.has(matchId)) {
       toast.info("Aguarde a operação anterior desta partida...");
@@ -2250,7 +2250,7 @@ const TournamentDetail = () => {
 
   // Combined handler: save score + declare winner in one action
   const handleAutoResult = async (matchId: string, score1: number, score2: number, winnerId: string) => {
-    if (isTournamentCompleted) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
+    if (isWriteLocked) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
     // Update local state BEFORE calling declareWinner so it reads the correct scores
     setMatches(prev => prev.map(m => m.id === matchId ? { ...m, score1, score2 } : m));
     await organizerQuery({
@@ -2263,7 +2263,7 @@ const TournamentDetail = () => {
   };
 
   const updateScore = async (matchId: string, score1: number, score2: number) => {
-    if (isTournamentCompleted) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
+    if (isWriteLocked) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }
     const { error } = await organizerQuery({
       table: "matches",
       operation: "update",

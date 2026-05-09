@@ -242,8 +242,15 @@ const Dashboard = () => {
               <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 {tournaments.map((t, i) => (
                   <motion.div key={t.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-                    <Link to={`/tournaments/${t.id}`} className="block">
-                      <div className="group rounded-xl border border-border bg-card p-5 shadow-card transition-all hover:border-primary/30 hover:shadow-glow">
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => navigate(`/tournaments/${t.id}`)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") navigate(`/tournaments/${t.id}`);
+                        }}
+                        className="group cursor-pointer rounded-xl border border-border bg-card p-5 shadow-card transition-all hover:border-primary/30 hover:shadow-glow focus:outline-none focus:ring-2 focus:ring-primary/60"
+                      >
                         <div className="mb-3 flex items-start justify-between">
                           <h3 className="text-lg font-semibold leading-tight group-hover:text-primary transition-colors">{t.name}</h3>
                           <div className="flex items-center gap-2">
@@ -255,7 +262,7 @@ const Dashboard = () => {
                                     variant="ghost"
                                     size="sm"
                                     className="h-7 w-7 p-0"
-                                    onClick={(e) => e.preventDefault()}
+                                    onClick={(e) => e.stopPropagation()}
                                   >
                                     <Trash2 className="h-3.5 w-3.5 text-destructive" />
                                   </Button>
@@ -309,7 +316,6 @@ const Dashboard = () => {
                           Ver Detalhes <ArrowRight className="h-3 w-3" />
                         </div>
                       </div>
-                    </Link>
                   </motion.div>
                 ))}
               </div>

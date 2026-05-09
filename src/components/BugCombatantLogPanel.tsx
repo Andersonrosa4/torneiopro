@@ -16,6 +16,14 @@ import {
   toCursor,
   type KeysetCursor,
 } from "@/lib/bugCombatantLogCursor";
+import {
+  flushNow,
+  recordCursorError,
+  recordFirstLoad,
+  recordLoadMore,
+  recordReset,
+  type ResetReason,
+} from "@/lib/bugCombatantLogTelemetry";
 import { toast } from "sonner";
 
 type Source = "all" | "cron" | "manual";
@@ -88,6 +96,10 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
   // Inserções via realtime no topo da lista NÃO mexem nele — assim o
   // próximo loadMore continua de onde paramos, sem pular linhas.
   const cursorRef = useRef<KeysetCursor | null>(null);
+  // Contador de páginas carregadas via loadMore (telemetria/perf).
+  const pageIndexRef = useRef(0);
+  // Motivo do próximo reset (por padrão "filters_changed"; sobrescrito antes do refetch).
+  const nextResetReasonRef = useRef<ResetReason>("mount");
 
   // Persiste filtros + posição de rolagem (sessionStorage)
   useEffect(() => {
@@ -139,6 +151,7 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
           ? `Combatedor: ${s.fixed} correção(ões) aplicada(s) em ${s.scanned} partidas.`
           : `Combatedor: ${s.scanned} partidas verificadas, nenhum bug detectado.`,
       );
+      nextResetReasonRef.current = "after_run";
       fetchLogs();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -170,26 +183,72 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     setError(null);
+    // Telemetria: registra reset (drop da lista atual) ANTES de zerar.
+    const prevRowsCount = rows.length;
+    const prevPageIndex = pageIndexRef.current;
+    const reason = nextResetReasonRef.current;
+    if (reason !== "mount" || prevRowsCount > 0) {
+      recordReset({
+        tournament_id: tournamentId,
+        reason,
+        source,
+        scope,
+        rows_dropped: prevRowsCount,
+        page_index_dropped: prevPageIndex,
+      });
+    }
+    nextResetReasonRef.current = "filters_changed"; // padrão para próximos resets
     // Reseta lista, paginação e cursor para recarregar do início
     setRows([]);
     setHasMore(true);
     cursorRef.current = null;
-    const { data, error: qErr } = await buildQuery(null);
+    pageIndexRef.current = 0;
+    const startedAt = (typeof performance !== "undefined" ? performance.now() : Date.now());
+    let qErr: { message?: string } | null = null;
+    let data: LogRow[] | null = null;
+    try {
+      const res = await buildQuery(null);
+      qErr = res.error;
+      data = (res.data ?? null) as LogRow[] | null;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      recordCursorError(tournamentId, { message: msg, context: "first_load", source, scope });
+      setError(msg || "Falha ao carregar a auditoria.");
+      setHasMore(false);
+      setLoading(false);
+      return;
+    }
+    const duration = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
     if (qErr) {
       setError(qErr.message || "Falha ao carregar a auditoria.");
       setHasMore(false);
+      recordFirstLoad({
+        tournament_id: tournamentId,
+        duration_ms: duration,
+        page_size: 0,
+        has_more: false,
+        source, scope, ok: false, error: qErr.message,
+      });
     } else if (data) {
       // Dedup defensivo (caso realtime tenha disparado em paralelo)
       const seen = new Set<string>();
       const unique = (data as LogRow[]).filter((r) => (seen.has(r.id) ? false : (seen.add(r.id), true)));
       setRows(unique);
-      setHasMore(data.length === PAGE_SIZE);
+      const more = data.length === PAGE_SIZE;
+      setHasMore(more);
       cursorRef.current = nextCursorFromPage(unique, null);
+      recordFirstLoad({
+        tournament_id: tournamentId,
+        duration_ms: duration,
+        page_size: unique.length,
+        has_more: more,
+        source, scope, ok: true,
+      });
     } else {
       setHasMore(false);
     }
     setLoading(false);
-  }, [buildQuery]);
+  }, [buildQuery, tournamentId, source, scope, rows.length]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
@@ -200,6 +259,7 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
       cursorRef.current ?? toCursor(rows[rows.length - 1] ?? null);
     if (!cursor) return;
     setLoadingMore(true);
+    const startedAt = (typeof performance !== "undefined" ? performance.now() : Date.now());
     let qErr: { message?: string } | null = null;
     let data: LogRow[] | null = null;
     try {
@@ -209,27 +269,45 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
     } catch (e) {
       // Erros de validação de cursor caem aqui — desliga paginação.
       const msg = e instanceof Error ? e.message : String(e);
+      recordCursorError(tournamentId, { message: msg, context: "load_more", source, scope });
       toast.error(`Cursor inválido para paginação: ${msg}`);
       setHasMore(false);
       setLoadingMore(false);
       return;
     }
+    const duration = (typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt;
+    const nextPageIndex = pageIndexRef.current + 1;
     if (qErr) {
       toast.error(`Falha ao carregar mais: ${qErr.message}`);
       setHasMore(false);
+      recordLoadMore(tournamentId, {
+        duration_ms: duration, page_size: 0, has_more: false,
+        page_index: nextPageIndex, source, scope, ok: false, error: qErr.message,
+      });
     } else if (data) {
       setRows((prev) => {
         const seen = new Set(prev.map((r) => r.id));
         const next = data!.filter((r) => !seen.has(r.id));
         return [...prev, ...next];
       });
-      setHasMore(data.length === PAGE_SIZE);
+      const more = data.length === PAGE_SIZE;
+      setHasMore(more);
       cursorRef.current = nextCursorFromPage(data, cursor);
+      pageIndexRef.current = nextPageIndex;
+      recordLoadMore(tournamentId, {
+        duration_ms: duration, page_size: data.length, has_more: more,
+        page_index: nextPageIndex, source, scope, ok: true,
+      });
     }
     setLoadingMore(false);
-  }, [buildQuery, hasMore, loadingMore, rows]);
+  }, [buildQuery, hasMore, loadingMore, rows, tournamentId, source, scope]);
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
+
+  // Flush da telemetria pendente ao desmontar (best-effort).
+  useEffect(() => {
+    return () => { void flushNow(); };
+  }, []);
 
   // Realtime: aplica diffs incrementais (INSERT/UPDATE/DELETE) sem refetch.
   // Mantém a ordenação (created_at desc, id desc) e o cursor de keyset intactos:
@@ -403,7 +481,7 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
             <Download className="w-4 h-4 mr-1.5" />
             Exportar CSV
           </Button>
-          <Button variant="outline" size="sm" onClick={fetchLogs} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={() => { nextResetReasonRef.current = "manual_refresh"; fetchLogs(); }} disabled={loading}>
             <RefreshCw className={`w-4 h-4 mr-1.5 ${loading ? "animate-spin" : ""}`} />
             Atualizar
           </Button>

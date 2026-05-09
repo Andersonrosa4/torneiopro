@@ -86,25 +86,40 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
     }
   }, [isAdmin, tournamentId]);
 
-  const buildQuery = useCallback((from: number, to: number) => {
-    let q = supabase
-      .from("bug_combatant_log")
-      .select("id,tournament_id,scanned,fixed,remaining,source,applied_fixes,created_at")
-      .order("created_at", { ascending: false })
-      .range(from, to);
-    if (scope === "tournament") q = q.eq("tournament_id", tournamentId);
-    if (source !== "all") q = q.eq("source", source);
-    return q;
-  }, [tournamentId, source, scope]);
+  // Keyset pagination: ordena por (created_at desc, id desc) e usa o último item como cursor.
+  // Isso elimina deslocamento de offset quando novas linhas chegam via realtime.
+  const buildQuery = useCallback(
+    (cursor: { created_at: string; id: string } | null) => {
+      let q = supabase
+        .from("bug_combatant_log")
+        .select("id,tournament_id,scanned,fixed,remaining,source,applied_fixes,created_at")
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(PAGE_SIZE);
+      if (scope === "tournament") q = q.eq("tournament_id", tournamentId);
+      if (source !== "all") q = q.eq("source", source);
+      if (cursor) {
+        // (created_at, id) < (cursor.created_at, cursor.id) em ordem desc
+        q = q.or(
+          `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`,
+        );
+      }
+      return q;
+    },
+    [tournamentId, source, scope],
+  );
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     // Reseta lista e paginação para recarregar do início
     setRows([]);
     setHasMore(true);
-    const { data, error } = await buildQuery(0, PAGE_SIZE - 1);
+    const { data, error } = await buildQuery(null);
     if (!error && data) {
-      setRows(data as LogRow[]);
+      // Dedup defensivo (caso realtime tenha disparado em paralelo)
+      const seen = new Set<string>();
+      const unique = (data as LogRow[]).filter((r) => (seen.has(r.id) ? false : (seen.add(r.id), true)));
+      setRows(unique);
       setHasMore(data.length === PAGE_SIZE);
     } else {
       setHasMore(false);
@@ -113,11 +128,11 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
   }, [buildQuery]);
 
   const loadMore = useCallback(async () => {
-    if (loadingMore || !hasMore) return;
+    if (loadingMore || !hasMore || rows.length === 0) return;
     setLoadingMore(true);
-    const from = rows.length;
-    const to = from + PAGE_SIZE - 1;
-    const { data, error } = await buildQuery(from, to);
+    const last = rows[rows.length - 1];
+    const cursor = { created_at: last.created_at, id: last.id };
+    const { data, error } = await buildQuery(cursor);
     if (!error && data) {
       setRows((prev) => {
         const seen = new Set(prev.map((r) => r.id));
@@ -127,7 +142,7 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
       setHasMore(data.length === PAGE_SIZE);
     }
     setLoadingMore(false);
-  }, [buildQuery, hasMore, loadingMore, rows.length]);
+  }, [buildQuery, hasMore, loadingMore, rows]);
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
 

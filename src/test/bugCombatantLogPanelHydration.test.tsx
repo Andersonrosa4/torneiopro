@@ -154,8 +154,8 @@ describe("BugCombatantLogPanel — hidratação após refresh", () => {
       scope: "tournament",
       search: "",
       scrollY: 0,
-      // Cursor com id em maiúsculas viola o formato canônico → hydrate deve devolver null.
-      cursor: { created_at: "2025-01-02T08:00:00.000Z", id: ROW_ID_OLD.toUpperCase() } as any,
+      // Cursor com id que não é UUID → `toCursor` devolve null → hydrate é descartado.
+      cursor: { created_at: "2025-01-02T08:00:00.000Z", id: "not-a-uuid" } as any,
       rows: makePersistedRows(),
       pageIndex: 1,
       hasMore: true,

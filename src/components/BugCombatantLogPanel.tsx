@@ -114,11 +114,15 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
+    setError(null);
     // Reseta lista e paginação para recarregar do início
     setRows([]);
     setHasMore(true);
-    const { data, error } = await buildQuery(null);
-    if (!error && data) {
+    const { data, error: qErr } = await buildQuery(null);
+    if (qErr) {
+      setError(qErr.message || "Falha ao carregar a auditoria.");
+      setHasMore(false);
+    } else if (data) {
       // Dedup defensivo (caso realtime tenha disparado em paralelo)
       const seen = new Set<string>();
       const unique = (data as LogRow[]).filter((r) => (seen.has(r.id) ? false : (seen.add(r.id), true)));
@@ -135,8 +139,11 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
     setLoadingMore(true);
     const last = rows[rows.length - 1];
     const cursor = { created_at: last.created_at, id: last.id };
-    const { data, error } = await buildQuery(cursor);
-    if (!error && data) {
+    const { data, error: qErr } = await buildQuery(cursor);
+    if (qErr) {
+      toast.error(`Falha ao carregar mais: ${qErr.message}`);
+      setHasMore(false);
+    } else if (data) {
       setRows((prev) => {
         const seen = new Set(prev.map((r) => r.id));
         const next = (data as LogRow[]).filter((r) => !seen.has(r.id));

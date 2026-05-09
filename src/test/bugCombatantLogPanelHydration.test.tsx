@@ -19,6 +19,16 @@ import {
 // ─── Mocks ─────────────────────────────────────────────────────────────────
 const invokeMock = vi.fn();
 
+// jsdom não tem IntersectionObserver — stub mínimo (panel usa para infinite scroll).
+class IOStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() { return []; }
+}
+(globalThis as any).IntersectionObserver = (globalThis as any).IntersectionObserver ?? IOStub;
+
+
 vi.mock("@/integrations/supabase/client", () => {
   const channelStub = {
     on: vi.fn().mockReturnThis(),

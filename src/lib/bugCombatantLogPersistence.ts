@@ -196,46 +196,197 @@ export function buildCompactJson(state: Omit<PersistedState, "v" | "savedAt">): 
   );
 }
 
-/** Lê o estado bruto do sessionStorage e expande para o formato canônico. */
-export function readPersisted(tournamentId: string): RawPersisted {
-  if (typeof sessionStorage === "undefined") return {};
-  try {
-    const raw = sessionStorage.getItem(storageKey(tournamentId));
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return {};
-    return expandPayload(parsed as CompactPayload | RawPersisted);
-  } catch {
-    return {};
+// ───── Migrações de schema ─────────────────────────────────────────────
+//
+// Cada migração leva um payload da versão N para a versão N+1, ou retorna
+// `null` se o payload for irreparável. O loop em `migrateToCurrent` aplica
+// as migrações em sequência até bater na `SCHEMA_VERSION`.
+//
+// Mantemos migrações ATIVAS aqui mesmo após a versão atual subir, para
+// preservar progresso de usuários que ainda têm sessões antigas abertas.
+
+type AnyPayload = Record<string, unknown> & { v?: unknown };
+type Migration = (input: AnyPayload) => AnyPayload | null;
+
+/**
+ * v1 (verbose) → v2 (compacto).
+ *
+ * Formato v1:
+ *   { v:1, tournament_id, source, scope, search, scrollY, cursor:{created_at,id}|null,
+ *     rows:[{id, tournament_id, scanned, fixed, remaining, source, applied_fixes, created_at}],
+ *     pageIndex, hasMore, savedAt }
+ */
+const MIGRATION_V1_TO_V2: Migration = (p) => {
+  if (typeof p.tournament_id !== "string") return null;
+  const rowsRaw = Array.isArray((p as { rows?: unknown }).rows) ? (p as { rows: unknown[] }).rows : [];
+  const compactRows: unknown[] = [];
+  for (const r of rowsRaw) {
+    if (!r || typeof r !== "object") continue;
+    const row = r as Record<string, unknown>;
+    if (typeof row.id !== "string") continue;
+    compactRows.push([
+      row.id,
+      Number(row.scanned) | 0,
+      Number(row.fixed) | 0,
+      Number(row.remaining) | 0,
+      typeof row.source === "string" ? row.source : "manual",
+      typeof row.created_at === "string" ? row.created_at : "",
+      row.applied_fixes ?? null,
+    ]);
   }
+  const cursor =
+    p.cursor && typeof p.cursor === "object"
+      ? (p.cursor as { created_at?: unknown; id?: unknown })
+      : null;
+  return {
+    v: 2,
+    k: p.tournament_id,
+    f: [
+      typeof p.source === "string" ? p.source : "all",
+      typeof p.scope === "string" ? p.scope : "tournament",
+      typeof p.search === "string" ? p.search : "",
+    ],
+    y: typeof p.scrollY === "number" ? (p.scrollY as number) | 0 : 0,
+    c:
+      cursor && typeof cursor.created_at === "string" && typeof cursor.id === "string"
+        ? [cursor.created_at, cursor.id]
+        : null,
+    p: typeof p.pageIndex === "number" ? p.pageIndex : 0,
+    m: p.hasMore === true ? 1 : 0,
+    a: typeof p.savedAt === "number" ? p.savedAt : Date.now(),
+    r: compactRows,
+  };
+};
+
+const MIGRATIONS: Record<number, Migration> = {
+  1: MIGRATION_V1_TO_V2,
+  // próximas: 2: MIGRATION_V2_TO_V3, ...
+};
+
+/** Sobe `payload` da versão dele até `SCHEMA_VERSION`. `null` = irreparável. */
+function migrateToCurrent(payload: AnyPayload): AnyPayload | null {
+  let cur: AnyPayload | null = payload;
+  let safety = 16; // hard cap defensivo contra loops em registries quebrados
+  while (cur && cur.v !== SCHEMA_VERSION) {
+    if (typeof cur.v !== "number") return null;
+    if (cur.v > SCHEMA_VERSION) return null; // versão FUTURA → não tentamos rebaixar
+    const step = MIGRATIONS[cur.v];
+    if (!step) return null;
+    cur = step(cur);
+    if (--safety <= 0) return null;
+  }
+  return cur;
 }
 
-function expandPayload(p: CompactPayload | RawPersisted): RawPersisted {
-  // Apenas v=SCHEMA_VERSION (2) é aceito. v1 é descartado silenciosamente.
-  if (!("v" in p) || p.v !== SCHEMA_VERSION) return {};
-  const c = p as CompactPayload;
-  const tournamentId = typeof c.k === "string" ? c.k : "";
-  const filters = Array.isArray(c.f) ? c.f : [];
-  const rowsRaw = Array.isArray(c.r) ? c.r : [];
+/**
+ * Lê o estado bruto do sessionStorage e expande para o formato canônico.
+ * Se a entrada estiver em uma versão antiga, tenta migrar; se não puder,
+ * REMOVE a chave (auto-clear) para evitar hidratar com dados incompatíveis
+ * em chamadas futuras.
+ */
+export function readPersisted(tournamentId: string): RawPersisted {
+  if (typeof sessionStorage === "undefined") return {};
+  const key = storageKey(tournamentId);
+  let raw: string | null = null;
+  try {
+    raw = sessionStorage.getItem(key);
+  } catch { return {}; }
+  if (!raw) return {};
+  let parsed: AnyPayload | null = null;
+  try {
+    const j = JSON.parse(raw);
+    if (j && typeof j === "object" && !Array.isArray(j)) parsed = j as AnyPayload;
+  } catch { /* json corrompido */ }
+  if (!parsed) {
+    // JSON inválido → não conseguimos nem ler a versão; descarta.
+    safeRemove(key);
+    return {};
+  }
+  if (parsed.v !== SCHEMA_VERSION) {
+    const migrated = migrateToCurrent(parsed);
+    if (!migrated) {
+      // Incompatível e sem caminho de migração → auto-clear.
+      safeRemove(key);
+      return {};
+    }
+    parsed = migrated;
+    // Persiste a versão migrada para que próximas leituras sejam diretas.
+    try { sessionStorage.setItem(key, JSON.stringify(parsed)); } catch { /* ignore */ }
+  }
+  return expandPayload(parsed as unknown as CompactPayload);
+}
+
+function safeRemove(key: string): void {
+  try { sessionStorage.removeItem(key); } catch { /* ignore */ }
+}
+
+function expandPayload(p: CompactPayload): RawPersisted {
+  if (p.v !== SCHEMA_VERSION) return {};
+  const tournamentId = typeof p.k === "string" ? p.k : "";
+  const filters = Array.isArray(p.f) ? p.f : [];
+  const rowsRaw = Array.isArray(p.r) ? p.r : [];
   const rows = rowsRaw
     .map((t) => expandRow(t as CompactRow, tournamentId))
     .filter((x): x is PersistedRow => x !== null);
-  const cursor = Array.isArray(c.c) && c.c.length === 2
-    ? { created_at: String(c.c[0]), id: String(c.c[1]) }
+  const cursor = Array.isArray(p.c) && p.c.length === 2
+    ? { created_at: String(p.c[0]), id: String(p.c[1]) }
     : null;
   return {
-    v: c.v,
+    v: p.v,
     tournament_id: tournamentId,
     source: (filters[0] as Source) ?? "all",
     scope: (filters[1] as Scope) ?? "tournament",
     search: typeof filters[2] === "string" ? (filters[2] as string) : "",
-    scrollY: typeof c.y === "number" ? c.y : 0,
+    scrollY: typeof p.y === "number" ? p.y : 0,
     cursor,
     rows,
-    pageIndex: typeof c.p === "number" ? c.p : 0,
-    hasMore: c.m === 1,
+    pageIndex: typeof p.p === "number" ? p.p : 0,
+    hasMore: p.m === 1,
   };
 }
+
+/**
+ * Varre TODAS as chaves `bug-audit:*` no sessionStorage e descarta entradas
+ * incompatíveis (versão futura, JSON corrompido, ou sem caminho de migração).
+ * Idempotente. Retorna o número de chaves removidas (útil para diagnóstico).
+ */
+export function sweepIncompatibleKeys(): number {
+  if (typeof sessionStorage === "undefined") return 0;
+  let removed = 0;
+  const toRemove: string[] = [];
+  try {
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const k = sessionStorage.key(i);
+      if (!k || !k.startsWith(STORAGE_KEY_PREFIX)) continue;
+      let raw: string | null = null;
+      try { raw = sessionStorage.getItem(k); } catch { toRemove.push(k); continue; }
+      if (!raw) continue;
+      let parsed: AnyPayload | null = null;
+      try {
+        const j = JSON.parse(raw);
+        if (j && typeof j === "object" && !Array.isArray(j)) parsed = j as AnyPayload;
+      } catch { /* json corrompido */ }
+      if (!parsed) { toRemove.push(k); continue; }
+      if (parsed.v === SCHEMA_VERSION) continue; // ok
+      // Tenta migrar; se não puder, remove.
+      const migrated = migrateToCurrent(parsed);
+      if (!migrated) { toRemove.push(k); continue; }
+      // Persiste versão migrada (não conta como remoção).
+      try { sessionStorage.setItem(k, JSON.stringify(migrated)); } catch { /* ignore */ }
+    }
+  } catch { /* iteração falhou — best-effort */ }
+  for (const k of toRemove) {
+    safeRemove(k);
+    removed++;
+  }
+  return removed;
+}
+
+// Sweep best-effort no carregamento do módulo. Idempotente — seguro chamar
+// novamente em testes via __INTERNAL.
+try { sweepIncompatibleKeys(); } catch { /* ignore */ }
+
+
 
 /**
  * Valida o estado persistido para HIDRATAÇÃO de paginação.

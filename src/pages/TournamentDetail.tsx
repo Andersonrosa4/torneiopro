@@ -1572,7 +1572,7 @@ const TournamentDetail = () => {
                toast.error(`❌ Falha na repropagação: ${repropError.message}. Executando rollback...`);
 
                try {
-                 const rollbackPlan = computeAggressiveCascadeReset(match, matches.filter(m => m.modality_id === match.modality_id || !match.modality_id));
+                  const rollbackPlan = computeAggressiveCascadeReset(match, matches.filter(m => sameMatchScope(m, match)));
                  // Also restore the original match
                  rollbackPlan.toUpdate.push({
                    matchId: match.id,
@@ -1609,13 +1609,11 @@ const TournamentDetail = () => {
             const { data: postSEData } = await organizerQuery({
               table: "matches",
               operation: "select",
-              filters: { tournament_id: id },
+              filters: matchScopeFilters(match, id),
               order: [{ column: "round" }, { column: "position" }],
             });
             if (postSEData) {
-              let seMatches = match.modality_id
-                ? (postSEData as typeof matches).filter(m => m.modality_id === match.modality_id)
-                : (postSEData as typeof matches);
+              let seMatches = postSEData as typeof matches;
 
               let byeProcessed = true;
               while (byeProcessed) {
@@ -1702,8 +1700,8 @@ const TournamentDetail = () => {
 
     // Determine if this is a double elimination bracket — filter by SAME modality
     const modalityMatchesForDE = match.modality_id
-      ? matches.filter(m => m.modality_id === match.modality_id)
-      : matches;
+      ? matches.filter(m => sameMatchScope(m, match))
+      : matches.filter(m => sameMatchScope(m, match));
     const isDoubleElimination = modalityMatchesForDE.some(m => m.bracket_type === 'losers' || m.bracket_type === 'final' || m.bracket_type === 'semi_final');
 
     if (isDoubleElimination) {
@@ -1713,9 +1711,7 @@ const TournamentDetail = () => {
       // e causa falsos positivos nos guards anti-colisão do advanceLogic.
       // Esta foi a causa raiz do bug de não propagação na chave de perdedores.
       // ══════════════════════════════════════════════════════════════════════
-      const freshFilters = match.modality_id
-        ? { modality_id: match.modality_id }
-        : { tournament_id: id };
+      const freshFilters = matchScopeFilters(match, id);
 
       const { data: freshMatches } = await organizerQuery({
         table: "matches",
@@ -1724,8 +1720,8 @@ const TournamentDetail = () => {
         order: [{ column: "round" }, { column: "position" }],
       });
       const freshMatchList = (freshMatches || (match.modality_id
-        ? matches.filter(m => m.modality_id === match.modality_id)
-        : matches)) as typeof matches;
+        ? matches.filter(m => sameMatchScope(m, match))
+        : matches.filter(m => sameMatchScope(m, match)))) as typeof matches;
 
       // Use the updated match data (winner already set)
       const freshMatch = freshMatchList.find(m => m.id === matchId) || { ...match, winner_team_id: winnerId, status: 'completed' };

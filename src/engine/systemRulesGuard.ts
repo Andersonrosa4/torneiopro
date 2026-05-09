@@ -24,6 +24,7 @@ export interface GuardMatch {
   winner_team_id: string | null;
   is_chapeu?: boolean | null;
   modality_id?: string | null;
+  stage_id?: string | null;
 }
 
 export interface TournamentSnapshot {
@@ -63,7 +64,11 @@ export function validateSystemRules(snapshot: TournamentSnapshot): RuleViolation
 // ── Helpers ──────────────────────────────────────────────────
 
 function groupKey(m: GuardMatch): string {
-  return `${m.bracket_type ?? 'null'}|${m.bracket_half ?? 'null'}|${m.modality_id ?? 'null'}`;
+  return `${m.bracket_type ?? 'null'}|${m.bracket_half ?? 'null'}|${m.modality_id ?? 'null'}|${m.stage_id ?? 'null'}`;
+}
+
+function scopeKey(m: GuardMatch): string {
+  return `${m.modality_id ?? 'null'}|${m.stage_id ?? 'null'}`;
 }
 
 function checkRoundOrder(knockoutMatches: GuardMatch[], violations: RuleViolation[]) {
@@ -112,7 +117,7 @@ function checkDuplicateInRound(matches: GuardMatch[], violations: RuleViolation[
   // (a team can appear in Winners R1 completed AND Losers R1 pending — that's valid)
   const scopes = new Map<string, GuardMatch[]>();
   for (const m of matches) {
-    const key = `${m.round}|${m.bracket_type ?? 'null'}|${m.modality_id ?? 'null'}`;
+    const key = `${m.round}|${m.bracket_type ?? 'null'}|${m.modality_id ?? 'null'}|${m.stage_id ?? 'null'}`;
     if (!scopes.has(key)) scopes.set(key, []);
     scopes.get(key)!.push(m);
   }
@@ -151,27 +156,36 @@ function checkAdvanceWithoutPlaying(matches: GuardMatch[], violations: RuleViola
 }
 
 function checkAllStartInWinners(matches: GuardMatch[], violations: RuleViolation[]) {
-  // Collect all teams that appear in round 1 of losers but never in winners
-  const winnersTeams = new Set<string>();
-  const losersR1Teams = new Set<string>();
-
+  // Isolar por escopo (modality + stage) — chaves diferentes não compartilham equipes
+  const scopes = new Map<string, GuardMatch[]>();
   for (const m of matches) {
-    if (m.bracket_type === 'winners') {
-      if (m.team1_id) winnersTeams.add(m.team1_id);
-      if (m.team2_id) winnersTeams.add(m.team2_id);
-    }
-    if (m.bracket_type === 'losers' && m.round === 1) {
-      if (m.team1_id) losersR1Teams.add(m.team1_id);
-      if (m.team2_id) losersR1Teams.add(m.team2_id);
-    }
+    const k = scopeKey(m);
+    if (!scopes.has(k)) scopes.set(k, []);
+    scopes.get(k)!.push(m);
   }
 
-  for (const tid of losersR1Teams) {
-    if (!winnersTeams.has(tid)) {
-      violations.push({
-        rule: '4.1',
-        message: `Equipe ${tid.slice(0, 8)} aparece na Losers R1 mas nunca na Winners — inserção direta proibida`,
-      });
+  for (const [, scopeMatches] of scopes) {
+    const winnersTeams = new Set<string>();
+    const losersR1Teams = new Set<string>();
+
+    for (const m of scopeMatches) {
+      if (m.bracket_type === 'winners') {
+        if (m.team1_id) winnersTeams.add(m.team1_id);
+        if (m.team2_id) winnersTeams.add(m.team2_id);
+      }
+      if (m.bracket_type === 'losers' && m.round === 1) {
+        if (m.team1_id) losersR1Teams.add(m.team1_id);
+        if (m.team2_id) losersR1Teams.add(m.team2_id);
+      }
+    }
+
+    for (const tid of losersR1Teams) {
+      if (!winnersTeams.has(tid)) {
+        violations.push({
+          rule: '4.1',
+          message: `Equipe ${tid.slice(0, 8)} aparece na Losers R1 mas nunca na Winners — inserção direta proibida`,
+        });
+      }
     }
   }
 }
@@ -186,11 +200,14 @@ function checkMaxLosses(matches: GuardMatch[], violations: RuleViolation[]) {
     if (m.bracket_type === 'third_place') continue; // Partida classificatória
     const loserId = m.team1_id === m.winner_team_id ? m.team2_id : m.team1_id;
     if (!loserId) continue;
-    lossCount.set(loserId, (lossCount.get(loserId) ?? 0) + 1);
+    // Chave inclui escopo (modality+stage) para nunca somar derrotas entre chaves diferentes
+    const key = `${scopeKey(m)}|${loserId}`;
+    lossCount.set(key, (lossCount.get(key) ?? 0) + 1);
   }
 
-  for (const [tid, losses] of lossCount) {
+  for (const [key, losses] of lossCount) {
     if (losses > 2) {
+      const tid = key.split('|').pop() || '';
       violations.push({
         rule: '4.6',
         message: `Equipe ${tid.slice(0, 8)} tem ${losses} derrotas — máximo permitido em DE é 2`,

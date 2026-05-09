@@ -546,6 +546,8 @@ const MatchCard = ({
         const structuralFeeders = allMatches.filter(m => 
           m.round === prevRound && 
           (m.bracket_number || 1) === (match.bracket_number || 1) &&
+          (m as any).modality_id === (match as any).modality_id &&
+          ((m as any).stage_id ?? null) === ((match as any).stage_id ?? null) &&
           (m.position === pos1 || m.position === pos2)
         );
         for (const f of structuralFeeders) {

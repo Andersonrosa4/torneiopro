@@ -137,7 +137,7 @@ Deno.serve(async (req) => {
   let q = supabase
     .from("bug_combatant_log")
     .select(
-      "id,tournament_id,scanned,fixed,remaining,source,applied_fixes,created_at",
+      "id,tournament_id,scanned,fixed,remaining,source,applied_fixes,reason,duration_ms,created_at",
     )
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })

@@ -44,6 +44,22 @@ interface LogRow {
   source: string;
   applied_fixes: unknown;
   created_at: string;
+  reason?: string | null;
+  duration_ms?: number | null;
+}
+
+const REASON_LABEL: Record<string, string> = {
+  initial: "Inicial",
+  periodic: "Periódica",
+  realtime: "Realtime",
+  manual: "Manual",
+  cron: "Cron",
+};
+
+function formatDurationMs(ms: number | null | undefined): string {
+  if (ms == null || !Number.isFinite(ms)) return "—";
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  return `${(ms / 1000).toFixed(ms < 10_000 ? 2 : 1)} s`;
 }
 
 interface Props {
@@ -519,6 +535,8 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
       "execucao_id",
       "torneio_id",
       "origem",
+      "motivo",
+      "duracao_ms",
       "verificadas",
       "corrigidas",
       "pendentes",
@@ -529,11 +547,14 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
     for (const r of filtered) {
       const fixes = parseFixes(r.applied_fixes);
       const when = formatDateTimeBR(r.created_at);
+      const reasonLbl = r.reason ? (REASON_LABEL[r.reason] ?? r.reason) : "";
+      const durMs = r.duration_ms ?? "";
+      const base = [when, r.id, r.tournament_id, r.source, reasonLbl, durMs, r.scanned, r.fixed, r.remaining];
       if (fixes.length === 0) {
-        lines.push([when, r.id, r.tournament_id, r.source, r.scanned, r.fixed, r.remaining, "", ""].map(esc).join(";"));
+        lines.push([...base, "", ""].map(esc).join(";"));
       } else {
         for (const f of fixes) {
-          lines.push([when, r.id, r.tournament_id, r.source, r.scanned, r.fixed, r.remaining, f.matchShort, f.label].map(esc).join(";"));
+          lines.push([...base, f.matchShort, f.label].map(esc).join(";"));
         }
       }
     }
@@ -724,7 +745,7 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
 
                 <ScrollArea className="flex-1 -mx-6 px-6 mt-4">
                   <div className="space-y-4 pb-6">
-                    {/* Origem */}
+                    {/* Origem + motivo */}
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge className={isCron
                         ? "bg-blue-500/15 text-blue-500 border-blue-500/30"
@@ -732,6 +753,16 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
                         {isCron ? <Bot className="w-3 h-3 mr-1" /> : <Hand className="w-3 h-3 mr-1" />}
                         {isCron ? "Automática (cron)" : "Manual"}
                       </Badge>
+                      {detail.reason && (
+                        <Badge variant="outline" className="uppercase tracking-wide">
+                          Motivo: {REASON_LABEL[detail.reason] ?? detail.reason}
+                        </Badge>
+                      )}
+                      {detail.duration_ms != null && (
+                        <Badge variant="outline" className="font-mono">
+                          ⏱ {formatDurationMs(detail.duration_ms)}
+                        </Badge>
+                      )}
                     </div>
 
                     {/* Métricas */}
@@ -891,7 +922,20 @@ function VirtualLogList({ items, scope, onSelect, onOpenMatch }: VirtualLogListP
                     {isCron ? <Bot className="w-3 h-3 mr-1" /> : <Hand className="w-3 h-3 mr-1" />}
                     {isCron ? "Automática" : "Manual"}
                   </Badge>
+                  {r.reason && (
+                    <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                      {REASON_LABEL[r.reason] ?? r.reason}
+                    </Badge>
+                  )}
                   <span className="text-xs text-muted-foreground">{formatDateTimeBR(r.created_at)}</span>
+                  {r.duration_ms != null && (
+                    <span
+                      className="text-[10px] font-mono text-muted-foreground/80"
+                      title="Duração total da execução"
+                    >
+                      ⏱ {formatDurationMs(r.duration_ms)}
+                    </span>
+                  )}
                   {scope === "all" && (
                     <span className="text-[10px] font-mono text-muted-foreground/70">
                       torneio {r.tournament_id.slice(0, 8)}

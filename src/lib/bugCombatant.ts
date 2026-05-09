@@ -108,13 +108,19 @@ export function invalidateBugCombatantConfigCache(): void {
   configCache = null;
 }
 
+/** Motivo da execução — registrado em `bug_combatant_log.reason`. */
+export type WatchdogReason = "initial" | "periodic" | "realtime" | "manual";
+
 /**
  * Executa scan + auto-fix. Silencioso (não joga toast por padrão).
- * Retorna o que conseguiu consertar.
+ * Sempre que `reason` for fornecido e a execução não for abortada por cooldown,
+ * grava uma linha em `bug_combatant_log` com motivo e duração — mesmo quando
+ * não houve correções (necessário para auditoria detalhada). RLS exige admin
+ * para inserir; falhas de insert são silenciadas (best-effort).
  */
 export async function runBugCombatant(
   tournamentId: string,
-  opts: { force?: boolean } = {}
+  opts: { force?: boolean; reason?: WatchdogReason } = {}
 ): Promise<AutoHealResult> {
   // Cooldown para evitar loops em re-renders (configurável via DB)
   const cfg = await getBugCombatantConfig();
@@ -127,9 +133,34 @@ export async function runBugCombatant(
   }
   sessionStorage.setItem(flagKey, String(Date.now()));
 
+  const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
   const report = await scanTournamentIntegrity(tournamentId);
+
+  const finish = async (result: AutoHealResult) => {
+    if (!opts.reason) return result;
+    const duration_ms = Math.max(
+      0,
+      Math.round((typeof performance !== "undefined" ? performance.now() : Date.now()) - t0)
+    );
+    try {
+      await supabase.from("bug_combatant_log").insert({
+        tournament_id: tournamentId,
+        scanned: result.scanned,
+        fixed: result.fixed,
+        remaining: result.remaining,
+        applied_fixes: result.appliedFixes,
+        source: "cron",
+        reason: opts.reason,
+        duration_ms,
+      });
+    } catch {
+      // best-effort — RLS pode bloquear (não-admin); não falhar o watchdog
+    }
+    return result;
+  };
+
   if (report.issues.length === 0) {
-    return { scanned: report.totalMatches, fixed: 0, remaining: 0, appliedFixes: [] };
+    return finish({ scanned: report.totalMatches, fixed: 0, remaining: 0, appliedFixes: [] });
   }
 
   const appliedFixes: string[] = [];
@@ -196,12 +227,12 @@ export async function runBugCombatant(
     );
   }
 
-  return {
+  return finish({
     scanned: report.totalMatches,
     fixed,
     remaining,
     appliedFixes,
-  };
+  });
 }
 
 /**
@@ -224,10 +255,10 @@ export function startBackgroundWatchdog(
   let interval: ReturnType<typeof setInterval> | null = null;
   let currentDebounceMs = DEFAULT_REALTIME_DEBOUNCE_MS;
 
-  const safeRun = async (force = false) => {
+  const safeRun = async (reason: WatchdogReason, force = false) => {
     if (stopped) return;
     try {
-      const result = await runBugCombatant(tournamentId, { force });
+      const result = await runBugCombatant(tournamentId, { force, reason });
       if (!stopped && result.fixed > 0) onFix(result);
     } catch (e) {
       console.warn("[🛡️ Watchdog] scan falhou:", e);
@@ -243,14 +274,14 @@ export function startBackgroundWatchdog(
     if (cfg.watchdogIntervalMs !== lastIntervalMs) {
       lastIntervalMs = cfg.watchdogIntervalMs;
       if (interval) clearInterval(interval);
-      interval = setInterval(() => safeRun(false), cfg.watchdogIntervalMs);
+      interval = setInterval(() => safeRun("periodic", false), cfg.watchdogIntervalMs);
     }
   };
 
   // Scan inicial + bootstrap da config
   const initial = setTimeout(() => {
     void applyConfig();
-    void safeRun(true);
+    void safeRun("initial", true);
   }, 1_500);
 
   // Re-leitura periódica da config (a cada 60s) — pega ajustes do admin sem recarregar
@@ -264,7 +295,7 @@ export function startBackgroundWatchdog(
       { event: "*", schema: "public", table: "matches", filter: `tournament_id=eq.${tournamentId}` },
       () => {
         if (realtimeTimer) clearTimeout(realtimeTimer);
-        realtimeTimer = setTimeout(() => safeRun(true), currentDebounceMs);
+        realtimeTimer = setTimeout(() => safeRun("realtime", true), currentDebounceMs);
       }
     )
     .subscribe();

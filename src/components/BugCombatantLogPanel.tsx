@@ -235,6 +235,10 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
               {running ? "Executando…" : "Rodar agora"}
             </Button>
           )}
+          <Button variant="outline" size="sm" onClick={exportCsv} disabled={loading || filtered.length === 0}>
+            <Download className="w-4 h-4 mr-1.5" />
+            Exportar CSV
+          </Button>
           <Button variant="outline" size="sm" onClick={fetchLogs} disabled={loading}>
             <RefreshCw className={`w-4 h-4 mr-1.5 ${loading ? "animate-spin" : ""}`} />
             Atualizar

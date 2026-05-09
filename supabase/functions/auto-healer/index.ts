@@ -56,10 +56,29 @@ Deno.serve(async (req) => {
 
   const summary: Array<{ tournamentId: string; scanned: number; fixed: number }> = [];
 
+  // Optional: scan single tournament if requested
+  let body: { tournamentId?: string; force?: boolean } = {};
+  try { body = await req.json(); } catch { /* cron sem body */ }
+
+  // 🔒 Concurrency lock — evita execuções sobrepostas do cron.
+  // Lock baseado em tabela com TTL (240s) para sobreviver ao pooler do Postgres.
+  // Manual scans com `force: true` ignoram o lock.
+  const useLock = !body.force;
+  let lockAcquired = false;
+  if (useLock) {
+    const { data: gotLock, error: lockErr } = await supabase.rpc("acquire_auto_healer_lock", { ttl_seconds: 240 });
+    if (lockErr) console.error("[auto-healer] erro adquirindo lock:", lockErr);
+    lockAcquired = gotLock === true;
+    if (!lockAcquired) {
+      console.warn("[auto-healer] execução anterior ainda em andamento — pulando ciclo");
+      return new Response(
+        JSON.stringify({ ok: true, skipped: true, reason: "previous run still in progress" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+      );
+    }
+  }
+
   try {
-    // Optional: scan single tournament if requested
-    let body: { tournamentId?: string } = {};
-    try { body = await req.json(); } catch { /* cron sem body */ }
 
     let tournamentIds: string[] = [];
     if (body.tournamentId) {
@@ -112,5 +131,10 @@ Deno.serve(async (req) => {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+  } finally {
+    if (lockAcquired) {
+      const { error: relErr } = await supabase.rpc("release_auto_healer_lock");
+      if (relErr) console.error("[auto-healer] erro liberando lock:", relErr);
+    }
   }
 });

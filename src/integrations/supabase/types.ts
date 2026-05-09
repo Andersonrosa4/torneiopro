@@ -229,6 +229,27 @@ export type Database = {
         }
         Relationships: []
       }
+      auto_healer_lock: {
+        Row: {
+          expires_at: string
+          holder: string | null
+          id: string
+          locked_at: string
+        }
+        Insert: {
+          expires_at: string
+          holder?: string | null
+          id: string
+          locked_at?: string
+        }
+        Update: {
+          expires_at?: string
+          holder?: string | null
+          id?: string
+          locked_at?: string
+        }
+        Relationships: []
+      }
       bookings: {
         Row: {
           arena_id: string
@@ -2132,6 +2153,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      acquire_auto_healer_lock: {
+        Args: { ttl_seconds?: number }
+        Returns: boolean
+      }
       get_organizer_id: { Args: never; Returns: string }
       has_role: {
         Args: {
@@ -2150,6 +2175,7 @@ export type Database = {
         Args: { _tournament_id: string }
         Returns: boolean
       }
+      release_auto_healer_lock: { Args: never; Returns: undefined }
       verify_organizer_password: {
         Args: { _email: string; _password: string; _username: string }
         Returns: {

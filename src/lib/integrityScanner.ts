@@ -95,6 +95,32 @@ export async function scanTournamentIntegrity(
       issues.push({ severity: "warn", code: "COMPLETED_NO_WINNER", message: `Partida concluída sem vencedor declarado`, matchId: m.id });
     }
 
+    // 6b. Vencedor declarado sem times definidos (vencedor fantasma)
+    // Sintoma clássico: card aparece "Finalizado" com troféu mas team1/team2 = "A definir" e placar 0×0
+    if (m.winner_team_id && (!m.team1_id || !m.team2_id)) {
+      issues.push({
+        severity: "error",
+        code: "WINNER_WITHOUT_TEAMS",
+        message: `Vencedor definido sem ambos os times presentes (vencedor fantasma)`,
+        matchId: m.id,
+      });
+    }
+
+    // 6c. Status concluído mas sem placar e sem times — propagação quebrada
+    if (
+      m.status === "completed" &&
+      (m.score1 ?? 0) === 0 &&
+      (m.score2 ?? 0) === 0 &&
+      (!m.team1_id || !m.team2_id)
+    ) {
+      issues.push({
+        severity: "error",
+        code: "COMPLETED_WITHOUT_TEAMS",
+        message: `Partida marcada como concluída sem times definidos`,
+        matchId: m.id,
+      });
+    }
+
     // 7. Duplicidade de time no mesmo round + bracket_type
     const bt = m.bracket_type ?? "winners";
     for (const tid of [m.team1_id, m.team2_id]) {

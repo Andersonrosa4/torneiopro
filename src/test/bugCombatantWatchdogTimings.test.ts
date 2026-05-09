@@ -22,14 +22,13 @@ const insertMock = vi.fn().mockResolvedValue({ error: null });
 const updateMock = vi.fn().mockResolvedValue({ error: null });
 
 vi.mock("@/integrations/supabase/client", () => {
-  const channelStub: any = {
-    on: vi.fn((_evt: string, _filter: any, cb: any) => {
-      realtimeHandler = cb;
-      return channelStub;
-    }),
-    subscribe: vi.fn().mockReturnValue(channelStub),
-    unsubscribe: vi.fn(),
-  };
+  const channelStub: any = {};
+  channelStub.on = vi.fn((_evt: string, _filter: any, cb: any) => {
+    realtimeHandler = cb;
+    return channelStub;
+  });
+  channelStub.subscribe = vi.fn(() => channelStub);
+  channelStub.unsubscribe = vi.fn();
   return {
     supabase: {
       from: vi.fn((table: string) => {

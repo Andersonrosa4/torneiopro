@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ interface Props {
   isAdmin?: boolean;
 }
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 25;
 
 function formatDateTimeBR(iso: string): string {
   try {
@@ -52,10 +52,13 @@ function parseFixes(raw: unknown): { matchShort: string; label: string }[] {
 export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmin }: Props) {
   const [rows, setRows] = useState<LogRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [running, setRunning] = useState(false);
   const [source, setSource] = useState<Source>("all");
   const [scope, setScope] = useState<Scope>("tournament");
   const [search, setSearch] = useState("");
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const runNow = useCallback(async () => {
     if (!isAdmin) return;
@@ -80,19 +83,43 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
     }
   }, [isAdmin, tournamentId]);
 
-  const fetchLogs = useCallback(async () => {
-    setLoading(true);
+  const buildQuery = useCallback((from: number, to: number) => {
     let q = supabase
       .from("bug_combatant_log")
       .select("id,tournament_id,scanned,fixed,remaining,source,applied_fixes,created_at")
       .order("created_at", { ascending: false })
-      .limit(PAGE_SIZE);
+      .range(from, to);
     if (scope === "tournament") q = q.eq("tournament_id", tournamentId);
     if (source !== "all") q = q.eq("source", source);
-    const { data, error } = await q;
-    if (!error && data) setRows(data as LogRow[]);
-    setLoading(false);
+    return q;
   }, [tournamentId, source, scope]);
+
+  const fetchLogs = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await buildQuery(0, PAGE_SIZE - 1);
+    if (!error && data) {
+      setRows(data as LogRow[]);
+      setHasMore(data.length === PAGE_SIZE);
+    }
+    setLoading(false);
+  }, [buildQuery]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const from = rows.length;
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = await buildQuery(from, to);
+    if (!error && data) {
+      setRows((prev) => {
+        const seen = new Set(prev.map((r) => r.id));
+        const next = (data as LogRow[]).filter((r) => !seen.has(r.id));
+        return [...prev, ...next];
+      });
+      setHasMore(data.length === PAGE_SIZE);
+    }
+    setLoadingMore(false);
+  }, [buildQuery, hasMore, loadingMore, rows.length]);
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
 
@@ -108,6 +135,17 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [tournamentId, fetchLogs]);
+
+  // IntersectionObserver para scroll infinito
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore || loading) return;
+    const obs = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting) loadMore();
+    }, { rootMargin: "200px" });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [hasMore, loading, loadMore]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return rows;
@@ -256,6 +294,23 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
             );
           })}
         </ul>
+      )}
+
+      {/* Sentinela para scroll infinito + botão de fallback */}
+      {!loading && filtered.length > 0 && (
+        <div ref={sentinelRef} className="flex justify-center pt-4">
+          {hasMore ? (
+            <Button variant="outline" size="sm" onClick={loadMore} disabled={loadingMore}>
+              {loadingMore ? (
+                <><RefreshCw className="w-4 h-4 mr-1.5 animate-spin" />Carregando…</>
+              ) : (
+                "Carregar mais"
+              )}
+            </Button>
+          ) : (
+            <span className="text-xs text-muted-foreground">Fim do histórico ({rows.length} registros)</span>
+          )}
+        </div>
       )}
     </section>
   );

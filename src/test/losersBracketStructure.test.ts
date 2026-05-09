@@ -70,7 +70,7 @@ describe("Losers bracket — rodada de consolidação (REGRESSÃO bug jogo #26)"
       expect(lR3.length, `L ${half} R3 deve existir como consolidação`).toBe(1);
       // Nenhum match da W deve apontar para L R3 via next_lose_match_id
       const droppersToR3 = result.matches.filter(
-        (m: any) => m.bracket_type === "winners" && m.next_lose_match_id === lR3[0].id,
+        (m: any) => m.bracket_type === "winners" && m.next_lose_match_id === (lR3[0] as any).id,
       );
       expect(droppersToR3.length, `L ${half} R3 não deve receber derrotados (é consolidação)`).toBe(0);
     }

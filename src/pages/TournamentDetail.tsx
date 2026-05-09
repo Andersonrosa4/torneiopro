@@ -229,22 +229,21 @@ const TournamentDetail = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // 🛡️ Combatente de Bugs: roda silenciosamente ao abrir o torneio.
-  // Detecta e corrige inconsistências estruturais (links quebrados, vencedor
-  // inválido, placar negativo, auto-confronto, etc) sem ação manual.
+  // 🛡️ Combatente de Bugs em background:
+  //  - scan inicial 1.5s após carregar
+  //  - re-scan automático a cada 30s
+  //  - re-scan disparado por mudanças realtime (debounce 2.5s)
+  // Corrige inconsistências estruturais sem ação manual e re-busca os dados.
   useEffect(() => {
     if (!id) return;
-    const t = setTimeout(() => {
-      runBugCombatant(id)
-        .then((r) => {
-          if (r.fixed > 0) {
-            toast.success(`🛡️ ${r.fixed} inconsistência${r.fixed > 1 ? "s" : ""} corrigida${r.fixed > 1 ? "s" : ""} automaticamente`);
-            fetchData();
-          }
-        })
-        .catch((e) => console.warn("[BugCombatant] falhou silenciosamente:", e));
-    }, 1500); // espera dados carregarem antes de varrer
-    return () => clearTimeout(t);
+    const stop = startBackgroundWatchdog(id, (r) => {
+      toast.success(
+        `🛡️ ${r.fixed} inconsistência${r.fixed > 1 ? "s" : ""} corrigida${r.fixed > 1 ? "s" : ""} automaticamente`,
+        { duration: 3000 }
+      );
+      fetchData();
+    });
+    return stop;
   }, [id, fetchData]);
 
   // Check if current organizer is associated with this tournament

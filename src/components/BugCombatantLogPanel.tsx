@@ -740,7 +740,7 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
 
                 <ScrollArea className="flex-1 -mx-6 px-6 mt-4">
                   <div className="space-y-4 pb-6">
-                    {/* Origem */}
+                    {/* Origem + motivo */}
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge className={isCron
                         ? "bg-blue-500/15 text-blue-500 border-blue-500/30"
@@ -748,6 +748,16 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
                         {isCron ? <Bot className="w-3 h-3 mr-1" /> : <Hand className="w-3 h-3 mr-1" />}
                         {isCron ? "Automática (cron)" : "Manual"}
                       </Badge>
+                      {detail.reason && (
+                        <Badge variant="outline" className="uppercase tracking-wide">
+                          Motivo: {REASON_LABEL[detail.reason] ?? detail.reason}
+                        </Badge>
+                      )}
+                      {detail.duration_ms != null && (
+                        <Badge variant="outline" className="font-mono">
+                          ⏱ {formatDurationMs(detail.duration_ms)}
+                        </Badge>
+                      )}
                     </div>
 
                     {/* Métricas */}

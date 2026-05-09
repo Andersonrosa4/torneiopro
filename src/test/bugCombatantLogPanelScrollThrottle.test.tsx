@@ -233,4 +233,71 @@ describe("BugCombatantLogPanel — throttle de persistência durante scroll", ()
 
     setItemSpy.mockRestore();
   });
+
+  it("debounce: visibilitychange + pagehide em <50ms coalescem em 1 flush", async () => {
+    const Panel = await loadPanel();
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+
+    render(<Panel tournamentId={TOURNAMENT_ID} isAdmin />);
+    await waitFor(() => { expect(invokeMock).toHaveBeenCalled(); });
+    await act(async () => { await Promise.resolve(); });
+
+    vi.useFakeTimers({
+      toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "performance", "Date"],
+    });
+
+    // Cria estado pendente (trailing).
+    setScrollY(123);
+    window.dispatchEvent(new Event("scroll"));
+    vi.advanceTimersByTime(10);
+
+    setItemSpy.mockClear();
+
+    // Navegador típico: dispara visibilitychange e pagehide em sequência rápida.
+    document.dispatchEvent(new Event("visibilitychange"));
+    vi.advanceTimersByTime(5);
+    window.dispatchEvent(new Event("pagehide"));
+    vi.advanceTimersByTime(5);
+    document.dispatchEvent(new Event("visibilitychange")); // outro disparo redundante
+
+    // Apenas 1 write de auditoria (o 1º flush). Os demais são debounced.
+    const writes = getAuditWrites(setItemSpy);
+    expect(writes.length).toBe(1);
+    expect(parseY(writes[0].value)).toBe(123);
+
+    setItemSpy.mockRestore();
+  });
+
+  it("debounce: após 50ms+, novo flush é permitido (cobre estado novo)", async () => {
+    const Panel = await loadPanel();
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+
+    render(<Panel tournamentId={TOURNAMENT_ID} isAdmin />);
+    await waitFor(() => { expect(invokeMock).toHaveBeenCalled(); });
+    await act(async () => { await Promise.resolve(); });
+
+    vi.useFakeTimers({
+      toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "performance", "Date"],
+    });
+
+    setScrollY(100);
+    window.dispatchEvent(new Event("scroll"));
+    vi.advanceTimersByTime(10);
+
+    setItemSpy.mockClear();
+    document.dispatchEvent(new Event("visibilitychange")); // 1º flush
+    vi.advanceTimersByTime(80);                            // janela passou
+    setScrollY(900);
+    window.dispatchEvent(new Event("scroll"));             // novo trailing pendente
+    vi.advanceTimersByTime(10);
+    window.dispatchEvent(new Event("pagehide"));           // 2º flush, válido
+
+    const writes = getAuditWrites(setItemSpy);
+    expect(writes.length).toBe(2);
+    expect(parseY(writes[0].value)).toBe(100);
+    expect(parseY(writes[1].value)).toBe(900);
+
+    setItemSpy.mockRestore();
+  });
 });
+

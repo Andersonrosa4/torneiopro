@@ -11,8 +11,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { formatDateBR } from "@/lib/utils";
 import {
+  deriveFallbackCursor,
   nextCursorFromPage,
-  toCursor,
   type KeysetCursor,
 } from "@/lib/bugCombatantLogCursor";
 import {
@@ -292,12 +292,27 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
-    // Cursor estável: prioriza o do servidor; se ausente (1ª página vazia ou
-    // erro), tenta derivar da última linha visível. Linhas inseridas pelo
-    // realtime no topo NÃO afetam o cursor.
-    const cursor =
-      cursorRef.current ?? toCursor(rows[rows.length - 1] ?? null);
-    if (!cursor) return;
+    // Cursor estável: prioriza o do servidor. Se ausente (1ª página vazia, hidratação
+    // parcial, reset por filtros), deriva via `deriveFallbackCursor` — que ordena
+    // estritamente por (created_at desc, id desc) e revalida o formato canônico.
+    // Linhas inseridas pelo realtime no topo NÃO afetam o cursor (sempre pegamos
+    // a mais antiga das visíveis). Inconsistência → desabilita paginação.
+    let cursor: KeysetCursor | null = cursorRef.current;
+    if (!cursor) {
+      const fb = deriveFallbackCursor(rows);
+      if (fb.ok === false) {
+        recordCursorError(tournamentId, {
+          message: `fallback indisponível: ${fb.reason}`,
+          context: "load_more_fallback",
+          source, scope,
+        });
+        toast.error("Paginação desabilitada: cursor inconsistente.");
+        setHasMore(false);
+        return;
+      }
+      cursor = fb.cursor;
+      cursorRef.current = cursor; // adota o fallback como âncora oficial
+    }
     setLoadingMore(true);
     const startedAt = (typeof performance !== "undefined" ? performance.now() : Date.now());
     let qErr: { message?: string } | null = null;

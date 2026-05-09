@@ -439,7 +439,11 @@ export function clearPersisted(tournamentId: string): void {
 export const __INTERNAL = {
   SCHEMA_VERSION,
   MAX_PERSISTED_ROWS,
+  STORAGE_KEY_PREFIX,
   resetRowsCache,
   serializeRows,
   buildCompactJson,
+  migrateToCurrent,
+  MIGRATIONS,
 };
+

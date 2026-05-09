@@ -168,18 +168,50 @@ function resetRowsCache(): void {
 }
 
 /**
- * Constrói o JSON compacto. Usa concatenação de strings para que a
- * porção `rows` (potencialmente grande) possa vir do cache, evitando
- * percorrer o array novamente quando só `scrollY` mudou.
+ * Constrói o JSON compacto com OPÇÕES de degradação.
+ *
+ * - `rowsLimit`: corta o array a esse tamanho (default = MAX_PERSISTED_ROWS).
+ * - `stripAppliedFixes`: substitui `applied_fixes` por `null` em cada linha
+ *   (campo de tamanho variável e potencialmente grande — o maior offender).
+ * - `dropCursor`: força `c=null`, sem cursor de retomada.
+ *
+ * O cache de serialização de linhas é reaproveitado APENAS no caminho
+ * default (sem `stripAppliedFixes` e com `rowsLimit >= rows.length`).
+ * Os caminhos de fallback são raros (perto da quota) e podem pagar o
+ * custo extra sem prejuízo de performance no caminho quente.
  */
-export function buildCompactJson(state: Omit<PersistedState, "v" | "savedAt">): string {
-  // Preserva a identidade do array quando já está dentro do cap, para que
-  // o cache de serialização funcione durante a rolagem (apenas `scrollY` muda).
-  const cappedRows = state.rows.length <= MAX_PERSISTED_ROWS
+export interface BuildOptions {
+  rowsLimit?: number;
+  stripAppliedFixes?: boolean;
+  dropCursor?: boolean;
+}
+
+export function buildCompactJson(
+  state: Omit<PersistedState, "v" | "savedAt">,
+  opts: BuildOptions = {},
+): string {
+  const limit = Math.max(0, opts.rowsLimit ?? MAX_PERSISTED_ROWS);
+  const cappedRows = state.rows.length <= limit
     ? state.rows
-    : state.rows.slice(0, MAX_PERSISTED_ROWS);
-  const rowsJson = serializeRows(cappedRows);
-  const cursorJson = state.cursor
+    : state.rows.slice(0, limit);
+
+  let rowsJson: string;
+  if (limit === 0) {
+    rowsJson = "[]";
+  } else if (opts.stripAppliedFixes) {
+    // Não usa cache: o output difere do canônico.
+    rowsJson = JSON.stringify(
+      cappedRows.map((r) => {
+        const t = compactRow(r);
+        t[6] = null; // applied_fixes
+        return t;
+      }),
+    );
+  } else {
+    rowsJson = serializeRows(cappedRows);
+  }
+
+  const cursorJson = !opts.dropCursor && state.cursor
     ? `[${JSON.stringify(state.cursor.created_at)},${JSON.stringify(state.cursor.id)}]`
     : "null";
   return (
@@ -195,6 +227,7 @@ export function buildCompactJson(state: Omit<PersistedState, "v" | "savedAt">): 
     `}`
   );
 }
+
 
 // ───── Migrações de schema ─────────────────────────────────────────────
 //
@@ -419,14 +452,105 @@ export function getHydratableState(
   };
 }
 
-export function writePersisted(state: Omit<PersistedState, "v" | "savedAt">): void {
-  if (typeof sessionStorage === "undefined") return;
-  try {
-    const json = buildCompactJson(state);
-    sessionStorage.setItem(storageKey(state.tournament_id), json);
-  } catch {
-    // quota / modo privado / serialização: ignora.
+// ───── Validação de tamanho + fallback ────────────────────────────────
+//
+// Budget MOLE (soft) em CHARs UTF-16. sessionStorage costuma oferecer
+// ~5MB por origem, mas é compartilhado com toda a aplicação. Usamos um
+// teto conservador para a entrada da auditoria especificamente, de modo
+// que outras telas não fiquem sem espaço. Se o payload exceder, ou se
+// `setItem` lançar QuotaExceededError, descemos a "escada" de fallback:
+//
+//   nível 0: payload completo (MAX_PERSISTED_ROWS, com applied_fixes)
+//   nível 1: rowsLimit = 50, com applied_fixes
+//   nível 2: rowsLimit = 50, applied_fixes = null   ← maior offender
+//   nível 3: rowsLimit = 0  (sem rows), cursor preservado
+//   nível 4: rowsLimit = 0, cursor=null  (apenas filtros + scrollY)
+//   nível 5: removeItem (desiste — estado mínimo é o estado vazio)
+//
+// Independente do nível, a hidratação subsequente continua segura:
+// `getHydratableState` retorna `null` quando faltam linhas, e o panel
+// refetcha a 1ª página. O cursor (se ainda presente) é validado.
+
+const SOFT_BUDGET_CHARS = 256 * 1024; // ~256K UTF-16 chars (~512KB bytes)
+
+interface FallbackStep {
+  level: number;
+  opts: BuildOptions;
+  /** `null` = não monta payload, apenas remove a chave. */
+  build: boolean;
+}
+
+const FALLBACK_LADDER: FallbackStep[] = [
+  { level: 0, opts: {}, build: true },
+  { level: 1, opts: { rowsLimit: 50 }, build: true },
+  { level: 2, opts: { rowsLimit: 50, stripAppliedFixes: true }, build: true },
+  { level: 3, opts: { rowsLimit: 0 }, build: true },
+  { level: 4, opts: { rowsLimit: 0, dropCursor: true }, build: true },
+  { level: 5, opts: {}, build: false },
+];
+
+let _lastFallbackLevel = -1;
+
+export interface WriteResult {
+  ok: boolean;
+  level: number;       // nível da escada efetivamente usado (-1 = no-op)
+  bytes: number;       // tamanho final escrito (chars UTF-16)
+  reason?: "oversize" | "quota" | "removed" | "no_storage";
+}
+
+function isQuotaError(e: unknown): boolean {
+  if (!e || typeof e !== "object") return false;
+  const err = e as { name?: string; code?: number };
+  return (
+    err.name === "QuotaExceededError" ||
+    err.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+    err.code === 22 || err.code === 1014
+  );
+}
+
+export function writePersisted(state: Omit<PersistedState, "v" | "savedAt">): WriteResult {
+  if (typeof sessionStorage === "undefined") {
+    return { ok: false, level: -1, bytes: 0, reason: "no_storage" };
   }
+  const key = storageKey(state.tournament_id);
+  let lastReason: WriteResult["reason"];
+
+  for (const step of FALLBACK_LADDER) {
+    if (!step.build) {
+      // Último recurso: remove a chave para não deixar lixo desatualizado.
+      try { sessionStorage.removeItem(key); } catch { /* ignore */ }
+      _lastFallbackLevel = step.level;
+      return { ok: false, level: step.level, bytes: 0, reason: "removed" };
+    }
+    let json: string;
+    try {
+      json = buildCompactJson(state, step.opts);
+    } catch {
+      lastReason = "oversize";
+      continue;
+    }
+    // Validação de tamanho ANTES de tentar gravar — evita pagar o custo
+    // de I/O síncrono quando sabemos que vai estourar.
+    if (json.length > SOFT_BUDGET_CHARS) {
+      lastReason = "oversize";
+      continue;
+    }
+    try {
+      sessionStorage.setItem(key, json);
+      _lastFallbackLevel = step.level;
+      return { ok: true, level: step.level, bytes: json.length };
+    } catch (e) {
+      if (isQuotaError(e)) {
+        lastReason = "quota";
+        continue;
+      }
+      // Erro não relacionado a quota (modo privado, serialização): aborta.
+      _lastFallbackLevel = step.level;
+      return { ok: false, level: step.level, bytes: 0, reason: "quota" };
+    }
+  }
+  _lastFallbackLevel = FALLBACK_LADDER[FALLBACK_LADDER.length - 1].level;
+  return { ok: false, level: _lastFallbackLevel, bytes: 0, reason: lastReason ?? "quota" };
 }
 
 export function clearPersisted(tournamentId: string): void {
@@ -440,10 +564,14 @@ export const __INTERNAL = {
   SCHEMA_VERSION,
   MAX_PERSISTED_ROWS,
   STORAGE_KEY_PREFIX,
+  SOFT_BUDGET_CHARS,
+  FALLBACK_LADDER,
   resetRowsCache,
   serializeRows,
   buildCompactJson,
   migrateToCurrent,
   MIGRATIONS,
+  getLastFallbackLevel: () => _lastFallbackLevel,
 };
+
 

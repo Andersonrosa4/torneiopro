@@ -116,11 +116,12 @@ export async function runBugCombatant(
   tournamentId: string,
   opts: { force?: boolean } = {}
 ): Promise<AutoHealResult> {
-  // Cooldown para evitar loops em re-renders
+  // Cooldown para evitar loops em re-renders (configurável via DB)
+  const cfg = await getBugCombatantConfig();
   const flagKey = RUN_FLAG_PREFIX + tournamentId;
   if (!opts.force) {
     const last = Number(sessionStorage.getItem(flagKey) || 0);
-    if (Date.now() - last < COOLDOWN_MS) {
+    if (Date.now() - last < cfg.cooldownMs) {
       return { scanned: 0, fixed: 0, remaining: 0, appliedFixes: [] };
     }
   }

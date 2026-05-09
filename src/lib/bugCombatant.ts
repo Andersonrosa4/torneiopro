@@ -255,10 +255,10 @@ export function startBackgroundWatchdog(
   let interval: ReturnType<typeof setInterval> | null = null;
   let currentDebounceMs = DEFAULT_REALTIME_DEBOUNCE_MS;
 
-  const safeRun = async (force = false) => {
+  const safeRun = async (reason: WatchdogReason, force = false) => {
     if (stopped) return;
     try {
-      const result = await runBugCombatant(tournamentId, { force });
+      const result = await runBugCombatant(tournamentId, { force, reason });
       if (!stopped && result.fixed > 0) onFix(result);
     } catch (e) {
       console.warn("[🛡️ Watchdog] scan falhou:", e);
@@ -274,14 +274,14 @@ export function startBackgroundWatchdog(
     if (cfg.watchdogIntervalMs !== lastIntervalMs) {
       lastIntervalMs = cfg.watchdogIntervalMs;
       if (interval) clearInterval(interval);
-      interval = setInterval(() => safeRun(false), cfg.watchdogIntervalMs);
+      interval = setInterval(() => safeRun("periodic", false), cfg.watchdogIntervalMs);
     }
   };
 
   // Scan inicial + bootstrap da config
   const initial = setTimeout(() => {
     void applyConfig();
-    void safeRun(true);
+    void safeRun("initial", true);
   }, 1_500);
 
   // Re-leitura periódica da config (a cada 60s) — pega ajustes do admin sem recarregar
@@ -295,7 +295,7 @@ export function startBackgroundWatchdog(
       { event: "*", schema: "public", table: "matches", filter: `tournament_id=eq.${tournamentId}` },
       () => {
         if (realtimeTimer) clearTimeout(realtimeTimer);
-        realtimeTimer = setTimeout(() => safeRun(true), currentDebounceMs);
+        realtimeTimer = setTimeout(() => safeRun("realtime", true), currentDebounceMs);
       }
     )
     .subscribe();

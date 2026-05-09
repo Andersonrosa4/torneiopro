@@ -118,7 +118,7 @@ interface CompactPayload {
 }
 
 export function storageKey(tournamentId: string): string {
-  return `bug-audit:${tournamentId}`;
+  return `${STORAGE_KEY_PREFIX}${tournamentId}`;
 }
 
 function compactRow(r: PersistedRow): CompactRow {

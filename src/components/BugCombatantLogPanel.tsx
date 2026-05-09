@@ -283,6 +283,23 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
           })}
         </ul>
       )}
+
+      {/* Sentinela para scroll infinito + botão de fallback */}
+      {!loading && filtered.length > 0 && (
+        <div ref={sentinelRef} className="flex justify-center pt-4">
+          {hasMore ? (
+            <Button variant="outline" size="sm" onClick={loadMore} disabled={loadingMore}>
+              {loadingMore ? (
+                <><RefreshCw className="w-4 h-4 mr-1.5 animate-spin" />Carregando…</>
+              ) : (
+                "Carregar mais"
+              )}
+            </Button>
+          ) : (
+            <span className="text-xs text-muted-foreground">Fim do histórico ({rows.length} registros)</span>
+          )}
+        </div>
+      )}
     </section>
   );
 }

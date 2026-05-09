@@ -468,12 +468,50 @@ function buildLosersBracketWithFeeders(
       incoming = pendingBye ? [pendingBye, ...droppers] : droppers;
     } else {
       // R2+: intercalar survivors com novos perdedores (REGRA 9 — inversão anti-revanche)
-      const surv: Entry[] = survivorEntries;
       const newLosers: Entry[] = winnersInRound
         .map(m => ({ source: m, linkField: 'next_lose_match_id' as const }))
         .sort((a, b) => a.source.position - b.source.position)
         .reverse(); // REVERSO: anti-rematch
 
+      // ══════════════════════════════════════════════════════════════
+      // RODADAS DE CONSOLIDAÇÃO (MINOR ROUNDS)
+      //
+      // Quando há mais sobreviventes do que novos derrotados, os
+      // sobreviventes DEVEM se enfrentar primeiro (rodada minor) para
+      // equilibrar a chave. Sem isso, um sobrevivente recebe um bye
+      // injusto (pula uma rodada inteira) e o derrotado da Winners
+      // entra cedo demais — exatamente o bug do jogo #26.
+      // ══════════════════════════════════════════════════════════════
+      while (survivorEntries.length > newLosers.length && survivorEntries.length > 1) {
+        const minorIncoming: Entry[] = pendingBye
+          ? [pendingBye, ...survivorEntries]
+          : [...survivorEntries];
+        pendingBye = null;
+
+        const numMinor = Math.floor(minorIncoming.length / 2);
+        const minorMatches: MatchData[] = [];
+        for (let mi = 0; mi < numMinor; mi++) {
+          const m = createMatch(
+            tournamentId, modalityId, losersRound, mi + 1,
+            'losers', half, bracketNumber,
+          );
+          minorIncoming[mi * 2].source[minorIncoming[mi * 2].linkField] = m._temp_id;
+          minorIncoming[mi * 2 + 1].source[minorIncoming[mi * 2 + 1].linkField] = m._temp_id;
+          minorMatches.push(m);
+          allLosersMatches.push(m);
+        }
+        if (minorIncoming.length % 2 === 1) {
+          pendingBye = minorIncoming[minorIncoming.length - 1];
+        }
+        console.log(
+          `[Losers MINOR] ${half} R${losersRound}: consolidação entre ${minorIncoming.length} sobreviventes (${numMinor} jogo(s))`
+        );
+        survivorEntries = minorMatches.map(m => ({ source: m, linkField: 'next_win_match_id' as const }));
+        losersRound++;
+      }
+
+      // MAJOR round: intercalar sobreviventes (já balanceados) com novos derrotados
+      const surv: Entry[] = survivorEntries;
       const maxLen = Math.max(surv.length, newLosers.length);
       const interleaved: Entry[] = [];
       for (let i = 0; i < maxLen; i++) {

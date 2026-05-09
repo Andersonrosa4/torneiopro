@@ -27,9 +27,86 @@ export interface AutoHealResult {
 }
 
 const RUN_FLAG_PREFIX = "bugCombatant:lastRun:";
-const COOLDOWN_MS = 15_000; // permite re-scan rápido em background sem martelar
-const WATCHDOG_INTERVAL_MS = 30_000; // varredura periódica
-const REALTIME_DEBOUNCE_MS = 2_500; // espera estabilizar após mudança realtime
+
+// Defaults (usados se a leitura da tabela `bug_combatant_config` falhar)
+const DEFAULT_COOLDOWN_MS = 15_000;
+const DEFAULT_WATCHDOG_INTERVAL_MS = 30_000;
+const DEFAULT_REALTIME_DEBOUNCE_MS = 2_500;
+
+// Limites de segurança (espelham os CHECKs da tabela)
+const BOUNDS = {
+  cooldown_ms: { min: 1_000, max: 600_000 },
+  watchdog_interval_ms: { min: 5_000, max: 3_600_000 },
+  realtime_debounce_ms: { min: 250, max: 60_000 },
+} as const;
+
+export interface BugCombatantConfig {
+  cooldownMs: number;
+  watchdogIntervalMs: number;
+  realtimeDebounceMs: number;
+}
+
+const DEFAULT_CONFIG: BugCombatantConfig = {
+  cooldownMs: DEFAULT_COOLDOWN_MS,
+  watchdogIntervalMs: DEFAULT_WATCHDOG_INTERVAL_MS,
+  realtimeDebounceMs: DEFAULT_REALTIME_DEBOUNCE_MS,
+};
+
+const CONFIG_TTL_MS = 60_000; // re-busca no máximo 1x/min
+let configCache: { value: BugCombatantConfig; fetchedAt: number } | null = null;
+let inflight: Promise<BugCombatantConfig> | null = null;
+
+function clamp(n: unknown, key: keyof typeof BOUNDS, fallback: number): number {
+  const v = typeof n === "number" && Number.isFinite(n) ? n : fallback;
+  return Math.min(BOUNDS[key].max, Math.max(BOUNDS[key].min, Math.floor(v)));
+}
+
+/**
+ * Busca a configuração do robô auditor. Cache de 60s + dedupe de chamadas
+ * concorrentes. Em qualquer falha (RLS, rede, tabela ausente) cai nos defaults.
+ */
+export async function getBugCombatantConfig(
+  opts: { force?: boolean } = {}
+): Promise<BugCombatantConfig> {
+  const now = Date.now();
+  if (!opts.force && configCache && now - configCache.fetchedAt < CONFIG_TTL_MS) {
+    return configCache.value;
+  }
+  if (inflight) return inflight;
+
+  inflight = (async () => {
+    try {
+      const { data, error } = await supabase
+        .from("bug_combatant_config")
+        .select("cooldown_ms,watchdog_interval_ms,realtime_debounce_ms")
+        .eq("id", "singleton")
+        .maybeSingle();
+      if (error || !data) {
+        configCache = { value: DEFAULT_CONFIG, fetchedAt: now };
+        return DEFAULT_CONFIG;
+      }
+      const value: BugCombatantConfig = {
+        cooldownMs: clamp(data.cooldown_ms, "cooldown_ms", DEFAULT_COOLDOWN_MS),
+        watchdogIntervalMs: clamp(data.watchdog_interval_ms, "watchdog_interval_ms", DEFAULT_WATCHDOG_INTERVAL_MS),
+        realtimeDebounceMs: clamp(data.realtime_debounce_ms, "realtime_debounce_ms", DEFAULT_REALTIME_DEBOUNCE_MS),
+      };
+      configCache = { value, fetchedAt: now };
+      return value;
+    } catch {
+      configCache = { value: DEFAULT_CONFIG, fetchedAt: now };
+      return DEFAULT_CONFIG;
+    } finally {
+      inflight = null;
+    }
+  })();
+
+  return inflight;
+}
+
+/** Invalida o cache para forçar releitura imediata (ex.: após admin salvar). */
+export function invalidateBugCombatantConfigCache(): void {
+  configCache = null;
+}
 
 /**
  * Executa scan + auto-fix. Silencioso (não joga toast por padrão).

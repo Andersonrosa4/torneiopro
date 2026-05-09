@@ -320,69 +320,12 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
           <p className="text-xs mt-1">O robô só registra quando aplica correções — sistema saudável significa lista vazia.</p>
         </div>
       ) : (
-        <ul className="space-y-2">
-          {filtered.map((r) => {
-            const fixes = parseFixes(r.applied_fixes);
-            const isCron = r.source === "cron";
-            return (
-              <li
-                key={r.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => setDetail(r)}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetail(r); } }}
-                className="rounded-lg border border-border bg-background/40 p-3 cursor-pointer hover:border-primary/50 hover:bg-accent/30 transition-colors"
-              >
-                <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <Badge className={isCron
-                    ? "bg-blue-500/15 text-blue-500 border-blue-500/30"
-                    : "bg-purple-500/15 text-purple-500 border-purple-500/30"}>
-                    {isCron ? <Bot className="w-3 h-3 mr-1" /> : <Hand className="w-3 h-3 mr-1" />}
-                    {isCron ? "Automática" : "Manual"}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">{formatDateTimeBR(r.created_at)}</span>
-                  {scope === "all" && (
-                    <span className="text-[10px] font-mono text-muted-foreground/70">
-                      torneio {r.tournament_id.slice(0, 8)}
-                    </span>
-                  )}
-                  <div className="ml-auto flex gap-1.5 text-[11px]">
-                    <span className="text-muted-foreground">{r.scanned} verif.</span>
-                    <span className="text-emerald-500">{r.fixed} corr.</span>
-                    {r.remaining > 0 && (
-                      <span className="text-amber-500 flex items-center gap-0.5">
-                        <AlertTriangle className="w-3 h-3" />{r.remaining} pend.
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {fixes.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {fixes.slice(0, 6).map((f, idx) => (
-                      <span
-                        key={`${r.id}-${idx}`}
-                        role="button"
-                        tabIndex={0}
-                        onClick={(e) => { e.stopPropagation(); onOpenMatch?.(f.matchShort); }}
-                        onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onOpenMatch?.(f.matchShort); } }}
-                        className="text-[11px] px-2 py-0.5 rounded-md border border-border bg-card hover:bg-accent hover:text-accent-foreground transition-colors font-mono cursor-pointer"
-                        title={`Abrir partida ${f.matchShort} • ${f.label}`}
-                      >
-                        <span className="text-primary">{f.matchShort}</span>
-                        <span className="text-muted-foreground"> · {f.label}</span>
-                      </span>
-                    ))}
-                    {fixes.length > 6 && (
-                      <span className="text-[11px] px-2 py-0.5 text-muted-foreground italic">
-                        +{fixes.length - 6} (clique para ver tudo)
-                      </span>
-                    )}
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        <VirtualLogList
+          items={filtered}
+          scope={scope}
+          onSelect={(r) => setDetail(r)}
+          onOpenMatch={onOpenMatch}
+        />
       )}
 
       {/* Sentinela para scroll infinito + botão de fallback */}

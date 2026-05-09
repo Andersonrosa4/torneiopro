@@ -1,0 +1,106 @@
+# Project Memory
+
+## Core
+- Strict PT-BR UI (no English terms like Match, Winner). Dates must use `formatDateBR` (DD/MM/AAAA) to avoid timezone shifts.
+- Visuals: Dark Arena aesthetic, shield logo, cosmic bg, 40 particles. Strictly NO celebration effects, sounds, or canvas-confetti.
+- Project is locked to React 18.2.0. Supabase Reference ID: `yhfzxfsetiznvkwoiwkc`.
+- Bracket integrity governed by `docs/SYSTEM_RULES.md` and `systemRulesGuard.ts`. Violations are considered bugs.
+- Strict Modality isolation: never use `tournament_id` as sole filter. Tournament format (Normal/Double Elim) is global.
+- Court Bookings module is a completely isolated vertical. Do not mix with Tournament logic.
+- Engine Separation: Normal and Double Elimination are independent. No ELO for seeding, use `team.seed`.
+- Database Ownership is validated via `organizer-api` Edge Function. RLS policies are PERMISSIVE for fast reads.
+- NEVER nest `<button>` inside `<button>` (Radix TabsTrigger/DialogTrigger/shadcn Button etc). Use `<span role="button">`. Causes black screens.
+- Losers bracket DEVE ter rodadas de consolidação (minor) sempre que sobreviventes > novos derrotados — ver mem://features/match-logic/losers-consolidation-rounds.
+
+## Memories
+- [Sport Themes](mem://style/sport-themes) — Dynamic sport color palettes, typography, and backgrounds based on SportContext
+- [Data Management](mem://features/data-management) — Export to PDF/Excel/CSV; global deletion cascade handling for tournaments
+- [Animations & Feedback](mem://style/animations-and-feedback) — Framer Motion allowed, strictly forbidden to use celebration popups/confetti
+- [Visual Constraints](mem://style/sport-visual-constraints) — Beach Tennis uses solid paddles/orange balls; realistic athlete imagery only
+- [Localization PT-BR](mem://localization/pt-br) — Strict PT-BR terminology for tournaments; English terms strictly forbidden in UI
+- [Tournament Configuration](mem://features/tournaments) — Modalities are independent; tournament format (normal/double elim) is global
+- [Online Status](mem://features/user-management/online-status) — Async update of last_online_at in organizers; admin-only visibility
+- [Ownership Structure](mem://database/ownership-structure) — auth.uid() -> organizers.user_id -> tournaments.created_by
+- [Status Automation](mem://features/tournament-lifecycle/status-automation) — Status transitions to complete only when all active modalities finish
+- [Custom Access Code](mem://features/tournaments/custom-access-code) — 20-char unique uppercase alphanumeric access code for tournaments
+- [Data Access Layer](mem://architecture/data-access-layer) — CRUD via organizer-api Edge Functions; publicQuery and organizerQuery
+- [Supabase Reference](mem://tech-stack/supabase-config) — Project Reference ID yhfzxfsetiznvkwoiwkc
+- [Athlete Panel Parity](mem://features/athlete-panel/view-parity) — Athlete public view must match organizer panel visually/functionally
+- [Double Elimination Sequencing](mem://features/match-logic/double-elimination-sequencing) — Topological sorting for sequence; WA/WB merged visually
+- [Engine Separation](mem://architecture/engine-separation) — Normal and Double Elimination engines are strictly separate; no inherited logic
+- [Beach Tennis Scoring](mem://features/sport-specific/beach-tennis-scoring) — Displays sets won (2-0) instead of total games for Beach Tennis
+- [Format Persistence](mem://features/match-logic/double-elimination-format-persistence) — Generating double elim forces tournament format update
+- [Visual Identity](mem://style/visual-identity) — Shield logo, Dark Arena cosmic background, amber/deep blue gradients, back buttons
+- [Branding Processing](mem://project/branding) — LogoImage uses standard img with fetchPriority=high and CSS filters instead of Canvas
+- [Double Elimination Losers Deferral](mem://features/match-logic/double-elimination-losers-deferral) — pendingBye logic defers non-power-of-2 teams to next losers round
+- [Losers Consolidation Rounds](mem://features/match-logic/losers-consolidation-rounds) — Minor rounds inseridas quando sobreviventes > novos derrotados (fix bug jogo #26)
+- [Backend Hardening](mem://security/backend-hardening) — JWT HMAC-SHA256, ownership validation on server, env-protected seed-admin
+- [Test Credentials](mem://auth/organizer-credentials) — Test account: SABRINA / SABRINA1
+- [Modality Isolation](mem://features/match-logic/modality-isolation) — Strict isolation by modality_id; tournament_id not used as sole filter
+- [Shared Access](mem://features/tournament-access/shared-access) — Multi-organizer access via tournament_organizers; only creator/admin can delete
+- [Date Formatting](mem://localization/date-formatting) — formatDateBR (DD/MM/AAAA) prevents timezone shift from new Date()
+- [PostgREST Hints](mem://architecture/api/postgrest-hints) — Mandatory relationship hints in queries (e.g. organizers!organizer_id)
+- [Propagation Integrity](mem://features/match-logic/propagation-integrity) — Await winner persistence before fetching freshMatches to avoid race conditions
+- [Concurrency Handling](mem://architecture/concurrency-handling) — Sequential processing and retry mechanism (3x) for getOrganizer
+- [Team Management](mem://features/teams/management-logic) — Excel import logic (raw: false, cellText: true, defval: "") and batch insertion
+- [Scoring Model](mem://features/rankings/scoring-model) — Ranking points scale (1st: 20pt...); Misto split into male/female inheriting points
+- [Random Draw](mem://features/match-logic/random-draw-logic) — Fisher-Yates for random teams, fixed strategic positions for seeds
+- [Bracket Progression Standard](mem://features/match-logic/bracket-progression-standard) — Mirrored Extremes (1A x 2H, etc.); matches grouped by next_win_match_id
+- [Court Bookings Architecture](mem://features/court-bookings/module-architecture) — Isolated 3-tier RBAC module (Master Admin, Arena Owner, Athlete)
+- [Court Booking Rules](mem://features/court-bookings/business-rules) — Double booking guard, 2h cancel window, finance tracking, inactive block
+- [Development Constraints](mem://project/development-constraints) — Do not touch stable code/React 18.2.0; isolated Court Booking vertical
+- [Chapéu System](mem://features/match-logic/chapeu-system-logic) — Waiting slots structural distribution to closest power of 2; seeds get no bye priority
+- [Arena Management](mem://features/court-bookings/arena-management) — CRUD for arenas and courts; specific operation times and pricing
+- [Testing Standards](mem://tech-stack/testing/standards-and-invariants) — Vitest invariants (scores non-negative, points non-regressive) blocking build on fail
+- [Third Place Match](mem://features/match-logic/third-place-match) — Semi-final losers routed to 3rd place match; explicit labeling required
+- [Password Hashing](mem://security/password-hashing) — bcrypt via pgcrypto using extensions schema prefix
+- [Access Control](mem://auth/access-control) — RLS policies on organizers table must be PERMISSIVE
+- [Admin Credentials](mem://auth/admin-credentials) — Supabase Auth hierarchy; default sovereign admin joao2892002@gmail.com
+- [Court Assignments](mem://features/match-logic/court-assignments) — Badges for groups/brackets; court distribution rules and sequencing logic
+- [Public Mini Games Access](mem://architecture/api/public-mini-game-access) — Direct client INSERTs for quiz_scores to bypass organizer-api 401
+- [Bracket UI Standards](mem://style/bracket-ui-standards) — Converging single tree; horizontal scroll/zoom; hides phantom matches
+- [Ranked Challenges](mem://features/ranked-challenges) — Mutual confirm, +/- points updates, CPF search, profile pictures
+- [Sport Customization](mem://features/court-bookings/sport-customization) — Booking UI adapts themes (icons/gradients) based on selected sport
+- [Visibility Management](mem://features/tournaments/visibility-management) — Public/Private toggle hiding from Athlete Hub feed
+- [Master Admin Privileges](mem://features/court-bookings/master-admin-privileges) — user_roles admin can bypass arena_id restrictions for bookings
+- [Lifecycle Management](mem://auth/lifecycle-management) — Synchronous onAuthStateChange listener; async calls as non-blocking promises
+- [Athlete Management](mem://features/admin/athlete-management) — Admin tab uses athlete-admin Edge Function to manage user metadata
+- [Unified Schema](mem://database/schema-unified) — 4 logical domains (Tournaments, Bookings, Social/Athlete, Management) via Edge Functions
+- [Core Mechanics](mem://features/match-logic/core-mechanics) — Snake balancing in groups; Mirrored Extremes in knockouts; strict logic separation
+- [Infrastructure & Perf](mem://tech-stack/infrastructure-and-performance) — Realtime sync, Link Preload, React 18.2.0 lock, 2s AuthContext timeout
+- [Scoring Engines](mem://features/match-logic/scoring-engines-consolidated) — Tennis/Padel (0-15-30-40, tiebreaks), Futsal (periods, cards), strict deterministic
+- [Athlete Auth Flow](mem://auth/athlete/fluxo-e-cadastro) — Athlete role assigned via assign-athlete-role; local storage password recall
+- [Realtime Integrity](mem://architecture/system-stability-and-realtime-integrity) — Supabase client singleton; REPLICA IDENTITY FULL for filtered realtime updates
+- [Visual Sequence Truth](mem://features/match-logic/visual-sequence-truth) — Sequence tab labels explicit origins (Seed, Winner/Loser Match X); cross-bracket sweep
+- [Resting Time Constraint](mem://features/match-logic/sequence-ordering-resting-time-constraint) — Applied to group phase only; knockout phase follows natural bracket order
+- [Manual Bracket Corrections](mem://features/match-logic/manual-bracket-corrections) — SQL overrides require manual re-advance of winners to maintain progression
+- [Classification Logic](mem://features/match-logic/classification-and-ranking-logic) — Final prioritizes 1st/2nd; 3rd Place match dictates 3rd/4th over point diff
+- [Misto Processing](mem://features/rankings/misto-modality-processing) — Misto pairs split to Male/Female; visual tabs consolidated
+- [Manual Override Rules](mem://features/match-logic/manual-override-rules) — Standard pipeline enforced for manual overrides (lock, reset, repropagate, validate)
+- [Tiebreak Engine](mem://features/rankings/tiebreak-engine) — Fallback criteria configured; completely removed ELO from seeding/tiebreaks
+- [Auto Advance](mem://features/match-logic/auto-advance) — Group to Knockout transition auto triggers when round 0 completes
+- [System Rules Docs](mem://project/documentation/system-rules) — SYSTEM_RULES.md is ultimate technical truth for brackets; violations are bugs
+- [Stress Tests](mem://project/documentation/stress-tests) — STRESS_TESTS.md documents 11 extreme resilience scenarios for validation
+- [Athlete Visibility](mem://features/admin/athlete-visibility-constraint) — Admin searches require 'athlete' role explicitly mapped in user_roles
+- [Cascade Propagation](mem://features/match-logic/cascade-and-propagation) — trySiblingSwap prevents destination ID changes; sequential re-execution for slots
+- [Historical Lock](mem://features/tournaments/historical-lock) — 'completed'/'cancelled' status locks global writes, excepting ranking and new stages
+- [Maintenance Tools](mem://features/match-logic/maintenance-tools) — Granular cascade, repair/sync scans, override pipeline for results flow
+- [Ranking System Logic](mem://features/rankings/system-logic) — No podium visuals; list/table only; badges allowed; edit allowed in completed tourneys
+- [Tournament Stages](mem://features/tournaments/stages) — Multi-phase tournaments via stage_id; allows expanding historical circuits
+- [Third Place Exemption](mem://features/match-logic/rule-4-6-third-place-exemption) — Exempt from double-loss elimination limit in double elimination rules
+- [Automated Simulation](mem://features/testing/automated-simulation) — create_and_simulate tests logic strictly against systemRulesGuard
+- [Double Elimination Constraints](mem://features/match-logic/double-elimination-constraints) — No grand final reset; Mirror Crossing paths enforced
+- [Custom Modalities](mem://features/tournaments/custom-modalities) — Modalities isolated with custom names; requires 2-step deletion confirm
+- [Stage Deletion](mem://features/tournaments/stage-deletion) — Mandatory cleanup flow deletes matches/teams before tournament_stages record
+- [Badge System](mem://features/rankings/badge-system) — Visual badges (⭐, ❤️, 🏆) for highlighted athletes stored in rankings.badge
+- [Points History Audit](mem://features/rankings/points-history-audit-trail) — ranking_points_history logs edits with tournament, stage, difference, and reason
+- [Modality Tabs Navigation](mem://style/navigation/modality-tabs) — Independent horizontal scrollbar-thin for category tabs
+- [Bracket Badges](mem://style/ui-conventions/bracket-badges) — CA/CB for round > 0 based on bracket_number; GA/GB for group phase
+- [RLS Intentional Strategy](mem://security/rls-intentional-strategy) — PERMISSIVE reads; writes validated at Edge Function organizer-api level
+- [Tournament Organizers Constraints](mem://database/schema/tournament-organizers-constraints) — granted_by field is mandatory to associate new managers
+- [Auto-Repair Mechanism](mem://features/match-logic/auto-repair-mechanism) — Post-propagation scan fixes null slots after declareWinner immediately
+- [Sequence Stability](mem://features/match-sequence/sequence-stability) — matchNumber immutable post-publish; late entries must use Chapéus
+- [Match Identifiers](mem://architecture/documentation/match-identifiers) — RXPY convention (R=Round, P=Position) for diagnostic mapping
+- [Integrity Guards Refined](mem://features/match-logic/integrity-guards-refined) — trg_validate_match_teams blocks self-match and intra-round duplicates
+- [Post-Generation Auto Repair](mem://features/match-logic/post-generation-auto-repair) — postGenerationValidator autonomously fixes links after bracket generation
+- [Late Team Insertion System](mem://features/match-logic/late-team-insertion-system) — lateTeamInsertion places new teams in BYE or prelims of Winners Lower

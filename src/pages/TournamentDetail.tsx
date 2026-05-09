@@ -149,6 +149,7 @@ const TournamentDetail = () => {
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
   const bracketExportRef = useRef<HTMLDivElement>(null);
   const [exportingBracket, setExportingBracket] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("teams");
 
   const { modalities, selectedModality, setSelectedModality, updateModality, createModality, deleteModality, loading: modalitiesLoading } = useModalities(id);
 

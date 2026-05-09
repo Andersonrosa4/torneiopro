@@ -168,18 +168,50 @@ function resetRowsCache(): void {
 }
 
 /**
- * Constrói o JSON compacto. Usa concatenação de strings para que a
- * porção `rows` (potencialmente grande) possa vir do cache, evitando
- * percorrer o array novamente quando só `scrollY` mudou.
+ * Constrói o JSON compacto com OPÇÕES de degradação.
+ *
+ * - `rowsLimit`: corta o array a esse tamanho (default = MAX_PERSISTED_ROWS).
+ * - `stripAppliedFixes`: substitui `applied_fixes` por `null` em cada linha
+ *   (campo de tamanho variável e potencialmente grande — o maior offender).
+ * - `dropCursor`: força `c=null`, sem cursor de retomada.
+ *
+ * O cache de serialização de linhas é reaproveitado APENAS no caminho
+ * default (sem `stripAppliedFixes` e com `rowsLimit >= rows.length`).
+ * Os caminhos de fallback são raros (perto da quota) e podem pagar o
+ * custo extra sem prejuízo de performance no caminho quente.
  */
-export function buildCompactJson(state: Omit<PersistedState, "v" | "savedAt">): string {
-  // Preserva a identidade do array quando já está dentro do cap, para que
-  // o cache de serialização funcione durante a rolagem (apenas `scrollY` muda).
-  const cappedRows = state.rows.length <= MAX_PERSISTED_ROWS
+export interface BuildOptions {
+  rowsLimit?: number;
+  stripAppliedFixes?: boolean;
+  dropCursor?: boolean;
+}
+
+export function buildCompactJson(
+  state: Omit<PersistedState, "v" | "savedAt">,
+  opts: BuildOptions = {},
+): string {
+  const limit = Math.max(0, opts.rowsLimit ?? MAX_PERSISTED_ROWS);
+  const cappedRows = state.rows.length <= limit
     ? state.rows
-    : state.rows.slice(0, MAX_PERSISTED_ROWS);
-  const rowsJson = serializeRows(cappedRows);
-  const cursorJson = state.cursor
+    : state.rows.slice(0, limit);
+
+  let rowsJson: string;
+  if (limit === 0) {
+    rowsJson = "[]";
+  } else if (opts.stripAppliedFixes) {
+    // Não usa cache: o output difere do canônico.
+    rowsJson = JSON.stringify(
+      cappedRows.map((r) => {
+        const t = compactRow(r);
+        t[6] = null; // applied_fixes
+        return t;
+      }),
+    );
+  } else {
+    rowsJson = serializeRows(cappedRows);
+  }
+
+  const cursorJson = !opts.dropCursor && state.cursor
     ? `[${JSON.stringify(state.cursor.created_at)},${JSON.stringify(state.cursor.id)}]`
     : "null";
   return (
@@ -195,6 +227,7 @@ export function buildCompactJson(state: Omit<PersistedState, "v" | "savedAt">): 
     `}`
   );
 }
+
 
 // ───── Migrações de schema ─────────────────────────────────────────────
 //

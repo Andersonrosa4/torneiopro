@@ -45,6 +45,7 @@ import { FileDown } from "lucide-react";
 import ClassificationTab from "@/components/ClassificationTab";
 import RankingsTab from "@/components/RankingsTab";
 import StageSelector from "@/components/StageSelector";
+import BugCombatantLogPanel from "@/components/BugCombatantLogPanel";
 
 const sportLabels: Record<string, string> = {
   beach_volleyball: "🏐 Vôlei de Praia",

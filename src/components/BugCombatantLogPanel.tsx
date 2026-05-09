@@ -24,6 +24,11 @@ import {
   recordReset,
   type ResetReason,
 } from "@/lib/bugCombatantLogTelemetry";
+import {
+  getHydratableState,
+  readPersisted,
+  writePersisted,
+} from "@/lib/bugCombatantLogPersistence";
 import { toast } from "sonner";
 
 type Source = "all" | "cron" | "manual";

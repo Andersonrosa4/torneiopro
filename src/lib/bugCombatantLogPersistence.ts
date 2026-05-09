@@ -18,7 +18,15 @@
 // - Mantemos um cache 1-slot da serialização das linhas (por identidade
 //   de referência), de modo que rolar (mudando apenas `scrollY`) NÃO
 //   re-serializa o array inteiro de linhas.
-// - Versões antigas (v1) são descartadas silenciosamente na hidratação.
+//
+// VERSIONAMENTO E MIGRAÇÃO (v2+):
+// - Toda entrada carrega `v` (schema version). Na leitura, se `v` não bate,
+//   tentamos rodar migrações registradas em `MIGRATIONS` (v1→v2, v2→v3, …).
+//   Se NÃO houver caminho até a versão atual, a entrada é REMOVIDA
+//   automaticamente (auto-clear) — evitando hidratar com dados incompatíveis
+//   ou crashar na expansão. O caller volta a refetch da 1ª página.
+// - `sweepIncompatibleKeys()` varre TODAS as chaves `bug-audit:*` no
+//   sessionStorage e descarta as que não puderem ser migradas. Idempotente.
 
 import {
   toCursor,
@@ -27,6 +35,7 @@ import {
 
 const SCHEMA_VERSION = 2;
 const MAX_PERSISTED_ROWS = 200;
+const STORAGE_KEY_PREFIX = "bug-audit:";
 
 export type Source = "all" | "cron" | "manual";
 export type Scope = "tournament" | "all";

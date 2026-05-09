@@ -151,6 +151,7 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
           ? `Combatedor: ${s.fixed} correção(ões) aplicada(s) em ${s.scanned} partidas.`
           : `Combatedor: ${s.scanned} partidas verificadas, nenhum bug detectado.`,
       );
+      nextResetReasonRef.current = "after_run";
       fetchLogs();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

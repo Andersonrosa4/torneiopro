@@ -726,7 +726,7 @@ const MatchCard = ({
               <Trophy className="h-2.5 w-2.5" />
             </Button>
           )}
-          {isCompleted && !t1Win && !t2Win && <span className="text-muted-foreground/30 text-[9px] ml-auto">Empate</span>}
+          {/* Empates não existem em torneios eliminatórios — removido por regra do sistema */}
         </div>
       </div>
 

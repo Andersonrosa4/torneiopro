@@ -15,6 +15,7 @@ import {
   nextCursorFromPage,
   type KeysetCursor,
 } from "@/lib/bugCombatantLogCursor";
+import { restoreScrollY } from "@/lib/bugCombatantLogScrollRestore";
 import {
   flushNow,
   recordCursorError,
@@ -140,18 +141,25 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
     };
   }, [tournamentId, source, scope, search, rows, hasMore]);
 
-  // Restaura scroll após a primeira carga concluir
+  // Restaura scroll após hidratação. Usa `restoreScrollY`, que tolera o
+  // crescimento progressivo do `scrollHeight` enquanto o virtualizador mede
+  // os itens — evitando o "salto para o topo" quando o `window.scrollTo`
+  // inicial é silenciosamente clampado por falta de altura.
   useEffect(() => {
     if (restoredRef.current || loading) return;
-    const y = (persisted.scrollY as number | undefined) ?? 0;
-    if (y > 0) {
-      // aguarda a virtualizada montar e calcular alturas
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => window.scrollTo({ top: y, behavior: "auto" }));
-      });
-    }
     restoredRef.current = true;
-  }, [loading, persisted.scrollY]);
+    const y = (persisted.scrollY as number | undefined) ?? 0;
+    if (y <= 0) return;
+    void restoreScrollY({ targetY: y }).then((res) => {
+      if (!res.ok) {
+        recordCursorError(tournamentId, {
+          message: `restoreScrollY falhou (${res.reason}): targetY=${y} finalY=${res.finalY} attempts=${res.attempts}`,
+          context: "scroll_restore",
+          source, scope,
+        });
+      }
+    });
+  }, [loading, persisted.scrollY, tournamentId, source, scope]);
 
   const runNow = useCallback(async () => {
     if (!isAdmin) return;

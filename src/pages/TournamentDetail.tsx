@@ -70,6 +70,17 @@ const statusColors: Record<string, string> = {
   cancelled: "bg-destructive/20 text-destructive",
 };
 
+const sameMatchScope = (m: Match, ref: Match) =>
+  m.modality_id === ref.modality_id && (m.stage_id ?? null) === (ref.stage_id ?? null);
+
+const matchScopeFilters = (match: Match, tournamentId: string) => {
+  const filters: Record<string, any> = match.modality_id
+    ? { modality_id: match.modality_id }
+    : { tournament_id: tournamentId };
+  if (match.stage_id !== undefined) filters.stage_id = match.stage_id ?? null;
+  return filters;
+};
+
 interface Team {
   id: string;
   tournament_id: string;
@@ -1350,12 +1361,10 @@ const TournamentDetail = () => {
     if (!match || !id) { declareWinnerMutex.current.delete(matchId); return; }
 
     // ── ROUND LOCK GUARD ──
-    const modalityMatches = match.modality_id
-      ? matches.filter(m => m.modality_id === match.modality_id)
-      : matches.filter(m => m.round > 0);
+    const modalityMatches = matches.filter(m => sameMatchScope(m, match));
     const lockCheck = isRoundLocked(
-      { id: match.id, round: match.round, status: match.status, bracket_type: match.bracket_type, bracket_half: match.bracket_half, modality_id: match.modality_id },
-      modalityMatches.map(m => ({ id: m.id, round: m.round, status: m.status, bracket_type: m.bracket_type, bracket_half: m.bracket_half, modality_id: m.modality_id })),
+      { id: match.id, round: match.round, status: match.status, bracket_type: match.bracket_type, bracket_half: match.bracket_half, modality_id: match.modality_id, stage_id: match.stage_id, next_win_match_id: match.next_win_match_id, next_lose_match_id: match.next_lose_match_id },
+      modalityMatches.map(m => ({ id: m.id, round: m.round, status: m.status, bracket_type: m.bracket_type, bracket_half: m.bracket_half, modality_id: m.modality_id, stage_id: m.stage_id, next_win_match_id: m.next_win_match_id, next_lose_match_id: m.next_lose_match_id })),
     );
     if (lockCheck.locked) {
       toast.error(lockCheck.reason);

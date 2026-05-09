@@ -156,27 +156,36 @@ function checkAdvanceWithoutPlaying(matches: GuardMatch[], violations: RuleViola
 }
 
 function checkAllStartInWinners(matches: GuardMatch[], violations: RuleViolation[]) {
-  // Collect all teams that appear in round 1 of losers but never in winners
-  const winnersTeams = new Set<string>();
-  const losersR1Teams = new Set<string>();
-
+  // Isolar por escopo (modality + stage) — chaves diferentes não compartilham equipes
+  const scopes = new Map<string, GuardMatch[]>();
   for (const m of matches) {
-    if (m.bracket_type === 'winners') {
-      if (m.team1_id) winnersTeams.add(m.team1_id);
-      if (m.team2_id) winnersTeams.add(m.team2_id);
-    }
-    if (m.bracket_type === 'losers' && m.round === 1) {
-      if (m.team1_id) losersR1Teams.add(m.team1_id);
-      if (m.team2_id) losersR1Teams.add(m.team2_id);
-    }
+    const k = scopeKey(m);
+    if (!scopes.has(k)) scopes.set(k, []);
+    scopes.get(k)!.push(m);
   }
 
-  for (const tid of losersR1Teams) {
-    if (!winnersTeams.has(tid)) {
-      violations.push({
-        rule: '4.1',
-        message: `Equipe ${tid.slice(0, 8)} aparece na Losers R1 mas nunca na Winners — inserção direta proibida`,
-      });
+  for (const [, scopeMatches] of scopes) {
+    const winnersTeams = new Set<string>();
+    const losersR1Teams = new Set<string>();
+
+    for (const m of scopeMatches) {
+      if (m.bracket_type === 'winners') {
+        if (m.team1_id) winnersTeams.add(m.team1_id);
+        if (m.team2_id) winnersTeams.add(m.team2_id);
+      }
+      if (m.bracket_type === 'losers' && m.round === 1) {
+        if (m.team1_id) losersR1Teams.add(m.team1_id);
+        if (m.team2_id) losersR1Teams.add(m.team2_id);
+      }
+    }
+
+    for (const tid of losersR1Teams) {
+      if (!winnersTeams.has(tid)) {
+        violations.push({
+          rule: '4.1',
+          message: `Equipe ${tid.slice(0, 8)} aparece na Losers R1 mas nunca na Winners — inserção direta proibida`,
+        });
+      }
     }
   }
 }

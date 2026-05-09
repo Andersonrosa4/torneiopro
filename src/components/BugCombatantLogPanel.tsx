@@ -11,7 +11,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { formatDateBR } from "@/lib/utils";
 import {
-  cursorToOrFilter,
   nextCursorFromPage,
   toCursor,
   type KeysetCursor,
@@ -178,21 +177,45 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
     }
   }, [isAdmin, tournamentId]);
 
-  // Keyset pagination: ordena por (created_at desc, id desc) e usa o cursor
-  // padronizado de `bugCombatantLogCursor`. Cursor é validado (formato canônico
-  // ISO-8601 + UUID) antes de ser interpolado no filtro `or(...)` do PostgREST.
+  // Keyset pagination via edge function `bug-combatant-log`:
+  // - O cursor é VALIDADO server-side (formato canônico ISO-8601 UTC + UUID)
+  //   antes de qualquer filtro ser montado. Cursor inválido → 400 INVALID_CURSOR.
+  // - Filtros (tournament_id/source) também são validados server-side.
+  // - Mantém a mesma forma `{ data, error }` esperada pelos consumidores.
   const buildQuery = useCallback(
-    (cursor: KeysetCursor | null) => {
-      let q = supabase
-        .from("bug_combatant_log")
-        .select("id,tournament_id,scanned,fixed,remaining,source,applied_fixes,created_at")
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false })
-        .limit(PAGE_SIZE);
-      if (scope === "tournament") q = q.eq("tournament_id", tournamentId);
-      if (source !== "all") q = q.eq("source", source);
-      if (cursor) q = q.or(cursorToOrFilter(cursor));
-      return q;
+    async (cursor: KeysetCursor | null): Promise<{ data: LogRow[] | null; error: { message: string; code?: string } | null }> => {
+      const { data, error } = await supabase.functions.invoke("bug-combatant-log", {
+        body: {
+          tournament_id: tournamentId,
+          scope,
+          source,
+          limit: PAGE_SIZE,
+          cursor: cursor ?? null,
+        },
+      });
+      if (error) {
+        // FunctionsHttpError vem do gateway; tenta extrair payload estruturado.
+        let payload: any = null;
+        try {
+          payload = typeof (error as any).context?.json === "function"
+            ? await (error as any).context.json()
+            : null;
+        } catch { /* noop */ }
+        const code = payload?.error?.code as string | undefined;
+        const msg = payload?.error?.message ?? error.message ?? "Falha na requisição";
+        if (code === "INVALID_CURSOR") {
+          // Propaga como exceção para acionar `recordCursorError` no chamador.
+          throw new Error(`[INVALID_CURSOR] ${msg}`);
+        }
+        return { data: null, error: { message: msg, code } };
+      }
+      if (data?.error) {
+        const code = data.error.code as string | undefined;
+        const msg = data.error.message ?? "Erro do servidor";
+        if (code === "INVALID_CURSOR") throw new Error(`[INVALID_CURSOR] ${msg}`);
+        return { data: null, error: { message: msg, code } };
+      }
+      return { data: (data?.rows ?? []) as LogRow[], error: null };
     },
     [tournamentId, source, scope],
   );

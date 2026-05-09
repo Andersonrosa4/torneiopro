@@ -141,36 +141,39 @@ const Dashboard = () => {
 
   const deleteTournament = async (tournamentId: string) => {
     try {
-      // 1. Delete rankings
-      await organizerQuery({ table: "rankings", operation: "delete", filters: { tournament_id: tournamentId } });
+      // Limpa referências internas de avanço (next_win/next_lose) para evitar
+      // FK violation entre matches do mesmo torneio durante o CASCADE.
+      await supabase
+        .from("matches")
+        .update({ next_win_match_id: null, next_lose_match_id: null })
+        .eq("tournament_id", tournamentId);
 
-      // 2. Nullify FK refs + delete matches + classificacao_grupos + groups (undo_bracket handles all)
-      await organizerQuery({
-        table: "matches",
-        operation: "undo_bracket",
-        tournament_id: tournamentId,
-      });
+      // Todas as tabelas filhas têm FK ON DELETE CASCADE → basta apagar o torneio.
+      const { error } = await supabase.from("tournaments").delete().eq("id", tournamentId);
 
-      // 3. Delete participants
-      await organizerQuery({ table: "participants", operation: "delete", filters: { tournament_id: tournamentId } });
-
-      // 4. Delete teams
-      await organizerQuery({ table: "teams", operation: "delete", filters: { tournament_id: tournamentId } });
-
-      // 5. Delete modalities
-      await organizerQuery({ table: "modalities", operation: "delete", filters: { tournament_id: tournamentId } });
-
-      // 6. Delete the tournament itself
-      const { error } = await organizerQuery({ table: "tournaments", operation: "delete", filters: { id: tournamentId } });
       if (error) {
+        console.error("[deleteTournament] erro:", error);
         toast.error("Erro ao excluir torneio: " + error.message);
+        return;
+      }
+
+      // Confirma que o registro realmente saiu (RLS pode silenciar o DELETE).
+      const { data: stillThere } = await supabase
+        .from("tournaments")
+        .select("id")
+        .eq("id", tournamentId)
+        .maybeSingle();
+
+      if (stillThere) {
+        toast.error("Sem permissão para excluir este torneio.");
         return;
       }
 
       setTournaments((prev) => prev.filter((t) => t.id !== tournamentId));
       toast.success("Torneio excluído com sucesso!");
     } catch (err: any) {
-      toast.error("Erro ao excluir torneio. Tente novamente.");
+      console.error("[deleteTournament] exceção:", err);
+      toast.error("Erro ao excluir torneio: " + (err?.message || "tente novamente"));
     }
   };
 

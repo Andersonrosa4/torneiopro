@@ -16,6 +16,7 @@ import {
   type KeysetCursor,
 } from "@/lib/bugCombatantLogCursor";
 import { restoreScrollY } from "@/lib/bugCombatantLogScrollRestore";
+import { createThrottledPersister } from "@/lib/bugCombatantLogThrottle";
 import {
   flushNow,
   recordCursorError,

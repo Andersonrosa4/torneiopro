@@ -28,7 +28,7 @@ interface Props {
   isAdmin?: boolean;
 }
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 25;
 
 function formatDateTimeBR(iso: string): string {
   try {

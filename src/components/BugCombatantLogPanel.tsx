@@ -52,9 +52,33 @@ function parseFixes(raw: unknown): { matchShort: string; label: string }[] {
 export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmin }: Props) {
   const [rows, setRows] = useState<LogRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [running, setRunning] = useState(false);
   const [source, setSource] = useState<Source>("all");
   const [scope, setScope] = useState<Scope>("tournament");
   const [search, setSearch] = useState("");
+
+  const runNow = useCallback(async () => {
+    if (!isAdmin) return;
+    setRunning(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("auto-healer", {
+        body: { tournamentId },
+      });
+      if (error) throw error;
+      const s = (data?.summary?.[0] ?? { scanned: 0, fixed: 0 }) as { scanned: number; fixed: number };
+      toast.success(
+        s.fixed > 0
+          ? `Combatedor: ${s.fixed} correção(ões) aplicada(s) em ${s.scanned} partidas.`
+          : `Combatedor: ${s.scanned} partidas verificadas, nenhum bug detectado.`,
+      );
+      fetchLogs();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Falha ao rodar o combatedor: ${msg}`);
+    } finally {
+      setRunning(false);
+    }
+  }, [isAdmin, tournamentId]);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);

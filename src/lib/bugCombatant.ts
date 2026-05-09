@@ -221,6 +221,8 @@ export function startBackgroundWatchdog(
 ): () => void {
   let stopped = false;
   let realtimeTimer: ReturnType<typeof setTimeout> | null = null;
+  let interval: ReturnType<typeof setInterval> | null = null;
+  let currentDebounceMs = DEFAULT_REALTIME_DEBOUNCE_MS;
 
   const safeRun = async (force = false) => {
     if (stopped) return;
@@ -232,10 +234,27 @@ export function startBackgroundWatchdog(
     }
   };
 
-  // Scan inicial
-  const initial = setTimeout(() => safeRun(true), 1_500);
-  // Scans periódicos
-  const interval = setInterval(() => safeRun(false), WATCHDOG_INTERVAL_MS);
+  // Aplica intervalos vindos da config (com re-aplicação se mudarem)
+  let lastIntervalMs = 0;
+  const applyConfig = async () => {
+    if (stopped) return;
+    const cfg = await getBugCombatantConfig({ force: true });
+    currentDebounceMs = cfg.realtimeDebounceMs;
+    if (cfg.watchdogIntervalMs !== lastIntervalMs) {
+      lastIntervalMs = cfg.watchdogIntervalMs;
+      if (interval) clearInterval(interval);
+      interval = setInterval(() => safeRun(false), cfg.watchdogIntervalMs);
+    }
+  };
+
+  // Scan inicial + bootstrap da config
+  const initial = setTimeout(() => {
+    void applyConfig();
+    void safeRun(true);
+  }, 1_500);
+
+  // Re-leitura periódica da config (a cada 60s) — pega ajustes do admin sem recarregar
+  const configRefresh = setInterval(() => void applyConfig(), 60_000);
 
   // Listener realtime — qualquer mudança em matches dispara scan debounced
   const channel = supabase
@@ -245,7 +264,7 @@ export function startBackgroundWatchdog(
       { event: "*", schema: "public", table: "matches", filter: `tournament_id=eq.${tournamentId}` },
       () => {
         if (realtimeTimer) clearTimeout(realtimeTimer);
-        realtimeTimer = setTimeout(() => safeRun(true), REALTIME_DEBOUNCE_MS);
+        realtimeTimer = setTimeout(() => safeRun(true), currentDebounceMs);
       }
     )
     .subscribe();
@@ -253,7 +272,8 @@ export function startBackgroundWatchdog(
   return () => {
     stopped = true;
     clearTimeout(initial);
-    clearInterval(interval);
+    clearInterval(configRefresh);
+    if (interval) clearInterval(interval);
     if (realtimeTimer) clearTimeout(realtimeTimer);
     supabase.removeChannel(channel);
   };

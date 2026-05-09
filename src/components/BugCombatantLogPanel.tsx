@@ -136,6 +136,17 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
     return () => { supabase.removeChannel(channel); };
   }, [tournamentId, fetchLogs]);
 
+  // IntersectionObserver para scroll infinito
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore || loading) return;
+    const obs = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting) loadMore();
+    }, { rootMargin: "200px" });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [hasMore, loading, loadMore]);
+
   const filtered = useMemo(() => {
     if (!search.trim()) return rows;
     const t = search.trim().toLowerCase();

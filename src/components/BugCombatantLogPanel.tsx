@@ -16,6 +16,7 @@ import {
   type KeysetCursor,
 } from "@/lib/bugCombatantLogCursor";
 import { restoreScrollY } from "@/lib/bugCombatantLogScrollRestore";
+import { createThrottledPersister } from "@/lib/bugCombatantLogThrottle";
 import {
   flushNow,
   recordCursorError,
@@ -113,31 +114,41 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
   // Persiste filtros, scroll, cursor, páginas e flag hasMore (sessionStorage).
   // Cursor + rows + pageIndex permitem retomar a paginação após refresh sem
   // refazer páginas anteriores nem quebrar a ordem keyset.
+  //
+  // Performance: durante rolagem contínua, eventos de scroll disparam ~60Hz.
+  // Usamos um throttle leading+trailing (250ms) para limitar a no máximo
+  // ~4 writes/s no caminho quente — `JSON.stringify(rows)` é o gargalo real.
+  // O `flush` é chamado em `visibilitychange`/`pagehide`/cleanup para garantir
+  // que a posição final é gravada antes da aba sair.
   useEffect(() => {
-    const save = () => {
-      writePersisted({
-        tournament_id: tournamentId,
-        source,
-        scope,
-        search,
-        scrollY: typeof window !== "undefined" ? window.scrollY : 0,
-        cursor: cursorRef.current,
-        rows,
-        pageIndex: pageIndexRef.current,
-        hasMore,
-      });
-    };
-    let raf = 0;
-    const onScroll = () => {
-      if (raf) return;
-      raf = window.requestAnimationFrame(() => { raf = 0; save(); });
-    };
+    const buildPayload = () => ({
+      tournament_id: tournamentId,
+      source,
+      scope,
+      search,
+      scrollY: typeof window !== "undefined" ? window.scrollY : 0,
+      cursor: cursorRef.current,
+      rows,
+      pageIndex: pageIndexRef.current,
+      hasMore,
+    });
+    const throttled = createThrottledPersister(
+      () => writePersisted(buildPayload()),
+      { intervalMs: 250 },
+    );
+    const onScroll = () => throttled();
+    const onVisibilityFlush = () => throttled.flush();
     window.addEventListener("scroll", onScroll, { passive: true });
-    save();
+    document.addEventListener("visibilitychange", onVisibilityFlush);
+    window.addEventListener("pagehide", onVisibilityFlush);
+    // Persistência imediata ao montar/atualizar dependências (não throttled —
+    // mudanças de filtros/rows são pontuais e raras comparadas a scroll).
+    writePersisted(buildPayload());
     return () => {
       window.removeEventListener("scroll", onScroll);
-      if (raf) cancelAnimationFrame(raf);
-      save();
+      document.removeEventListener("visibilitychange", onVisibilityFlush);
+      window.removeEventListener("pagehide", onVisibilityFlush);
+      throttled.flush();
     };
   }, [tournamentId, source, scope, search, rows, hasMore]);
 

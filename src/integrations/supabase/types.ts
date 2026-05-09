@@ -382,6 +382,33 @@ export type Database = {
         }
         Relationships: []
       }
+      bug_combatant_config: {
+        Row: {
+          cooldown_ms: number
+          id: string
+          realtime_debounce_ms: number
+          updated_at: string
+          updated_by: string | null
+          watchdog_interval_ms: number
+        }
+        Insert: {
+          cooldown_ms?: number
+          id?: string
+          realtime_debounce_ms?: number
+          updated_at?: string
+          updated_by?: string | null
+          watchdog_interval_ms?: number
+        }
+        Update: {
+          cooldown_ms?: number
+          id?: string
+          realtime_debounce_ms?: number
+          updated_at?: string
+          updated_by?: string | null
+          watchdog_interval_ms?: number
+        }
+        Relationships: []
+      }
       bug_combatant_log: {
         Row: {
           applied_fixes: Json

@@ -246,7 +246,11 @@ describe("BugCombatantLogPanel — throttle de persistência durante scroll", ()
       toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "performance", "Date"],
     });
 
-    // Cria estado pendente (trailing).
+    // Cria estado pendente (trailing): 1º scroll dispara leading,
+    // 2º scroll dentro da janela de 250ms fica pendente para o trailing.
+    setScrollY(50);
+    window.dispatchEvent(new Event("scroll"));
+    vi.advanceTimersByTime(10);
     setScrollY(123);
     window.dispatchEvent(new Event("scroll"));
     vi.advanceTimersByTime(10);

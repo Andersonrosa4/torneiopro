@@ -37,7 +37,7 @@ describe("Losers bracket — rodada de consolidação (REGRESSÃO bug jogo #26)"
         (m: any) => m.bracket_type === "losers" && m.bracket_half === half && m.round === 1,
       );
       for (const r1 of losersR1) {
-        const target = result.matches.find((m: any) => m._temp_id === r1.next_win_match_id);
+        const target = result.matches.find((m: any) => m.id === r1.next_win_match_id);
         expect(target, `L ${half} R1 deve ter destino`).toBeTruthy();
         expect(target!.round).toBe(2); // sempre R2, nunca pular para R3+
       }
@@ -55,7 +55,7 @@ describe("Losers bracket — rodada de consolidação (REGRESSÃO bug jogo #26)"
     );
 
     for (const ws of wSemis) {
-      const losersTarget = result.matches.find((m: any) => m._temp_id === ws.next_lose_match_id);
+      const losersTarget = result.matches.find((m: any) => m.id === ws.next_lose_match_id);
       expect(losersTarget, `Winners semi (R3) deve ter destino nos perdedores`).toBeTruthy();
       // Antes do fix: caía em L R3 (errado, pulava consolidação).
       // Depois do fix: cai em L R4, depois da rodada de consolidação.
@@ -70,7 +70,7 @@ describe("Losers bracket — rodada de consolidação (REGRESSÃO bug jogo #26)"
       expect(lR3.length, `L ${half} R3 deve existir como consolidação`).toBe(1);
       // Nenhum match da W deve apontar para L R3 via next_lose_match_id
       const droppersToR3 = result.matches.filter(
-        (m: any) => m.bracket_type === "winners" && m.next_lose_match_id === lR3[0]._temp_id,
+        (m: any) => m.bracket_type === "winners" && m.next_lose_match_id === lR3[0].id,
       );
       expect(droppersToR3.length, `L ${half} R3 não deve receber derrotados (é consolidação)`).toBe(0);
     }

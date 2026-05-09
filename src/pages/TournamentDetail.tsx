@@ -1730,9 +1730,7 @@ const TournamentDetail = () => {
       const advancement = processDoubleEliminationAdvance(freshMatchList, freshMatch, winnerId, loserId);
       
       // ── VALIDATION LOG ──
-      const modalityMatchesDE = selectedModality
-        ? matches.filter(m => m.modality_id === selectedModality.id && m.round > 0)
-        : matches.filter(m => m.round > 0);
+      const modalityMatchesDE = matches.filter(m => sameMatchScope(m, match) && m.round > 0);
       
       // Count teams (N) from unique team IDs in the bracket
       const teamIdsDE = new Set<string>();
@@ -1800,14 +1798,12 @@ const TournamentDetail = () => {
       const { data: postPropMatches } = await organizerQuery({
         table: "matches",
         operation: "select",
-        filters: { tournament_id: id },
+        filters: matchScopeFilters(match, id),
         order: [{ column: "round" }, { column: "position" }],
       });
       
       if (postPropMatches) {
-        const modalityMatches = match.modality_id
-          ? (postPropMatches as typeof matches).filter(m => m.modality_id === match.modality_id)
-          : (postPropMatches as typeof matches);
+        const modalityMatches = postPropMatches as typeof matches;
         
         let byeProcessed = true;
         while (byeProcessed) {
@@ -1877,7 +1873,7 @@ const TournamentDetail = () => {
         const { data: repairMatches } = await organizerQuery({
           table: "matches",
           operation: "select",
-          filters: match.modality_id ? { modality_id: match.modality_id } : { tournament_id: id },
+          filters: matchScopeFilters(match, id),
           order: [{ column: "round" }, { column: "position" }],
         });
 

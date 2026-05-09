@@ -64,7 +64,11 @@ export function validateSystemRules(snapshot: TournamentSnapshot): RuleViolation
 // ── Helpers ──────────────────────────────────────────────────
 
 function groupKey(m: GuardMatch): string {
-  return `${m.bracket_type ?? 'null'}|${m.bracket_half ?? 'null'}|${m.modality_id ?? 'null'}`;
+  return `${m.bracket_type ?? 'null'}|${m.bracket_half ?? 'null'}|${m.modality_id ?? 'null'}|${m.stage_id ?? 'null'}`;
+}
+
+function scopeKey(m: GuardMatch): string {
+  return `${m.modality_id ?? 'null'}|${m.stage_id ?? 'null'}`;
 }
 
 function checkRoundOrder(knockoutMatches: GuardMatch[], violations: RuleViolation[]) {

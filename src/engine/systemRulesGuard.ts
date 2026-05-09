@@ -24,6 +24,7 @@ export interface GuardMatch {
   winner_team_id: string | null;
   is_chapeu?: boolean | null;
   modality_id?: string | null;
+  stage_id?: string | null;
 }
 
 export interface TournamentSnapshot {

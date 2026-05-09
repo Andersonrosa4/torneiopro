@@ -3,9 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RefreshCw, ShieldCheck, AlertTriangle, Bot, Hand, Search } from "lucide-react";
+import { RefreshCw, ShieldCheck, AlertTriangle, Bot, Hand, Search, Play } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatDateBR } from "@/lib/utils";
+import { toast } from "sonner";
 
 type Source = "all" | "cron" | "manual";
 type Scope = "tournament" | "all";

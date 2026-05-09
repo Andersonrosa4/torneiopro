@@ -413,8 +413,10 @@ export type Database = {
         Row: {
           applied_fixes: Json
           created_at: string
+          duration_ms: number | null
           fixed: number
           id: string
+          reason: string | null
           remaining: number
           scanned: number
           source: string
@@ -423,8 +425,10 @@ export type Database = {
         Insert: {
           applied_fixes?: Json
           created_at?: string
+          duration_ms?: number | null
           fixed?: number
           id?: string
+          reason?: string | null
           remaining?: number
           scanned?: number
           source?: string
@@ -433,8 +437,10 @@ export type Database = {
         Update: {
           applied_fixes?: Json
           created_at?: string
+          duration_ms?: number | null
           fixed?: number
           id?: string
+          reason?: string | null
           remaining?: number
           scanned?: number
           source?: string

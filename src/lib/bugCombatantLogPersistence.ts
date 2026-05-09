@@ -164,9 +164,12 @@ function resetRowsCache(): void {
  * percorrer o array novamente quando só `scrollY` mudou.
  */
 export function buildCompactJson(state: Omit<PersistedState, "v" | "savedAt">): string {
-  const rowsJson = serializeRows(state.rows.slice(0, MAX_PERSISTED_ROWS) === state.rows
+  // Preserva a identidade do array quando já está dentro do cap, para que
+  // o cache de serialização funcione durante a rolagem (apenas `scrollY` muda).
+  const cappedRows = state.rows.length <= MAX_PERSISTED_ROWS
     ? state.rows
-    : state.rows.slice(0, MAX_PERSISTED_ROWS));
+    : state.rows.slice(0, MAX_PERSISTED_ROWS);
+  const rowsJson = serializeRows(cappedRows);
   const cursorJson = state.cursor
     ? `[${JSON.stringify(state.cursor.created_at)},${JSON.stringify(state.cursor.id)}]`
     : "null";

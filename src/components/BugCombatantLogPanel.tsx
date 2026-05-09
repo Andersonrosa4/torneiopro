@@ -99,10 +99,15 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
+    // Reseta lista e paginação para recarregar do início
+    setRows([]);
+    setHasMore(true);
     const { data, error } = await buildQuery(0, PAGE_SIZE - 1);
     if (!error && data) {
       setRows(data as LogRow[]);
       setHasMore(data.length === PAGE_SIZE);
+    } else {
+      setHasMore(false);
     }
     setLoading(false);
   }, [buildQuery]);

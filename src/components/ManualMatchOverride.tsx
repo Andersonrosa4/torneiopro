@@ -47,7 +47,11 @@ interface Match {
   score1?: number | null;
   score2?: number | null;
   bracket_number?: number | null;
+  stage_id?: string | null;
 }
+
+const sameMatchScope = (m: Match, ref: Match) =>
+  m.modality_id === ref.modality_id && (m.stage_id ?? null) === (ref.stage_id ?? null);
 
 interface ManualMatchOverrideProps {
   match: Match;
@@ -124,16 +128,14 @@ export function ManualMatchOverride({ match, matchNumber, teams, allMatches, tou
       // PIPELINE COMPLETO (mesmo de declareWinner)
       // ══════════════════════════════════════════════════════
 
-      const modalityMatches = match.modality_id
-        ? allMatches.filter(m => m.modality_id === match.modality_id)
-        : allMatches.filter(m => m.round > 0);
+      const modalityMatches = allMatches.filter(m => sameMatchScope(m, match));
 
       // ── (a) ROUND LOCK GUARD ──
       // Only check if setting a winner (completing a match)
       if (w) {
         const lockCheck = isRoundLocked(
-          { id: match.id, round: match.round, status: match.status, bracket_type: match.bracket_type ?? null, bracket_half: match.bracket_half ?? null, modality_id: match.modality_id },
-          modalityMatches.map(m => ({ id: m.id, round: m.round, status: m.status, bracket_type: m.bracket_type ?? null, bracket_half: m.bracket_half ?? null, modality_id: m.modality_id })),
+          { id: match.id, round: match.round, status: match.status, bracket_type: match.bracket_type ?? null, bracket_half: match.bracket_half ?? null, modality_id: match.modality_id, stage_id: match.stage_id, next_win_match_id: match.next_win_match_id, next_lose_match_id: match.next_lose_match_id },
+          modalityMatches.map(m => ({ id: m.id, round: m.round, status: m.status, bracket_type: m.bracket_type ?? null, bracket_half: m.bracket_half ?? null, modality_id: m.modality_id, stage_id: m.stage_id, next_win_match_id: m.next_win_match_id, next_lose_match_id: m.next_lose_match_id })),
         );
         if (lockCheck.locked) {
           toast.error(lockCheck.reason);

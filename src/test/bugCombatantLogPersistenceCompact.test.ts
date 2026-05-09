@@ -206,7 +206,7 @@ describe("compactação do payload (v2)", () => {
     expect(out.rows).toHaveLength(2);
   });
 
-  it("descarta silenciosamente payloads de versão antiga (v1)", () => {
+  it("MIGRA payloads de versão antiga (v1) para o schema atual", () => {
     sessionStorage.setItem(
       storageKey(TID),
       JSON.stringify({
@@ -214,11 +214,23 @@ describe("compactação do payload (v2)", () => {
         tournament_id: TID,
         source: "all",
         scope: "tournament",
+        scrollY: 42,
+        cursor: { created_at: "2025-01-02T08:00:00.000Z", id: RID },
         rows: [makeRow(1)],
+        pageIndex: 1,
+        hasMore: true,
+        savedAt: 0,
       }),
     );
     const out = readPersisted(TID);
-    expect(out).toEqual({});
+    expect(out.v).toBe(__INTERNAL.SCHEMA_VERSION);
+    expect(out.tournament_id).toBe(TID);
+    expect(out.rows).toHaveLength(1);
+    expect(out.cursor).toEqual({ created_at: "2025-01-02T08:00:00.000Z", id: RID });
+    // Persistência foi reescrita no formato compacto v2.
+    const reread = JSON.parse(sessionStorage.getItem(storageKey(TID))!);
+    expect(reread.v).toBe(__INTERNAL.SCHEMA_VERSION);
+    expect(reread.k).toBe(TID);
   });
 
   it("aplica cap de MAX_PERSISTED_ROWS na escrita", () => {

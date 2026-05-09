@@ -208,6 +208,20 @@ export async function runBugCombatant(
         addPatch(issue.matchId, { status: "pending" });
         appliedFixes.push(`🔧 ${issue.matchId.slice(0, 8)}: status revertido para pendente`);
         break;
+      case "WINNER_WITHOUT_TEAMS":
+        // Vencedor fantasma: limpa winner + zera placar + volta para pendente
+        addPatch(issue.matchId, {
+          winner_team_id: null,
+          score1: 0,
+          score2: 0,
+          status: "pending",
+        });
+        appliedFixes.push(`🔧 ${issue.matchId.slice(0, 8)}: vencedor fantasma removido (times ausentes)`);
+        break;
+      case "COMPLETED_WITHOUT_TEAMS":
+        addPatch(issue.matchId, { status: "pending", winner_team_id: null });
+        appliedFixes.push(`🔧 ${issue.matchId.slice(0, 8)}: concluído sem times → revertido para pendente`);
+        break;
       // DUPLICATE_TEAM_IN_ROUND: requer decisão humana, não tocar.
     }
   }

@@ -205,18 +205,74 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
 
-  // Realtime: append novas execuções
+  // Realtime: aplica diffs incrementais (INSERT/UPDATE/DELETE) sem refetch.
+  // Mantém a ordenação (created_at desc, id desc) e o cursor de keyset intactos:
+  // - INSERT entra ordenado (normalmente no topo) e sem duplicar
+  // - UPDATE substitui a linha existente preservando posição
+  // - DELETE remove pela id
   useEffect(() => {
+    const matchesFilters = (row: LogRow) => {
+      if (scope === "tournament" && row.tournament_id !== tournamentId) return false;
+      if (source !== "all" && row.source !== source) return false;
+      return true;
+    };
+
+    const insertOrdered = (prev: LogRow[], row: LogRow): LogRow[] => {
+      // Dedup
+      if (prev.some((r) => r.id === row.id)) return prev;
+      // (created_at desc, id desc) — encontra primeira posição onde prev[i] é "menor"
+      const isBefore = (a: LogRow, b: LogRow) => {
+        if (a.created_at === b.created_at) return a.id > b.id;
+        return a.created_at > b.created_at;
+      };
+      const idx = prev.findIndex((r) => !isBefore(r, row));
+      if (idx === -1) {
+        // Mais antigo que tudo já carregado → só insere se ainda há espaço (ou seja, se não houver mais páginas pendentes)
+        if (hasMore) return prev;
+        return [...prev, row];
+      }
+      const next = prev.slice();
+      next.splice(idx, 0, row);
+      return next;
+    };
+
     const channel = supabase
-      .channel(`bug-log-${tournamentId}`)
+      .channel(`bug-log-${tournamentId}-${scope}-${source}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "bug_combatant_log" },
-        () => fetchLogs(),
+        (payload) => {
+          const row = payload.new as LogRow | undefined;
+          if (!row || !matchesFilters(row)) return;
+          setRows((prev) => insertOrdered(prev, row));
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "bug_combatant_log" },
+        (payload) => {
+          const row = payload.new as LogRow | undefined;
+          if (!row) return;
+          setRows((prev) => {
+            const exists = prev.some((r) => r.id === row.id);
+            if (!exists) return matchesFilters(row) ? insertOrdered(prev, row) : prev;
+            if (!matchesFilters(row)) return prev.filter((r) => r.id !== row.id);
+            return prev.map((r) => (r.id === row.id ? { ...r, ...row } : r));
+          });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "bug_combatant_log" },
+        (payload) => {
+          const oldRow = payload.old as { id?: string } | undefined;
+          if (!oldRow?.id) return;
+          setRows((prev) => prev.filter((r) => r.id !== oldRow.id));
+        },
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [tournamentId, fetchLogs]);
+  }, [tournamentId, scope, source, hasMore]);
 
   // IntersectionObserver para scroll infinito
   useEffect(() => {

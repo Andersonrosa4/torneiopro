@@ -138,10 +138,23 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
           <ShieldCheck className="w-5 h-5 text-emerald-500" />
           <h2 className="text-base sm:text-lg font-semibold">Auditoria do Combatedor de Bugs</h2>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchLogs} disabled={loading}>
-          <RefreshCw className={`w-4 h-4 mr-1.5 ${loading ? "animate-spin" : ""}`} />
-          Atualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Button
+              size="sm"
+              onClick={runNow}
+              disabled={running || loading}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <Play className={`w-4 h-4 mr-1.5 ${running ? "animate-pulse" : ""}`} />
+              {running ? "Executando…" : "Rodar agora"}
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={fetchLogs} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 mr-1.5 ${loading ? "animate-spin" : ""}`} />
+            Atualizar
+          </Button>
+        </div>
       </header>
 
       {/* Filtros */}

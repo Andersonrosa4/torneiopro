@@ -3,7 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RefreshCw, ShieldCheck, AlertTriangle, Bot, Hand, Search, Play, Download } from "lucide-react";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { RefreshCw, ShieldCheck, AlertTriangle, Bot, Hand, Search, Play, Download, ExternalLink } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatDateBR } from "@/lib/utils";
 import { toast } from "sonner";
@@ -58,6 +60,7 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
   const [source, setSource] = useState<Source>("all");
   const [scope, setScope] = useState<Scope>("tournament");
   const [search, setSearch] = useState("");
+  const [detail, setDetail] = useState<LogRow | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const runNow = useCallback(async () => {
@@ -301,7 +304,14 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
             const fixes = parseFixes(r.applied_fixes);
             const isCron = r.source === "cron";
             return (
-              <li key={r.id} className="rounded-lg border border-border bg-background/40 p-3">
+              <li
+                key={r.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setDetail(r)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetail(r); } }}
+                className="rounded-lg border border-border bg-background/40 p-3 cursor-pointer hover:border-primary/50 hover:bg-accent/30 transition-colors"
+              >
                 <div className="flex flex-wrap items-center gap-2 mb-2">
                   <Badge className={isCron
                     ? "bg-blue-500/15 text-blue-500 border-blue-500/30"
@@ -327,18 +337,25 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
                 </div>
                 {fixes.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
-                    {fixes.map((f, idx) => (
-                      <button
+                    {fixes.slice(0, 6).map((f, idx) => (
+                      <span
                         key={`${r.id}-${idx}`}
-                        type="button"
-                        onClick={() => onOpenMatch?.(f.matchShort)}
-                        className="text-[11px] px-2 py-0.5 rounded-md border border-border bg-card hover:bg-accent hover:text-accent-foreground transition-colors font-mono"
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); onOpenMatch?.(f.matchShort); }}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onOpenMatch?.(f.matchShort); } }}
+                        className="text-[11px] px-2 py-0.5 rounded-md border border-border bg-card hover:bg-accent hover:text-accent-foreground transition-colors font-mono cursor-pointer"
                         title={`Abrir partida ${f.matchShort} • ${f.label}`}
                       >
                         <span className="text-primary">{f.matchShort}</span>
                         <span className="text-muted-foreground"> · {f.label}</span>
-                      </button>
+                      </span>
                     ))}
+                    {fixes.length > 6 && (
+                      <span className="text-[11px] px-2 py-0.5 text-muted-foreground italic">
+                        +{fixes.length - 6} (clique para ver tudo)
+                      </span>
+                    )}
                   </div>
                 )}
               </li>
@@ -363,6 +380,120 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
           )}
         </div>
       )}
+
+      {/* Drawer de detalhes da execução */}
+      <Sheet open={!!detail} onOpenChange={(o) => { if (!o) setDetail(null); }}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-hidden flex flex-col">
+          {detail && (() => {
+            const fixes = parseFixes(detail.applied_fixes);
+            const isCron = detail.source === "cron";
+            return (
+              <>
+                <SheetHeader>
+                  <SheetTitle className="flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-emerald-500" />
+                    Detalhes da execução
+                  </SheetTitle>
+                  <SheetDescription>
+                    {formatDateTimeBR(detail.created_at)}
+                  </SheetDescription>
+                </SheetHeader>
+
+                <ScrollArea className="flex-1 -mx-6 px-6 mt-4">
+                  <div className="space-y-4 pb-6">
+                    {/* Origem */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className={isCron
+                        ? "bg-blue-500/15 text-blue-500 border-blue-500/30"
+                        : "bg-purple-500/15 text-purple-500 border-purple-500/30"}>
+                        {isCron ? <Bot className="w-3 h-3 mr-1" /> : <Hand className="w-3 h-3 mr-1" />}
+                        {isCron ? "Automática (cron)" : "Manual"}
+                      </Badge>
+                    </div>
+
+                    {/* Métricas */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="rounded-lg border border-border p-3 text-center">
+                        <div className="text-2xl font-semibold">{detail.scanned}</div>
+                        <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Verificadas</div>
+                      </div>
+                      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-center">
+                        <div className="text-2xl font-semibold text-emerald-500">{detail.fixed}</div>
+                        <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Corrigidas</div>
+                      </div>
+                      <div className={`rounded-lg border p-3 text-center ${detail.remaining > 0 ? "border-amber-500/30 bg-amber-500/5" : "border-border"}`}>
+                        <div className={`text-2xl font-semibold ${detail.remaining > 0 ? "text-amber-500" : ""}`}>{detail.remaining}</div>
+                        <div className="text-[11px] text-muted-foreground uppercase tracking-wide">Pendentes</div>
+                      </div>
+                    </div>
+
+                    {/* Identificadores */}
+                    <div className="rounded-lg border border-border p-3 space-y-1.5 text-xs font-mono">
+                      <div className="flex justify-between gap-2">
+                        <span className="text-muted-foreground">execução</span>
+                        <span className="truncate">{detail.id}</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-muted-foreground">torneio</span>
+                        <span className="truncate">{detail.tournament_id}</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-muted-foreground">origem</span>
+                        <span>{detail.source}</span>
+                      </div>
+                    </div>
+
+                    {/* Lista de correções */}
+                    <div>
+                      <h3 className="text-sm font-semibold mb-2">
+                        Correções aplicadas ({fixes.length})
+                      </h3>
+                      {fixes.length === 0 ? (
+                        <p className="text-xs text-muted-foreground italic">Nenhuma correção registrada nesta execução.</p>
+                      ) : (
+                        <ul className="space-y-1.5">
+                          {fixes.map((f, idx) => (
+                            <li
+                              key={idx}
+                              className="flex items-center justify-between gap-2 rounded-md border border-border bg-background/40 px-2.5 py-1.5"
+                            >
+                              <div className="flex flex-col min-w-0">
+                                <span className="font-mono text-xs text-primary">{f.matchShort}</span>
+                                <span className="text-[11px] text-muted-foreground truncate">{f.label}</span>
+                              </div>
+                              {onOpenMatch && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => { onOpenMatch(f.matchShort); setDetail(null); }}
+                                >
+                                  <ExternalLink className="w-3 h-3 mr-1" />
+                                  Abrir
+                                </Button>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    {/* JSON cru (debug) */}
+                    <details className="rounded-lg border border-border p-3 text-xs">
+                      <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                        Ver registro bruto (JSON)
+                      </summary>
+                      <pre className="mt-2 overflow-auto text-[10px] leading-snug font-mono bg-background/60 p-2 rounded">
+{JSON.stringify(detail, null, 2)}
+                      </pre>
+                    </details>
+                  </div>
+                </ScrollArea>
+              </>
+            );
+          })()}
+        </SheetContent>
+      </Sheet>
     </section>
   );
 }

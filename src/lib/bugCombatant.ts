@@ -125,3 +125,58 @@ export async function runBugCombatant(
     appliedFixes,
   };
 }
+
+/**
+ * 🛡️ Watchdog em background — roda continuamente enquanto a página estiver aberta.
+ *
+ * - Faz scan inicial após 1.5s (espera dados carregarem)
+ * - Repete a cada 30s
+ * - Também escuta mudanças realtime na tabela `matches` e dispara scan extra
+ *   (debounce 2.5s) — assim qualquer alteração feita por outro organizador
+ *   é validada imediatamente.
+ *
+ * Retorna função de cleanup. Chame em useEffect.
+ */
+export function startBackgroundWatchdog(
+  tournamentId: string,
+  onFix: (result: AutoHealResult) => void
+): () => void {
+  let stopped = false;
+  let realtimeTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const safeRun = async (force = false) => {
+    if (stopped) return;
+    try {
+      const result = await runBugCombatant(tournamentId, { force });
+      if (!stopped && result.fixed > 0) onFix(result);
+    } catch (e) {
+      console.warn("[🛡️ Watchdog] scan falhou:", e);
+    }
+  };
+
+  // Scan inicial
+  const initial = setTimeout(() => safeRun(true), 1_500);
+  // Scans periódicos
+  const interval = setInterval(() => safeRun(false), WATCHDOG_INTERVAL_MS);
+
+  // Listener realtime — qualquer mudança em matches dispara scan debounced
+  const channel = supabase
+    .channel(`bug-combatant-${tournamentId}`)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "matches", filter: `tournament_id=eq.${tournamentId}` },
+      () => {
+        if (realtimeTimer) clearTimeout(realtimeTimer);
+        realtimeTimer = setTimeout(() => safeRun(true), REALTIME_DEBOUNCE_MS);
+      }
+    )
+    .subscribe();
+
+  return () => {
+    stopped = true;
+    clearTimeout(initial);
+    clearInterval(interval);
+    if (realtimeTimer) clearTimeout(realtimeTimer);
+    supabase.removeChannel(channel);
+  };
+}

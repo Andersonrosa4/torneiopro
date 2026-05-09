@@ -44,6 +44,22 @@ interface LogRow {
   source: string;
   applied_fixes: unknown;
   created_at: string;
+  reason?: string | null;
+  duration_ms?: number | null;
+}
+
+const REASON_LABEL: Record<string, string> = {
+  initial: "Inicial",
+  periodic: "Periódica",
+  realtime: "Realtime",
+  manual: "Manual",
+  cron: "Cron",
+};
+
+function formatDurationMs(ms: number | null | undefined): string {
+  if (ms == null || !Number.isFinite(ms)) return "—";
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  return `${(ms / 1000).toFixed(ms < 10_000 ? 2 : 1)} s`;
 }
 
 interface Props {

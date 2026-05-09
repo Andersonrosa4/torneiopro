@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RefreshCw, ShieldCheck, AlertTriangle, Bot, Hand, Search, Play } from "lucide-react";
+import { RefreshCw, ShieldCheck, AlertTriangle, Bot, Hand, Search, Play, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatDateBR } from "@/lib/utils";
 import { toast } from "sonner";
@@ -169,6 +169,53 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
     );
   }, [filtered]);
 
+  const exportCsv = useCallback(() => {
+    if (filtered.length === 0) {
+      toast.info("Nada para exportar com os filtros atuais.");
+      return;
+    }
+    const esc = (v: unknown) => {
+      const s = v == null ? "" : String(v);
+      return /[",;\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const headers = [
+      "data_hora",
+      "execucao_id",
+      "torneio_id",
+      "origem",
+      "verificadas",
+      "corrigidas",
+      "pendentes",
+      "match_id_curto",
+      "correcao",
+    ];
+    const lines: string[] = [headers.join(";")];
+    for (const r of filtered) {
+      const fixes = parseFixes(r.applied_fixes);
+      const when = formatDateTimeBR(r.created_at);
+      if (fixes.length === 0) {
+        lines.push([when, r.id, r.tournament_id, r.source, r.scanned, r.fixed, r.remaining, "", ""].map(esc).join(";"));
+      } else {
+        for (const f of fixes) {
+          lines.push([when, r.id, r.tournament_id, r.source, r.scanned, r.fixed, r.remaining, f.matchShort, f.label].map(esc).join(";"));
+        }
+      }
+    }
+    // BOM para Excel reconhecer UTF-8
+    const blob = new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const tag = scope === "all" ? "todos" : tournamentId.slice(0, 8);
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    a.href = url;
+    a.download = `auditoria-bugs_${tag}_${source}_${stamp}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast.success(`Exportado: ${filtered.length} execução(ões).`);
+  }, [filtered, scope, source, tournamentId]);
+
   return (
     <section className="rounded-xl border border-border bg-card p-3 sm:p-6 shadow-card">
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
@@ -188,6 +235,10 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
               {running ? "Executando…" : "Rodar agora"}
             </Button>
           )}
+          <Button variant="outline" size="sm" onClick={exportCsv} disabled={loading || filtered.length === 0}>
+            <Download className="w-4 h-4 mr-1.5" />
+            Exportar CSV
+          </Button>
           <Button variant="outline" size="sm" onClick={fetchLogs} disabled={loading}>
             <RefreshCw className={`w-4 h-4 mr-1.5 ${loading ? "animate-spin" : ""}`} />
             Atualizar

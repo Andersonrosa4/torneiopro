@@ -303,11 +303,14 @@ describe("BugCombatantLogPanel — throttle de persistência durante scroll", ()
     window.dispatchEvent(new Event("pagehide"));           // 2º flush → grava 901
 
     const writes = getAuditWrites(setItemSpy);
-    // 3 writes esperados: flush(150), leading(900), flush(901). O ponto-chave
-    // é que cada flush passou pelo gate (separados por > 50ms).
-    expect(writes.length).toBe(3);
+    // Dois flushes distintos passaram pelo gate (separados por > 50ms):
+    //   1º flush grava o trailing pendente (y=150)
+    //   2º flush grava o trailing pendente posterior (y=901)
+    // Entre os flushes, o throttle não deixou leading novo passar (estava
+    // dentro do intervalo de 250ms).
+    expect(writes.length).toBe(2);
     expect(parseY(writes[0].value)).toBe(150);
-    expect(parseY(writes[writes.length - 1].value)).toBe(901);
+    expect(parseY(writes[1].value)).toBe(901);
 
     setItemSpy.mockRestore();
   });

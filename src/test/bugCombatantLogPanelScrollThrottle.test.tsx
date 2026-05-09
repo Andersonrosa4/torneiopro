@@ -285,21 +285,29 @@ describe("BugCombatantLogPanel — throttle de persistência durante scroll", ()
     });
 
     setScrollY(100);
-    window.dispatchEvent(new Event("scroll"));
+    window.dispatchEvent(new Event("scroll")); // leading
+    vi.advanceTimersByTime(10);
+    setScrollY(150);
+    window.dispatchEvent(new Event("scroll")); // pendente (trailing)
     vi.advanceTimersByTime(10);
 
     setItemSpy.mockClear();
-    document.dispatchEvent(new Event("visibilitychange")); // 1º flush
-    vi.advanceTimersByTime(80);                            // janela passou
+    document.dispatchEvent(new Event("visibilitychange")); // 1º flush → grava 150
+    vi.advanceTimersByTime(80);                            // janela do debounce passou
     setScrollY(900);
+    window.dispatchEvent(new Event("scroll"));             // leading novo: grava 900
+    vi.advanceTimersByTime(10);
+    setScrollY(901);
     window.dispatchEvent(new Event("scroll"));             // novo trailing pendente
     vi.advanceTimersByTime(10);
-    window.dispatchEvent(new Event("pagehide"));           // 2º flush, válido
+    window.dispatchEvent(new Event("pagehide"));           // 2º flush → grava 901
 
     const writes = getAuditWrites(setItemSpy);
-    expect(writes.length).toBe(2);
-    expect(parseY(writes[0].value)).toBe(100);
-    expect(parseY(writes[1].value)).toBe(900);
+    // 3 writes esperados: flush(150), leading(900), flush(901). O ponto-chave
+    // é que cada flush passou pelo gate (separados por > 50ms).
+    expect(writes.length).toBe(3);
+    expect(parseY(writes[0].value)).toBe(150);
+    expect(parseY(writes[writes.length - 1].value)).toBe(901);
 
     setItemSpy.mockRestore();
   });

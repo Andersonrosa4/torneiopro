@@ -2150,6 +2150,8 @@ export type Database = {
         Args: { _tournament_id: string }
         Returns: boolean
       }
+      release_auto_healer_lock: { Args: never; Returns: boolean }
+      try_auto_healer_lock: { Args: never; Returns: boolean }
       verify_organizer_password: {
         Args: { _email: string; _password: string; _username: string }
         Returns: {

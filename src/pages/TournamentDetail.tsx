@@ -70,6 +70,17 @@ const statusColors: Record<string, string> = {
   cancelled: "bg-destructive/20 text-destructive",
 };
 
+const sameMatchScope = (m: Match, ref: Match) =>
+  m.modality_id === ref.modality_id && (m.stage_id ?? null) === (ref.stage_id ?? null);
+
+const matchScopeFilters = (match: Match, tournamentId: string) => {
+  const filters: Record<string, any> = match.modality_id
+    ? { modality_id: match.modality_id }
+    : { tournament_id: tournamentId };
+  if (match.stage_id !== undefined) filters.stage_id = match.stage_id ?? null;
+  return filters;
+};
+
 interface Team {
   id: string;
   tournament_id: string;
@@ -1350,12 +1361,10 @@ const TournamentDetail = () => {
     if (!match || !id) { declareWinnerMutex.current.delete(matchId); return; }
 
     // ── ROUND LOCK GUARD ──
-    const modalityMatches = match.modality_id
-      ? matches.filter(m => m.modality_id === match.modality_id)
-      : matches.filter(m => m.round > 0);
+    const modalityMatches = matches.filter(m => sameMatchScope(m, match));
     const lockCheck = isRoundLocked(
-      { id: match.id, round: match.round, status: match.status, bracket_type: match.bracket_type, bracket_half: match.bracket_half, modality_id: match.modality_id },
-      modalityMatches.map(m => ({ id: m.id, round: m.round, status: m.status, bracket_type: m.bracket_type, bracket_half: m.bracket_half, modality_id: m.modality_id })),
+      { id: match.id, round: match.round, status: match.status, bracket_type: match.bracket_type, bracket_half: match.bracket_half, modality_id: match.modality_id, stage_id: match.stage_id, next_win_match_id: match.next_win_match_id, next_lose_match_id: match.next_lose_match_id },
+      modalityMatches.map(m => ({ id: m.id, round: m.round, status: m.status, bracket_type: m.bracket_type, bracket_half: m.bracket_half, modality_id: m.modality_id, stage_id: m.stage_id, next_win_match_id: m.next_win_match_id, next_lose_match_id: m.next_lose_match_id })),
     );
     if (lockCheck.locked) {
       toast.error(lockCheck.reason);
@@ -1378,23 +1387,19 @@ const TournamentDetail = () => {
      const isReDeclaration = match.status === 'completed' && match.winner_team_id;
      if (isReDeclaration) {
        // Determine if this is DE or SE
-       const modalityMatchesForCheck = match.modality_id
-         ? matches.filter(m => m.modality_id === match.modality_id)
-         : matches;
+       const modalityMatchesForCheck = matches.filter(m => sameMatchScope(m, match));
        const isDE = modalityMatchesForCheck.some(m => m.bracket_type === 'losers');
        
        // Fetch fresh data for cascade
        const { data: freshForCascade } = await organizerQuery({
          table: "matches",
          operation: "select",
-         filters: { tournament_id: id },
+          filters: matchScopeFilters(match, id),
          order: [{ column: "round" }, { column: "position" }],
        });
        
        if (freshForCascade) {
-         const cascadeMatches = match.modality_id
-           ? (freshForCascade as typeof matches).filter(m => m.modality_id === match.modality_id)
-           : (freshForCascade as typeof matches);
+          const cascadeMatches = freshForCascade as typeof matches;
          
          const freshMatch = cascadeMatches.find(m => m.id === matchId) || match;
          
@@ -1453,13 +1458,11 @@ const TournamentDetail = () => {
              const { data: postResetData } = await organizerQuery({
                table: "matches",
                operation: "select",
-               filters: { tournament_id: id },
+                filters: matchScopeFilters(match, id),
                order: [{ column: "round" }, { column: "position" }],
              });
              if (postResetData) {
-               let postResetMatches = match.modality_id
-                 ? (postResetData as typeof matches).filter(m => m.modality_id === match.modality_id)
-                 : (postResetData as typeof matches);
+                let postResetMatches = postResetData as typeof matches;
 
                // Get all completed matches (excluding the one being re-declared)
                const completedToReplay = postResetMatches
@@ -1569,7 +1572,7 @@ const TournamentDetail = () => {
                toast.error(`❌ Falha na repropagação: ${repropError.message}. Executando rollback...`);
 
                try {
-                 const rollbackPlan = computeAggressiveCascadeReset(match, matches.filter(m => m.modality_id === match.modality_id || !match.modality_id));
+                  const rollbackPlan = computeAggressiveCascadeReset(match, matches.filter(m => sameMatchScope(m, match)));
                  // Also restore the original match
                  rollbackPlan.toUpdate.push({
                    matchId: match.id,
@@ -1606,13 +1609,11 @@ const TournamentDetail = () => {
             const { data: postSEData } = await organizerQuery({
               table: "matches",
               operation: "select",
-              filters: { tournament_id: id },
+              filters: matchScopeFilters(match, id),
               order: [{ column: "round" }, { column: "position" }],
             });
             if (postSEData) {
-              let seMatches = match.modality_id
-                ? (postSEData as typeof matches).filter(m => m.modality_id === match.modality_id)
-                : (postSEData as typeof matches);
+              let seMatches = postSEData as typeof matches;
 
               let byeProcessed = true;
               while (byeProcessed) {
@@ -1699,8 +1700,8 @@ const TournamentDetail = () => {
 
     // Determine if this is a double elimination bracket — filter by SAME modality
     const modalityMatchesForDE = match.modality_id
-      ? matches.filter(m => m.modality_id === match.modality_id)
-      : matches;
+      ? matches.filter(m => sameMatchScope(m, match))
+      : matches.filter(m => sameMatchScope(m, match));
     const isDoubleElimination = modalityMatchesForDE.some(m => m.bracket_type === 'losers' || m.bracket_type === 'final' || m.bracket_type === 'semi_final');
 
     if (isDoubleElimination) {
@@ -1710,9 +1711,7 @@ const TournamentDetail = () => {
       // e causa falsos positivos nos guards anti-colisão do advanceLogic.
       // Esta foi a causa raiz do bug de não propagação na chave de perdedores.
       // ══════════════════════════════════════════════════════════════════════
-      const freshFilters = match.modality_id
-        ? { modality_id: match.modality_id }
-        : { tournament_id: id };
+      const freshFilters = matchScopeFilters(match, id);
 
       const { data: freshMatches } = await organizerQuery({
         table: "matches",
@@ -1721,8 +1720,8 @@ const TournamentDetail = () => {
         order: [{ column: "round" }, { column: "position" }],
       });
       const freshMatchList = (freshMatches || (match.modality_id
-        ? matches.filter(m => m.modality_id === match.modality_id)
-        : matches)) as typeof matches;
+        ? matches.filter(m => sameMatchScope(m, match))
+        : matches.filter(m => sameMatchScope(m, match)))) as typeof matches;
 
       // Use the updated match data (winner already set)
       const freshMatch = freshMatchList.find(m => m.id === matchId) || { ...match, winner_team_id: winnerId, status: 'completed' };
@@ -1731,9 +1730,7 @@ const TournamentDetail = () => {
       const advancement = processDoubleEliminationAdvance(freshMatchList, freshMatch, winnerId, loserId);
       
       // ── VALIDATION LOG ──
-      const modalityMatchesDE = selectedModality
-        ? matches.filter(m => m.modality_id === selectedModality.id && m.round > 0)
-        : matches.filter(m => m.round > 0);
+      const modalityMatchesDE = matches.filter(m => sameMatchScope(m, match) && m.round > 0);
       
       // Count teams (N) from unique team IDs in the bracket
       const teamIdsDE = new Set<string>();
@@ -1801,14 +1798,12 @@ const TournamentDetail = () => {
       const { data: postPropMatches } = await organizerQuery({
         table: "matches",
         operation: "select",
-        filters: { tournament_id: id },
+        filters: matchScopeFilters(match, id),
         order: [{ column: "round" }, { column: "position" }],
       });
       
       if (postPropMatches) {
-        const modalityMatches = match.modality_id
-          ? (postPropMatches as typeof matches).filter(m => m.modality_id === match.modality_id)
-          : (postPropMatches as typeof matches);
+        const modalityMatches = postPropMatches as typeof matches;
         
         let byeProcessed = true;
         while (byeProcessed) {
@@ -1878,7 +1873,7 @@ const TournamentDetail = () => {
         const { data: repairMatches } = await organizerQuery({
           table: "matches",
           operation: "select",
-          filters: match.modality_id ? { modality_id: match.modality_id } : { tournament_id: id },
+          filters: matchScopeFilters(match, id),
           order: [{ column: "round" }, { column: "position" }],
         });
 
@@ -1983,15 +1978,13 @@ const TournamentDetail = () => {
       const { data: currentMatches } = await organizerQuery({
         table: "matches",
         operation: "select",
-        filters: { tournament_id: id },
+        filters: matchScopeFilters(match, id),
         order: [{ column: "round" }, { column: "position" }],
       });
 
       if (currentMatches) {
         const modalityId = match.modality_id;
-        const relevantMatches = modalityId
-          ? currentMatches.filter((m: any) => m.modality_id === modalityId)
-          : currentMatches;
+        const relevantMatches = currentMatches;
 
         const currentRound = match.round;
         const roundMatches = relevantMatches.filter((m: any) => m.round === currentRound);
@@ -2043,14 +2036,12 @@ const TournamentDetail = () => {
         const { data: postChapeuMatches } = await organizerQuery({
           table: "matches",
           operation: "select",
-          filters: { tournament_id: id },
+          filters: matchScopeFilters(match, id),
           order: [{ column: "round" }, { column: "position" }],
         });
 
         if (postChapeuMatches) {
-          const postRelevant = modalityId
-            ? postChapeuMatches.filter((m: any) => m.modality_id === modalityId)
-            : postChapeuMatches;
+          const postRelevant = postChapeuMatches;
           const postRoundMatches = (postRelevant as any[]).filter((m: any) => m.round === currentRound);
           const allRoundDone = postRoundMatches.every((m: any) => m.status === "completed");
 
@@ -2097,6 +2088,7 @@ const TournamentDetail = () => {
                       status: "pending",
                       bracket_number: match.bracket_number || 1,
                       modality_id: modalityId,
+                      stage_id: match.stage_id ?? null,
                     });
                   }
 
@@ -2121,6 +2113,7 @@ const TournamentDetail = () => {
                         bracket_number: match.bracket_number || 1,
                         bracket_type: "third_place",
                         modality_id: modalityId,
+                        stage_id: match.stage_id ?? null,
                       });
                     }
                   }
@@ -2132,13 +2125,11 @@ const TournamentDetail = () => {
                     const { data: justInserted } = await organizerQuery({
                       table: "matches",
                       operation: "select",
-                      filters: { tournament_id: id },
+                      filters: matchScopeFilters(match, id),
                       order: [{ column: "round" }, { column: "position" }],
                     });
                     if (justInserted) {
-                      const modalityInserted = modalityId
-                        ? (justInserted as any[]).filter((m: any) => m.modality_id === modalityId)
-                        : (justInserted as any[]);
+                      const modalityInserted = justInserted as any[];
                       const thirdPlaceMatch = modalityInserted.find((m: any) => m.bracket_type === 'third_place' && m.round === nextRound);
                       const finalMatch = modalityInserted.find((m: any) => m.bracket_type !== 'third_place' && m.round === nextRound);
                       if (thirdPlaceMatch) {

@@ -2113,6 +2113,7 @@ const TournamentDetail = () => {
                         bracket_number: match.bracket_number || 1,
                         bracket_type: "third_place",
                         modality_id: modalityId,
+                        stage_id: match.stage_id ?? null,
                       });
                     }
                   }
@@ -2124,13 +2125,11 @@ const TournamentDetail = () => {
                     const { data: justInserted } = await organizerQuery({
                       table: "matches",
                       operation: "select",
-                      filters: { tournament_id: id },
+                      filters: matchScopeFilters(match, id),
                       order: [{ column: "round" }, { column: "position" }],
                     });
                     if (justInserted) {
-                      const modalityInserted = modalityId
-                        ? (justInserted as any[]).filter((m: any) => m.modality_id === modalityId)
-                        : (justInserted as any[]);
+                      const modalityInserted = justInserted as any[];
                       const thirdPlaceMatch = modalityInserted.find((m: any) => m.bracket_type === 'third_place' && m.round === nextRound);
                       const finalMatch = modalityInserted.find((m: any) => m.bracket_type !== 'third_place' && m.round === nextRound);
                       if (thirdPlaceMatch) {

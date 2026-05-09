@@ -907,7 +907,20 @@ function VirtualLogList({ items, scope, onSelect, onOpenMatch }: VirtualLogListP
                     {isCron ? <Bot className="w-3 h-3 mr-1" /> : <Hand className="w-3 h-3 mr-1" />}
                     {isCron ? "Automática" : "Manual"}
                   </Badge>
+                  {r.reason && (
+                    <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                      {REASON_LABEL[r.reason] ?? r.reason}
+                    </Badge>
+                  )}
                   <span className="text-xs text-muted-foreground">{formatDateTimeBR(r.created_at)}</span>
+                  {r.duration_ms != null && (
+                    <span
+                      className="text-[10px] font-mono text-muted-foreground/80"
+                      title="Duração total da execução"
+                    >
+                      ⏱ {formatDurationMs(r.duration_ms)}
+                    </span>
+                  )}
                   {scope === "all" && (
                     <span className="text-[10px] font-mono text-muted-foreground/70">
                       torneio {r.tournament_id.slice(0, 8)}

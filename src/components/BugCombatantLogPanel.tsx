@@ -82,19 +82,43 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
     }
   }, [isAdmin, tournamentId]);
 
-  const fetchLogs = useCallback(async () => {
-    setLoading(true);
+  const buildQuery = useCallback((from: number, to: number) => {
     let q = supabase
       .from("bug_combatant_log")
       .select("id,tournament_id,scanned,fixed,remaining,source,applied_fixes,created_at")
       .order("created_at", { ascending: false })
-      .limit(PAGE_SIZE);
+      .range(from, to);
     if (scope === "tournament") q = q.eq("tournament_id", tournamentId);
     if (source !== "all") q = q.eq("source", source);
-    const { data, error } = await q;
-    if (!error && data) setRows(data as LogRow[]);
-    setLoading(false);
+    return q;
   }, [tournamentId, source, scope]);
+
+  const fetchLogs = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await buildQuery(0, PAGE_SIZE - 1);
+    if (!error && data) {
+      setRows(data as LogRow[]);
+      setHasMore(data.length === PAGE_SIZE);
+    }
+    setLoading(false);
+  }, [buildQuery]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const from = rows.length;
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = await buildQuery(from, to);
+    if (!error && data) {
+      setRows((prev) => {
+        const seen = new Set(prev.map((r) => r.id));
+        const next = (data as LogRow[]).filter((r) => !seen.has(r.id));
+        return [...prev, ...next];
+      });
+      setHasMore(data.length === PAGE_SIZE);
+    }
+    setLoadingMore(false);
+  }, [buildQuery, hasMore, loadingMore, rows.length]);
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
 

@@ -1978,15 +1978,13 @@ const TournamentDetail = () => {
       const { data: currentMatches } = await organizerQuery({
         table: "matches",
         operation: "select",
-        filters: { tournament_id: id },
+        filters: matchScopeFilters(match, id),
         order: [{ column: "round" }, { column: "position" }],
       });
 
       if (currentMatches) {
         const modalityId = match.modality_id;
-        const relevantMatches = modalityId
-          ? currentMatches.filter((m: any) => m.modality_id === modalityId)
-          : currentMatches;
+        const relevantMatches = currentMatches;
 
         const currentRound = match.round;
         const roundMatches = relevantMatches.filter((m: any) => m.round === currentRound);
@@ -2038,14 +2036,12 @@ const TournamentDetail = () => {
         const { data: postChapeuMatches } = await organizerQuery({
           table: "matches",
           operation: "select",
-          filters: { tournament_id: id },
+          filters: matchScopeFilters(match, id),
           order: [{ column: "round" }, { column: "position" }],
         });
 
         if (postChapeuMatches) {
-          const postRelevant = modalityId
-            ? postChapeuMatches.filter((m: any) => m.modality_id === modalityId)
-            : postChapeuMatches;
+          const postRelevant = postChapeuMatches;
           const postRoundMatches = (postRelevant as any[]).filter((m: any) => m.round === currentRound);
           const allRoundDone = postRoundMatches.every((m: any) => m.status === "completed");
 
@@ -2092,6 +2088,7 @@ const TournamentDetail = () => {
                       status: "pending",
                       bracket_number: match.bracket_number || 1,
                       modality_id: modalityId,
+                      stage_id: match.stage_id ?? null,
                     });
                   }
 

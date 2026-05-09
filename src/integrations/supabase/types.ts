@@ -361,6 +361,39 @@ export type Database = {
         }
         Relationships: []
       }
+      bug_combatant_log: {
+        Row: {
+          applied_fixes: Json
+          created_at: string
+          fixed: number
+          id: string
+          remaining: number
+          scanned: number
+          source: string
+          tournament_id: string
+        }
+        Insert: {
+          applied_fixes?: Json
+          created_at?: string
+          fixed?: number
+          id?: string
+          remaining?: number
+          scanned?: number
+          source?: string
+          tournament_id: string
+        }
+        Update: {
+          applied_fixes?: Json
+          created_at?: string
+          fixed?: number
+          id?: string
+          remaining?: number
+          scanned?: number
+          source?: string
+          tournament_id?: string
+        }
+        Relationships: []
+      }
       challenge_notifications: {
         Row: {
           challenge_id: string

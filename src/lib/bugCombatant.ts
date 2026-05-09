@@ -108,13 +108,19 @@ export function invalidateBugCombatantConfigCache(): void {
   configCache = null;
 }
 
+/** Motivo da execução — registrado em `bug_combatant_log.reason`. */
+export type WatchdogReason = "initial" | "periodic" | "realtime" | "manual";
+
 /**
  * Executa scan + auto-fix. Silencioso (não joga toast por padrão).
- * Retorna o que conseguiu consertar.
+ * Sempre que `reason` for fornecido e a execução não for abortada por cooldown,
+ * grava uma linha em `bug_combatant_log` com motivo e duração — mesmo quando
+ * não houve correções (necessário para auditoria detalhada). RLS exige admin
+ * para inserir; falhas de insert são silenciadas (best-effort).
  */
 export async function runBugCombatant(
   tournamentId: string,
-  opts: { force?: boolean } = {}
+  opts: { force?: boolean; reason?: WatchdogReason } = {}
 ): Promise<AutoHealResult> {
   // Cooldown para evitar loops em re-renders (configurável via DB)
   const cfg = await getBugCombatantConfig();
@@ -127,9 +133,34 @@ export async function runBugCombatant(
   }
   sessionStorage.setItem(flagKey, String(Date.now()));
 
+  const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
   const report = await scanTournamentIntegrity(tournamentId);
+
+  const finish = async (result: AutoHealResult) => {
+    if (!opts.reason) return result;
+    const duration_ms = Math.max(
+      0,
+      Math.round((typeof performance !== "undefined" ? performance.now() : Date.now()) - t0)
+    );
+    try {
+      await supabase.from("bug_combatant_log").insert({
+        tournament_id: tournamentId,
+        scanned: result.scanned,
+        fixed: result.fixed,
+        remaining: result.remaining,
+        applied_fixes: result.appliedFixes,
+        source: "cron",
+        reason: opts.reason,
+        duration_ms,
+      });
+    } catch {
+      // best-effort — RLS pode bloquear (não-admin); não falhar o watchdog
+    }
+    return result;
+  };
+
   if (report.issues.length === 0) {
-    return { scanned: report.totalMatches, fixed: 0, remaining: 0, appliedFixes: [] };
+    return finish({ scanned: report.totalMatches, fixed: 0, remaining: 0, appliedFixes: [] });
   }
 
   const appliedFixes: string[] = [];
@@ -196,12 +227,12 @@ export async function runBugCombatant(
     );
   }
 
-  return {
+  return finish({
     scanned: report.totalMatches,
     fixed,
     remaining,
     appliedFixes,
-  };
+  });
 }
 
 /**

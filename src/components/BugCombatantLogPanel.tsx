@@ -319,7 +319,16 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
     setLoadingMore(false);
   }, [buildQuery, hasMore, loadingMore, rows, tournamentId, source, scope]);
 
-  useEffect(() => { fetchLogs(); }, [fetchLogs]);
+  useEffect(() => {
+    // Se hidratamos do sessionStorage, pulamos APENAS o fetch inicial.
+    // Mudanças de filtros depois disso disparam refetch normalmente.
+    if (skipInitialFetchRef.current) {
+      skipInitialFetchRef.current = false;
+      nextResetReasonRef.current = "filters_changed";
+      return;
+    }
+    fetchLogs();
+  }, [fetchLogs]);
 
   // Flush da telemetria pendente ao desmontar (best-effort).
   useEffect(() => {

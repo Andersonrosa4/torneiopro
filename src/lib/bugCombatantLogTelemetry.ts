@@ -42,7 +42,7 @@ export interface LoadMoreMetrics {
 
 export interface CursorErrorMetrics {
   message: string;
-  context: "load_more" | "first_load" | "build_query" | "load_more_fallback";
+  context: "load_more" | "first_load" | "build_query" | "load_more_fallback" | "scroll_restore";
   source: string;
   scope: string;
 }

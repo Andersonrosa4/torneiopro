@@ -229,6 +229,24 @@ const TournamentDetail = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // 🛡️ Combatente de Bugs: roda silenciosamente ao abrir o torneio.
+  // Detecta e corrige inconsistências estruturais (links quebrados, vencedor
+  // inválido, placar negativo, auto-confronto, etc) sem ação manual.
+  useEffect(() => {
+    if (!id) return;
+    const t = setTimeout(() => {
+      runBugCombatant(id)
+        .then((r) => {
+          if (r.fixed > 0) {
+            toast.success(`🛡️ ${r.fixed} inconsistência${r.fixed > 1 ? "s" : ""} corrigida${r.fixed > 1 ? "s" : ""} automaticamente`);
+            fetchData();
+          }
+        })
+        .catch((e) => console.warn("[BugCombatant] falhou silenciosamente:", e));
+    }, 1500); // espera dados carregarem antes de varrer
+    return () => clearTimeout(t);
+  }, [id, fetchData]);
+
   // Check if current organizer is associated with this tournament
   useEffect(() => {
     if (!id || !organizerId || isAdmin) return;

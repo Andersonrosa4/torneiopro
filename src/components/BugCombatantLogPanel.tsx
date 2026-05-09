@@ -300,7 +300,7 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
     let cursor: KeysetCursor | null = cursorRef.current;
     if (!cursor) {
       const fb = deriveFallbackCursor(rows);
-      if (!fb.ok) {
+      if (fb.ok === false) {
         recordCursorError(tournamentId, {
           message: `fallback indisponível: ${fb.reason}`,
           context: "load_more_fallback",

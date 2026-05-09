@@ -27,7 +27,9 @@ export interface AutoHealResult {
 }
 
 const RUN_FLAG_PREFIX = "bugCombatant:lastRun:";
-const COOLDOWN_MS = 60_000; // não re-rodar mais de 1x/minuto por torneio
+const COOLDOWN_MS = 15_000; // permite re-scan rápido em background sem martelar
+const WATCHDOG_INTERVAL_MS = 30_000; // varredura periódica
+const REALTIME_DEBOUNCE_MS = 2_500; // espera estabilizar após mudança realtime
 
 /**
  * Executa scan + auto-fix. Silencioso (não joga toast por padrão).

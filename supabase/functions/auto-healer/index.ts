@@ -56,10 +56,28 @@ Deno.serve(async (req) => {
 
   const summary: Array<{ tournamentId: string; scanned: number; fixed: number }> = [];
 
+  // Optional: scan single tournament if requested
+  let body: { tournamentId?: string; force?: boolean } = {};
+  try { body = await req.json(); } catch { /* cron sem body */ }
+
+  // 🔒 Concurrency lock — evita execuções sobrepostas do cron.
+  // Manual scans com `force: true` ignoram o lock (mas ainda são serializados pelo Postgres).
+  const useLock = !body.force;
+  let lockAcquired = false;
+  if (useLock) {
+    const { data: gotLock, error: lockErr } = await supabase.rpc("try_auto_healer_lock");
+    if (lockErr) console.error("[auto-healer] erro adquirindo lock:", lockErr);
+    lockAcquired = gotLock === true;
+    if (!lockAcquired) {
+      console.warn("[auto-healer] execução anterior ainda em andamento — pulando ciclo");
+      return new Response(
+        JSON.stringify({ ok: true, skipped: true, reason: "previous run still in progress" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+      );
+    }
+  }
+
   try {
-    // Optional: scan single tournament if requested
-    let body: { tournamentId?: string } = {};
-    try { body = await req.json(); } catch { /* cron sem body */ }
 
     let tournamentIds: string[] = [];
     if (body.tournamentId) {

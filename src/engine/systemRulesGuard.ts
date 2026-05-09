@@ -200,11 +200,14 @@ function checkMaxLosses(matches: GuardMatch[], violations: RuleViolation[]) {
     if (m.bracket_type === 'third_place') continue; // Partida classificatória
     const loserId = m.team1_id === m.winner_team_id ? m.team2_id : m.team1_id;
     if (!loserId) continue;
-    lossCount.set(loserId, (lossCount.get(loserId) ?? 0) + 1);
+    // Chave inclui escopo (modality+stage) para nunca somar derrotas entre chaves diferentes
+    const key = `${scopeKey(m)}|${loserId}`;
+    lossCount.set(key, (lossCount.get(key) ?? 0) + 1);
   }
 
-  for (const [tid, losses] of lossCount) {
+  for (const [key, losses] of lossCount) {
     if (losses > 2) {
+      const tid = key.split('|').pop() || '';
       violations.push({
         rule: '4.6',
         message: `Equipe ${tid.slice(0, 8)} tem ${losses} derrotas — máximo permitido em DE é 2`,

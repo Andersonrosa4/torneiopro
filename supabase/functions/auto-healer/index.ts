@@ -52,18 +52,49 @@ Deno.serve(async (req) => {
 
   const url = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
   const supabase = createClient(url, serviceKey, { auth: { persistSession: false } });
 
-  const summary: Array<{ tournamentId: string; scanned: number; fixed: number }> = [];
+  const summary: Array<{ tournamentId: string; scanned: number; fixed: number; appliedFixes?: string[] }> = [];
 
   // Optional: scan single tournament if requested
   let body: { tournamentId?: string; force?: boolean } = {};
   try { body = await req.json(); } catch { /* cron sem body */ }
 
+  // 🔐 Manual runs (com tournamentId) exigem admin autenticado.
+  // Cron (sem body / sem auth header de usuário) usa service role direto.
+  const authHeader = req.headers.get("Authorization");
+  const isManualCall = !!body.tournamentId;
+  if (isManualCall) {
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ ok: false, error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const userClient = createClient(url, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false },
+    });
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claims, error: claimsErr } = await userClient.auth.getClaims(token);
+    if (claimsErr || !claims?.claims) {
+      return new Response(JSON.stringify({ ok: false, error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { data: isAdmin, error: roleErr } = await userClient.rpc("is_organizer_admin");
+    if (roleErr || isAdmin !== true) {
+      return new Response(JSON.stringify({ ok: false, error: "Forbidden: admin only" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }
+
   // 🔒 Concurrency lock — evita execuções sobrepostas do cron.
   // Lock baseado em tabela com TTL (240s) para sobreviver ao pooler do Postgres.
   // Manual scans com `force: true` ignoram o lock.
-  const useLock = !body.force;
+  // Manual runs sempre ignoram o lock para resposta imediata.
+  const useLock = !body.force && !isManualCall;
   let lockAcquired = false;
   if (useLock) {
     const { data: gotLock, error: lockErr } = await supabase.rpc("acquire_auto_healer_lock", { ttl_seconds: 240 });
@@ -119,7 +150,7 @@ Deno.serve(async (req) => {
         });
         console.info(`[auto-healer] torneio ${tid}: ${fixed}/${patches.size} correções aplicadas`);
       }
-      summary.push({ tournamentId: tid, scanned: list.length, fixed });
+      summary.push({ tournamentId: tid, scanned: list.length, fixed, appliedFixes: fixes });
     }
 
     return new Response(JSON.stringify({ ok: true, processed: summary.length, summary }), {

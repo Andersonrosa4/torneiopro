@@ -3,9 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RefreshCw, ShieldCheck, AlertTriangle, Bot, Hand, Search } from "lucide-react";
+import { RefreshCw, ShieldCheck, AlertTriangle, Bot, Hand, Search, Play } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatDateBR } from "@/lib/utils";
+import { toast } from "sonner";
 
 type Source = "all" | "cron" | "manual";
 type Scope = "tournament" | "all";
@@ -51,9 +52,33 @@ function parseFixes(raw: unknown): { matchShort: string; label: string }[] {
 export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmin }: Props) {
   const [rows, setRows] = useState<LogRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [running, setRunning] = useState(false);
   const [source, setSource] = useState<Source>("all");
   const [scope, setScope] = useState<Scope>("tournament");
   const [search, setSearch] = useState("");
+
+  const runNow = useCallback(async () => {
+    if (!isAdmin) return;
+    setRunning(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("auto-healer", {
+        body: { tournamentId },
+      });
+      if (error) throw error;
+      const s = (data?.summary?.[0] ?? { scanned: 0, fixed: 0 }) as { scanned: number; fixed: number };
+      toast.success(
+        s.fixed > 0
+          ? `Combatedor: ${s.fixed} correção(ões) aplicada(s) em ${s.scanned} partidas.`
+          : `Combatedor: ${s.scanned} partidas verificadas, nenhum bug detectado.`,
+      );
+      fetchLogs();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Falha ao rodar o combatedor: ${msg}`);
+    } finally {
+      setRunning(false);
+    }
+  }, [isAdmin, tournamentId]);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -113,10 +138,23 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
           <ShieldCheck className="w-5 h-5 text-emerald-500" />
           <h2 className="text-base sm:text-lg font-semibold">Auditoria do Combatedor de Bugs</h2>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchLogs} disabled={loading}>
-          <RefreshCw className={`w-4 h-4 mr-1.5 ${loading ? "animate-spin" : ""}`} />
-          Atualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Button
+              size="sm"
+              onClick={runNow}
+              disabled={running || loading}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <Play className={`w-4 h-4 mr-1.5 ${running ? "animate-pulse" : ""}`} />
+              {running ? "Executando…" : "Rodar agora"}
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={fetchLogs} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 mr-1.5 ${loading ? "animate-spin" : ""}`} />
+            Atualizar
+          </Button>
+        </div>
       </header>
 
       {/* Filtros */}

@@ -10,6 +10,12 @@ import { RefreshCw, ShieldCheck, AlertTriangle, Bot, Hand, Search, Play, Downloa
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { formatDateBR } from "@/lib/utils";
+import {
+  cursorToOrFilter,
+  nextCursorFromPage,
+  toCursor,
+  type KeysetCursor,
+} from "@/lib/bugCombatantLogCursor";
 import { toast } from "sonner";
 
 type Source = "all" | "cron" | "manual";
@@ -78,6 +84,10 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
   const [error, setError] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const restoredRef = useRef(false);
+  // Cursor de paginação ESTÁVEL: só avança com respostas do servidor.
+  // Inserções via realtime no topo da lista NÃO mexem nele — assim o
+  // próximo loadMore continua de onde paramos, sem pular linhas.
+  const cursorRef = useRef<KeysetCursor | null>(null);
 
   // Persiste filtros + posição de rolagem (sessionStorage)
   useEffect(() => {
@@ -138,10 +148,11 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
     }
   }, [isAdmin, tournamentId]);
 
-  // Keyset pagination: ordena por (created_at desc, id desc) e usa o último item como cursor.
-  // Isso elimina deslocamento de offset quando novas linhas chegam via realtime.
+  // Keyset pagination: ordena por (created_at desc, id desc) e usa o cursor
+  // padronizado de `bugCombatantLogCursor`. Cursor é validado (formato canônico
+  // ISO-8601 + UUID) antes de ser interpolado no filtro `or(...)` do PostgREST.
   const buildQuery = useCallback(
-    (cursor: { created_at: string; id: string } | null) => {
+    (cursor: KeysetCursor | null) => {
       let q = supabase
         .from("bug_combatant_log")
         .select("id,tournament_id,scanned,fixed,remaining,source,applied_fixes,created_at")
@@ -150,12 +161,7 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
         .limit(PAGE_SIZE);
       if (scope === "tournament") q = q.eq("tournament_id", tournamentId);
       if (source !== "all") q = q.eq("source", source);
-      if (cursor) {
-        // (created_at, id) < (cursor.created_at, cursor.id) em ordem desc
-        q = q.or(
-          `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`,
-        );
-      }
+      if (cursor) q = q.or(cursorToOrFilter(cursor));
       return q;
     },
     [tournamentId, source, scope],
@@ -164,9 +170,10 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     setError(null);
-    // Reseta lista e paginação para recarregar do início
+    // Reseta lista, paginação e cursor para recarregar do início
     setRows([]);
     setHasMore(true);
+    cursorRef.current = null;
     const { data, error: qErr } = await buildQuery(null);
     if (qErr) {
       setError(qErr.message || "Falha ao carregar a auditoria.");
@@ -177,6 +184,7 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
       const unique = (data as LogRow[]).filter((r) => (seen.has(r.id) ? false : (seen.add(r.id), true)));
       setRows(unique);
       setHasMore(data.length === PAGE_SIZE);
+      cursorRef.current = nextCursorFromPage(unique, null);
     } else {
       setHasMore(false);
     }
@@ -184,21 +192,39 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
   }, [buildQuery]);
 
   const loadMore = useCallback(async () => {
-    if (loadingMore || !hasMore || rows.length === 0) return;
+    if (loadingMore || !hasMore) return;
+    // Cursor estável: prioriza o do servidor; se ausente (1ª página vazia ou
+    // erro), tenta derivar da última linha visível. Linhas inseridas pelo
+    // realtime no topo NÃO afetam o cursor.
+    const cursor =
+      cursorRef.current ?? toCursor(rows[rows.length - 1] ?? null);
+    if (!cursor) return;
     setLoadingMore(true);
-    const last = rows[rows.length - 1];
-    const cursor = { created_at: last.created_at, id: last.id };
-    const { data, error: qErr } = await buildQuery(cursor);
+    let qErr: { message?: string } | null = null;
+    let data: LogRow[] | null = null;
+    try {
+      const res = await buildQuery(cursor);
+      qErr = res.error;
+      data = (res.data ?? null) as LogRow[] | null;
+    } catch (e) {
+      // Erros de validação de cursor caem aqui — desliga paginação.
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Cursor inválido para paginação: ${msg}`);
+      setHasMore(false);
+      setLoadingMore(false);
+      return;
+    }
     if (qErr) {
       toast.error(`Falha ao carregar mais: ${qErr.message}`);
       setHasMore(false);
     } else if (data) {
       setRows((prev) => {
         const seen = new Set(prev.map((r) => r.id));
-        const next = (data as LogRow[]).filter((r) => !seen.has(r.id));
+        const next = data!.filter((r) => !seen.has(r.id));
         return [...prev, ...next];
       });
       setHasMore(data.length === PAGE_SIZE);
+      cursorRef.current = nextCursorFromPage(data, cursor);
     }
     setLoadingMore(false);
   }, [buildQuery, hasMore, loadingMore, rows]);

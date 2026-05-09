@@ -3132,6 +3132,22 @@ const TournamentDetail = () => {
                   stageId={selectedStageId}
                 />
             </TabsContent>
+
+            {/* Auditoria Tab — log do Combatedor de Bugs */}
+            {canEdit && (
+              <TabsContent value="audit">
+                <BugCombatantLogPanel
+                  tournamentId={id || ""}
+                  isAdmin={!!isAdmin}
+                  onOpenMatch={(shortId) => {
+                    setActiveTab("bracket");
+                    toast.info(`Abrindo chave — partida ${shortId}`, {
+                      description: "Localize o card destacado pelo identificador.",
+                    });
+                  }}
+                />
+              </TabsContent>
+            )}
           </Tabs>
           <FlowAppsBranding variant="tournament-cta" />
         </motion.div>

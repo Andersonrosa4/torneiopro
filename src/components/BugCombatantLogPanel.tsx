@@ -11,7 +11,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { formatDateBR } from "@/lib/utils";
 import {
-  cursorToOrFilter,
   nextCursorFromPage,
   toCursor,
   type KeysetCursor,

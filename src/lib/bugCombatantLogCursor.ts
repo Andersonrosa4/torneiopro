@@ -126,3 +126,55 @@ export function compareDesc(a: KeysetCursor, b: KeysetCursor): number {
   if (a.id !== b.id) return a.id > b.id ? 1 : -1;
   return 0;
 }
+
+/**
+ * Resultado de derivar um cursor de fallback a partir das linhas visíveis.
+ * Quando `ok=false`, o chamador DEVE desabilitar a paginação (não há âncora
+ * keyset confiável para evitar duplicatas/lacunas).
+ */
+export type FallbackResult =
+  | { ok: true; cursor: KeysetCursor; sourceIndex: number }
+  | { ok: false; reason: string };
+
+/**
+ * Deriva um cursor a partir das linhas atualmente visíveis quando o cursor
+ * "oficial" do servidor está ausente (ex.: 1ª página vazia, hidratação parcial,
+ * cursorRef resetado por mudança de filtros).
+ *
+ * Estratégia:
+ * - Filtra apenas linhas com cursor canônico (`toCursor` ≠ null).
+ * - Ordena estritamente por (created_at desc, id desc) — não confia na ordem
+ *   da fonte (realtime pode ter intercalado linhas).
+ * - Pega a ÚLTIMA (mais antiga) e revalida com `assertCursor`.
+ */
+export function deriveFallbackCursor<T extends CursorCandidate>(
+  rows: readonly T[] | null | undefined,
+): FallbackResult {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return { ok: false, reason: "rows vazio: sem âncora para derivar cursor" };
+  }
+  const valid: Array<{ cursor: KeysetCursor; index: number }> = [];
+  let invalidCount = 0;
+  rows.forEach((row, index) => {
+    const c = toCursor(row);
+    if (c) valid.push({ cursor: c, index });
+    else invalidCount++;
+  });
+  if (valid.length === 0) {
+    return {
+      ok: false,
+      reason: `nenhuma linha visível tem cursor canônico (${invalidCount} inválidas)`,
+    };
+  }
+  valid.sort((a, b) => compareDesc(b.cursor, a.cursor));
+  const last = valid[valid.length - 1];
+  try {
+    assertCursor(last.cursor);
+  } catch (e) {
+    return {
+      ok: false,
+      reason: `cursor derivado falhou em assertCursor: ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+  return { ok: true, cursor: last.cursor, sourceIndex: last.index };
+}

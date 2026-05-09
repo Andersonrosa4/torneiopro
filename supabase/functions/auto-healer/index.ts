@@ -93,7 +93,8 @@ Deno.serve(async (req) => {
   // 🔒 Concurrency lock — evita execuções sobrepostas do cron.
   // Lock baseado em tabela com TTL (240s) para sobreviver ao pooler do Postgres.
   // Manual scans com `force: true` ignoram o lock.
-  const useLock = !body.force;
+  // Manual runs sempre ignoram o lock para resposta imediata.
+  const useLock = !body.force && !isManualCall;
   let lockAcquired = false;
   if (useLock) {
     const { data: gotLock, error: lockErr } = await supabase.rpc("acquire_auto_healer_lock", { ttl_seconds: 240 });

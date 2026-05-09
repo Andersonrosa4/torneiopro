@@ -16,6 +16,14 @@ import {
   toCursor,
   type KeysetCursor,
 } from "@/lib/bugCombatantLogCursor";
+import {
+  flushNow,
+  recordCursorError,
+  recordFirstLoad,
+  recordLoadMore,
+  recordReset,
+  type ResetReason,
+} from "@/lib/bugCombatantLogTelemetry";
 import { toast } from "sonner";
 
 type Source = "all" | "cron" | "manual";

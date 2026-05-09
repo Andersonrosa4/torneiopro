@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
         });
         console.info(`[auto-healer] torneio ${tid}: ${fixed}/${patches.size} correções aplicadas`);
       }
-      summary.push({ tournamentId: tid, scanned: list.length, fixed });
+      summary.push({ tournamentId: tid, scanned: list.length, fixed, appliedFixes: fixes });
     }
 
     return new Response(JSON.stringify({ ok: true, processed: summary.length, summary }), {

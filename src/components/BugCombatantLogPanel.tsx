@@ -15,6 +15,7 @@ import {
   nextCursorFromPage,
   type KeysetCursor,
 } from "@/lib/bugCombatantLogCursor";
+import { restoreScrollY } from "@/lib/bugCombatantLogScrollRestore";
 import {
   flushNow,
   recordCursorError,

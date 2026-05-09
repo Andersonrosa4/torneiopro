@@ -24,6 +24,11 @@ import {
   recordReset,
   type ResetReason,
 } from "@/lib/bugCombatantLogTelemetry";
+import {
+  getHydratableState,
+  readPersisted,
+  writePersisted,
+} from "@/lib/bugCombatantLogPersistence";
 import { toast } from "sonner";
 
 type Source = "all" | "cron" | "manual";
@@ -68,26 +73,28 @@ function parseFixes(raw: unknown): { matchShort: string; label: string }[] {
 }
 
 export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmin }: Props) {
-  // Chave única por torneio para preservar estado entre trocas de aba
-  const stateKey = `bug-audit:${tournamentId}`;
-  const persisted = useMemo<{
-    source?: Source; scope?: Scope; search?: string; scrollY?: number;
-  }>(() => {
-    try {
-      const raw = sessionStorage.getItem(stateKey);
-      return raw ? JSON.parse(raw) : {};
-    } catch { return {}; }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stateKey]);
+  // Snapshot do estado persistido (filtros + cursor + páginas) para o torneio atual.
+  const persisted = useMemo(() => readPersisted(tournamentId), [tournamentId]);
+  const initialSource: Source = (persisted.source as Source) ?? "all";
+  const initialScope: Scope = (persisted.scope as Scope) ?? "tournament";
 
-  const [rows, setRows] = useState<LogRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Tenta hidratar a paginação. Se cursor/filtros não baterem, devolve null
+  // e fazemos o fetch normal do início.
+  const hydrated = useMemo(
+    () => getHydratableState(tournamentId, initialSource, initialScope),
+    // recalcula só quando o torneio muda; filtros iniciais vêm do mesmo snapshot.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tournamentId],
+  );
+
+  const [rows, setRows] = useState<LogRow[]>(() => (hydrated?.rows as LogRow[]) ?? []);
+  const [loading, setLoading] = useState(!hydrated);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(hydrated?.hasMore ?? true);
   const [running, setRunning] = useState(false);
-  const [source, setSource] = useState<Source>(persisted.source ?? "all");
-  const [scope, setScope] = useState<Scope>(persisted.scope ?? "tournament");
-  const [search, setSearch] = useState(persisted.search ?? "");
+  const [source, setSource] = useState<Source>(initialSource);
+  const [scope, setScope] = useState<Scope>(initialScope);
+  const [search, setSearch] = useState((persisted.search as string) ?? "");
   const [detail, setDetail] = useState<LogRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -95,20 +102,30 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
   // Cursor de paginação ESTÁVEL: só avança com respostas do servidor.
   // Inserções via realtime no topo da lista NÃO mexem nele — assim o
   // próximo loadMore continua de onde paramos, sem pular linhas.
-  const cursorRef = useRef<KeysetCursor | null>(null);
+  const cursorRef = useRef<KeysetCursor | null>(hydrated?.cursor ?? null);
   // Contador de páginas carregadas via loadMore (telemetria/perf).
-  const pageIndexRef = useRef(0);
+  const pageIndexRef = useRef(hydrated?.pageIndex ?? 0);
   // Motivo do próximo reset (por padrão "filters_changed"; sobrescrito antes do refetch).
   const nextResetReasonRef = useRef<ResetReason>("mount");
+  // true até o efeito de fetch inicial decidir se hidrata ou refetcha.
+  const skipInitialFetchRef = useRef(!!hydrated);
 
-  // Persiste filtros + posição de rolagem (sessionStorage)
+  // Persiste filtros, scroll, cursor, páginas e flag hasMore (sessionStorage).
+  // Cursor + rows + pageIndex permitem retomar a paginação após refresh sem
+  // refazer páginas anteriores nem quebrar a ordem keyset.
   useEffect(() => {
     const save = () => {
-      try {
-        sessionStorage.setItem(stateKey, JSON.stringify({
-          source, scope, search, scrollY: window.scrollY,
-        }));
-      } catch { /* quota cheia / modo privado */ }
+      writePersisted({
+        tournament_id: tournamentId,
+        source,
+        scope,
+        search,
+        scrollY: typeof window !== "undefined" ? window.scrollY : 0,
+        cursor: cursorRef.current,
+        rows,
+        pageIndex: pageIndexRef.current,
+        hasMore,
+      });
     };
     let raf = 0;
     const onScroll = () => {
@@ -116,18 +133,18 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
       raf = window.requestAnimationFrame(() => { raf = 0; save(); });
     };
     window.addEventListener("scroll", onScroll, { passive: true });
-    save(); // salva mudança de filtros imediatamente
+    save();
     return () => {
       window.removeEventListener("scroll", onScroll);
       if (raf) cancelAnimationFrame(raf);
       save();
     };
-  }, [stateKey, source, scope, search]);
+  }, [tournamentId, source, scope, search, rows, hasMore]);
 
   // Restaura scroll após a primeira carga concluir
   useEffect(() => {
     if (restoredRef.current || loading) return;
-    const y = persisted.scrollY ?? 0;
+    const y = (persisted.scrollY as number | undefined) ?? 0;
     if (y > 0) {
       // aguarda a virtualizada montar e calcular alturas
       requestAnimationFrame(() => {
@@ -302,7 +319,16 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
     setLoadingMore(false);
   }, [buildQuery, hasMore, loadingMore, rows, tournamentId, source, scope]);
 
-  useEffect(() => { fetchLogs(); }, [fetchLogs]);
+  useEffect(() => {
+    // Se hidratamos do sessionStorage, pulamos APENAS o fetch inicial.
+    // Mudanças de filtros depois disso disparam refetch normalmente.
+    if (skipInitialFetchRef.current) {
+      skipInitialFetchRef.current = false;
+      nextResetReasonRef.current = "filters_changed";
+      return;
+    }
+    fetchLogs();
+  }, [fetchLogs]);
 
   // Flush da telemetria pendente ao desmontar (best-effort).
   useEffect(() => {

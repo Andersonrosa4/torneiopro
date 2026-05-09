@@ -53,6 +53,14 @@ interface Match {
 const sameMatchScope = (m: Match, ref: Match) =>
   m.modality_id === ref.modality_id && (m.stage_id ?? null) === (ref.stage_id ?? null);
 
+const matchScopeFilters = (match: Match, tournamentId: string) => {
+  const filters: Record<string, any> = match.modality_id
+    ? { modality_id: match.modality_id }
+    : { tournament_id: tournamentId };
+  if (match.stage_id !== undefined) filters.stage_id = match.stage_id ?? null;
+  return filters;
+};
+
 interface ManualMatchOverrideProps {
   match: Match;
   matchNumber: number;
@@ -230,14 +238,12 @@ export function ManualMatchOverride({ match, matchNumber, teams, allMatches, tou
           const { data: postResetData } = await organizerQuery({
             table: "matches",
             operation: "select",
-            filters: { tournament_id: tournamentId },
+            filters: matchScopeFilters(match, tournamentId),
             order: [{ column: "round" }, { column: "position" }],
           });
 
           if (postResetData) {
-            let postResetMatches = match.modality_id
-              ? (postResetData as Match[]).filter(m => m.modality_id === match.modality_id)
-              : (postResetData as Match[]);
+            let postResetMatches = postResetData as Match[];
 
             // Get all completed matches (excluding the one being overridden)
             const completedToReplay = postResetMatches
@@ -325,7 +331,7 @@ export function ManualMatchOverride({ match, matchNumber, teams, allMatches, tou
           try {
             const rollbackPlan = computeAggressiveCascadeReset(
               { ...match, winner_team_id: w, status: 'completed' } as any,
-              allMatches as any,
+              allMatches.filter(m => sameMatchScope(m, match)) as any,
             );
             // Reset the override match itself too
             rollbackPlan.toUpdate.push({
@@ -363,13 +369,11 @@ export function ManualMatchOverride({ match, matchNumber, teams, allMatches, tou
           const { data: freshData } = await organizerQuery({
             table: "matches",
             operation: "select",
-            filters: { tournament_id: tournamentId },
+            filters: matchScopeFilters(match, tournamentId),
             order: [{ column: "round" }, { column: "position" }],
           });
           if (freshData) {
-            let freshMatches = match.modality_id
-              ? (freshData as Match[]).filter(m => m.modality_id === match.modality_id)
-              : (freshData as Match[]);
+            let freshMatches = freshData as Match[];
 
             const freshOverride = freshMatches.find(m => m.id === match.id);
             if (freshOverride) {

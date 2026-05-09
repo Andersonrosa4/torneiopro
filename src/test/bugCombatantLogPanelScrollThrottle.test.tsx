@@ -233,4 +233,86 @@ describe("BugCombatantLogPanel — throttle de persistência durante scroll", ()
 
     setItemSpy.mockRestore();
   });
+
+  it("debounce: visibilitychange + pagehide em <50ms coalescem em 1 flush", async () => {
+    const Panel = await loadPanel();
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+
+    render(<Panel tournamentId={TOURNAMENT_ID} isAdmin />);
+    await waitFor(() => { expect(invokeMock).toHaveBeenCalled(); });
+    await act(async () => { await Promise.resolve(); });
+
+    vi.useFakeTimers({
+      toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "performance", "Date"],
+    });
+
+    // Cria estado pendente (trailing): 1º scroll dispara leading,
+    // 2º scroll dentro da janela de 250ms fica pendente para o trailing.
+    setScrollY(50);
+    window.dispatchEvent(new Event("scroll"));
+    vi.advanceTimersByTime(10);
+    setScrollY(123);
+    window.dispatchEvent(new Event("scroll"));
+    vi.advanceTimersByTime(10);
+
+    setItemSpy.mockClear();
+
+    // Navegador típico: dispara visibilitychange e pagehide em sequência rápida.
+    document.dispatchEvent(new Event("visibilitychange"));
+    vi.advanceTimersByTime(5);
+    window.dispatchEvent(new Event("pagehide"));
+    vi.advanceTimersByTime(5);
+    document.dispatchEvent(new Event("visibilitychange")); // outro disparo redundante
+
+    // Apenas 1 write de auditoria (o 1º flush). Os demais são debounced.
+    const writes = getAuditWrites(setItemSpy);
+    expect(writes.length).toBe(1);
+    expect(parseY(writes[0].value)).toBe(123);
+
+    setItemSpy.mockRestore();
+  });
+
+  it("debounce: após 50ms+, novo flush é permitido (cobre estado novo)", async () => {
+    const Panel = await loadPanel();
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+
+    render(<Panel tournamentId={TOURNAMENT_ID} isAdmin />);
+    await waitFor(() => { expect(invokeMock).toHaveBeenCalled(); });
+    await act(async () => { await Promise.resolve(); });
+
+    vi.useFakeTimers({
+      toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "performance", "Date"],
+    });
+
+    setScrollY(100);
+    window.dispatchEvent(new Event("scroll")); // leading
+    vi.advanceTimersByTime(10);
+    setScrollY(150);
+    window.dispatchEvent(new Event("scroll")); // pendente (trailing)
+    vi.advanceTimersByTime(10);
+
+    setItemSpy.mockClear();
+    document.dispatchEvent(new Event("visibilitychange")); // 1º flush → grava 150
+    vi.advanceTimersByTime(80);                            // janela do debounce passou
+    setScrollY(900);
+    window.dispatchEvent(new Event("scroll"));             // leading novo: grava 900
+    vi.advanceTimersByTime(10);
+    setScrollY(901);
+    window.dispatchEvent(new Event("scroll"));             // novo trailing pendente
+    vi.advanceTimersByTime(10);
+    window.dispatchEvent(new Event("pagehide"));           // 2º flush → grava 901
+
+    const writes = getAuditWrites(setItemSpy);
+    // Dois flushes distintos passaram pelo gate (separados por > 50ms):
+    //   1º flush grava o trailing pendente (y=150)
+    //   2º flush grava o trailing pendente posterior (y=901)
+    // Entre os flushes, o throttle não deixou leading novo passar (estava
+    // dentro do intervalo de 250ms).
+    expect(writes.length).toBe(2);
+    expect(parseY(writes[0].value)).toBe(150);
+    expect(parseY(writes[1].value)).toBe(901);
+
+    setItemSpy.mockRestore();
+  });
 });
+

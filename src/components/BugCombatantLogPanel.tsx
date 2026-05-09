@@ -137,7 +137,18 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
       { intervalMs: 250 },
     );
     const onScroll = () => throttled();
-    const onVisibilityFlush = () => throttled.flush();
+    // Debounce de coalescência: o navegador frequentemente dispara
+    // `visibilitychange` (hidden) e `pagehide` em sequência (alguns ms).
+    // Sem o gate, gravaríamos 2x o mesmo estado. 50ms é suficiente para
+    // engolir a sequência sem atrasar o flush real (síncrono).
+    const FLUSH_DEBOUNCE_MS = 50;
+    let lastFlushAt = -Infinity;
+    const onVisibilityFlush = () => {
+      const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+      if (now - lastFlushAt < FLUSH_DEBOUNCE_MS) return;
+      lastFlushAt = now;
+      throttled.flush();
+    };
     window.addEventListener("scroll", onScroll, { passive: true });
     document.addEventListener("visibilitychange", onVisibilityFlush);
     window.addEventListener("pagehide", onVisibilityFlush);

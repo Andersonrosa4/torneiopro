@@ -130,5 +130,10 @@ Deno.serve(async (req) => {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+  } finally {
+    if (lockAcquired) {
+      const { error: relErr } = await supabase.rpc("release_auto_healer_lock");
+      if (relErr) console.error("[auto-healer] erro liberando lock:", relErr);
+    }
   }
 });

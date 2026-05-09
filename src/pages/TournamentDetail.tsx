@@ -3140,10 +3140,31 @@ const TournamentDetail = () => {
                   tournamentId={id || ""}
                   isAdmin={!!isAdmin}
                   onOpenMatch={(shortId) => {
+                    const target = matches.find((m: any) =>
+                      typeof m.id === "string" && m.id.toLowerCase().startsWith(shortId.toLowerCase()),
+                    );
+                    if (!target) {
+                      toast.error(`Partida ${shortId} não encontrada (pode ter sido removida).`);
+                      return;
+                    }
+                    if (target.modality_id && target.modality_id !== selectedModality?.id) {
+                      const mod = modalities.find((m: any) => m.id === target.modality_id);
+                      if (mod) setSelectedModality(mod);
+                    }
                     setActiveTab("bracket");
-                    toast.info(`Abrindo chave — partida ${shortId}`, {
-                      description: "Localize o card destacado pelo identificador.",
+                    toast.success(`Abrindo chave — partida ${shortId}`, {
+                      description: "Card destacado em amarelo por alguns segundos.",
                     });
+                    // Aguarda render do bracket e destaca via DOM
+                    setTimeout(() => {
+                      const el = document.querySelector(`[data-match-id="${target.id}"]`) as HTMLElement | null;
+                      if (!el) return;
+                      el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+                      el.classList.add("ring-4", "ring-amber-400", "ring-offset-2", "ring-offset-background", "rounded-lg", "transition-all");
+                      window.setTimeout(() => {
+                        el.classList.remove("ring-4", "ring-amber-400", "ring-offset-2", "ring-offset-background");
+                      }, 4000);
+                    }, 350);
                   }}
                 />
               </TabsContent>

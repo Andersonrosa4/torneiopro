@@ -535,6 +535,8 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
       "execucao_id",
       "torneio_id",
       "origem",
+      "motivo",
+      "duracao_ms",
       "verificadas",
       "corrigidas",
       "pendentes",
@@ -545,11 +547,14 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
     for (const r of filtered) {
       const fixes = parseFixes(r.applied_fixes);
       const when = formatDateTimeBR(r.created_at);
+      const reasonLbl = r.reason ? (REASON_LABEL[r.reason] ?? r.reason) : "";
+      const durMs = r.duration_ms ?? "";
+      const base = [when, r.id, r.tournament_id, r.source, reasonLbl, durMs, r.scanned, r.fixed, r.remaining];
       if (fixes.length === 0) {
-        lines.push([when, r.id, r.tournament_id, r.source, r.scanned, r.fixed, r.remaining, "", ""].map(esc).join(";"));
+        lines.push([...base, "", ""].map(esc).join(";"));
       } else {
         for (const f of fixes) {
-          lines.push([when, r.id, r.tournament_id, r.source, r.scanned, r.fixed, r.remaining, f.matchShort, f.label].map(esc).join(";"));
+          lines.push([...base, f.matchShort, f.label].map(esc).join(";"));
         }
       }
     }

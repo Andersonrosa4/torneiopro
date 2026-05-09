@@ -105,7 +105,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.restoreAllMocks();
   cleanup();
   clearPersisted(TOURNAMENT_ID);
 });

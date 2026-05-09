@@ -52,6 +52,8 @@ function parseFixes(raw: unknown): { matchShort: string; label: string }[] {
 export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmin }: Props) {
   const [rows, setRows] = useState<LogRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [running, setRunning] = useState(false);
   const [source, setSource] = useState<Source>("all");
   const [scope, setScope] = useState<Scope>("tournament");

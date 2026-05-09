@@ -54,17 +54,66 @@ function parseFixes(raw: unknown): { matchShort: string; label: string }[] {
 }
 
 export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmin }: Props) {
+  // Chave única por torneio para preservar estado entre trocas de aba
+  const stateKey = `bug-audit:${tournamentId}`;
+  const persisted = useMemo<{
+    source?: Source; scope?: Scope; search?: string; scrollY?: number;
+  }>(() => {
+    try {
+      const raw = sessionStorage.getItem(stateKey);
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stateKey]);
+
   const [rows, setRows] = useState<LogRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [running, setRunning] = useState(false);
-  const [source, setSource] = useState<Source>("all");
-  const [scope, setScope] = useState<Scope>("tournament");
-  const [search, setSearch] = useState("");
+  const [source, setSource] = useState<Source>(persisted.source ?? "all");
+  const [scope, setScope] = useState<Scope>(persisted.scope ?? "tournament");
+  const [search, setSearch] = useState(persisted.search ?? "");
   const [detail, setDetail] = useState<LogRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const restoredRef = useRef(false);
+
+  // Persiste filtros + posição de rolagem (sessionStorage)
+  useEffect(() => {
+    const save = () => {
+      try {
+        sessionStorage.setItem(stateKey, JSON.stringify({
+          source, scope, search, scrollY: window.scrollY,
+        }));
+      } catch { /* quota cheia / modo privado */ }
+    };
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = window.requestAnimationFrame(() => { raf = 0; save(); });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    save(); // salva mudança de filtros imediatamente
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+      save();
+    };
+  }, [stateKey, source, scope, search]);
+
+  // Restaura scroll após a primeira carga concluir
+  useEffect(() => {
+    if (restoredRef.current || loading) return;
+    const y = persisted.scrollY ?? 0;
+    if (y > 0) {
+      // aguarda a virtualizada montar e calcular alturas
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => window.scrollTo({ top: y, behavior: "auto" }));
+      });
+    }
+    restoredRef.current = true;
+  }, [loading, persisted.scrollY]);
 
   const runNow = useCallback(async () => {
     if (!isAdmin) return;

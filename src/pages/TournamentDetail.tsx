@@ -28,6 +28,7 @@ import { processDoubleEliminationAdvance, handleResetFinal } from "@/lib/doubleE
 import { computeAggressiveCascadeReset, computePartialCascadeResetSE } from "@/lib/aggressiveCascadeReset";
 import { distributeChapeus, getChapeuTeams, getRealTeams } from "@/lib/chapeuDistribution";
 import { generateSeeds } from "@/engine/seedingEngine";
+import { runBugCombatant } from "@/lib/bugCombatant";
 import { checkAutoAdvance } from "@/engine/autoAdvanceEngine";
 import { isRoundLocked } from "@/engine/roundLockGuard";
 import { validateSystemRules, type TournamentSnapshot, type GuardMatch } from "@/engine/systemRulesGuard";

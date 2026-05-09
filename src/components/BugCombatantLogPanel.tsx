@@ -58,6 +58,7 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
   const [source, setSource] = useState<Source>("all");
   const [scope, setScope] = useState<Scope>("tournament");
   const [search, setSearch] = useState("");
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const runNow = useCallback(async () => {
     if (!isAdmin) return;

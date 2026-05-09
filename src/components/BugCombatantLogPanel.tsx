@@ -96,6 +96,10 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
   // Inserções via realtime no topo da lista NÃO mexem nele — assim o
   // próximo loadMore continua de onde paramos, sem pular linhas.
   const cursorRef = useRef<KeysetCursor | null>(null);
+  // Contador de páginas carregadas via loadMore (telemetria/perf).
+  const pageIndexRef = useRef(0);
+  // Motivo do próximo reset (por padrão "filters_changed"; sobrescrito antes do refetch).
+  const nextResetReasonRef = useRef<ResetReason>("mount");
 
   // Persiste filtros + posição de rolagem (sessionStorage)
   useEffect(() => {

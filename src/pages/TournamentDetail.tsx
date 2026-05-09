@@ -1387,23 +1387,19 @@ const TournamentDetail = () => {
      const isReDeclaration = match.status === 'completed' && match.winner_team_id;
      if (isReDeclaration) {
        // Determine if this is DE or SE
-       const modalityMatchesForCheck = match.modality_id
-         ? matches.filter(m => m.modality_id === match.modality_id)
-         : matches;
+       const modalityMatchesForCheck = matches.filter(m => sameMatchScope(m, match));
        const isDE = modalityMatchesForCheck.some(m => m.bracket_type === 'losers');
        
        // Fetch fresh data for cascade
        const { data: freshForCascade } = await organizerQuery({
          table: "matches",
          operation: "select",
-         filters: { tournament_id: id },
+          filters: matchScopeFilters(match, id),
          order: [{ column: "round" }, { column: "position" }],
        });
        
        if (freshForCascade) {
-         const cascadeMatches = match.modality_id
-           ? (freshForCascade as typeof matches).filter(m => m.modality_id === match.modality_id)
-           : (freshForCascade as typeof matches);
+          const cascadeMatches = freshForCascade as typeof matches;
          
          const freshMatch = cascadeMatches.find(m => m.id === matchId) || match;
          
@@ -1462,13 +1458,11 @@ const TournamentDetail = () => {
              const { data: postResetData } = await organizerQuery({
                table: "matches",
                operation: "select",
-               filters: { tournament_id: id },
+                filters: matchScopeFilters(match, id),
                order: [{ column: "round" }, { column: "position" }],
              });
              if (postResetData) {
-               let postResetMatches = match.modality_id
-                 ? (postResetData as typeof matches).filter(m => m.modality_id === match.modality_id)
-                 : (postResetData as typeof matches);
+                let postResetMatches = postResetData as typeof matches;
 
                // Get all completed matches (excluding the one being re-declared)
                const completedToReplay = postResetMatches

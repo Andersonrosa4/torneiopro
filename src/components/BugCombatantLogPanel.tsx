@@ -321,13 +321,60 @@ export default function BugCombatantLogPanel({ tournamentId, onOpenMatch, isAdmi
 
       {/* Lista */}
       {loading ? (
-        <p className="text-sm text-muted-foreground py-6 text-center">Carregando…</p>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-10 text-muted-foreground">
-          <ShieldCheck className="w-10 h-10 mx-auto mb-2 opacity-50" />
-          <p className="text-sm">Nenhuma execução registrada com os filtros atuais.</p>
-          <p className="text-xs mt-1">O robô só registra quando aplica correções — sistema saudável significa lista vazia.</p>
+        <ul className="space-y-2" aria-busy="true" aria-label="Carregando auditoria">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <li
+              key={`sk-${i}`}
+              className="rounded-lg border border-border bg-background/40 p-3"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <Skeleton className="h-5 w-24 rounded-full" />
+                <Skeleton className="h-3 w-32" />
+                <Skeleton className="h-3 w-20 ml-auto" />
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <Skeleton className="h-5 w-28 rounded-md" />
+                <Skeleton className="h-5 w-24 rounded-md" />
+                <Skeleton className="h-5 w-32 rounded-md" />
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : error ? (
+        <div className="text-center py-10 px-4 rounded-lg border border-destructive/30 bg-destructive/5">
+          <AlertCircle className="w-10 h-10 mx-auto mb-2 text-destructive" />
+          <p className="text-sm font-medium text-destructive">Não foi possível carregar a auditoria.</p>
+          <p className="text-xs text-muted-foreground mt-1 break-words">{error}</p>
+          <Button variant="outline" size="sm" onClick={fetchLogs} className="mt-4">
+            <RefreshCw className="w-4 h-4 mr-1.5" />
+            Tentar novamente
+          </Button>
         </div>
+      ) : filtered.length === 0 ? (
+        rows.length > 0 || search.trim() ? (
+          // Há dados carregados, mas filtros/busca zeraram a lista
+          <div className="text-center py-10 text-muted-foreground">
+            <FilterX className="w-10 h-10 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">Nenhum resultado para os filtros aplicados.</p>
+            <p className="text-xs mt-1">Tente alterar a origem, o escopo ou limpar a busca.</p>
+            {(search.trim() || source !== "all") && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setSearch(""); setSource("all"); }}
+                className="mt-4"
+              >
+                Limpar filtros
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="text-center py-10 text-muted-foreground">
+            <ShieldCheck className="w-10 h-10 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">Nenhuma execução registrada ainda.</p>
+            <p className="text-xs mt-1">O robô só registra quando aplica correções — sistema saudável significa lista vazia.</p>
+          </div>
+        )
       ) : (
         <VirtualLogList
           items={filtered}

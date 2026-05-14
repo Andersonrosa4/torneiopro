@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { exportMatchSequence } from "@/lib/exportUtils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getSlotFeeders } from "@/lib/feederLabels";
+import { getVeranicoEighthsLabels } from "@/lib/veranicoEighthsMap";
 import { getEliminationRoundLabel, getEliminationRoundShortLabel } from "@/lib/roundLabels";
 import { buildSchedulerBlocks, schedulerSequence, getSchedulerBlockColor, getSchedulerBadgeColor, type SchedulerBlock } from "@/lib/roundScheduler";
 import { buildMatchNumberMap } from "@/lib/matchNumbering";
@@ -492,14 +493,9 @@ const MatchCard = ({
         const isVeranicoEighths = numGroups === 4 && r1Count === 8 && allGroupsHave4;
 
         if (isVeranicoEighths) {
-          // Engine pairings (TournamentDetail eighthsMap):
-          // pos1: 1A×4D, pos2: 1B×4C, pos3: 1C×4B, pos4: 1D×4A,
-          // pos5: 2A×3D, pos6: 2B×3C, pos7: 2C×3B, pos8: 2D×3A
-          const map: Record<number, [string, string]> = {
-            1: ['1º A', '4º D'], 2: ['1º B', '4º C'], 3: ['1º C', '4º B'], 4: ['1º D', '4º A'],
-            5: ['2º A', '3º D'], 6: ['2º B', '3º C'], 7: ['2º C', '3º B'], 8: ['2º D', '3º A'],
-          };
-          const labels = map[pos];
+          // Pareamento das oitavas — fonte única em src/lib/veranicoEighthsMap.ts
+          // (visual e engine compartilham este mesmo map para evitar divergência)
+          const labels = getVeranicoEighthsLabels(pos);
           if (labels) {
             return {
               team1: match.team1_id ? null : labels[0],

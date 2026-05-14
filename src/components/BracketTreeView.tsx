@@ -564,36 +564,37 @@ const GroupStageView = ({
     return map;
   }, [groupNumbers, groupMatchesByGroup]);
 
-  const groupRoundsByGroup = useMemo(() => {
-    const map: Record<number, Match[][]> = {};
-    groupNumbers.forEach((gNum) => {
-      map[gNum] = buildRoundRobinRounds(groupMatchesByGroup[gNum] || []);
+  // Lista única achatada na ordem real de execução (1, 2, 3, 4...)
+  const flatSequence = useMemo(() => {
+    const all = groupMatches.slice();
+    all.sort((a, b) => {
+      const na = matchNumberMap?.get(a.id) ?? 9999;
+      const nb = matchNumberMap?.get(b.id) ?? 9999;
+      if (na !== nb) return na - nb;
+      return a.position - b.position;
     });
-    return map;
-  }, [groupMatchesByGroup, groupNumbers]);
-
-  const totalGroupRounds = Math.max(0, ...Object.values(groupRoundsByGroup).map((rounds) => rounds.length));
-  const isGroupRoundUnlocked = (_roundIndex: number) => true;
+    return all;
+  }, [groupMatches, matchNumberMap]);
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {groupNumbers.map((gNum) => {
           const teamIds = teamsByGroup[gNum] || [];
           return (
-            <div key={gNum} className="rounded-xl border border-primary/30 bg-gradient-to-r from-primary/15 to-accent/10 p-4 space-y-3">
-              <div className="text-xs font-bold uppercase tracking-[0.2em] bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent flex items-center gap-2 pb-1">
+            <div key={gNum} className="rounded-xl border border-primary/30 bg-gradient-to-r from-primary/15 to-accent/10 p-3 sm:p-4 space-y-3">
+              <div className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.2em] bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent flex items-center gap-2 pb-1">
                 <span className="text-primary">⚽</span>
                 <span>Grupo {numberToLetter(gNum)}</span>
                 <span className="ml-auto text-[10px] text-muted-foreground font-normal normal-case tracking-normal">{teamIds.length} duplas</span>
               </div>
               <div className="space-y-1.5">
                 {teamIds.map((teamId, idx) => (
-                  <div key={teamId} className="flex items-center gap-2 rounded-lg border border-border/50 bg-card/80 px-3 py-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary shrink-0">
+                  <div key={teamId} className="flex items-center gap-2 rounded-lg border border-border/50 bg-card/80 px-2.5 sm:px-3 py-1.5 sm:py-2">
+                    <span className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary shrink-0">
                       {idx + 1}
                     </span>
-                    <span className="text-sm team-name truncate">{getName(teamId)}</span>
+                    <span className="text-xs sm:text-sm team-name truncate">{getName(teamId)}</span>
                   </div>
                 ))}
               </div>
@@ -602,54 +603,23 @@ const GroupStageView = ({
         })}
       </div>
 
-      {totalGroupRounds > 0 && (
-        <div className="relative overflow-x-auto pb-4 rounded-xl border border-border bg-card/50 p-4">
-          <div className="flex gap-6 relative" style={{ zIndex: 1 }}>
-            {Array.from({ length: totalGroupRounds }, (_, ri) => {
-              const unlocked = isGroupRoundUnlocked(ri);
-              return (
-                <div key={`grupo-rodada-${ri}`} className="flex flex-col shrink-0" style={{ minWidth: 170 }}>
-                  <div className={`text-[9px] uppercase font-semibold mb-3 whitespace-nowrap rounded-full px-3 py-0.5 text-center ${
-                    unlocked ? "bg-primary/15 text-primary" : "bg-muted/50 text-muted-foreground"
-                  }`}>
-                    Fase de Grupos — Rodada {ri + 1}
-                  </div>
-                  <div className="flex flex-col gap-3 flex-1">
-                    {groupNumbers.map((gNum) => {
-                      const roundMatches = groupRoundsByGroup[gNum]?.[ri] || [];
-                      if (roundMatches.length === 0) return null;
-                      return (
-                        <div key={`grupo-${gNum}-rodada-${ri}`} className="space-y-1.5">
-                          <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70">
-                            Grupo {numberToLetter(gNum)}
-                          </div>
-                          {roundMatches.map((match) => (
-                            unlocked ? (
-                              <MatchCard
-                                key={match.id}
-                                match={match}
-                                getName={getName}
-                                scale="normal"
-                                allMatches={allMatches}
-                                matchNumber={matchNumberMap?.get(match.id)}
-                                matchNumberMap={matchNumberMap}
-                              />
-                            ) : (
-                              <LockedGroupMatchCard
-                                key={match.id}
-                                match={match}
-                                matchNumber={matchNumberMap?.get(match.id)}
-                                waitingForRound={ri}
-                              />
-                            )
-                          ))}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
+      {flatSequence.length > 0 && (
+        <div className="rounded-xl border border-border bg-card/50 p-3 sm:p-4">
+          <div className="text-[10px] sm:text-xs uppercase font-semibold mb-3 rounded-full px-3 py-0.5 inline-block bg-primary/15 text-primary">
+            Chaveamento — Fase de Grupos
+          </div>
+          <div className="grid gap-2 sm:gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {flatSequence.map((match) => (
+              <MatchCard
+                key={match.id}
+                match={match}
+                getName={getName}
+                scale="normal"
+                allMatches={allMatches}
+                matchNumber={matchNumberMap?.get(match.id)}
+                matchNumberMap={matchNumberMap}
+              />
+            ))}
           </div>
         </div>
       )}

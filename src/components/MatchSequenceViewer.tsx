@@ -740,53 +740,7 @@ const MatchCard = ({
         </div>
       )}
 
-      {/* LiveScoreBoard dialog */}
-      {isLiveScorable && hasTeams && match.team1_id && match.team2_id && tournamentId && !isFutsal && (
-        <LiveScoreBoard
-          matchId={match.id}
-          tournamentId={tournamentId}
-          team1Name={team1Name}
-          team2Name={team2Name}
-          team1Id={match.team1_id}
-          team2Id={match.team2_id}
-          open={liveScoreOpen}
-          onClose={() => setLiveScoreOpen(false)}
-          onMatchComplete={(mId, s1, s2, wId) => {
-            setLiveScoreOpen(false);
-            if (onAutoResult) onAutoResult(mId, s1, s2, wId);
-            else {
-              onUpdateScore(mId, s1, s2);
-              onDeclareWinner(mId, wId);
-            }
-          }}
-          initialLiveScore={(match as any).live_score || null}
-          rules={tournamentRules!}
-        />
-      )}
-
-      {/* Futsal LiveScoreBoard dialog */}
-      {isLiveScorable && hasTeams && match.team1_id && match.team2_id && tournamentId && isFutsal && (
-        <FutsalLiveScoreBoard
-          matchId={match.id}
-          tournamentId={tournamentId}
-          team1Name={team1Name}
-          team2Name={team2Name}
-          team1Id={match.team1_id}
-          team2Id={match.team2_id}
-          open={liveScoreOpen}
-          onClose={() => setLiveScoreOpen(false)}
-          onMatchComplete={(mId, s1, s2, wId) => {
-            setLiveScoreOpen(false);
-            if (onAutoResult) onAutoResult(mId, s1, s2, wId);
-            else {
-              onUpdateScore(mId, s1, s2);
-              onDeclareWinner(mId, wId);
-            }
-          }}
-          initialLiveScore={(match as any).live_score || null}
-          rules={tournamentRules as unknown as FutsalRules}
-        />
-      )}
+      {/* Live scoring removido (tênis/padel/futsal) */}
 
       {/* Score editing with sets — compact */}
       {hasTeams && canScore && !isLiveScorable && (

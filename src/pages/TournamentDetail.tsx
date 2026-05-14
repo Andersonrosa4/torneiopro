@@ -975,9 +975,13 @@ const TournamentDetail = () => {
                   // Map: pos 1→semi 1, pos 2→semi 2, pos 3→semi 2, pos 4→semi 1
                   const cupMap: Record<number, number> = { 1: 1, 2: 2, 3: 2, 4: 1 };
                   nextPos = cupMap[m.position] || Math.ceil(m.position / 2);
+                } else if (matchesInRound === 8 && nextRoundMatchCount === 4) {
+                  // Cruzamento Oitavas → Quartas (Modo Veranico Oitavas):
+                  // Q1: O1×O6 | Q2: O3×O8 | Q3: O2×O5 | Q4: O4×O7
+                  const oitavasToQuartas: Record<number, number> = { 1: 1, 6: 1, 3: 2, 8: 2, 2: 3, 5: 3, 4: 4, 7: 4 };
+                  nextPos = oitavasToQuartas[m.position] || Math.ceil(m.position / 2);
                 } else if (matchesInRound >= 8 && nextRoundMatchCount >= 4) {
-                  // Extremity pairing for rounds feeding into quarter-finals (Oitavas, etc.)
-                  // pos1→Q1, pos8→Q1, pos2→Q2, pos7→Q2, pos3→Q3, pos6→Q3, pos4→Q4, pos5→Q4
+                  // Extremity pairing for larger brackets
                   if (m.position <= matchesInRound / 2) {
                     nextPos = m.position;
                   } else {

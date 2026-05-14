@@ -79,15 +79,12 @@ export function generateFakeTeams(
   };
 
   const firsts = pickUnique(firstsPool, totalAthletes);
-  const lasts = pickUnique(lastsPool, totalAthletes);
 
   const teams: Array<{ player1: string; player2: string }> = [];
   for (let i = 0; i < count; i++) {
-    const a = i * 2;
-    const b = i * 2 + 1;
     teams.push({
-      player1: `${firsts[a]} ${lasts[a]}`,
-      player2: `${firsts[b]} ${lasts[b]}`,
+      player1: firsts[i * 2],
+      player2: firsts[i * 2 + 1],
     });
   }
   return teams;

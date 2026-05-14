@@ -992,18 +992,14 @@ const MatchSequenceViewer = ({
 
       const groupStage = matches.filter(m => m.round === 0);
       if (groupStage.length > 0) {
-        const { sequence: gsSeq, roundBoundaries } = buildGroupStageInterleaved(groupStage);
-        for (let ri = 0; ri < roundBoundaries.length; ri++) {
-          const start = roundBoundaries[ri];
-          const end = ri + 1 < roundBoundaries.length ? roundBoundaries[ri + 1] : gsSeq.length;
-          const chunk = gsSeq.slice(start, end);
-          if (chunk.length === 0) continue;
+        const { sequence: gsSeq } = buildGroupStageInterleaved(groupStage);
+        if (gsSeq.length > 0) {
           blocks.push({
-            label: `Fase de Grupos — Rodada ${ri + 1}`,
-            matches: chunk.map(m => ({ match: m, globalIndex: matchNumberMap.get(m.id) ?? 0 })),
-            blockKey: `GS_R${ri + 1}`,
+            label: `Chaveamento`,
+            matches: gsSeq.map(m => ({ match: m, globalIndex: matchNumberMap.get(m.id) ?? 0 })),
+            blockKey: `GS_ALL`,
             isUnlocked: true,
-            isCompleted: chunk.every(m => m.status === 'completed'),
+            isCompleted: gsSeq.every(m => m.status === 'completed'),
           });
         }
       }

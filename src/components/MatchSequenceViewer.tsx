@@ -473,22 +473,51 @@ const MatchCard = ({
     // If there's a group stage AND this is the first knockout round,
     // show group origin labels (e.g. "1º A", "2º H") using Mirrored Crossover
     if (hasGroupStage && isFirstKnockoutRound && tournamentFormat !== 'double_elimination') {
-      const groupNumbers = [...new Set(allMatches.filter(m => m.round === 0 && m.bracket_number).map(m => m.bracket_number!))].sort((a, b) => a - b);
+      const groupRound0 = allMatches.filter(m => m.round === 0 && m.bracket_number);
+      const groupNumbers = [...new Set(groupRound0.map(m => m.bracket_number!))].sort((a, b) => a - b);
       const numGroups = groupNumbers.length;
       if (numGroups > 0) {
         const pos = match.position; // 1-indexed
+
+        // Count distinct teams per group to detect Veranico Oitavas (4 grupos × 4 vagas → 8 oitavas)
+        const teamsPerGroup = new Map<number, Set<string>>();
+        groupRound0.forEach(m => {
+          const g = m.bracket_number!;
+          if (!teamsPerGroup.has(g)) teamsPerGroup.set(g, new Set());
+          if (m.team1_id) teamsPerGroup.get(g)!.add(m.team1_id);
+          if (m.team2_id) teamsPerGroup.get(g)!.add(m.team2_id);
+        });
+        const r1Count = allMatches.filter(m => m.round === firstKnockoutRound && (m.bracket_type || 'winners') === 'winners').length;
+        const allGroupsHave4 = groupNumbers.every(g => (teamsPerGroup.get(g)?.size || 0) >= 4);
+        const isVeranicoEighths = numGroups === 4 && r1Count === 8 && allGroupsHave4;
+
+        if (isVeranicoEighths) {
+          // Engine pairings (TournamentDetail eighthsMap):
+          // pos1: 1A×4D, pos2: 1B×4C, pos3: 1C×4B, pos4: 1D×4A,
+          // pos5: 2A×3D, pos6: 2B×3C, pos7: 2C×3B, pos8: 2D×3A
+          const map: Record<number, [string, string]> = {
+            1: ['1º A', '4º D'], 2: ['1º B', '4º C'], 3: ['1º C', '4º B'], 4: ['1º D', '4º A'],
+            5: ['2º A', '3º D'], 6: ['2º B', '3º C'], 7: ['2º C', '3º B'], 8: ['2º D', '3º A'],
+          };
+          const labels = map[pos];
+          if (labels) {
+            return {
+              team1: match.team1_id ? null : labels[0],
+              team2: match.team2_id ? null : labels[1],
+            };
+          }
+        }
+
         const groupIdx = Math.ceil(pos / 2) - 1; // 0, 0, 1, 1, 2, 2, ...
         const mirrorIdx = numGroups - 1 - groupIdx;
         const groupLetter = String.fromCharCode(65 + groupIdx);
         const mirrorLetter = String.fromCharCode(65 + mirrorIdx);
         if (pos % 2 === 1) {
-          // Odd position: 1º from group vs 2º from mirror group
           return {
             team1: match.team1_id ? null : `1º ${groupLetter}`,
             team2: match.team2_id ? null : `2º ${mirrorLetter}`,
           };
         } else {
-          // Even position: 2º from group vs 1º from mirror group
           return {
             team1: match.team1_id ? null : `2º ${groupLetter}`,
             team2: match.team2_id ? null : `1º ${mirrorLetter}`,
@@ -497,7 +526,7 @@ const MatchCard = ({
       }
       return { team1: null, team2: null };
     }
-    
+
     // Use unified slot feeder logic (same as BracketTreeView) for correct slot assignment
     const slotFeeders = getSlotFeeders(match as any, allMatches as any, matchNumberMap);
     

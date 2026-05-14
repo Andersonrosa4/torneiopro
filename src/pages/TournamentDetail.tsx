@@ -152,7 +152,7 @@ const TournamentDetail = () => {
   const { modalities, selectedModality, setSelectedModality, updateModality, createModality, deleteModality, loading: modalitiesLoading } = useModalities(id);
 
   const isOwner = tournament?.created_by === organizerId || isAdmin || isAssociatedOrganizer;
-  const { hasAccess: hasLuanaAccess } = useLuanaAccess(tournament?.created_by);
+  const hasLuanaAccess = useLuanaAccess(tournament?.created_by);
   const isTournamentCompleted = tournament?.status === 'completed' || tournament?.status === 'cancelled';
   const isFutevoleiTournament = tournament?.sport === 'futevolei';
   const isWriteLocked = isTournamentCompleted && !isFutevoleiTournament;

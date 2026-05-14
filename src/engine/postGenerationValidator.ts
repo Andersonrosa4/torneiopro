@@ -161,9 +161,12 @@ export function validatePostGeneration(
   }
 
   // ── 5. Equipe duplicada no mesmo round + bracket_type — AUTO-REPAIR: limpar duplicata do match posterior ──
+  // IMPORTANTE: round 0 é fase de grupos/round-robin. Nessa fase a mesma dupla
+  // aparece em várias partidas do mesmo "round" por regra, então nunca limpar slots.
   let duplicatesInRound = 0;
   const roundScopeMatches = new Map<string, ValidationMatch[]>();
   for (const m of matches) {
+    if (m.round === 0) continue;
     const key = `${m.round}|${m.bracket_type ?? 'null'}|${m.modality_id ?? 'null'}`;
     if (!roundScopeMatches.has(key)) roundScopeMatches.set(key, []);
     roundScopeMatches.get(key)!.push(m);

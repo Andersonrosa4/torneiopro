@@ -752,16 +752,16 @@ const TournamentDetail = () => {
 
       if (isLuanaQuarters) {
         // Estrutura fixa: 4 grupos → 4 repescagens (R1) → 4 quartas (R2) → 2 semis (R3) → final + 3º (R4)
-        // Pares de repescagem (cruzamento espelhado):
-        //   R1P1: 2A × 3D  → vencedor enfrenta 1D na Quartas Pos 4
-        //   R1P2: 2D × 3A  → vencedor enfrenta 1A na Quartas Pos 1
-        //   R1P3: 2B × 3C  → vencedor enfrenta 1C na Quartas Pos 3
-        //   R1P4: 2C × 3B  → vencedor enfrenta 1B na Quartas Pos 2
+        // Repescagem INTRA-CHAVE (sem cruzar com outra chave):
+        //   R1P1: 2A × 3A  → vencedor enfrenta 1D na Quartas Pos 4
+        //   R1P2: 2B × 3B  → vencedor enfrenta 1C na Quartas Pos 3
+        //   R1P3: 2C × 3C  → vencedor enfrenta 1B na Quartas Pos 2
+        //   R1P4: 2D × 3D  → vencedor enfrenta 1A na Quartas Pos 1
         const repechageMeta = [
-          { pos: 1, leftGroup: 0, rightGroup: numGroups - 1, quarterPos: numGroups }, // 2A×3D → Q4
-          { pos: 2, leftGroup: numGroups - 1, rightGroup: 0, quarterPos: 1 },         // 2D×3A → Q1
-          { pos: 3, leftGroup: 1, rightGroup: numGroups - 2, quarterPos: numGroups - 1 }, // 2B×3C → Q3
-          { pos: 4, leftGroup: numGroups - 2, rightGroup: 1, quarterPos: 2 },         // 2C×3B → Q2
+          { pos: 1, leftGroup: 0,             rightGroup: 0,             quarterPos: numGroups }, // 2A×3A → Q4
+          { pos: 2, leftGroup: 1,             rightGroup: 1,             quarterPos: numGroups - 1 }, // 2B×3B → Q3
+          { pos: 3, leftGroup: numGroups - 2, rightGroup: numGroups - 2, quarterPos: 2 },         // 2C×3C → Q2
+          { pos: 4, leftGroup: numGroups - 1, rightGroup: numGroups - 1, quarterPos: 1 },         // 2D×3D → Q1
         ];
 
         const luanaShells: any[] = [];
@@ -1356,12 +1356,13 @@ const TournamentDetail = () => {
     if (repechageShells.length === 4 && brackets.length === 4) {
       const g = (idx: number) => groupRankings[String(brackets[idx])] || [];
       const numG = brackets.length;
-      // [pos, leftGroup (2º), rightGroup (3º), quarterPos (slot do 1º colocado adversário)]
+      // Repescagem INTRA-CHAVE: 2º × 3º DA MESMA CHAVE; vencedor cruza com 1º de chave oposta nas quartas
+      // [pos, group (chave), quarterPos (slot do 1º colocado adversário), firstGroup (chave do 1º colocado)]
       const repechageMap = [
-        { pos: 1, left: 0, right: numG - 1, quarterPos: numG, firstGroup: numG - 1 },     // 2A×3D → Q4 vs 1D
-        { pos: 2, left: numG - 1, right: 0, quarterPos: 1, firstGroup: 0 },                // 2D×3A → Q1 vs 1A
-        { pos: 3, left: 1, right: numG - 2, quarterPos: numG - 1, firstGroup: numG - 2 }, // 2B×3C → Q3 vs 1C
-        { pos: 4, left: numG - 2, right: 1, quarterPos: 2, firstGroup: 1 },                // 2C×3B → Q2 vs 1B
+        { pos: 1, left: 0,        right: 0,        quarterPos: numG,     firstGroup: numG - 1 }, // 2A×3A → Q4 vs 1D
+        { pos: 2, left: 1,        right: 1,        quarterPos: numG - 1, firstGroup: numG - 2 }, // 2B×3B → Q3 vs 1C
+        { pos: 3, left: numG - 2, right: numG - 2, quarterPos: 2,        firstGroup: 1 },        // 2C×3C → Q2 vs 1B
+        { pos: 4, left: numG - 1, right: numG - 1, quarterPos: 1,        firstGroup: 0 },        // 2D×3D → Q1 vs 1A
       ];
       const findShell = (round: number, position: number, bt: string) =>
         existingKnockout.find((m: any) => m.round === round && m.position === position && (m.bracket_type || "winners") === bt);
@@ -1389,7 +1390,7 @@ const TournamentDetail = () => {
         }
       }
       await Promise.all(veranicoUpdates);
-      toast.success(`MODO VERANICO: repescagens (2º×3º) e quartas (1º colocados) preenchidas.`);
+      toast.success(`MODO VERANICO: repescagens INTRA-CHAVE (2º×3º) e quartas (1º colocados) preenchidas.`);
       fetchData();
       return;
     }

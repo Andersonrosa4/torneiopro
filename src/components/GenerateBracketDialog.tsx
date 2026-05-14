@@ -62,6 +62,10 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
   const [byeTeamIds, setByeTeamIds] = useState<string[]>([]);
   const [useIndex, setUseIndex] = useState(false);
   const [numIndexTeams, setNumIndexTeams] = useState("1");
+  const [luanaStartsAt, setLuanaStartsAt] = useState<"quarters" | "eighths">("quarters");
+  const [luanaGroupCount, setLuanaGroupCount] = useState("4");
+
+  const canShowLuana = !!showLuanaMode && sport === "beach_volleyball";
 
   const isBeachTennis = sport === "beach_tennis";
   const supportsIndex = sport === "beach_volleyball" || sport === "futevolei";

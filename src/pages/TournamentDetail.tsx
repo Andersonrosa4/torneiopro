@@ -49,6 +49,7 @@ import RankingsTab from "@/components/RankingsTab";
 import StageSelector from "@/components/StageSelector";
 import BugCombatantLogPanel from "@/components/BugCombatantLogPanel";
 import { generateFakeTeams, type FakeNameGender } from "@/lib/fakeNames";
+import { VERANICO_EIGHTHS_MAP } from "@/lib/veranicoEighthsMap";
 
 const sportLabels: Record<string, string> = {
   beach_volleyball: "🏐 Vôlei de Praia",

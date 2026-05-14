@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { exportMatchSequence } from "@/lib/exportUtils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getSlotFeeders } from "@/lib/feederLabels";
+import { getVeranicoEighthsLabels } from "@/lib/veranicoEighthsMap";
 import { getEliminationRoundLabel, getEliminationRoundShortLabel } from "@/lib/roundLabels";
 import { buildSchedulerBlocks, schedulerSequence, getSchedulerBlockColor, getSchedulerBadgeColor, type SchedulerBlock } from "@/lib/roundScheduler";
 import { buildMatchNumberMap } from "@/lib/matchNumbering";

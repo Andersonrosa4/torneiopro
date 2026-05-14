@@ -86,6 +86,11 @@ const matchScopeFilters = (match: Match, tournamentId: string) => {
   return filters;
 };
 
+const normalizeTeamName = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleLowerCase("pt-BR");
+
+const teamPairKey = (player1Name: string, player2Name: string) =>
+  [normalizeTeamName(player1Name), normalizeTeamName(player2Name)].sort().join("|");
+
 interface Team {
   id: string;
   tournament_id: string;

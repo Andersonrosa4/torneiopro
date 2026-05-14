@@ -2621,9 +2621,11 @@ const TournamentDetail = () => {
                     )}
                   </>
                 )}
-                <Badge className={statusColors[tournament.status] || ""}>
-                  {statusLabels[tournament.status] || tournament.status}
-                </Badge>
+                {!(tournament.status === "completed" && isOnNewStage) && (
+                  <Badge className={statusColors[tournament.status] || ""}>
+                    {statusLabels[tournament.status] || tournament.status}
+                  </Badge>
+                )}
               </div>
               {tournament.description && (
                 <p className="mt-2 text-muted-foreground">{tournament.description}</p>

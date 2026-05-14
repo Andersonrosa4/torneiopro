@@ -2460,10 +2460,102 @@ const TournamentDetail = () => {
                   toast.success("🏆 Torneio finalizado! Campeão definido!");
                 }
               }
-            }
           }
         }
       }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // SE/VERANICO POST-DECLARATION AUTO-REPAIR
+    // Garante que NENHUMA propagação fique pendente quando jogos
+    // são marcados fora de ordem (ex: R3 antes de R2). Varre todos
+    // os jogos completos e:
+    //   1) Preenche slots nulos no next_win_match_id usando regra
+    //      de paridade de posição (pos ímpar → team1, par → team2).
+    //   2) Reprocessa repetidamente até convergir (cascade).
+    //   3) Auto-completa "BYE virtual" quando o destino tem 1 time
+    //      e nenhum feeder pendente.
+    // ══════════════════════════════════════════════════════════════
+    if (!isDoubleElimination) {
+      try {
+        let sweepIterations = 0;
+        let sweepRepaired = true;
+        while (sweepRepaired && sweepIterations < 5) {
+          sweepRepaired = false;
+          sweepIterations++;
+
+          const { data: sweepMatches } = await organizerQuery({
+            table: "matches",
+            operation: "select",
+            filters: matchScopeFilters(match, id),
+            order: [{ column: "round" }, { column: "position" }],
+          });
+          if (!sweepMatches) break;
+          const sweepList = sweepMatches as typeof matches;
+
+          // Pass 1: propagate winners of completed matches
+          for (const cm of sweepList) {
+            if (cm.status !== 'completed' || !cm.winner_team_id) continue;
+
+            // Winner → next_win_match_id
+            if (cm.next_win_match_id) {
+              const dest = sweepList.find(m => m.id === cm.next_win_match_id);
+              if (dest && dest.status !== 'completed' &&
+                  dest.team1_id !== cm.winner_team_id && dest.team2_id !== cm.winner_team_id) {
+                const isTopSlot = cm.position % 2 === 1;
+                const slot = isTopSlot ? 'team1_id' : 'team2_id';
+                // Fallback: if preferred slot is taken by something else, use any free slot
+                const targetSlot = !dest[slot] ? slot : (!dest.team1_id ? 'team1_id' : (!dest.team2_id ? 'team2_id' : null));
+                if (targetSlot) {
+                  console.log(`[SE-AUTO-REPAIR] Winner ${cm.winner_team_id} (R${cm.round}P${cm.position}) → R${dest.round}P${dest.position} ${targetSlot}`);
+                  const { error: repErr } = await organizerQuery({
+                    table: "matches",
+                    operation: "update",
+                    data: { [targetSlot]: cm.winner_team_id },
+                    filters: { id: dest.id },
+                  });
+                  if (!repErr) {
+                    (dest as any)[targetSlot] = cm.winner_team_id;
+                    sweepRepaired = true;
+                  }
+                }
+              }
+            }
+
+            // Loser → next_lose_match_id (3rd place)
+            const cmLoserId = cm.team1_id === cm.winner_team_id ? cm.team2_id : cm.team1_id;
+            if (cm.next_lose_match_id && cmLoserId) {
+              const dest = sweepList.find(m => m.id === cm.next_lose_match_id);
+              if (dest && dest.status !== 'completed' &&
+                  dest.team1_id !== cmLoserId && dest.team2_id !== cmLoserId) {
+                const isTopSlot = cm.position % 2 === 1;
+                const slot = isTopSlot ? 'team1_id' : 'team2_id';
+                const targetSlot = !dest[slot] ? slot : (!dest.team1_id ? 'team1_id' : (!dest.team2_id ? 'team2_id' : null));
+                if (targetSlot) {
+                  console.log(`[SE-AUTO-REPAIR] Loser ${cmLoserId} (R${cm.round}P${cm.position}) → R${dest.round}P${dest.position} ${targetSlot}`);
+                  const { error: repErr } = await organizerQuery({
+                    table: "matches",
+                    operation: "update",
+                    data: { [targetSlot]: cmLoserId },
+                    filters: { id: dest.id },
+                  });
+                  if (!repErr) {
+                    (dest as any)[targetSlot] = cmLoserId;
+                    sweepRepaired = true;
+                  }
+                }
+              }
+            }
+          }
+        }
+        if (sweepIterations > 1) {
+          toast.info(`🔧 Chaveamento sincronizado (${sweepIterations} passes).`);
+        }
+      } catch (sweepError) {
+        console.error("[SE-AUTO-REPAIR:ERROR]", sweepError);
+        // Non-blocking
+      }
+    }
     }
 
     // Re-fetch matches from DB to get fresh state after feeder propagation

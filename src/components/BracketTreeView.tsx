@@ -645,6 +645,27 @@ const GroupStageView = ({
                   </div>
                 ))}
               </div>
+
+              {(groupMatchesByGroup[gNum]?.length ?? 0) > 0 && (
+                <div className="pt-2 border-t border-border/40 space-y-2">
+                  <div className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">
+                    Jogos do Grupo
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {groupMatchesByGroup[gNum].map((m) => (
+                      <MatchCard
+                        key={m.id}
+                        match={m}
+                        getName={getName}
+                        scale="small"
+                        allMatches={allMatches}
+                        matchNumber={matchNumberMap?.get(m.id)}
+                        matchNumberMap={matchNumberMap}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}

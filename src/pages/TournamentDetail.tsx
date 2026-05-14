@@ -16,6 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import AppHeader from "@/components/AppHeader";
 import ThemedBackground from "@/components/ThemedBackground";
 import { GenerateBracketDialog } from "@/components/GenerateBracketDialog";
+import { useLuanaAccess } from "@/hooks/useLuanaAccess";
 import { rankTeamsInGroup, selectIndexTeams } from "@/lib/tiebreakLogic";
 import { organizerQuery, publicQuery } from "@/lib/organizerApi";
 import { formatDateBR } from "@/lib/utils";
@@ -151,6 +152,7 @@ const TournamentDetail = () => {
   const { modalities, selectedModality, setSelectedModality, updateModality, createModality, deleteModality, loading: modalitiesLoading } = useModalities(id);
 
   const isOwner = tournament?.created_by === organizerId || isAdmin || isAssociatedOrganizer;
+  const hasLuanaAccess = useLuanaAccess(tournament?.created_by);
   const isTournamentCompleted = tournament?.status === 'completed' || tournament?.status === 'cancelled';
   const isFutevoleiTournament = tournament?.sport === 'futevolei';
   const isWriteLocked = isTournamentCompleted && !isFutevoleiTournament;
@@ -2873,6 +2875,7 @@ const TournamentDetail = () => {
                     teams={filteredTeams}
                     isDisabled={false}
                     sport={selectedModality?.sport || tournament.sport}
+                    showLuanaMode={hasLuanaAccess}
                   />
                 </div>
               )}

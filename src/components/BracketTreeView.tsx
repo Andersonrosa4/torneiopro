@@ -539,12 +539,6 @@ const GroupStageView = ({
   matchNumberMap?: Map<string, number>;
 }) => {
   const groupNumbers = Array.from(new Set(groupMatches.map((m) => m.bracket_number || 1))).sort();
-  const hasKnockout = allMatches.some(m => m.round > 0);
-
-  const { knockoutRounds, rounds: knockoutRoundLabels } = useMemo(
-    () => hasKnockout ? { knockoutRounds: [], rounds: [] } : buildGroupKnockoutPreview(groupNumbers),
-    [groupNumbers, hasKnockout]
-  );
 
   const groupMatchesByGroup = useMemo(() => {
     const map: Record<number, Match[]> = {};
@@ -569,6 +563,21 @@ const GroupStageView = ({
     });
     return map;
   }, [groupNumbers, groupMatchesByGroup]);
+
+  const groupRoundsByGroup = useMemo(() => {
+    const map: Record<number, Match[][]> = {};
+    groupNumbers.forEach((gNum) => {
+      map[gNum] = buildRoundRobinRounds(groupMatchesByGroup[gNum] || []);
+    });
+    return map;
+  }, [groupMatchesByGroup, groupNumbers]);
+
+  const totalGroupRounds = Math.max(0, ...Object.values(groupRoundsByGroup).map((rounds) => rounds.length));
+  const isGroupRoundUnlocked = (roundIndex: number) => {
+    if (roundIndex === 0) return true;
+    const previousRounds = Object.values(groupRoundsByGroup).flatMap((rounds) => rounds[roundIndex - 1] || []);
+    return previousRounds.length > 0 && previousRounds.every((match) => match.status === "completed");
+  };
 
   return (
     <div className="space-y-4">
@@ -597,24 +606,50 @@ const GroupStageView = ({
         })}
       </div>
 
-      {!hasKnockout && knockoutRounds.length > 0 && (
+      {totalGroupRounds > 0 && (
         <div className="relative overflow-x-auto pb-4 rounded-xl border border-border bg-card/50 p-4">
-          <div className="flex gap-10 relative" style={{ zIndex: 1 }}>
-            {knockoutRounds.map((roundMatches, ri) => {
-              const roundLabel = knockoutRoundLabels[ri]?.label || `Rodada ${ri + 1}`;
+          <div className="flex gap-6 relative" style={{ zIndex: 1 }}>
+            {Array.from({ length: totalGroupRounds }, (_, ri) => {
+              const unlocked = isGroupRoundUnlocked(ri);
               return (
-                <div key={`ko-${ri}`} className="flex flex-col shrink-0" style={{ minWidth: 135 }}>
+                <div key={`grupo-rodada-${ri}`} className="flex flex-col shrink-0" style={{ minWidth: 170 }}>
                   <div className={`text-[9px] uppercase font-semibold mb-3 whitespace-nowrap rounded-full px-3 py-0.5 text-center ${
-                    roundMatches[0]?.scale === "final" || roundMatches[0]?.scale === "semi"
-                      ? "bg-primary/15 text-primary"
-                      : "bg-muted/50 text-muted-foreground"
+                    unlocked ? "bg-primary/15 text-primary" : "bg-muted/50 text-muted-foreground"
                   }`}>
-                    {roundLabel}
+                    Fase de Grupos — Rodada {ri + 1}
                   </div>
-                  <div className="flex flex-col justify-around gap-4 flex-1">
-                    {roundMatches.map((pm) => (
-                      <PlaceholderMatchCard key={pm.id} id={pm.id} label1={pm.label1} label2={pm.label2} scale={pm.scale} />
-                    ))}
+                  <div className="flex flex-col gap-3 flex-1">
+                    {groupNumbers.map((gNum) => {
+                      const roundMatches = groupRoundsByGroup[gNum]?.[ri] || [];
+                      if (roundMatches.length === 0) return null;
+                      return (
+                        <div key={`grupo-${gNum}-rodada-${ri}`} className="space-y-1.5">
+                          <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                            Grupo {numberToLetter(gNum)}
+                          </div>
+                          {roundMatches.map((match) => (
+                            unlocked ? (
+                              <MatchCard
+                                key={match.id}
+                                match={match}
+                                getName={getName}
+                                scale="normal"
+                                allMatches={allMatches}
+                                matchNumber={matchNumberMap?.get(match.id)}
+                                matchNumberMap={matchNumberMap}
+                              />
+                            ) : (
+                              <LockedGroupMatchCard
+                                key={match.id}
+                                match={match}
+                                matchNumber={matchNumberMap?.get(match.id)}
+                                waitingForRound={ri}
+                              />
+                            )
+                          ))}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );

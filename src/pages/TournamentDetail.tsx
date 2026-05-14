@@ -3028,9 +3028,19 @@ const TournamentDetail = () => {
                               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                               onClick={async () => {
                                 const count = filteredTeams.length;
-                                // Single bulk delete by modality_id — 1 request instead of N
                                 const filters: Record<string, any> = { tournament_id: id };
                                 if (selectedModality?.id) filters.modality_id = selectedModality.id;
+                                if (selectedStageId) filters.stage_id = selectedStageId;
+
+                                // 1) Apaga primeiro as partidas (evita guard de "completed sem times")
+                                const { error: matchErr } = await organizerQuery({
+                                  table: "matches",
+                                  operation: "delete",
+                                  filters,
+                                });
+                                if (matchErr) { toast.error(`Falha ao remover partidas: ${matchErr.message}`); return; }
+
+                                // 2) Em seguida apaga as duplas
                                 const { error } = await organizerQuery({
                                   table: "teams",
                                   operation: "delete",

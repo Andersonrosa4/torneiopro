@@ -52,37 +52,44 @@ function pickPool(gender: FakeNameGender): string[] {
 
 /**
  * Gera `count` duplas com nomes reais (Nome Sobrenome).
- * Garante que cada atleta da dupla tenha um nome diferente.
+ * Garante que NÃO haja primeiros nomes nem sobrenomes repetidos entre os atletas.
+ * Se o pool não for suficiente, sufixa com número para manter unicidade.
  */
 export function generateFakeTeams(
   count: number,
   gender: FakeNameGender
 ): Array<{ player1: string; player2: string }> {
-  const firsts = shuffle(pickPool(gender));
-  const lasts = shuffle(LAST_NAMES);
-  const used = new Set<string>();
-  const teams: Array<{ player1: string; player2: string }> = [];
+  const totalAthletes = count * 2;
+  const firstsPool = shuffle(pickPool(gender));
+  const lastsPool = shuffle(LAST_NAMES);
 
-  const makeName = (idx: number): string => {
-    let attempts = 0;
-    while (attempts < 200) {
-      const first = firsts[(idx + attempts) % firsts.length];
-      const last = lasts[Math.floor(Math.random() * lasts.length)];
-      const full = `${first} ${last}`;
-      if (!used.has(full)) {
-        used.add(full);
-        return full;
+  const pickUnique = (pool: string[], n: number): string[] => {
+    const result: string[] = [];
+    for (let i = 0; i < n; i++) {
+      if (i < pool.length) {
+        result.push(pool[i]);
+      } else {
+        // pool esgotado: sufixa para garantir unicidade
+        const base = pool[i % pool.length];
+        const suffix = Math.floor(i / pool.length) + 1;
+        result.push(`${base} ${suffix}`);
       }
-      attempts++;
     }
-    // fallback raro
-    return `${firsts[idx % firsts.length]} ${lasts[idx % lasts.length]} ${used.size}`;
+    return result;
   };
 
+  const firsts = pickUnique(firstsPool, totalAthletes);
+  const lasts = pickUnique(lastsPool, totalAthletes);
+
+  const teams: Array<{ player1: string; player2: string }> = [];
   for (let i = 0; i < count; i++) {
-    const p1 = makeName(i * 2);
-    const p2 = makeName(i * 2 + 1);
-    teams.push({ player1: p1, player2: p2 });
+    const a = i * 2;
+    const b = i * 2 + 1;
+    teams.push({
+      player1: `${firsts[a]} ${lasts[a]}`,
+      player2: `${firsts[b]} ${lasts[b]}`,
+    });
   }
   return teams;
 }
+

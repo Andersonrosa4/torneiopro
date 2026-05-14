@@ -44,8 +44,11 @@ export function validateSystemRules(snapshot: TournamentSnapshot): RuleViolation
   // ── Nenhum match eliminatório com slot null (exceto chapéu aguardando feeder) ──
   checkNullSlots(knockoutMatches, violations);
 
-  // ── Nenhuma equipe aparece em dois matches da mesma rodada ──
+  // ── Nenhuma equipe aparece em dois matches da mesma rodada (knockout) ──
   checkDuplicateInRound(matches, violations);
+
+  // ── Nenhuma equipe pertence a mais de um grupo na mesma modalidade (round 0) ──
+  checkTeamInMultipleGroups(matches, violations);
 
   // ── Nenhuma equipe avançou sem jogar ──
   checkAdvanceWithoutPlaying(matches, violations);
@@ -153,6 +156,35 @@ function checkAdvanceWithoutPlaying(matches: GuardMatch[], violations: RuleViola
       violations.push({
         rule: '5.1',
         message: `Match R${m.round}P${m.position}: vencedor ${m.winner_team_id.slice(0, 8)} não é participante do match`,
+      });
+    }
+  }
+}
+
+function checkTeamInMultipleGroups(matches: GuardMatch[], violations: RuleViolation[]) {
+  // Round 0 (fase de grupos): cada equipe deve pertencer a EXATAMENTE UM grupo
+  // (bracket_number) por escopo (modality + stage). Aparecer em 2+ grupos é bug grave.
+  const teamGroups = new Map<string, Set<number>>(); // key: scope|teamId → set of bracket_numbers
+  for (const m of matches) {
+    if (m.round !== 0) continue;
+    const bn = (m as any).bracket_number ?? 1;
+    const scope = scopeKey(m);
+    for (const tid of [m.team1_id, m.team2_id]) {
+      if (!tid) continue;
+      const key = `${scope}|${tid}`;
+      if (!teamGroups.has(key)) teamGroups.set(key, new Set());
+      teamGroups.get(key)!.add(bn);
+    }
+  }
+  const reported = new Set<string>();
+  for (const [key, groupSet] of teamGroups) {
+    if (groupSet.size > 1 && !reported.has(key)) {
+      reported.add(key);
+      const tid = key.split('|').pop() || '';
+      const groupsList = [...groupSet].sort((a, b) => a - b).join(', ');
+      violations.push({
+        rule: '1.5',
+        message: `Equipe ${tid.slice(0, 8)} pertence a múltiplos grupos da fase de grupos: chaves [${groupsList}] — uma equipe só pode estar em um grupo`,
       });
     }
   }

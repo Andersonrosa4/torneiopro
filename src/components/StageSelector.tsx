@@ -4,7 +4,7 @@ import { organizerQuery, publicQuery } from "@/lib/organizerApi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Plus, Calendar, Layers, Trash2 } from "lucide-react";
+import { Plus, Calendar, Layers, Trash2, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
@@ -32,6 +32,10 @@ const StageSelector = ({ tournamentId, isOwner, selectedStageId, onSelectStage }
   const [newStageDate, setNewStageDate] = useState("");
   const [creating, setCreating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Stage | null>(null);
+  const [editTarget, setEditTarget] = useState<Stage | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const fetchStages = useCallback(async () => {
     const { data } = await publicQuery<Stage[]>({
@@ -78,6 +82,35 @@ const StageSelector = ({ tournamentId, isOwner, selectedStageId, onSelectStage }
     setNewStageName("");
     setNewStageDate("");
     setDialogOpen(false);
+    fetchStages();
+  };
+
+  const openEdit = (stage: Stage) => {
+    setEditTarget(stage);
+    setEditName(stage.name);
+    setEditDate(stage.event_date || "");
+  };
+
+  const saveEdit = async () => {
+    if (!editTarget) return;
+    if (!editName.trim()) {
+      toast.error("Nome da etapa é obrigatório");
+      return;
+    }
+    setSavingEdit(true);
+    const { error } = await organizerQuery({
+      table: "tournament_stages",
+      operation: "update",
+      data: { name: editName.trim(), event_date: editDate || null },
+      filters: { id: editTarget.id },
+    });
+    setSavingEdit(false);
+    if (error) {
+      toast.error("Erro ao salvar: " + error.message);
+      return;
+    }
+    toast.success("Etapa atualizada!");
+    setEditTarget(null);
     fetchStages();
   };
 
@@ -140,7 +173,7 @@ const StageSelector = ({ tournamentId, isOwner, selectedStageId, onSelectStage }
           onClick={() => onSelectStage(null)}
           className="h-8 text-xs rounded-lg"
         >
-          Geral
+          1ª Etapa
         </Button>
         {stages.map((stage) => (
           <div key={stage.id} className="flex items-center gap-0.5 group">
@@ -158,13 +191,22 @@ const StageSelector = ({ tournamentId, isOwner, selectedStageId, onSelectStage }
               )}
             </Button>
             {isOwner && (
-              <button
-                onClick={() => setDeleteTarget(stage)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive p-1"
-                title="Excluir etapa"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
+              <>
+                <button
+                  onClick={() => openEdit(stage)}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary p-1"
+                  title="Editar etapa"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => setDeleteTarget(stage)}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive p-1"
+                  title="Excluir etapa"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </>
             )}
           </div>
         ))}
@@ -211,6 +253,42 @@ const StageSelector = ({ tournamentId, isOwner, selectedStageId, onSelectStage }
           </Dialog>
         )}
       </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-primary" />
+              Editar Etapa
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Nome da Etapa</label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && saveEdit()}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Data (opcional)</label>
+              <Input
+                type="date"
+                value={editDate}
+                onChange={(e) => setEditDate(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditTarget(null)}>Cancelar</Button>
+            <Button onClick={saveEdit} disabled={savingEdit} className="gap-1">
+              {savingEdit ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>

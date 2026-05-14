@@ -1087,7 +1087,7 @@ const TournamentDetail = () => {
         result = generateDoubleEliminationBracket({
           tournamentId: id!,
           modalityId: currentModalityId || "",
-          teams: filteredTeams.map(t => ({
+          teams: scopedTeams.map(t => ({
             id: t.id, player1_name: t.player1_name, player2_name: t.player2_name, seed: t.seed ?? 0,
           })),
           useSeeds: config.useSeeds,
@@ -1148,7 +1148,7 @@ const TournamentDetail = () => {
       fetchData();
     } else {
       // === NORMAL KNOCKOUT — only create first round with REAL teams ===
-      let arranged = [...filteredTeams];
+      let arranged = [...scopedTeams];
       if (config.useSeeds && config.seedTeamIds && config.seedTeamIds.length > 0) {
         const seeds = arranged.filter(t => config.seedTeamIds!.includes(t.id));
         const nonSeeds = arranged.filter(t => !config.seedTeamIds!.includes(t.id)).sort(() => Math.random() - 0.5);

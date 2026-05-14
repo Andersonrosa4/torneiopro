@@ -445,140 +445,87 @@ const CenterColumn = ({
 /* ────────────────────────────────────────────────────
    Group Stage View
    ──────────────────────────────────────────────────── */
-const GROUP_CARD_H = 76;
-const GROUP_CARD_GAP = 8;
+function buildRoundRobinRounds(groupMatches: Match[]): Match[][] {
+  const teamIds = new Set<string>();
+  for (const match of groupMatches) {
+    if (match.team1_id) teamIds.add(match.team1_id);
+    if (match.team2_id) teamIds.add(match.team2_id);
+  }
 
-const PlaceholderMatchCard = ({
-  id,
-  label1,
-  label2,
-  scale = "normal",
-}: {
-  id: string;
-  label1: string;
-  label2: string;
-  scale?: "normal" | "semi" | "final";
-  roundLabel?: string;
-}) => {
-  const sizeClasses = {
-    normal: "w-[130px] text-[9px]",
-    semi: "w-[130px] text-[9px]",
-    final: "w-[140px] text-[10px]",
-  };
-  const borderClasses = {
-    normal: "border-border/60",
-    semi: "border-primary/40 shadow-[0_0_10px_hsl(var(--primary)/0.15)]",
-    final: "border-primary/60 shadow-[0_0_16px_hsl(var(--primary)/0.3)] ring-1 ring-primary/20",
-  };
+  const teams = [...teamIds];
+  if (teams.length <= 1) return groupMatches.map((match) => [match]);
 
-  return (
-    <div
-      id={id}
-      data-match-id={id}
-      className={`rounded-lg border bg-card/60 backdrop-blur-sm shrink-0 ${sizeClasses[scale]} ${borderClasses[scale]}`}
-    >
-      {scale === "final" && (
-        <div className="flex items-center justify-center gap-1 rounded-t-lg bg-gradient-primary px-2 py-0.5 text-[9px] font-bold text-primary-foreground tracking-wider">
-          <Trophy className="h-2.5 w-2.5" /> FINAL
-        </div>
-      )}
-      {scale === "semi" && (
-        <div className="flex items-center justify-center gap-1 rounded-t-lg bg-primary/15 px-2 py-0.5 text-[9px] font-semibold text-primary tracking-wider">
-          SEMIFINAL
-        </div>
-      )}
-      <div className="flex items-center justify-between px-2 py-1.5">
-        <span className="truncate flex-1 text-muted-foreground/60 italic">{label1}</span>
-      </div>
-      <div className="border-t border-border/30" />
-      <div className="flex items-center justify-between px-2 py-1.5">
-        <span className="truncate flex-1 text-muted-foreground/60 italic">{label2}</span>
-      </div>
-      <div className="flex justify-center border-t border-border/20 px-2 py-1">
-        <Badge variant="outline" className="text-muted-foreground text-[8px] px-1.5 py-0 leading-tight border-border/40">Aguardando</Badge>
-      </div>
-    </div>
-  );
-};
-
-function buildGroupKnockoutPreview(groupNumbers: number[]) {
-  const numGroups = groupNumbers.length;
-  const advancingPerGroup = 2;
-  const totalAdvancing = numGroups * advancingPerGroup;
-
-  const rounds: { label: string; matchCount: number; scale: "normal" | "semi" | "final" }[] = [];
-  let remaining = totalAdvancing;
-
-  while (remaining > 1) {
-    const matchCount = Math.floor(remaining / 2);
-    remaining = matchCount;
-    if (remaining === 1) {
-      rounds.push({ label: "Final", matchCount, scale: "final" });
-    } else if (matchCount <= 2) {
-      rounds.push({ label: matchCount === 2 ? "Semifinais" : "Rodada", matchCount, scale: "semi" });
-    } else {
-      const labels: Record<number, string> = { 4: "Quartas de Final", 8: "Oitavas", 2: "Semifinais" };
-      rounds.push({ label: labels[matchCount] || `Rodada (${matchCount} jogos)`, matchCount, scale: "normal" });
+  const matchByPair = new Map<string, Match>();
+  for (const match of groupMatches) {
+    if (match.team1_id && match.team2_id) {
+      const key = [match.team1_id, match.team2_id].sort().join("|");
+      matchByPair.set(key, match);
     }
   }
 
-  type PlaceholderMatch = { id: string; label1: string; label2: string; scale: "normal" | "semi" | "final" };
-  const knockoutRounds: PlaceholderMatch[][] = [];
-  const connections: { srcId: string; dstId: string }[] = [];
+  const list = [...teams];
+  const bye = "__BYE__";
+  if (teams.length % 2 !== 0) list.splice(1, 0, bye);
 
-  if (rounds.length > 0) {
-    const firstRound: PlaceholderMatch[] = [];
-    const firstRoundCount = rounds[0].matchCount;
-    const pairings: { g1: number; seed1: number; g2: number; seed2: number }[] = [];
+  const ordered: Match[] = [];
+  const assigned = new Set<string>();
+  const total = list.length;
 
-    for (let i = 0; i < numGroups; i++) {
-      const rightIdx = numGroups - 1 - i;
-      if (rightIdx < i) break;
-      pairings.push({ g1: groupNumbers[i], seed1: 1, g2: groupNumbers[rightIdx], seed2: 2 });
-      pairings.push({ g1: groupNumbers[i], seed1: 2, g2: groupNumbers[rightIdx], seed2: 1 });
-    }
-
-    if (numGroups % 2 === 1) {
-      const midIdx = Math.floor(numGroups / 2);
-      pairings.push({ g1: groupNumbers[midIdx], seed1: 1, g2: groupNumbers[midIdx], seed2: 2 });
-    }
-
-    for (let i = 0; i < firstRoundCount; i++) {
-      if (i < pairings.length) {
-        const p = pairings[i];
-        firstRound.push({
-          id: `knockout-0-${i}`,
-          label1: `${p.seed1}º Grupo ${numberToLetter(p.g1)}`,
-          label2: `${p.seed2}º Grupo ${numberToLetter(p.g2)}`,
-          scale: rounds[0].scale,
-        });
-      } else {
-        firstRound.push({ id: `knockout-0-${i}`, label1: "A definir", label2: "A definir", scale: rounds[0].scale });
+  for (let roundIndex = 0; roundIndex < total - 1; roundIndex++) {
+    for (let i = 0; i < total / 2; i++) {
+      const a = list[i];
+      const b = list[total - 1 - i];
+      if (a === bye || b === bye) continue;
+      const match = matchByPair.get([a, b].sort().join("|"));
+      if (match && !assigned.has(match.id)) {
+        ordered.push(match);
+        assigned.add(match.id);
       }
     }
-    knockoutRounds.push(firstRound);
 
-    for (let ri = 1; ri < rounds.length; ri++) {
-      const prevRound = knockoutRounds[ri - 1];
-      const currentRound: PlaceholderMatch[] = [];
-      const count = rounds[ri].matchCount;
-
-      for (let i = 0; i < count; i++) {
-        const id = `knockout-${ri}-${i}`;
-        const src1Idx = i * 2;
-        const src2Idx = i * 2 + 1;
-        const label1 = src1Idx < prevRound.length ? `V Jogo ${src1Idx + 1}` : "A definir";
-        const label2 = src2Idx < prevRound.length ? `V Jogo ${src2Idx + 1}` : "A definir";
-        currentRound.push({ id, label1, label2, scale: rounds[ri].scale });
-        if (src1Idx < prevRound.length) connections.push({ srcId: prevRound[src1Idx].id, dstId: id });
-        if (src2Idx < prevRound.length) connections.push({ srcId: prevRound[src2Idx].id, dstId: id });
-      }
-      knockoutRounds.push(currentRound);
-    }
+    const last = list.pop();
+    if (last) list.splice(1, 0, last);
   }
 
-  return { knockoutRounds, rounds, connections };
+  ordered.push(...groupMatches.filter((match) => !assigned.has(match.id)).sort((a, b) => a.position - b.position));
+  return ordered.map((match) => [match]);
 }
+
+const LockedGroupMatchCard = ({
+  match,
+  matchNumber,
+  waitingForRound,
+}: {
+  match: Match;
+  matchNumber?: number;
+  waitingForRound: number;
+}) => (
+  <div
+    id={match.id}
+    data-match-id={match.id}
+    className="w-full min-w-0 sm:w-[130px] rounded-lg border border-border/60 bg-card/60 backdrop-blur-sm shrink-0 text-[9px] opacity-80"
+  >
+    {matchNumber != null && (
+      <div className="px-2 pt-2 pb-0.5 flex items-center justify-between gap-1">
+        <span className="inline-flex items-center rounded-sm bg-muted/60 border border-border/50 px-1.5 py-0.5 text-[10px] font-black text-muted-foreground uppercase leading-none">
+          JOGO {matchNumber}
+        </span>
+      </div>
+    )}
+    <div className="flex items-center justify-between px-2 py-1.5">
+      <span className="truncate flex-1 text-muted-foreground/60 italic">A definir</span>
+    </div>
+    <div className="border-t border-border/30" />
+    <div className="flex items-center justify-between px-2 py-1.5">
+      <span className="truncate flex-1 text-muted-foreground/60 italic">A definir</span>
+    </div>
+    <div className="flex justify-center border-t border-border/20 px-2 py-1">
+      <Badge variant="outline" className="text-muted-foreground text-[8px] px-1.5 py-0 leading-tight border-border/40">
+        Após Rodada {waitingForRound}
+      </Badge>
+    </div>
+  </div>
+);
 
 const GroupStageView = ({
   groupMatches,

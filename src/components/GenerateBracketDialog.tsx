@@ -298,7 +298,7 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
 
               <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
                 <Label className="text-base font-semibold">O torneio inicia em:</Label>
-                <RadioGroup value={luanaStartsAt} onValueChange={(v) => setLuanaStartsAt(v as "quarters" | "eighths")} className="space-y-2">
+                <RadioGroup value={luanaStartsAt} onValueChange={(v) => { const next = v as "quarters" | "eighths"; setLuanaStartsAt(next); if (next === "eighths") setLuanaGroupCount("8"); }} className="space-y-2">
                   <div className="flex items-start gap-2">
                     <RadioGroupItem value="quarters" id="luanaQuarters" className="mt-1" />
                     <Label htmlFor="luanaQuarters" className="cursor-pointer flex-1">

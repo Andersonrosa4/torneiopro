@@ -2048,7 +2048,12 @@ const TournamentDetail = () => {
       : matches.filter(m => sameMatchScope(m, match));
     const isDoubleElimination = modalityMatchesForDE.some(m => m.bracket_type === 'losers' || m.bracket_type === 'final' || m.bracket_type === 'semi_final');
 
-    if (isDoubleElimination) {
+    // ── GROUP PHASE GUARD ──
+    // Group-stage matches (round === 0) are round-robin and MUST NOT propagate.
+    // They never feed any other match, regardless of tournament format.
+    const isGroupStageMatch = match.round === 0;
+
+    if (isDoubleElimination && !isGroupStageMatch) {
       // ══════════════════════════════════════════════════════════════════════
       // IRON RULE: Buscar partidas SOMENTE da mesma modalidade.
       // Nunca buscar por tournament_id pois mistura modalidades diferentes
@@ -2293,7 +2298,8 @@ const TournamentDetail = () => {
       toast.success("Avanço automático realizado!");
     } else {
       // Normal bracket: IMMEDIATE propagation via next_win_match_id
-      if (match.next_win_match_id) {
+      // GUARD: Group-stage matches (round 0) NEVER propagate — round-robin only.
+      if (!isGroupStageMatch && match.next_win_match_id) {
         const isTopSlot = match.position % 2 === 1;
         const slotField = isTopSlot ? 'team1_id' : 'team2_id';
         await organizerQuery({
@@ -2306,7 +2312,7 @@ const TournamentDetail = () => {
       }
 
       // Normal bracket: propagate LOSER to 3rd place match via next_lose_match_id
-      if (match.next_lose_match_id && loserId) {
+      if (!isGroupStageMatch && match.next_lose_match_id && loserId) {
         const isTopSlot = match.position % 2 === 1;
         const slotField = isTopSlot ? 'team1_id' : 'team2_id';
         await organizerQuery({

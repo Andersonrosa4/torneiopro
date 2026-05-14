@@ -75,6 +75,9 @@ const statusColors: Record<string, string> = {
 const sameMatchScope = (m: Match, ref: Match) =>
   m.modality_id === ref.modality_id && (m.stage_id ?? null) === (ref.stage_id ?? null);
 
+const sameStageScope = (stageId: string | null | undefined, selectedStageId: string | null) =>
+  (stageId ?? null) === (selectedStageId ?? null);
+
 const matchScopeFilters = (match: Match, tournamentId: string) => {
   const filters: Record<string, any> = match.modality_id
     ? { modality_id: match.modality_id }
@@ -197,14 +200,14 @@ const TournamentDetail = () => {
     if (modalitiesLoading) return [];
     let result = selectedModality ? teams.filter(t => t.modality_id === selectedModality.id) 
       : modalities.length > 0 ? [] : teams;
-    if (selectedStageId) result = result.filter((t: any) => t.stage_id === selectedStageId);
+    result = result.filter((t: any) => sameStageScope(t.stage_id, selectedStageId));
     return result;
   }, [teams, selectedModality, modalities.length, modalitiesLoading, selectedStageId]);
   const filteredMatches = useMemo(() => {
     if (modalitiesLoading) return [];
     let result = selectedModality ? matches.filter(m => m.modality_id === selectedModality.id) 
       : modalities.length > 0 ? [] : matches;
-    if (selectedStageId) result = result.filter((m: any) => m.stage_id === selectedStageId);
+    result = result.filter((m: any) => sameStageScope(m.stage_id, selectedStageId));
     return result;
   }, [matches, selectedModality, modalities.length, modalitiesLoading, selectedStageId]);
 

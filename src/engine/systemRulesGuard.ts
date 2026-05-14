@@ -161,7 +161,34 @@ function checkAdvanceWithoutPlaying(matches: GuardMatch[], violations: RuleViola
   }
 }
 
-function checkAllStartInWinners(matches: GuardMatch[], violations: RuleViolation[]) {
+function checkTeamInMultipleGroups(matches: GuardMatch[], violations: RuleViolation[]) {
+  // Round 0 (fase de grupos): cada equipe deve pertencer a EXATAMENTE UM grupo
+  // (bracket_number) por escopo (modality + stage). Aparecer em 2+ grupos é bug grave.
+  const teamGroups = new Map<string, Set<number>>(); // key: scope|teamId → set of bracket_numbers
+  for (const m of matches) {
+    if (m.round !== 0) continue;
+    const bn = (m as any).bracket_number ?? 1;
+    const scope = scopeKey(m);
+    for (const tid of [m.team1_id, m.team2_id]) {
+      if (!tid) continue;
+      const key = `${scope}|${tid}`;
+      if (!teamGroups.has(key)) teamGroups.set(key, new Set());
+      teamGroups.get(key)!.add(bn);
+    }
+  }
+  const reported = new Set<string>();
+  for (const [key, groupSet] of teamGroups) {
+    if (groupSet.size > 1 && !reported.has(key)) {
+      reported.add(key);
+      const tid = key.split('|').pop() || '';
+      const groupsList = [...groupSet].sort((a, b) => a - b).join(', ');
+      violations.push({
+        rule: '1.5',
+        message: `Equipe ${tid.slice(0, 8)} pertence a múltiplos grupos da fase de grupos: chaves [${groupsList}] — uma equipe só pode estar em um grupo`,
+      });
+    }
+  }
+}
   // Isolar por escopo (modality + stage) — chaves diferentes não compartilham equipes
   const scopes = new Map<string, GuardMatch[]>();
   for (const m of matches) {

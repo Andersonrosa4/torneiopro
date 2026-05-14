@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Play, Users, Trophy, Swords, ShieldCheck } from "lucide-react";
+import { Play, Users, Trophy, Swords, ShieldCheck, Sparkles } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface Team {
@@ -15,7 +15,7 @@ interface Team {
   seed: number | null;
 }
 
-export type BracketMode = "normal" | "double_elimination";
+export type BracketMode = "normal" | "double_elimination" | "luana_repechage";
 
 interface GenerateBracketDialogProps {
   onGenerate: (config: {
@@ -33,14 +33,18 @@ interface GenerateBracketDialogProps {
     byeTeamIds: string[];
     useIndex: boolean;
     numIndexTeams?: number;
+    luanaStartsAt?: "quarters" | "eighths";
+    luanaGroupCount?: number;
   }) => void;
   teamCount: number;
   teams: Team[];
   isDisabled: boolean;
   sport: string;
+  /** Quando true, exibe a opção "Modo Luana — Grupos + Repescagem Cruzada" (apenas Vôlei de Praia). */
+  showLuanaMode?: boolean;
 }
 
-export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled, sport }: GenerateBracketDialogProps) => {
+export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled, sport, showLuanaMode }: GenerateBracketDialogProps) => {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"mode" | "config">("mode");
   const [bracketMode, setBracketMode] = useState<BracketMode>("normal");
@@ -58,6 +62,10 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
   const [byeTeamIds, setByeTeamIds] = useState<string[]>([]);
   const [useIndex, setUseIndex] = useState(false);
   const [numIndexTeams, setNumIndexTeams] = useState("1");
+  const [luanaStartsAt, setLuanaStartsAt] = useState<"quarters" | "eighths">("quarters");
+  const [luanaGroupCount, setLuanaGroupCount] = useState("4");
+
+  const canShowLuana = !!showLuanaMode && sport === "beach_volleyball";
 
   const isBeachTennis = sport === "beach_tennis";
   const supportsIndex = sport === "beach_volleyball" || sport === "futevolei";
@@ -117,14 +125,20 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
       numSets: Number(numSets),
       gamesPerSet: isBeachTennis ? Number(gamesPerSet) : undefined,
       seedTeamIds: useSeeds === "true" ? selectedSeedIds : undefined,
-      useGroupStage: bracketMode === "normal" ? useGroupStage : false,
+      useGroupStage: bracketMode === "normal" ? useGroupStage : bracketMode === "luana_repechage",
       groupMode,
-      numGroups: effectiveGroups,
+      numGroups: bracketMode === "luana_repechage" ? Number(luanaGroupCount) : effectiveGroups,
       groupSize: Number(groupSize) || 4,
-      teamsPerGroupAdvancing: advancing,
-      byeTeamIds: [], // BYEs disabled
+      teamsPerGroupAdvancing: bracketMode === "luana_repechage"
+        ? (luanaStartsAt === "quarters" ? 1 : 4)
+        : advancing,
+      byeTeamIds: [],
       useIndex: supportsIndex && useIndex,
       numIndexTeams: supportsIndex && useIndex ? Number(numIndexTeams) : 0,
+      ...(bracketMode === "luana_repechage" ? {
+        luanaStartsAt,
+        luanaGroupCount: Number(luanaGroupCount),
+      } : {}),
       ...(bracketMode === "double_elimination" && useSeeds === "true" ? {
         sideATeamIds,
         sideBTeamIds,
@@ -212,12 +226,117 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                 </div>
               </button>
 
+              {canShowLuana && (
+                <button
+                  onClick={() => { setBracketMode("luana_repechage"); setStep("config"); }}
+                  className="w-full rounded-xl border-2 border-amber-500/40 bg-gradient-to-br from-amber-500/10 to-orange-500/5 p-5 text-left hover:border-amber-400 hover:from-amber-500/20 transition-all group"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="rounded-lg bg-amber-500/20 p-3 group-hover:bg-amber-500/30 transition-colors">
+                      <Sparkles className="h-6 w-6 text-amber-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-foreground">Modo Luana — Grupos + Repescagem Cruzada</h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Fase de grupos onde 1º colocado passa direto. 2º e 3º disputam vagas
+                        em cruzamento espelhado entre chaves (2A×3D, 2B×3C, etc).
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span className="text-xs rounded-full bg-amber-500/20 px-2.5 py-1 text-amber-300">Vôlei de Praia</span>
+                        <span className="text-xs rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Repescagem Cruzada</span>
+                        <span className="text-xs rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Quartas ou Oitavas</span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              )}
+
               <div className="rounded-lg border border-primary/30 bg-primary/10 p-3">
                 <p className="text-xs text-muted-foreground">
                   {teamCount} duplas inscritas
                 </p>
               </div>
             </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" onClick={() => setOpen(false)} className="flex-1">
+                Cancelar
+              </Button>
+            </div>
+          </>
+        ) : bracketMode === "luana_repechage" ? (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-amber-400" />
+                Modo Luana — Grupos + Repescagem Cruzada
+              </DialogTitle>
+              <DialogDescription>Configure o formato</DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-5 py-4">
+              <div className="space-y-2">
+                <Label className="text-base font-semibold">Número de Chaves (Grupos)</Label>
+                <Select value={luanaGroupCount} onValueChange={setLuanaGroupCount}>
+                  <SelectTrigger className="bg-card"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {[2, 3, 4, 5, 6, 8].map(n => (
+                      <SelectItem key={n} value={String(n)}>{n} chaves</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  ~{Math.floor(teamCount / Number(luanaGroupCount || 4))} duplas por chave
+                </p>
+              </div>
+
+              <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+                <Label className="text-base font-semibold">O torneio inicia em:</Label>
+                <RadioGroup value={luanaStartsAt} onValueChange={(v) => setLuanaStartsAt(v as "quarters" | "eighths")} className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <RadioGroupItem value="quarters" id="luanaQuarters" className="mt-1" />
+                    <Label htmlFor="luanaQuarters" className="cursor-pointer flex-1">
+                      <span className="font-semibold text-foreground">Quartas de Final</span> (8 vagas)
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        1º de cada chave passa direto. 2º e 3º disputam repescagem cruzada (2A×3D, 2B×3C).
+                      </p>
+                    </Label>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <RadioGroupItem value="eighths" id="luanaEighths" className="mt-1" />
+                    <Label htmlFor="luanaEighths" className="cursor-pointer flex-1">
+                      <span className="font-semibold text-foreground">Oitavas de Final</span> (16 vagas)
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        1º a 4º de cada chave passam direto às oitavas. Sem repescagem.
+                      </p>
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-base font-semibold">Número de Sets</Label>
+                <Select value={numSets} onValueChange={setNumSets}>
+                  <SelectTrigger className="bg-card"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {setOptions.map((n) => (
+                      <SelectItem key={n} value={String(n)}>{n} set{n > 1 ? "s" : ""}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <Button variant="outline" onClick={() => setStep("mode")}>Voltar</Button>
+              <Button
+                onClick={handleGenerate}
+                className="flex-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:opacity-90"
+              >
+                Gerar Modo Luana
+              </Button>
+            </div>
+          </>
 
             <div className="flex gap-3 pt-2">
               <Button variant="outline" onClick={() => setOpen(false)} className="flex-1">

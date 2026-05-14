@@ -44,8 +44,11 @@ export function validateSystemRules(snapshot: TournamentSnapshot): RuleViolation
   // ── Nenhum match eliminatório com slot null (exceto chapéu aguardando feeder) ──
   checkNullSlots(knockoutMatches, violations);
 
-  // ── Nenhuma equipe aparece em dois matches da mesma rodada ──
+  // ── Nenhuma equipe aparece em dois matches da mesma rodada (knockout) ──
   checkDuplicateInRound(matches, violations);
+
+  // ── Nenhuma equipe pertence a mais de um grupo na mesma modalidade (round 0) ──
+  checkTeamInMultipleGroups(matches, violations);
 
   // ── Nenhuma equipe avançou sem jogar ──
   checkAdvanceWithoutPlaying(matches, violations);

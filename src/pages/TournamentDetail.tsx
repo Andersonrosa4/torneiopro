@@ -47,6 +47,7 @@ import ClassificationTab from "@/components/ClassificationTab";
 import RankingsTab from "@/components/RankingsTab";
 import StageSelector from "@/components/StageSelector";
 import BugCombatantLogPanel from "@/components/BugCombatantLogPanel";
+import { generateFakeTeams, type FakeNameGender } from "@/lib/fakeNames";
 
 const sportLabels: Record<string, string> = {
   beach_volleyball: "🏐 Vôlei de Praia",
@@ -136,6 +137,7 @@ const TournamentDetail = () => {
   const [editP1, setEditP1] = useState("");
   const [editP2, setEditP2] = useState("");
   const [fictitiousCount, setFictitiousCount] = useState("");
+  const [fictitiousGender, setFictitiousGender] = useState<FakeNameGender>("male");
   const declareWinnerMutex = useRef(new Set<string>());
   const [fictitiousDialogOpen, setFictitiousDialogOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -488,19 +490,19 @@ const TournamentDetail = () => {
     }
     const count = parseInt(fictitiousCount, 10);
     if (!Number.isFinite(count) || count < 1 || count > 256) { toast.error("Quantidade inválida (1 a 256)"); return; }
-    const newTeams = [];
-    for (let i = 0; i < count; i++) {
+    const fakeTeams = generateFakeTeams(count, fictitiousGender);
+    const newTeams = fakeTeams.map((t, i) => {
       const num = filteredTeams.length + i + 1;
-      newTeams.push({
+      return {
         tournament_id: id,
-        player1_name: `Jogador ${num}A`,
-        player2_name: `Jogador ${num}B`,
+        player1_name: t.player1,
+        player2_name: t.player2,
         seed: num,
         is_fictitious: true,
         modality_id: selectedModality?.id || null,
         stage_id: selectedStageId || null,
-      });
-    }
+      };
+    });
     const { error } = await organizerQuery({
       table: "teams",
       operation: "insert",
@@ -2865,6 +2867,30 @@ const TournamentDetail = () => {
                               autoFocus
                             />
                             <p className="text-xs text-muted-foreground">Digite de 1 a 256 duplas.</p>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Gênero dos nomes</label>
+                            <div className="grid grid-cols-3 gap-2">
+                              {([
+                                { value: "male", label: "Masculino" },
+                                { value: "female", label: "Feminino" },
+                                { value: "mixed", label: "Misto" },
+                              ] as { value: FakeNameGender; label: string }[]).map((opt) => (
+                                <Button
+                                  key={opt.value}
+                                  type="button"
+                                  variant={fictitiousGender === opt.value ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => setFictitiousGender(opt.value)}
+                                  className={fictitiousGender === opt.value ? "bg-gradient-primary text-primary-foreground" : ""}
+                                >
+                                  {opt.label}
+                                </Button>
+                              ))}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Os nomes serão gerados a partir de pessoas reais brasileiras.
+                            </p>
                           </div>
                           <Button
                             onClick={addFictitiousTeams}

@@ -560,7 +560,7 @@ const TournamentDetail = () => {
   };
 
   const generateBracket = async (config: {
-    bracketMode: "normal" | "double_elimination";
+    bracketMode: "normal" | "double_elimination" | "luana_repechage";
     startRound: number;
     useSeeds: boolean;
     numSets: number;
@@ -574,6 +574,8 @@ const TournamentDetail = () => {
     byeTeamIds: string[];
     useIndex: boolean;
     numIndexTeams?: number;
+    luanaStartsAt?: "quarters" | "eighths";
+    luanaGroupCount?: number;
   }) => {
     try {
       if (isWriteLocked) { toast.error("🔒 Torneio finalizado. Alterações bloqueadas."); return; }

@@ -597,23 +597,47 @@ const TournamentDetail = () => {
         return;
       }
 
-      // VALIDATION: Check minimum team count
-      if (filteredTeams.length < 2) {
+      const currentModalityId = selectedModality?.id || null;
+      const currentStageId = selectedStageId || null;
+
+      if (!selectedModality && modalities.length > 0) {
+        toast.error("⛔ Selecione uma modalidade antes de gerar o chaveamento.");
+        return;
+      }
+
+      const teamFilters: Record<string, any> = {
+        tournament_id: id,
+        stage_id: currentStageId,
+      };
+      if (selectedModality) teamFilters.modality_id = selectedModality.id;
+
+      const { data: freshScopedTeams, error: freshTeamsError } = await publicQuery<Team[]>({
+        table: "teams",
+        filters: teamFilters,
+        order: { column: "seed", ascending: true },
+      });
+
+      if (freshTeamsError) {
+        toast.error("Erro ao validar duplas: " + freshTeamsError.message);
+        return;
+      }
+
+      const scopedTeams = freshScopedTeams || [];
+
+      // VALIDATION: Check minimum team count using fresh database data only
+      if (scopedTeams.length < 2) {
         toast.error("❌ Erro: Cadastre pelo menos 2 duplas antes de gerar o chaveamento.");
         return;
       }
 
-      const currentModalityId = selectedModality?.id || null;
-      const currentStageId = selectedStageId || null;
-
-      const uniqueTeamIds = new Set(filteredTeams.map((team) => team.id));
-      if (uniqueTeamIds.size !== filteredTeams.length) {
+      const uniqueTeamIds = new Set(scopedTeams.map((team) => team.id));
+      if (uniqueTeamIds.size !== scopedTeams.length) {
         toast.error("⛔ Geração bloqueada: há duplas repetidas na lista atual.");
         return;
       }
 
-      const uniquePairKeys = new Set(filteredTeams.map((team) => teamPairKey(team.player1_name, team.player2_name)));
-      if (uniquePairKeys.size !== filteredTeams.length) {
+      const uniquePairKeys = new Set(scopedTeams.map((team) => teamPairKey(team.player1_name, team.player2_name)));
+      if (uniquePairKeys.size !== scopedTeams.length) {
         toast.error("⛔ Geração bloqueada: a mesma dupla aparece mais de uma vez nesta modalidade/etapa.");
         return;
       }

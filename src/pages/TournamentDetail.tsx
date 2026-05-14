@@ -1394,6 +1394,87 @@ const TournamentDetail = () => {
       return;
     }
 
+    // === MODO VERANICO (Oitavas) — 4 grupos × 4 vagas → 8 oitavas + cruzamento custom ===
+    // Detecção: 4 grupos, 8 partidas pré-criadas em round 1 (winners), cada grupo com ≥4 times.
+    const r1WinnersShells = existingKnockout.filter(
+      (m: any) => m.round === 1 && (m.bracket_type || "winners") === "winners"
+    );
+    const r2WinnersShells = existingKnockout.filter(
+      (m: any) => m.round === 2 && (m.bracket_type || "winners") === "winners"
+    );
+    const allGroupsHave4 = brackets.every(
+      (b) => (groupRankings[String(b)] || []).length >= 4
+    );
+    const isLuanaEighths =
+      brackets.length === 4 &&
+      r1WinnersShells.length === 8 &&
+      r2WinnersShells.length === 4 &&
+      allGroupsHave4 &&
+      repechageShells.length === 0;
+
+    if (isLuanaEighths) {
+      // Helpers
+      const g = (idx: number) => groupRankings[String(brackets[idx])] || [];
+      const A = 0, B = 1, C = 2, D = 3;
+      const teamAt = (grp: number, rankIdx: number) => g(grp)[rankIdx]?.teamId || null;
+
+      // Pareamento das oitavas (rank0=1º, rank1=2º, rank2=3º, rank3=4º)
+      // M1: A1×D4 | M2: B1×C4 | M3: C1×B4 | M4: D1×A4
+      // M5: A2×D3 | M6: B2×C3 | M7: C2×B3 | M8: D2×A3
+      const eighthsMap: { pos: number; t1: [number, number]; t2: [number, number] }[] = [
+        { pos: 1, t1: [A, 0], t2: [D, 3] },
+        { pos: 2, t1: [B, 0], t2: [C, 3] },
+        { pos: 3, t1: [C, 0], t2: [B, 3] },
+        { pos: 4, t1: [D, 0], t2: [A, 3] },
+        { pos: 5, t1: [A, 1], t2: [D, 2] },
+        { pos: 6, t1: [B, 1], t2: [C, 2] },
+        { pos: 7, t1: [C, 1], t2: [B, 2] },
+        { pos: 8, t1: [D, 1], t2: [A, 2] },
+      ];
+
+      // Cruzamento Oitavas → Quartas (custom Veranico)
+      // Q1: M1+M6 | Q2: M3+M8 | Q3: M2+M5 | Q4: M4+M7
+      const eighthToQuarter: Record<number, number> = {
+        1: 1, 6: 1,
+        3: 2, 8: 2,
+        2: 3, 5: 3,
+        4: 4, 7: 4,
+      };
+
+      const findShell = (round: number, position: number, bt: string = "winners") =>
+        existingKnockout.find(
+          (m: any) =>
+            m.round === round &&
+            m.position === position &&
+            (m.bracket_type || "winners") === bt
+        );
+
+      const updates: Promise<any>[] = [];
+
+      for (const meta of eighthsMap) {
+        const shell = findShell(1, meta.pos, "winners");
+        if (!shell) continue;
+        const team1 = teamAt(meta.t1[0], meta.t1[1]);
+        const team2 = teamAt(meta.t2[0], meta.t2[1]);
+        const quarterShell = findShell(2, eighthToQuarter[meta.pos], "winners");
+        const data: any = { team1_id: team1, team2_id: team2 };
+        if (quarterShell) data.next_win_match_id = quarterShell.id;
+        updates.push(
+          organizerQuery({
+            table: "matches",
+            operation: "update",
+            data,
+            filters: { id: shell.id },
+          })
+        );
+      }
+
+      await Promise.all(updates);
+      toast.success("MODO VERANICO (Oitavas): 8 partidas geradas com cruzamento personalizado.");
+      fetchData();
+      return;
+    }
+
     if (allAdvancing.length < 2) {
       toast.error("Duplas insuficientes para fase eliminatória.");
       return;

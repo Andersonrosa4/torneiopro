@@ -597,23 +597,47 @@ const TournamentDetail = () => {
         return;
       }
 
-      // VALIDATION: Check minimum team count
-      if (filteredTeams.length < 2) {
+      const currentModalityId = selectedModality?.id || null;
+      const currentStageId = selectedStageId || null;
+
+      if (!selectedModality && modalities.length > 0) {
+        toast.error("⛔ Selecione uma modalidade antes de gerar o chaveamento.");
+        return;
+      }
+
+      const teamFilters: Record<string, any> = {
+        tournament_id: id,
+        stage_id: currentStageId,
+      };
+      if (selectedModality) teamFilters.modality_id = selectedModality.id;
+
+      const { data: freshScopedTeams, error: freshTeamsError } = await publicQuery<Team[]>({
+        table: "teams",
+        filters: teamFilters,
+        order: { column: "seed", ascending: true },
+      });
+
+      if (freshTeamsError) {
+        toast.error("Erro ao validar duplas: " + freshTeamsError.message);
+        return;
+      }
+
+      const scopedTeams = freshScopedTeams || [];
+
+      // VALIDATION: Check minimum team count using fresh database data only
+      if (scopedTeams.length < 2) {
         toast.error("❌ Erro: Cadastre pelo menos 2 duplas antes de gerar o chaveamento.");
         return;
       }
 
-      const currentModalityId = selectedModality?.id || null;
-      const currentStageId = selectedStageId || null;
-
-      const uniqueTeamIds = new Set(filteredTeams.map((team) => team.id));
-      if (uniqueTeamIds.size !== filteredTeams.length) {
+      const uniqueTeamIds = new Set(scopedTeams.map((team) => team.id));
+      if (uniqueTeamIds.size !== scopedTeams.length) {
         toast.error("⛔ Geração bloqueada: há duplas repetidas na lista atual.");
         return;
       }
 
-      const uniquePairKeys = new Set(filteredTeams.map((team) => teamPairKey(team.player1_name, team.player2_name)));
-      if (uniquePairKeys.size !== filteredTeams.length) {
+      const uniquePairKeys = new Set(scopedTeams.map((team) => teamPairKey(team.player1_name, team.player2_name)));
+      if (uniquePairKeys.size !== scopedTeams.length) {
         toast.error("⛔ Geração bloqueada: a mesma dupla aparece mais de uma vez nesta modalidade/etapa.");
         return;
       }
@@ -653,11 +677,11 @@ const TournamentDetail = () => {
 
     if (config.useGroupStage) {
       // === GROUP STAGE ===
-      const totalTeams = filteredTeams.length;
+      const totalTeams = scopedTeams.length;
       const numGroups = config.numGroups;
 
       // 1) Order teams: ELO-based seeds, manual seeds, or full shuffle
-      let arranged = [...filteredTeams];
+      let arranged = [...scopedTeams];
       if (config.useSeeds && config.seedTeamIds && config.seedTeamIds.length > 0) {
         const seeds = arranged.filter(t => config.seedTeamIds!.includes(t.id));
         const nonSeeds = arranged.filter(t => !config.seedTeamIds!.includes(t.id)).sort(() => Math.random() - 0.5);
@@ -679,6 +703,12 @@ const TournamentDetail = () => {
         const groupIdx = cycle % 2 === 0 ? pos : (numGroups - 1 - pos);
         groupSlots[groupIdx].push(team);
       });
+
+      const assignedTeamIds = groupSlots.flat().map((team) => team.id);
+      if (assignedTeamIds.length !== totalTeams || new Set(assignedTeamIds).size !== totalTeams) {
+        toast.error("⛔ Geração bloqueada: distribuição de grupos alteraria a quantidade de duplas cadastradas.");
+        return;
+      }
 
       // 3) Validate: no group with only 1 team
       if (groupSlots.some(g => g.length < 2)) {
@@ -1057,7 +1087,7 @@ const TournamentDetail = () => {
         result = generateDoubleEliminationBracket({
           tournamentId: id!,
           modalityId: currentModalityId || "",
-          teams: filteredTeams.map(t => ({
+          teams: scopedTeams.map(t => ({
             id: t.id, player1_name: t.player1_name, player2_name: t.player2_name, seed: t.seed ?? 0,
           })),
           useSeeds: config.useSeeds,
@@ -1118,7 +1148,7 @@ const TournamentDetail = () => {
       fetchData();
     } else {
       // === NORMAL KNOCKOUT — only create first round with REAL teams ===
-      let arranged = [...filteredTeams];
+      let arranged = [...scopedTeams];
       if (config.useSeeds && config.seedTeamIds && config.seedTeamIds.length > 0) {
         const seeds = arranged.filter(t => config.seedTeamIds!.includes(t.id));
         const nonSeeds = arranged.filter(t => !config.seedTeamIds!.includes(t.id)).sort(() => Math.random() - 0.5);
@@ -1194,7 +1224,7 @@ const TournamentDetail = () => {
 
       if (postGenMatches && postGenMatches.length > 0) {
         const postFormat = config.bracketMode === 'double_elimination' ? 'double_elimination' : (tournament?.format || 'single_elimination');
-        const postTeamCount = filteredTeams.length;
+        const postTeamCount = scopedTeams.length;
         const result = validatePostGeneration(postGenMatches, postFormat, postTeamCount);
 
         // ── AUTO-REPAIR: aplicar correções automaticamente ──

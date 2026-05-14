@@ -155,7 +155,9 @@ const TournamentDetail = () => {
   const hasLuanaAccess = useLuanaAccess(tournament?.created_by);
   const isTournamentCompleted = tournament?.status === 'completed' || tournament?.status === 'cancelled';
   const isFutevoleiTournament = tournament?.sport === 'futevolei';
-  const isWriteLocked = isTournamentCompleted && !isFutevoleiTournament;
+  // Historical Lock: torneios finalizados ficam bloqueados, EXCETO em etapas novas (stage_id selecionado)
+  const isOnNewStage = !!selectedStageId;
+  const isWriteLocked = isTournamentCompleted && !isFutevoleiTournament && !isOnNewStage;
   const canEdit = isOwner && !isWriteLocked;
 
   // Helper: build snapshot and run system rules guard

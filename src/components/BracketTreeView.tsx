@@ -573,11 +573,7 @@ const GroupStageView = ({
   }, [groupMatchesByGroup, groupNumbers]);
 
   const totalGroupRounds = Math.max(0, ...Object.values(groupRoundsByGroup).map((rounds) => rounds.length));
-  const isGroupRoundUnlocked = (roundIndex: number) => {
-    if (roundIndex === 0) return true;
-    const previousRounds = Object.values(groupRoundsByGroup).flatMap((rounds) => rounds[roundIndex - 1] || []);
-    return previousRounds.length > 0 && previousRounds.every((match) => match.status === "completed");
-  };
+  const isGroupRoundUnlocked = (_roundIndex: number) => true;
 
   return (
     <div className="space-y-4">

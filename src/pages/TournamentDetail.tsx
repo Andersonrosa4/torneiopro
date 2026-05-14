@@ -677,11 +677,11 @@ const TournamentDetail = () => {
 
     if (config.useGroupStage) {
       // === GROUP STAGE ===
-      const totalTeams = filteredTeams.length;
+      const totalTeams = scopedTeams.length;
       const numGroups = config.numGroups;
 
       // 1) Order teams: ELO-based seeds, manual seeds, or full shuffle
-      let arranged = [...filteredTeams];
+      let arranged = [...scopedTeams];
       if (config.useSeeds && config.seedTeamIds && config.seedTeamIds.length > 0) {
         const seeds = arranged.filter(t => config.seedTeamIds!.includes(t.id));
         const nonSeeds = arranged.filter(t => !config.seedTeamIds!.includes(t.id)).sort(() => Math.random() - 0.5);
@@ -703,6 +703,12 @@ const TournamentDetail = () => {
         const groupIdx = cycle % 2 === 0 ? pos : (numGroups - 1 - pos);
         groupSlots[groupIdx].push(team);
       });
+
+      const assignedTeamIds = groupSlots.flat().map((team) => team.id);
+      if (assignedTeamIds.length !== totalTeams || new Set(assignedTeamIds).size !== totalTeams) {
+        toast.error("⛔ Geração bloqueada: distribuição de grupos alteraria a quantidade de duplas cadastradas.");
+        return;
+      }
 
       // 3) Validate: no group with only 1 team
       if (groupSlots.some(g => g.length < 2)) {

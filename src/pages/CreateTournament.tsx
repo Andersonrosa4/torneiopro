@@ -14,10 +14,8 @@ import { ArrowLeft } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import ThemedBackground from "@/components/ThemedBackground";
 import { organizerQuery, publicQuery } from "@/lib/organizerApi";
-import TournamentRulesForm, { TournamentRulesState, getDefaultRules } from "@/components/TournamentRulesForm";
-import SafeBoundary from "@/components/SafeBoundary";
 
-const SPORTS_WITH_RULES = ["tennis", "padel"];
+
 
 const CreateTournament = () => {
   const { organizerId, user } = useAuth();
@@ -36,21 +34,9 @@ const CreateTournament = () => {
     visibility: "public",
   });
 
-  const [rules, setRules] = useState<TournamentRulesState>(getDefaultRules("tennis"));
-
-  const showRules = SPORTS_WITH_RULES.includes(form.sport);
-
   const handleSportChange = (sport: string) => {
     try {
       setForm((prev) => ({ ...prev, sport }));
-      if (SPORTS_WITH_RULES.includes(sport)) {
-        try {
-          setRules(getDefaultRules(sport));
-        } catch (rulesErr) {
-          console.error("[CreateTournament] Falha ao carregar regras padrão, mantendo regras atuais:", rulesErr);
-          // Mantém o rules atual como fallback seguro — nunca derruba a tela.
-        }
-      }
     } catch (err) {
       console.error("[CreateTournament] Erro ao trocar esporte:", err);
       toast.error("Não foi possível trocar o esporte. Tente novamente.");
@@ -110,16 +96,6 @@ const CreateTournament = () => {
       return;
     }
 
-    // Save tournament rules for tennis/padel
-    if (showRules && data?.id) {
-      const { error: rulesError } = await organizerQuery({
-        table: "tournament_rules",
-        operation: "insert",
-        data: {
-          tournament_id: data.id,
-          ...rules,
-        },
-      });
       if (rulesError) {
         console.error("Error saving rules:", rulesError);
         // Non-blocking: tournament was created, rules can be set later

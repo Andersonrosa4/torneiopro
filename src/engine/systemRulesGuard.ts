@@ -189,6 +189,8 @@ function checkTeamInMultipleGroups(matches: GuardMatch[], violations: RuleViolat
     }
   }
 }
+
+function checkAllStartInWinners(matches: GuardMatch[], violations: RuleViolation[]) {
   // Isolar por escopo (modality + stage) — chaves diferentes não compartilham equipes
   const scopes = new Map<string, GuardMatch[]>();
   for (const m of matches) {

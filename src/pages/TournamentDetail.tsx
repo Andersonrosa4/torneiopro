@@ -743,6 +743,159 @@ const TournamentDetail = () => {
       const { error } = await organizerQuery({ table: "matches", operation: "insert", data: newMatches });
       if (error) { toast.error(error.message); return; }
 
+      // === MODO VERANICO — Grupos + Repescagem Cruzada (quartas) ===
+      const isLuanaQuarters = config.bracketMode === "luana_repechage" && config.luanaStartsAt === "quarters";
+
+      if (isLuanaQuarters) {
+        // Estrutura fixa: 4 grupos → 4 repescagens (R1) → 4 quartas (R2) → 2 semis (R3) → final + 3º (R4)
+        // Pares de repescagem (cruzamento espelhado):
+        //   R1P1: 2A × 3D  → vencedor enfrenta 1D na Quartas Pos 4
+        //   R1P2: 2D × 3A  → vencedor enfrenta 1A na Quartas Pos 1
+        //   R1P3: 2B × 3C  → vencedor enfrenta 1C na Quartas Pos 3
+        //   R1P4: 2C × 3B  → vencedor enfrenta 1B na Quartas Pos 2
+        const repechageMeta = [
+          { pos: 1, leftGroup: 0, rightGroup: numGroups - 1, quarterPos: numGroups }, // 2A×3D → Q4
+          { pos: 2, leftGroup: numGroups - 1, rightGroup: 0, quarterPos: 1 },         // 2D×3A → Q1
+          { pos: 3, leftGroup: 1, rightGroup: numGroups - 2, quarterPos: numGroups - 1 }, // 2B×3C → Q3
+          { pos: 4, leftGroup: numGroups - 2, rightGroup: 1, quarterPos: 2 },         // 2C×3B → Q2
+        ];
+
+        const luanaShells: any[] = [];
+
+        // Repescagens (round 1) — sem times ainda; serão preenchidos via auto-advance ao terminar grupos
+        for (const meta of repechageMeta) {
+          luanaShells.push({
+            tournament_id: id,
+            round: 1,
+            position: meta.pos,
+            team1_id: null,
+            team2_id: null,
+            status: "pending",
+            bracket_number: 1,
+            bracket_type: "repechage",
+            modality_id: currentModalityId,
+            stage_id: currentStageId,
+          });
+        }
+        // Quartas (round 2) — 4 matches
+        for (let p = 1; p <= 4; p++) {
+          luanaShells.push({
+            tournament_id: id,
+            round: 2,
+            position: p,
+            team1_id: null,
+            team2_id: null,
+            status: "pending",
+            bracket_number: 1,
+            bracket_type: "winners",
+            modality_id: currentModalityId,
+            stage_id: currentStageId,
+          });
+        }
+        // Semis (round 3) — 2 matches
+        for (let p = 1; p <= 2; p++) {
+          luanaShells.push({
+            tournament_id: id,
+            round: 3,
+            position: p,
+            team1_id: null,
+            team2_id: null,
+            status: "pending",
+            bracket_number: 1,
+            bracket_type: "winners",
+            modality_id: currentModalityId,
+            stage_id: currentStageId,
+          });
+        }
+        // Final (round 4 pos 1)
+        luanaShells.push({
+          tournament_id: id,
+          round: 4,
+          position: 1,
+          team1_id: null,
+          team2_id: null,
+          status: "pending",
+          bracket_number: 1,
+          bracket_type: "winners",
+          modality_id: currentModalityId,
+          stage_id: currentStageId,
+        });
+        // 3º lugar (round 4 pos 2)
+        luanaShells.push({
+          tournament_id: id,
+          round: 4,
+          position: 2,
+          team1_id: null,
+          team2_id: null,
+          status: "pending",
+          bracket_number: 1,
+          bracket_type: "third_place",
+          modality_id: currentModalityId,
+          stage_id: currentStageId,
+        });
+
+        const { error: shellErr } = await organizerQuery({ table: "matches", operation: "insert", data: luanaShells });
+        if (shellErr) { toast.error(shellErr.message); return; }
+
+        // Buscar shells inseridos para linkar
+        const { data: inserted } = await organizerQuery({
+          table: "matches",
+          operation: "select",
+          filters: { tournament_id: id, modality_id: currentModalityId },
+          order: [{ column: "round" }, { column: "position" }],
+        });
+        const luanaMatches = (inserted as any[] || []).filter(m => m.round >= 1);
+        const findM = (round: number, position: number, bracket_type: string = "winners") =>
+          luanaMatches.find((m: any) => m.round === round && m.position === position && (m.bracket_type || "winners") === bracket_type);
+
+        const linkUpdates: any[] = [];
+
+        // Repescagem → Quartas (slot team2_id)
+        for (const meta of repechageMeta) {
+          const repMatch = findM(1, meta.pos, "repechage");
+          const quarterMatch = findM(2, meta.quarterPos, "winners");
+          if (repMatch && quarterMatch) {
+            linkUpdates.push(organizerQuery({
+              table: "matches", operation: "update",
+              data: { next_win_match_id: quarterMatch.id },
+              filters: { id: repMatch.id },
+            }));
+          }
+        }
+
+        // Quartas → Semis (Mirrored Extremes: Q1↔Q4 → S1, Q2↔Q3 → S2)
+        const quarterToSemi: Record<number, number> = { 1: 1, 4: 1, 2: 2, 3: 2 };
+        for (let qp = 1; qp <= 4; qp++) {
+          const q = findM(2, qp, "winners");
+          const s = findM(3, quarterToSemi[qp], "winners");
+          if (q && s) {
+            linkUpdates.push(organizerQuery({
+              table: "matches", operation: "update",
+              data: { next_win_match_id: s.id },
+              filters: { id: q.id },
+            }));
+          }
+        }
+
+        // Semis → Final (vencedor) + 3º lugar (perdedor)
+        const finalM = findM(4, 1, "winners");
+        const thirdM = findM(4, 2, "third_place");
+        for (let sp = 1; sp <= 2; sp++) {
+          const s = findM(3, sp, "winners");
+          if (s && finalM) {
+            const linkData: any = { next_win_match_id: finalM.id };
+            if (thirdM) linkData.next_lose_match_id = thirdM.id;
+            linkUpdates.push(organizerQuery({
+              table: "matches", operation: "update",
+              data: linkData,
+              filters: { id: s.id },
+            }));
+          }
+        }
+
+        await Promise.all(linkUpdates);
+        console.log(`[MODO VERANICO] Estrutura criada: ${luanaShells.length} shells (4 reps + 4 quartas + 2 semis + final + 3º)`);
+      } else {
       // === PRE-GENERATE KNOCKOUT BRACKET STRUCTURE ===
       // Create empty match shells for all elimination rounds so they appear in the Sequence tab immediately
       const advancingCount = numGroups * config.teamsPerGroupAdvancing;
@@ -850,6 +1003,7 @@ const TournamentDetail = () => {
         }
         console.log(`[PreGen] Knockout shells created: ${koShells.length} matches for ${totalKORounds} rounds (${advancingCount} advancing → padded to ${nextPow})`);
       }
+      } // end else (não-luana)
 
       await organizerQuery({
         table: "tournaments",

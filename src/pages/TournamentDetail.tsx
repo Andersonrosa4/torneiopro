@@ -1347,6 +1347,49 @@ const TournamentDetail = () => {
 
     const allAdvancing = [...advancingTeamIds, ...indexTeamIds];
 
+    // === MODO VERANICO — preencher repescagens (2º×3º cruzados) e quartas (1º colocados) ===
+    const repechageShells = existingKnockout.filter((m: any) => m.bracket_type === "repechage");
+    if (repechageShells.length === 4 && brackets.length === 4) {
+      const g = (idx: number) => groupRankings[String(brackets[idx])] || [];
+      const numG = brackets.length;
+      // [pos, leftGroup (2º), rightGroup (3º), quarterPos (slot do 1º colocado adversário)]
+      const repechageMap = [
+        { pos: 1, left: 0, right: numG - 1, quarterPos: numG, firstGroup: numG - 1 },     // 2A×3D → Q4 vs 1D
+        { pos: 2, left: numG - 1, right: 0, quarterPos: 1, firstGroup: 0 },                // 2D×3A → Q1 vs 1A
+        { pos: 3, left: 1, right: numG - 2, quarterPos: numG - 1, firstGroup: numG - 2 }, // 2B×3C → Q3 vs 1C
+        { pos: 4, left: numG - 2, right: 1, quarterPos: 2, firstGroup: 1 },                // 2C×3B → Q2 vs 1B
+      ];
+      const findShell = (round: number, position: number, bt: string) =>
+        existingKnockout.find((m: any) => m.round === round && m.position === position && (m.bracket_type || "winners") === bt);
+
+      const veranicoUpdates: Promise<any>[] = [];
+      for (const meta of repechageMap) {
+        const second = g(meta.left)[1]?.teamId || null;
+        const third = g(meta.right)[2]?.teamId || null;
+        const repShell = findShell(1, meta.pos, "repechage");
+        if (repShell) {
+          veranicoUpdates.push(organizerQuery({
+            table: "matches", operation: "update",
+            data: { team1_id: second, team2_id: third },
+            filters: { id: repShell.id },
+          }));
+        }
+        const first = g(meta.firstGroup)[0]?.teamId || null;
+        const quarterShell = findShell(2, meta.quarterPos, "winners");
+        if (quarterShell) {
+          veranicoUpdates.push(organizerQuery({
+            table: "matches", operation: "update",
+            data: { team1_id: first },
+            filters: { id: quarterShell.id },
+          }));
+        }
+      }
+      await Promise.all(veranicoUpdates);
+      toast.success(`MODO VERANICO: repescagens (2º×3º) e quartas (1º colocados) preenchidas.`);
+      fetchData();
+      return;
+    }
+
     if (allAdvancing.length < 2) {
       toast.error("Duplas insuficientes para fase eliminatória.");
       return;

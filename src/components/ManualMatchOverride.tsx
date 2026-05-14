@@ -508,7 +508,7 @@ export function ManualMatchOverride({ match, matchNumber, teams, allMatches, tou
         title="Corrigir manualmente os slots e/ou vencedor desta partida"
       >
         <Wrench className="h-2.5 w-2.5" />
-        <span>Override</span>
+        <span>Corr. avanço</span>
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>

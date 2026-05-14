@@ -28,6 +28,7 @@ import { generateDoubleEliminationBracket } from "@/lib/doubleEliminationLogic";
 import { processDoubleEliminationAdvance, handleResetFinal } from "@/lib/doubleEliminationAdvance";
 import { computeAggressiveCascadeReset, computePartialCascadeResetSE } from "@/lib/aggressiveCascadeReset";
 import { distributeChapeus, getChapeuTeams, getRealTeams } from "@/lib/chapeuDistribution";
+import { eighthsToQuartersPosition, quartersToSemisPosition } from "@/lib/bracketCrossings";
 import { generateSeeds } from "@/engine/seedingEngine";
 import { runBugCombatant, startBackgroundWatchdog } from "@/lib/bugCombatant";
 import { checkAutoAdvance } from "@/engine/autoAdvanceEngine";
@@ -970,16 +971,12 @@ const TournamentDetail = () => {
                 const matchesInRound = nextPow / Math.pow(2, m.round);
                 const nextRoundMatchCount = nextPow / Math.pow(2, m.round + 1);
                 
-                // Cup-style crossing: in quarter-finals, pair extremes (1↔4, 2↔3)
+                // Cup-style crossing: quartas → semis (Mirrored Extremes)
                 if (m.round === quarterRound && numQuarterMatches === 4) {
-                  // Map: pos 1→semi 1, pos 2→semi 2, pos 3→semi 2, pos 4→semi 1
-                  const cupMap: Record<number, number> = { 1: 1, 2: 2, 3: 2, 4: 1 };
-                  nextPos = cupMap[m.position] || Math.ceil(m.position / 2);
+                  nextPos = quartersToSemisPosition(m.position);
                 } else if (matchesInRound === 8 && nextRoundMatchCount === 4) {
-                  // Cruzamento Oitavas → Quartas (Modo Veranico Oitavas):
-                  // Q1: O1×O6 | Q2: O3×O8 | Q3: O2×O5 | Q4: O4×O7
-                  const oitavasToQuartas: Record<number, number> = { 1: 1, 6: 1, 3: 2, 8: 2, 2: 3, 5: 3, 4: 4, 7: 4 };
-                  nextPos = oitavasToQuartas[m.position] || Math.ceil(m.position / 2);
+                  // Cruzamento Oitavas → Quartas (Modo Veranico Oitavas)
+                  nextPos = eighthsToQuartersPosition(m.position);
                 } else if (matchesInRound >= 8 && nextRoundMatchCount >= 4) {
                   // Extremity pairing for larger brackets
                   if (m.position <= matchesInRound / 2) {

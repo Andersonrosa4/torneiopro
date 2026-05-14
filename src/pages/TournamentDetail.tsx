@@ -747,10 +747,10 @@ const TournamentDetail = () => {
       const { error } = await organizerQuery({ table: "matches", operation: "insert", data: newMatches });
       if (error) { toast.error(error.message); return; }
 
-      // === MODO VERANICO — Grupos + Repescagem Cruzada (quartas) ===
+      // === MODO VERANICO — Grupos + Repescagem Intra-chave (apenas Quartas) ===
+      // Oitavas no Modo Veranico NÃO usa repescagem: 4 chaves × 4 vagas → 8 oitavas
+      // com cruzamento Mirrored Extremes A↔D / B↔C (vide bloco de preenchimento).
       const isLuanaQuarters = config.bracketMode === "luana_repechage" && config.luanaStartsAt === "quarters";
-      // === MODO VERANICO — Grupos + Repescagem Intra-chave (oitavas, 8 chaves) ===
-      const isLuanaEighths = config.bracketMode === "luana_repechage" && config.luanaStartsAt === "eighths" && numGroups === 8;
 
       if (isLuanaQuarters) {
         // Estrutura fixa: 4 grupos → 4 repescagens (R1) → 4 quartas (R2) → 2 semis (R3) → final + 3º (R4)

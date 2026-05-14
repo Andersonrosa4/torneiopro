@@ -11,10 +11,7 @@ import { getEliminationRoundLabel, getEliminationRoundShortLabel } from "@/lib/r
 import { buildSchedulerBlocks, schedulerSequence, getSchedulerBlockColor, getSchedulerBadgeColor, type SchedulerBlock } from "@/lib/roundScheduler";
 import { buildMatchNumberMap } from "@/lib/matchNumbering";
 import { ManualMatchOverride } from "@/components/ManualMatchOverride";
-import LiveScoreBoard from "@/components/LiveScoreBoard";
-import FutsalLiveScoreBoard from "@/components/FutsalLiveScoreBoard";
-import type { ScoringRules } from "@/lib/scoringEngine";
-import type { FutsalRules } from "@/lib/futsalScoringEngine";
+type ScoringRules = any;
 
 /* Helper: Convert number to letter (1→A, 2→B, etc) */
 const numberToLetter = (num: number): string => {
@@ -406,8 +403,8 @@ const MatchCard = ({
   const [isEditing, setIsEditing] = useState(false);
   const [liveScoreOpen, setLiveScoreOpen] = useState(false);
 
-  const isLiveScorable = (sport === "tennis" || sport === "padel" || sport === "futsal") && !!tournamentRules;
-  const isFutsal = sport === "futsal";
+  const isLiveScorable = false;
+  const isFutsal = false;
 
   useEffect(() => {
     setSetScores(initSets());

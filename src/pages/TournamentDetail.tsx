@@ -1468,24 +1468,11 @@ const TournamentDetail = () => {
 
     if (isLuanaEighthsFill) {
       const g = (idx: number) => groupRankings[String(brackets[idx])] || [];
-      const A = 0, B = 1, C = 2, D = 3;
       const teamAt = (grp: number, rankIdx: number) => g(grp)[rankIdx]?.teamId || null;
 
-      // Pareamento das oitavas (rank0=1º, rank1=2º, rank2=3º, rank3=4º):
-      // 1) A1×D4   2) B1×C4
-      // 3) C1×B4   4) D1×A4
-      // 5) A2×D3   6) B2×C3
-      // 7) C2×B3   8) D2×A3
-      const eighthsMap: { pos: number; t1: [number, number]; t2: [number, number] }[] = [
-        { pos: 1, t1: [A, 0], t2: [D, 3] },
-        { pos: 2, t1: [B, 0], t2: [C, 3] },
-        { pos: 3, t1: [C, 0], t2: [B, 3] },
-        { pos: 4, t1: [D, 0], t2: [A, 3] },
-        { pos: 5, t1: [A, 1], t2: [D, 2] },
-        { pos: 6, t1: [B, 1], t2: [C, 2] },
-        { pos: 7, t1: [C, 1], t2: [B, 2] },
-        { pos: 8, t1: [D, 1], t2: [A, 2] },
-      ];
+      // Pareamento das oitavas — fonte única em src/lib/veranicoEighthsMap.ts
+      // (visual e engine compartilham este mesmo map para evitar divergência)
+      const eighthsMap = VERANICO_EIGHTHS_MAP;
 
       const findShell = (round: number, position: number, bt: string = "winners") =>
         existingKnockout.find(

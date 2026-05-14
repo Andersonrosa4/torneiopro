@@ -35,33 +35,6 @@ const sports = [
     glowColor: "hsl(195 85% 45% / 0.35)",
     borderGlow: "hsl(195 85% 50% / 0.4)",
   },
-  {
-    id: "tennis",
-    name: "Tênis",
-    video: "/videos/sport-tennis.mp4",
-    subtitle: "Torneios · Chaveamento · Placar",
-    accent: "from-lime-500/80 to-green-600/80",
-    glowColor: "hsl(120 50% 40% / 0.35)",
-    borderGlow: "hsl(120 50% 45% / 0.4)",
-  },
-  {
-    id: "padel",
-    name: "Padel",
-    video: "/videos/sport-padel.mp4",
-    subtitle: "Torneios · Chaveamento · Placar",
-    accent: "from-violet-500/80 to-purple-600/80",
-    glowColor: "hsl(270 60% 50% / 0.35)",
-    borderGlow: "hsl(270 60% 55% / 0.4)",
-  },
-  {
-    id: "futsal",
-    name: "Futsal",
-    video: "/videos/sport-futsal.mp4",
-    subtitle: "Torneios · Chaveamento · Placar",
-    accent: "from-red-500/80 to-rose-600/80",
-    glowColor: "hsl(0 70% 50% / 0.35)",
-    borderGlow: "hsl(0 70% 55% / 0.4)",
-  },
 ];
 
 /* ---------- Cosmic particle field ---------- */

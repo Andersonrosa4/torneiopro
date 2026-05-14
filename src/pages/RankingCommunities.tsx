@@ -16,18 +16,12 @@ const sportLabels: Record<string, string> = {
   beach_tennis: "Beach Tennis",
   beach_volleyball: "Vôlei de Praia",
   futevolei: "Futevôlei",
-  tennis: "Tênis",
-  padel: "Padel",
-  futsal: "Futsal",
 };
 
 const sportEmojis: Record<string, string> = {
   beach_tennis: "🎾",
   beach_volleyball: "🏐",
   futevolei: "⚽🏐",
-  tennis: "🎾",
-  padel: "🏸",
-  futsal: "⚽",
 };
 
 interface Community {

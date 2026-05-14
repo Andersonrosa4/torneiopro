@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from "react";
 
-type SportType = "beach_volleyball" | "futevolei" | "beach_tennis" | "tennis" | "padel" | "futsal";
+type SportType = "beach_volleyball" | "futevolei" | "beach_tennis";
 
 interface SportContextType {
   selectedSport: SportType | null;

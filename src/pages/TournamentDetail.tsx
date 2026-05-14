@@ -75,6 +75,9 @@ const statusColors: Record<string, string> = {
 const sameMatchScope = (m: Match, ref: Match) =>
   m.modality_id === ref.modality_id && (m.stage_id ?? null) === (ref.stage_id ?? null);
 
+const sameStageScope = (stageId: string | null | undefined, selectedStageId: string | null) =>
+  (stageId ?? null) === (selectedStageId ?? null);
+
 const matchScopeFilters = (match: Match, tournamentId: string) => {
   const filters: Record<string, any> = match.modality_id
     ? { modality_id: match.modality_id }
@@ -82,6 +85,11 @@ const matchScopeFilters = (match: Match, tournamentId: string) => {
   if (match.stage_id !== undefined) filters.stage_id = match.stage_id ?? null;
   return filters;
 };
+
+const normalizeTeamName = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleLowerCase("pt-BR");
+
+const teamPairKey = (player1Name: string, player2Name: string) =>
+  [normalizeTeamName(player1Name), normalizeTeamName(player2Name)].sort().join("|");
 
 interface Team {
   id: string;
@@ -197,14 +205,14 @@ const TournamentDetail = () => {
     if (modalitiesLoading) return [];
     let result = selectedModality ? teams.filter(t => t.modality_id === selectedModality.id) 
       : modalities.length > 0 ? [] : teams;
-    if (selectedStageId) result = result.filter((t: any) => t.stage_id === selectedStageId);
+    result = result.filter((t: any) => sameStageScope(t.stage_id, selectedStageId));
     return result;
   }, [teams, selectedModality, modalities.length, modalitiesLoading, selectedStageId]);
   const filteredMatches = useMemo(() => {
     if (modalitiesLoading) return [];
     let result = selectedModality ? matches.filter(m => m.modality_id === selectedModality.id) 
       : modalities.length > 0 ? [] : matches;
-    if (selectedStageId) result = result.filter((m: any) => m.stage_id === selectedStageId);
+    result = result.filter((m: any) => sameStageScope(m.stage_id, selectedStageId));
     return result;
   }, [matches, selectedModality, modalities.length, modalitiesLoading, selectedStageId]);
 
@@ -597,6 +605,18 @@ const TournamentDetail = () => {
 
       const currentModalityId = selectedModality?.id || null;
       const currentStageId = selectedStageId || null;
+
+      const uniqueTeamIds = new Set(filteredTeams.map((team) => team.id));
+      if (uniqueTeamIds.size !== filteredTeams.length) {
+        toast.error("⛔ Geração bloqueada: há duplas repetidas na lista atual.");
+        return;
+      }
+
+      const uniquePairKeys = new Set(filteredTeams.map((team) => teamPairKey(team.player1_name, team.player2_name)));
+      if (uniquePairKeys.size !== filteredTeams.length) {
+        toast.error("⛔ Geração bloqueada: a mesma dupla aparece mais de uma vez nesta modalidade/etapa.");
+        return;
+      }
 
       // Delete only matches for the current modality — use bulk API
       if (selectedModality) {

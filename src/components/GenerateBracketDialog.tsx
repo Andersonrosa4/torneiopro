@@ -311,9 +311,9 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                   <div className="flex items-start gap-2">
                     <RadioGroupItem value="eighths" id="luanaEighths" className="mt-1" />
                     <Label htmlFor="luanaEighths" className="cursor-pointer flex-1">
-                      <span className="font-semibold text-foreground">Oitavas de Final</span> (16 vagas)
+                      <span className="font-semibold text-foreground">Oitavas de Final</span> (16 vagas — 8 chaves)
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        1º a 4º de cada chave passam direto às oitavas. Sem repescagem.
+                        1º de cada chave passa direto. 2º e 3º disputam repescagem dentro da própria chave (2A×3A, 2B×3B, …, 2H×3H). Cruzamento espelhado garante que o 1º só pode reencontrar alguém da própria chave na final.
                       </p>
                     </Label>
                   </div>

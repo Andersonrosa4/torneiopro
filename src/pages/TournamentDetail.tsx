@@ -2635,9 +2635,9 @@ const TournamentDetail = () => {
                 </span>
               </div>
             </div>
-            {isTournamentCompleted && isOwner && (
+            {isTournamentCompleted && isOwner && !isOnNewStage && (
               <div className="w-full rounded-lg border border-success/30 bg-success/10 px-4 py-2.5 text-sm text-success flex items-center gap-2">
-                🔒 Torneio finalizado — todas as alterações estão bloqueadas para preservar o histórico.
+                🔒 1ª Etapa finalizada — alterações bloqueadas apenas na 1ª Etapa. Crie uma nova etapa para continuar editando.
               </div>
             )}
             <div className="flex flex-wrap items-center gap-2 sm:gap-2 self-start">

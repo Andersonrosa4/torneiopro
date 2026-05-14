@@ -236,7 +236,7 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                       <Sparkles className="h-6 w-6 text-amber-400" />
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-lg font-bold text-foreground">Modo Luana — Grupos + Repescagem Cruzada</h3>
+                      <h3 className="text-lg font-bold text-foreground">MODO VERANICO — Grupos + Repescagem Cruzada</h3>
                       <p className="text-sm text-muted-foreground mt-1">
                         Fase de grupos onde 1º colocado passa direto. 2º e 3º disputam vagas
                         em cruzamento espelhado entre chaves (2A×3D, 2B×3C, etc).
@@ -269,7 +269,7 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-amber-400" />
-                Modo Luana — Grupos + Repescagem Cruzada
+                MODO VERANICO — Grupos + Repescagem Cruzada
               </DialogTitle>
               <DialogDescription>Configure o formato</DialogDescription>
             </DialogHeader>
@@ -333,14 +333,7 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                 onClick={handleGenerate}
                 className="flex-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:opacity-90"
               >
-                Gerar Modo Luana
-              </Button>
-            </div>
-          </>
-
-            <div className="flex gap-3 pt-2">
-              <Button variant="outline" onClick={() => setOpen(false)} className="flex-1">
-                Cancelar
+                Gerar MODO VERANICO
               </Button>
             </div>
           </>

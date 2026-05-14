@@ -59,17 +59,12 @@ export function generateFakeTeams(
   count: number,
   gender: FakeNameGender
 ): Array<{ player1: string; player2: string }> {
-  const totalAthletes = count * 2;
-  const firstsPool = shuffle(pickPool(gender));
-  const lastsPool = shuffle(LAST_NAMES);
-
   const pickUnique = (pool: string[], n: number): string[] => {
     const result: string[] = [];
     for (let i = 0; i < n; i++) {
       if (i < pool.length) {
         result.push(pool[i]);
       } else {
-        // pool esgotado: sufixa para garantir unicidade
         const base = pool[i % pool.length];
         const suffix = Math.floor(i / pool.length) + 1;
         result.push(`${base} ${suffix}`);
@@ -78,9 +73,19 @@ export function generateFakeTeams(
     return result;
   };
 
-  const firsts = pickUnique(firstsPool, totalAthletes);
-
   const teams: Array<{ player1: string; player2: string }> = [];
+
+  if (gender === "mixed") {
+    // Misto: cada dupla precisa ter 1 homem + 1 mulher
+    const males = pickUnique(shuffle(MALE_FIRST_NAMES), count);
+    const females = pickUnique(shuffle(FEMALE_FIRST_NAMES), count);
+    for (let i = 0; i < count; i++) {
+      teams.push({ player1: males[i], player2: females[i] });
+    }
+    return teams;
+  }
+
+  const firsts = pickUnique(shuffle(pickPool(gender)), count * 2);
   for (let i = 0; i < count; i++) {
     teams.push({
       player1: firsts[i * 2],
@@ -89,4 +94,5 @@ export function generateFakeTeams(
   }
   return teams;
 }
+
 

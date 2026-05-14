@@ -606,6 +606,18 @@ const TournamentDetail = () => {
       const currentModalityId = selectedModality?.id || null;
       const currentStageId = selectedStageId || null;
 
+      const uniqueTeamIds = new Set(filteredTeams.map((team) => team.id));
+      if (uniqueTeamIds.size !== filteredTeams.length) {
+        toast.error("⛔ Geração bloqueada: há duplas repetidas na lista atual.");
+        return;
+      }
+
+      const uniquePairKeys = new Set(filteredTeams.map((team) => teamPairKey(team.player1_name, team.player2_name)));
+      if (uniquePairKeys.size !== filteredTeams.length) {
+        toast.error("⛔ Geração bloqueada: a mesma dupla aparece mais de uma vez nesta modalidade/etapa.");
+        return;
+      }
+
       // Delete only matches for the current modality — use bulk API
       if (selectedModality) {
         await organizerQuery({

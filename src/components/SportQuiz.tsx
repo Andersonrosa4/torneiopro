@@ -29,9 +29,6 @@ const sportLabels: Record<string, string> = {
   beach_volleyball: "Vôlei de Praia",
   futevolei: "Futevôlei",
   beach_tennis: "Beach Tennis",
-  tennis: "Tênis",
-  padel: "Padel",
-  futsal: "Futsal",
 };
 
 const QUIZ_SIZE = 10;

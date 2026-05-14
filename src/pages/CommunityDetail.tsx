@@ -16,7 +16,7 @@ import { motion } from "framer-motion";
 
 const sportLabels: Record<string, string> = {
   beach_tennis: "Beach Tennis", beach_volleyball: "Vôlei de Praia",
-  futevolei: "Futevôlei", tennis: "Tênis", padel: "Padel", futsal: "Futsal",
+  futevolei: "Futevôlei",
 };
 
 interface Member {

@@ -19,27 +19,18 @@ const sportLabels: Record<string, string> = {
   beach_tennis: "Beach Tennis",
   beach_volleyball: "Vôlei de Praia",
   futevolei: "Futevôlei",
-  tennis: "Tênis",
-  padel: "Padel",
-  futsal: "Futsal",
 };
 
 const sportEmojis: Record<string, string> = {
   beach_tennis: "🎾",
   beach_volleyball: "🏐",
   futevolei: "⚽🏐",
-  tennis: "🎾",
-  padel: "🏸",
-  futsal: "⚽",
 };
 
 const sportColors: Record<string, string> = {
   beach_tennis: "from-sky-500 to-blue-600",
   beach_volleyball: "from-amber-500 to-orange-600",
   futevolei: "from-emerald-500 to-teal-600",
-  tennis: "from-lime-500 to-green-600",
-  padel: "from-violet-500 to-purple-600",
-  futsal: "from-red-500 to-rose-600",
 };
 
 const verbLabels: Record<string, string> = {

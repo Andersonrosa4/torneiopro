@@ -48,33 +48,6 @@ const sportOptions = [
     border: "hsl(155 55% 45% / 0.4)",
     bg: "hsl(155 55% 40% / 0.08)",
   },
-  {
-    id: "tennis",
-    name: "Tênis",
-    emoji: "🎾",
-    gradient: "from-lime-500 to-green-600",
-    glow: "hsl(120 50% 40% / 0.3)",
-    border: "hsl(120 50% 45% / 0.4)",
-    bg: "hsl(120 50% 40% / 0.08)",
-  },
-  {
-    id: "padel",
-    name: "Padel",
-    emoji: "🏸",
-    gradient: "from-violet-500 to-purple-600",
-    glow: "hsl(270 60% 50% / 0.3)",
-    border: "hsl(270 60% 55% / 0.4)",
-    bg: "hsl(270 60% 50% / 0.08)",
-  },
-  {
-    id: "futsal",
-    name: "Futsal",
-    emoji: "⚽",
-    gradient: "from-red-500 to-rose-600",
-    glow: "hsl(0 70% 50% / 0.3)",
-    border: "hsl(0 70% 55% / 0.4)",
-    bg: "hsl(0 70% 50% / 0.08)",
-  },
 ];
 
 const CourtBooking = () => {
@@ -317,7 +290,7 @@ const CourtBooking = () => {
             <Card className="border-[hsl(0_0%_100%/0.1)] bg-[hsl(220_15%_10%/0.8)] backdrop-blur-md">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-foreground">
-                  <MapPin className="h-5 w-5" style={{ color: `hsl(${activeSport.id === 'beach_tennis' ? '195 85% 50%' : activeSport.id === 'beach_volleyball' ? '35 85% 55%' : activeSport.id === 'futevolei' ? '155 55% 45%' : activeSport.id === 'tennis' ? '120 50% 45%' : activeSport.id === 'padel' ? '270 60% 55%' : '0 70% 55%'})` }} />
+                  <MapPin className="h-5 w-5" style={{ color: `hsl(${activeSport.id === 'beach_tennis' ? '195 85% 50%' : activeSport.id === 'beach_volleyball' ? '35 85% 55%' : '155 55% 45%'})` }} />
                   Localização — {selectedSport?.name}
                 </CardTitle>
               </CardHeader>

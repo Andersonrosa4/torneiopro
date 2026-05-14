@@ -29,9 +29,6 @@ const SPORT_TYPES = [
   { value: "beach_tennis", label: "Beach Tennis" },
   { value: "beach_volleyball", label: "Vôlei de Praia" },
   { value: "futevolei", label: "Futevôlei" },
-  { value: "padel", label: "Padel" },
-  { value: "tennis", label: "Tênis" },
-  { value: "futsal", label: "Futsal" },
   { value: "society", label: "Society" },
 ];
 

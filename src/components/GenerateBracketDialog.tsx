@@ -277,11 +277,7 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
             <div className="space-y-5 py-4">
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Número de Chaves (Grupos)</Label>
-                <Select
-                  value={luanaStartsAt === "eighths" ? "8" : luanaGroupCount}
-                  onValueChange={setLuanaGroupCount}
-                  disabled={luanaStartsAt === "eighths"}
-                >
+                <Select value={luanaGroupCount} onValueChange={setLuanaGroupCount}>
                   <SelectTrigger className="bg-card"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {[2, 3, 4, 5, 6, 8].map(n => (
@@ -290,15 +286,13 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  {luanaStartsAt === "eighths"
-                    ? "Oitavas exige exatamente 8 chaves (1º direto + repescagem 2º×3º intra-chave)."
-                    : `~${Math.floor(teamCount / Number(luanaGroupCount || 4))} duplas por chave`}
+                  ~{Math.floor(teamCount / Number(luanaGroupCount || 4))} duplas por chave
                 </p>
               </div>
 
               <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
                 <Label className="text-base font-semibold">O torneio inicia em:</Label>
-                <RadioGroup value={luanaStartsAt} onValueChange={(v) => { const next = v as "quarters" | "eighths"; setLuanaStartsAt(next); if (next === "eighths") setLuanaGroupCount("8"); }} className="space-y-2">
+                <RadioGroup value={luanaStartsAt} onValueChange={(v) => setLuanaStartsAt(v as "quarters" | "eighths")} className="space-y-2">
                   <div className="flex items-start gap-2">
                     <RadioGroupItem value="quarters" id="luanaQuarters" className="mt-1" />
                     <Label htmlFor="luanaQuarters" className="cursor-pointer flex-1">
@@ -311,9 +305,9 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                   <div className="flex items-start gap-2">
                     <RadioGroupItem value="eighths" id="luanaEighths" className="mt-1" />
                     <Label htmlFor="luanaEighths" className="cursor-pointer flex-1">
-                      <span className="font-semibold text-foreground">Oitavas de Final</span> (16 vagas — 8 chaves)
+                      <span className="font-semibold text-foreground">Oitavas de Final</span> (16 vagas — 4 chaves × 4)
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        1º de cada chave passa direto. 2º e 3º disputam repescagem dentro da própria chave (2A×3A, 2B×3B, …, 2H×3H). Cruzamento espelhado garante que o 1º só pode reencontrar alguém da própria chave na final.
+                        1º a 4º de cada chave passam direto. Sem repescagem. Cruzamento A×D e B×C: 1) A1×D4, 2) B1×C4, 3) C1×B4, 4) D1×A4, 5) A2×D3, 6) B2×C3, 7) C2×B3, 8) D2×A3.
                       </p>
                     </Label>
                   </div>

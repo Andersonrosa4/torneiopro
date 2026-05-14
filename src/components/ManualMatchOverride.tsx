@@ -582,11 +582,15 @@ export function ManualMatchOverride({ match, matchNumber, teams, allMatches, tou
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE} className="text-xs text-muted-foreground italic">— Sem vencedor (partida pendente) —</SelectItem>
-                  {teams.map(t => (
-                    <SelectItem key={t.id} value={t.id} className="text-xs text-success font-medium">
-                      🏆 {t.player1_name} / {t.player2_name}
-                    </SelectItem>
-                  ))}
+                  {[team1, team2]
+                    .filter(id => id && id !== NONE)
+                    .map(id => teams.find(t => t.id === id))
+                    .filter((t): t is typeof teams[number] => !!t)
+                    .map(t => (
+                      <SelectItem key={t.id} value={t.id} className="text-xs text-success font-medium">
+                        🏆 {t.player1_name} / {t.player2_name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

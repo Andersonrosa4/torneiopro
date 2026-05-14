@@ -1224,7 +1224,7 @@ const TournamentDetail = () => {
 
       if (postGenMatches && postGenMatches.length > 0) {
         const postFormat = config.bracketMode === 'double_elimination' ? 'double_elimination' : (tournament?.format || 'single_elimination');
-        const postTeamCount = filteredTeams.length;
+        const postTeamCount = scopedTeams.length;
         const result = validatePostGeneration(postGenMatches, postFormat, postTeamCount);
 
         // ── AUTO-REPAIR: aplicar correções automaticamente ──

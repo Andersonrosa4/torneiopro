@@ -2298,7 +2298,8 @@ const TournamentDetail = () => {
       toast.success("Avanço automático realizado!");
     } else {
       // Normal bracket: IMMEDIATE propagation via next_win_match_id
-      if (match.next_win_match_id) {
+      // GUARD: Group-stage matches (round 0) NEVER propagate — round-robin only.
+      if (!isGroupStageMatch && match.next_win_match_id) {
         const isTopSlot = match.position % 2 === 1;
         const slotField = isTopSlot ? 'team1_id' : 'team2_id';
         await organizerQuery({
@@ -2311,7 +2312,7 @@ const TournamentDetail = () => {
       }
 
       // Normal bracket: propagate LOSER to 3rd place match via next_lose_match_id
-      if (match.next_lose_match_id && loserId) {
+      if (!isGroupStageMatch && match.next_lose_match_id && loserId) {
         const isTopSlot = match.position % 2 === 1;
         const slotField = isTopSlot ? 'team1_id' : 'team2_id';
         await organizerQuery({

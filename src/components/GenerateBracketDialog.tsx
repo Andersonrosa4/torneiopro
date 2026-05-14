@@ -277,7 +277,11 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
             <div className="space-y-5 py-4">
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Número de Chaves (Grupos)</Label>
-                <Select value={luanaGroupCount} onValueChange={setLuanaGroupCount}>
+                <Select
+                  value={luanaStartsAt === "eighths" ? "8" : luanaGroupCount}
+                  onValueChange={setLuanaGroupCount}
+                  disabled={luanaStartsAt === "eighths"}
+                >
                   <SelectTrigger className="bg-card"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {[2, 3, 4, 5, 6, 8].map(n => (
@@ -286,7 +290,9 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  ~{Math.floor(teamCount / Number(luanaGroupCount || 4))} duplas por chave
+                  {luanaStartsAt === "eighths"
+                    ? "Oitavas exige exatamente 8 chaves (1º direto + repescagem 2º×3º intra-chave)."
+                    : `~${Math.floor(teamCount / Number(luanaGroupCount || 4))} duplas por chave`}
                 </p>
               </div>
 

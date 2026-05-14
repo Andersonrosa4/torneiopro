@@ -96,12 +96,6 @@ const CreateTournament = () => {
       return;
     }
 
-      if (rulesError) {
-        console.error("Error saving rules:", rulesError);
-        // Non-blocking: tournament was created, rules can be set later
-      }
-    }
-
     toast.success(`Torneio criado! Código: ${normalizedCode}`);
     navigate(`/tournaments/${data.id}`);
     setLoading(false);
@@ -162,9 +156,6 @@ const CreateTournament = () => {
                     <SelectItem value="beach_volleyball">🏐 Vôlei de Praia</SelectItem>
                     <SelectItem value="futevolei">⚽ Futevôlei</SelectItem>
                     <SelectItem value="beach_tennis">🎾 Beach Tennis</SelectItem>
-                    <SelectItem value="tennis">🎾 Tênis</SelectItem>
-                    <SelectItem value="padel">🏓 Padel</SelectItem>
-                    <SelectItem value="futsal">⚽ Futsal</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -178,16 +169,6 @@ const CreateTournament = () => {
                 />
               </div>
             </div>
-
-            {/* Rules configuration for tennis/padel */}
-            {showRules && (
-              <div className="space-y-2">
-                <Label className="text-base font-semibold">⚙️ Configurações de Regras</Label>
-                <SafeBoundary label="TournamentRulesForm">
-                  <TournamentRulesForm sport={form.sport} rules={rules} onChange={setRules} />
-                </SafeBoundary>
-              </div>
-            )}
 
             <div className="space-y-2">
               <Label>Visibilidade</Label>

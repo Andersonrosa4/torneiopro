@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Play, Users, Trophy, Swords, ShieldCheck } from "lucide-react";
+import { Play, Users, Trophy, Swords, ShieldCheck, Sparkles } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface Team {
@@ -15,7 +15,7 @@ interface Team {
   seed: number | null;
 }
 
-export type BracketMode = "normal" | "double_elimination";
+export type BracketMode = "normal" | "double_elimination" | "luana_repechage";
 
 interface GenerateBracketDialogProps {
   onGenerate: (config: {
@@ -33,14 +33,18 @@ interface GenerateBracketDialogProps {
     byeTeamIds: string[];
     useIndex: boolean;
     numIndexTeams?: number;
+    luanaStartsAt?: "quarters" | "eighths";
+    luanaGroupCount?: number;
   }) => void;
   teamCount: number;
   teams: Team[];
   isDisabled: boolean;
   sport: string;
+  /** Quando true, exibe a opção "Modo Luana — Grupos + Repescagem Cruzada" (apenas Vôlei de Praia). */
+  showLuanaMode?: boolean;
 }
 
-export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled, sport }: GenerateBracketDialogProps) => {
+export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled, sport, showLuanaMode }: GenerateBracketDialogProps) => {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"mode" | "config">("mode");
   const [bracketMode, setBracketMode] = useState<BracketMode>("normal");

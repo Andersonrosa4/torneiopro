@@ -749,6 +749,8 @@ const TournamentDetail = () => {
 
       // === MODO VERANICO — Grupos + Repescagem Cruzada (quartas) ===
       const isLuanaQuarters = config.bracketMode === "luana_repechage" && config.luanaStartsAt === "quarters";
+      // === MODO VERANICO — Grupos + Repescagem Intra-chave (oitavas, 8 chaves) ===
+      const isLuanaEighths = config.bracketMode === "luana_repechage" && config.luanaStartsAt === "eighths" && numGroups === 8;
 
       if (isLuanaQuarters) {
         // Estrutura fixa: 4 grupos → 4 repescagens (R1) → 4 quartas (R2) → 2 semis (R3) → final + 3º (R4)
@@ -899,6 +901,159 @@ const TournamentDetail = () => {
 
         await Promise.all(linkUpdates);
         console.log(`[MODO VERANICO] Estrutura criada: ${luanaShells.length} shells (4 reps + 4 quartas + 2 semis + final + 3º)`);
+      } else if (isLuanaEighths) {
+        // === MODO VERANICO — Oitavas (8 chaves, repescagem 2º×3º intra-chave) ===
+        // Estrutura: 8 grupos → 8 repescagens (R1) → 8 oitavas (R2) → 4 quartas (R3) → 2 semis (R4) → final + 3º (R5)
+        //
+        // OITAVAS — cruzamento espelhado garantindo que o 1º de cada chave SÓ
+        // possa reencontrar alguém da própria chave na FINAL:
+        //   O1: 1A × Vencedor(R1P7=2G×3G)
+        //   O2: 1B × Vencedor(R1P8=2H×3H)
+        //   O3: 1C × Vencedor(R1P5=2E×3E)
+        //   O4: 1D × Vencedor(R1P6=2F×3F)
+        //   O5: 1E × Vencedor(R1P3=2C×3C)
+        //   O6: 1F × Vencedor(R1P4=2D×3D)
+        //   O7: 1G × Vencedor(R1P1=2A×3A)
+        //   O8: 1H × Vencedor(R1P2=2B×3B)
+        // Quartas: Q1=O1+O8, Q2=O2+O7, Q3=O3+O6, Q4=O4+O5
+        // Semis:   S1=Q1+Q4, S2=Q2+Q3
+        const oitavasMeta = [
+          { pos: 1, repPos: 7, eighthToQ: 1 },
+          { pos: 2, repPos: 8, eighthToQ: 2 },
+          { pos: 3, repPos: 5, eighthToQ: 3 },
+          { pos: 4, repPos: 6, eighthToQ: 4 },
+          { pos: 5, repPos: 3, eighthToQ: 4 },
+          { pos: 6, repPos: 4, eighthToQ: 3 },
+          { pos: 7, repPos: 1, eighthToQ: 2 },
+          { pos: 8, repPos: 2, eighthToQ: 1 },
+        ];
+
+        const luanaShells: any[] = [];
+
+        // R1 — 8 repescagens intra-chave (sem times)
+        for (let p = 1; p <= 8; p++) {
+          luanaShells.push({
+            tournament_id: id, round: 1, position: p,
+            team1_id: null, team2_id: null, status: "pending",
+            bracket_number: 1, bracket_type: "repechage",
+            modality_id: currentModalityId, stage_id: currentStageId,
+          });
+        }
+        // R2 — 8 oitavas
+        for (let p = 1; p <= 8; p++) {
+          luanaShells.push({
+            tournament_id: id, round: 2, position: p,
+            team1_id: null, team2_id: null, status: "pending",
+            bracket_number: 1, bracket_type: "winners",
+            modality_id: currentModalityId, stage_id: currentStageId,
+          });
+        }
+        // R3 — 4 quartas
+        for (let p = 1; p <= 4; p++) {
+          luanaShells.push({
+            tournament_id: id, round: 3, position: p,
+            team1_id: null, team2_id: null, status: "pending",
+            bracket_number: 1, bracket_type: "winners",
+            modality_id: currentModalityId, stage_id: currentStageId,
+          });
+        }
+        // R4 — 2 semis
+        for (let p = 1; p <= 2; p++) {
+          luanaShells.push({
+            tournament_id: id, round: 4, position: p,
+            team1_id: null, team2_id: null, status: "pending",
+            bracket_number: 1, bracket_type: "winners",
+            modality_id: currentModalityId, stage_id: currentStageId,
+          });
+        }
+        // R5 — Final + 3º lugar
+        luanaShells.push({
+          tournament_id: id, round: 5, position: 1,
+          team1_id: null, team2_id: null, status: "pending",
+          bracket_number: 1, bracket_type: "winners",
+          modality_id: currentModalityId, stage_id: currentStageId,
+        });
+        luanaShells.push({
+          tournament_id: id, round: 5, position: 2,
+          team1_id: null, team2_id: null, status: "pending",
+          bracket_number: 1, bracket_type: "third_place",
+          modality_id: currentModalityId, stage_id: currentStageId,
+        });
+
+        const { error: shellErr } = await organizerQuery({ table: "matches", operation: "insert", data: luanaShells });
+        if (shellErr) { toast.error(shellErr.message); return; }
+
+        const { data: inserted } = await organizerQuery({
+          table: "matches",
+          operation: "select",
+          filters: { tournament_id: id, modality_id: currentModalityId },
+          order: [{ column: "round" }, { column: "position" }],
+        });
+        const luanaMatches = (inserted as any[] || []).filter(m => m.round >= 1);
+        const findM = (round: number, position: number, bracket_type: string = "winners") =>
+          luanaMatches.find((m: any) => m.round === round && m.position === position && (m.bracket_type || "winners") === bracket_type);
+
+        const linkUpdates: any[] = [];
+
+        // Repescagem (R1) → Oitavas (R2) — slot team2_id
+        for (const meta of oitavasMeta) {
+          const repM = findM(1, meta.repPos, "repechage");
+          const oitM = findM(2, meta.pos, "winners");
+          if (repM && oitM) {
+            linkUpdates.push(organizerQuery({
+              table: "matches", operation: "update",
+              data: { next_win_match_id: oitM.id },
+              filters: { id: repM.id },
+            }));
+          }
+        }
+
+        // Oitavas (R2) → Quartas (R3): O1+O8→Q1, O2+O7→Q2, O3+O6→Q3, O4+O5→Q4
+        const oitToQuarter: Record<number, number> = { 1: 1, 8: 1, 2: 2, 7: 2, 3: 3, 6: 3, 4: 4, 5: 4 };
+        for (let op = 1; op <= 8; op++) {
+          const o = findM(2, op, "winners");
+          const q = findM(3, oitToQuarter[op], "winners");
+          if (o && q) {
+            linkUpdates.push(organizerQuery({
+              table: "matches", operation: "update",
+              data: { next_win_match_id: q.id },
+              filters: { id: o.id },
+            }));
+          }
+        }
+
+        // Quartas (R3) → Semis (R4): Q1+Q4→S1, Q2+Q3→S2
+        const quarterToSemi: Record<number, number> = { 1: 1, 4: 1, 2: 2, 3: 2 };
+        for (let qp = 1; qp <= 4; qp++) {
+          const q = findM(3, qp, "winners");
+          const s = findM(4, quarterToSemi[qp], "winners");
+          if (q && s) {
+            linkUpdates.push(organizerQuery({
+              table: "matches", operation: "update",
+              data: { next_win_match_id: s.id },
+              filters: { id: q.id },
+            }));
+          }
+        }
+
+        // Semis (R4) → Final (R5P1) + 3º lugar (R5P2)
+        const finalM = findM(5, 1, "winners");
+        const thirdM = findM(5, 2, "third_place");
+        for (let sp = 1; sp <= 2; sp++) {
+          const s = findM(4, sp, "winners");
+          if (s && finalM) {
+            const linkData: any = { next_win_match_id: finalM.id };
+            if (thirdM) linkData.next_lose_match_id = thirdM.id;
+            linkUpdates.push(organizerQuery({
+              table: "matches", operation: "update",
+              data: linkData,
+              filters: { id: s.id },
+            }));
+          }
+        }
+
+        await Promise.all(linkUpdates);
+        console.log(`[MODO VERANICO Oitavas] Estrutura criada: ${luanaShells.length} shells (8 reps + 8 oitavas + 4 quartas + 2 semis + final + 3º)`);
       } else {
       // === PRE-GENERATE KNOCKOUT BRACKET STRUCTURE ===
       // Create empty match shells for all elimination rounds so they appear in the Sequence tab immediately

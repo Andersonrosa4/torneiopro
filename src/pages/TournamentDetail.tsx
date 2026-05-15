@@ -1053,6 +1053,25 @@ const TournamentDetail = () => {
         } else {
           console.warn(`[MODO VERANICO] Estrutura criada com avisos: ${failed.length} falhas iniciais, ${missing.length} reaplicados`);
         }
+        await logVeranico({
+          tournament_id: id!, modality_id: currentModalityId, stage_id: currentStageId,
+          action: "veranico.quarters.links_written",
+          detail: {
+            links_total: linkDescs.length,
+            failed_initial: failed.length,
+            failed_labels: failed.map(f => f.label),
+            reapplied: missing.length,
+            reapplied_labels: missing.map(m => m.label),
+          },
+        });
+        await logVeranico({
+          tournament_id: id!, modality_id: currentModalityId, stage_id: currentStageId,
+          action: "veranico.quarters.links_verified",
+          detail: {
+            ok: failed.length === 0 && missing.length === 0,
+            broken_after_repair: missing.filter(m => failed.some(f => f.matchId === m.matchId)).length,
+          },
+        });
       } else {
       // === PRE-GENERATE KNOCKOUT BRACKET STRUCTURE ===
       // Create empty match shells for all elimination rounds so they appear in the Sequence tab immediately

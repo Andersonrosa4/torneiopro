@@ -765,7 +765,8 @@ const NormalKnockout = ({
             const matchCount = roundMatches.length;
             const isFinal = matchCount === 1 && round === maxRound;
             const isSemi = matchCount <= 2 && round === maxRound - 1 && !isFinal;
-            const roundLabel = getEliminationRoundLabel(round, matchCountByRound[round] || 0);
+            const isAllRepechage = roundMatches.length > 0 && roundMatches.every(m => (m as any).bracket_type === 'repechage');
+            const roundLabel = isAllRepechage ? "Repescagem" : getEliminationRoundLabel(round, matchCountByRound[round] || 0);
             const scale = isFinal ? "final" : isSemi ? "semi" : "normal";
 
             return (

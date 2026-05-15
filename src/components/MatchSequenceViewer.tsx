@@ -463,8 +463,9 @@ const MatchCard = ({
   const feederLabels = useMemo(() => {
     if (match.round === 0) return { team1: null, team2: null };
 
-    // ── MODO VERANICO (Quartas com Repescagem Intra-chave) ──
-    // R1 repechage: 4 jogos "2º X vs 3º X" (mesma chave) → vencedor enfrenta 1º cruzado nas Quartas (R2).
+    // ── MODO VERANICO (Quartas com Repescagem CRUZADA A↔D / B↔C) ──
+    // R1 repechage: 4 jogos cruzando chaves (2A×3D, 2D×3A, 2B×3C, 2C×3B)
+    //   → vencedor enfrenta 1º colocado em quarta cruzada (R2).
     // R2 quartas: team1 = "1º X" (X = letra da posição), team2 = "Venc. Jogo Y" via feeder.
     {
       const groupRound0V = allMatches.filter(m => m.round === 0 && m.bracket_number);
@@ -476,10 +477,17 @@ const MatchCard = ({
 
       if (isVeranicoQuarters) {
         if (match.round === 1 && (match as any).bracket_type === 'repechage') {
-          const letter = String.fromCharCode(65 + (match.position - 1));
+          // Mapa cruzado por posição: P1=2A×3D, P2=2D×3A, P3=2B×3C, P4=2C×3B
+          const crossMap: Record<number, { t1: string; t2: string }> = {
+            1: { t1: '2º A', t2: '3º D' },
+            2: { t1: '2º D', t2: '3º A' },
+            3: { t1: '2º B', t2: '3º C' },
+            4: { t1: '2º C', t2: '3º B' },
+          };
+          const labels = crossMap[match.position] || { t1: '2º ?', t2: '3º ?' };
           return {
-            team1: match.team1_id ? null : `2º ${letter}`,
-            team2: match.team2_id ? null : `3º ${letter}`,
+            team1: match.team1_id ? null : labels.t1,
+            team2: match.team2_id ? null : labels.t2,
           };
         }
         if (match.round === 2 && ((match as any).bracket_type || 'winners') === 'winners') {

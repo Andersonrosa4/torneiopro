@@ -81,6 +81,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       if (session?.user) {
+        // Validate session is still valid server-side (may have been revoked)
+        const { error: userErr } = await supabase.auth.getUser();
+        if (userErr) {
+          console.warn("Stored session is invalid, signing out:", userErr.message);
+          await supabase.auth.signOut().catch(() => {});
+          setLoading(false);
+          return;
+        }
         _accessToken = session.access_token;
         setAccessToken(session.access_token);
         setUser({ id: session.user.id });

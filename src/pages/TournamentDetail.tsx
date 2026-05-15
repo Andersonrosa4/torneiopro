@@ -3118,6 +3118,16 @@ const TournamentDetail = () => {
                     <Input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} placeholder="Nome do torneio" />
                   </div>
                   <div className="space-y-1.5">
+                    <label className="text-sm font-semibold">Código do Torneio *</label>
+                    <Input
+                      value={editForm.tournament_code}
+                      onChange={e => setEditForm(f => ({ ...f, tournament_code: e.target.value.toUpperCase() }))}
+                      placeholder="Ex: VERAO2026"
+                      className="font-mono tracking-wider"
+                    />
+                    <p className="text-xs text-muted-foreground">Letras e números. Será convertido para maiúsculas. Deve ser único.</p>
+                  </div>
+                  <div className="space-y-1.5">
                     <label className="text-sm font-semibold">Descrição</label>
                     <Input value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} placeholder="Descrição opcional" />
                   </div>

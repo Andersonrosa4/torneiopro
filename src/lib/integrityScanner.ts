@@ -166,3 +166,193 @@ export async function assertTournamentIntegrity(
     throw new Error(`[INTEGRITY] ${errors.length} erro(s) detectado(s):\n${summary}`);
   }
 }
+
+// =============================================================================
+// PROPAGATION CONSISTENCY SCANNER
+// =============================================================================
+// Verifica, partida a partida concluída, se o vencedor declarado foi
+// efetivamente propagado para o slot correto da próxima partida (next_win)
+// e — quando aplicável — se o perdedor caiu no destino correto (next_lose,
+// usado em 3º lugar e em chaves de dupla eliminação).
+// =============================================================================
+
+export interface PropagationIssue {
+  matchId: string;
+  modalityId: string | null;
+  round: number;
+  position: number;
+  bracketType: string;
+  kind: "winner_not_propagated" | "loser_not_propagated" | "wrong_team_in_destination" | "dangling_destination";
+  detail: string;
+}
+
+export interface ModalityConsistencyReport {
+  modalityId: string;
+  modalityName: string;
+  totalMatches: number;
+  completedMatches: number;
+  expectedPropagations: number;     // total de slots de destino que deveriam estar preenchidos
+  successfulPropagations: number;   // slots corretamente preenchidos
+  brokenPropagations: number;       // slots ausentes ou com time errado
+  issues: PropagationIssue[];
+  ok: boolean;
+}
+
+export interface PropagationConsistencyReport {
+  ok: boolean;
+  scannedAt: string;
+  totalIssues: number;
+  modalities: ModalityConsistencyReport[];
+}
+
+/**
+ * Varre TODAS as modalidades de um torneio e devolve um relatório agrupado
+ * com a contagem de propagações quebradas por modalidade.
+ *
+ * Regras de checagem:
+ *  - Toda match `completed` com `winner_team_id` E com `next_win_match_id`
+ *    deve resultar no winner_team_id presente em team1_id OU team2_id da
+ *    partida de destino (a menos que a partida de destino também esteja
+ *    `completed` — nesse caso já foi consumida).
+ *  - Se houver `next_lose_match_id` (3º lugar / dupla eliminação), o
+ *    perdedor (= o time que não venceu) deve estar presente no destino,
+ *    nas mesmas condições.
+ *  - Destino inexistente (id presente mas não está na lista) = dangling.
+ */
+export async function scanPropagationConsistency(
+  tournamentId: string
+): Promise<PropagationConsistencyReport> {
+  // 1) Modalidades
+  const { data: mods, error: modErr } = await supabase
+    .from("modalities")
+    .select("id, name")
+    .eq("tournament_id", tournamentId);
+
+  if (modErr) {
+    return {
+      ok: false,
+      scannedAt: new Date().toISOString(),
+      totalIssues: 0,
+      modalities: [],
+    };
+  }
+
+  // 2) Todas as partidas do torneio (uma única query)
+  const { data: matches } = await supabase
+    .from("matches")
+    .select("id, modality_id, round, position, bracket_type, status, team1_id, team2_id, winner_team_id, next_win_match_id, next_lose_match_id")
+    .eq("tournament_id", tournamentId);
+
+  const all = (matches ?? []) as any[];
+  const byId = new Map<string, any>(all.map((m) => [m.id, m]));
+
+  const modalityReports: ModalityConsistencyReport[] = [];
+  let totalIssues = 0;
+
+  for (const mod of (mods ?? [])) {
+    const modMatches = all.filter((m) => m.modality_id === mod.id);
+    const completed = modMatches.filter((m) => m.status === "completed" && m.winner_team_id);
+
+    let expected = 0;
+    let success = 0;
+    const issues: PropagationIssue[] = [];
+
+    for (const m of completed) {
+      const loserId =
+        m.team1_id && m.team2_id
+          ? m.winner_team_id === m.team1_id
+            ? m.team2_id
+            : m.winner_team_id === m.team2_id
+              ? m.team1_id
+              : null
+          : null;
+
+      // ── Vencedor → next_win
+      if (m.next_win_match_id) {
+        expected++;
+        const dest = byId.get(m.next_win_match_id);
+        if (!dest) {
+          issues.push({
+            matchId: m.id, modalityId: m.modality_id, round: m.round, position: m.position,
+            bracketType: m.bracket_type ?? "winners",
+            kind: "dangling_destination",
+            detail: `Destino do vencedor (R${m.round}P${m.position}) não existe (${m.next_win_match_id})`,
+          });
+        } else if (dest.status === "completed") {
+          // já consumido — considera ok
+          success++;
+        } else if (dest.team1_id === m.winner_team_id || dest.team2_id === m.winner_team_id) {
+          success++;
+        } else if (!dest.team1_id && !dest.team2_id) {
+          issues.push({
+            matchId: m.id, modalityId: m.modality_id, round: m.round, position: m.position,
+            bracketType: m.bracket_type ?? "winners",
+            kind: "winner_not_propagated",
+            detail: `Vencedor da R${m.round}P${m.position} não foi colocado em R${dest.round}P${dest.position}`,
+          });
+        } else {
+          issues.push({
+            matchId: m.id, modalityId: m.modality_id, round: m.round, position: m.position,
+            bracketType: m.bracket_type ?? "winners",
+            kind: "wrong_team_in_destination",
+            detail: `Slot de destino R${dest.round}P${dest.position} preenchido com outro time (esperado vencedor de R${m.round}P${m.position})`,
+          });
+        }
+      }
+
+      // ── Perdedor → next_lose (3º lugar / dupla eliminação)
+      if (m.next_lose_match_id && loserId) {
+        expected++;
+        const dest = byId.get(m.next_lose_match_id);
+        if (!dest) {
+          issues.push({
+            matchId: m.id, modalityId: m.modality_id, round: m.round, position: m.position,
+            bracketType: m.bracket_type ?? "winners",
+            kind: "dangling_destination",
+            detail: `Destino do perdedor (R${m.round}P${m.position}) não existe (${m.next_lose_match_id})`,
+          });
+        } else if (dest.status === "completed") {
+          success++;
+        } else if (dest.team1_id === loserId || dest.team2_id === loserId) {
+          success++;
+        } else if (!dest.team1_id && !dest.team2_id) {
+          issues.push({
+            matchId: m.id, modalityId: m.modality_id, round: m.round, position: m.position,
+            bracketType: m.bracket_type ?? "winners",
+            kind: "loser_not_propagated",
+            detail: `Perdedor da R${m.round}P${m.position} não foi colocado em R${dest.round}P${dest.position}`,
+          });
+        } else {
+          issues.push({
+            matchId: m.id, modalityId: m.modality_id, round: m.round, position: m.position,
+            bracketType: m.bracket_type ?? "winners",
+            kind: "wrong_team_in_destination",
+            detail: `Slot de perdedor R${dest.round}P${dest.position} preenchido com outro time`,
+          });
+        }
+      }
+    }
+
+    const broken = issues.length;
+    totalIssues += broken;
+
+    modalityReports.push({
+      modalityId: mod.id,
+      modalityName: mod.name,
+      totalMatches: modMatches.length,
+      completedMatches: completed.length,
+      expectedPropagations: expected,
+      successfulPropagations: success,
+      brokenPropagations: broken,
+      issues,
+      ok: broken === 0,
+    });
+  }
+
+  return {
+    ok: totalIssues === 0,
+    scannedAt: new Date().toISOString(),
+    totalIssues,
+    modalities: modalityReports,
+  };
+}

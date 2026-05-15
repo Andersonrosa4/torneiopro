@@ -830,16 +830,16 @@ const TournamentDetail = () => {
 
       if (isLuanaQuarters) {
         // Estrutura fixa: 4 grupos → 4 repescagens (R1) → 4 quartas (R2) → 2 semis (R3) → final + 3º (R4)
-        // Repescagem CRUZADA (A↔D e B↔C) — pareamento das Quartas redefinido:
-        //   R1P1 (Jogo 25): 2A × 3D  → vencedor enfrenta 1C na Quartas Pos 3 (Jogo 31)
+        // Repescagem CRUZADA (A↔D e B↔C) — pareamento visual das Quartas:
+        //   R1P1 (Jogo 25): 2A × 3D  → vencedor enfrenta 1B na Quartas Pos 2 (Jogo 31)
         //   R1P2 (Jogo 26): 2D × 3A  → vencedor enfrenta 1A na Quartas Pos 1 (Jogo 29)
-        //   R1P3 (Jogo 27): 2B × 3C  → vencedor enfrenta 1B na Quartas Pos 2 (Jogo 30)
-        //   R1P4 (Jogo 28): 2C × 3B  → vencedor enfrenta 1D na Quartas Pos 4 (Jogo 32)
+        //   R1P3 (Jogo 27): 2B × 3C  → vencedor enfrenta 1D na Quartas Pos 4 (Jogo 30)
+        //   R1P4 (Jogo 28): 2C × 3B  → vencedor enfrenta 1C na Quartas Pos 3 (Jogo 32)
         const repechageMeta = [
-          { pos: 1, leftGroup: 0,             rightGroup: numGroups - 1, quarterPos: numGroups - 1 }, // 2A×3D → Q3 (1C)
+          { pos: 1, leftGroup: 0,             rightGroup: numGroups - 1, quarterPos: 2 },             // 2A×3D → Q2 (1B)
           { pos: 2, leftGroup: numGroups - 1, rightGroup: 0,             quarterPos: 1 },             // 2D×3A → Q1 (1A)
-          { pos: 3, leftGroup: 1,             rightGroup: numGroups - 2, quarterPos: 2 },             // 2B×3C → Q2 (1B)
-          { pos: 4, leftGroup: numGroups - 2, rightGroup: 1,             quarterPos: numGroups },     // 2C×3B → Q4 (1D)
+          { pos: 3, leftGroup: 1,             rightGroup: numGroups - 2, quarterPos: numGroups },     // 2B×3C → Q4 (1D)
+          { pos: 4, leftGroup: numGroups - 2, rightGroup: 1,             quarterPos: numGroups - 1 }, // 2C×3B → Q3 (1C)
         ];
 
 

@@ -156,7 +156,7 @@ const TournamentDetail = () => {
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState("");
   const [editTournamentOpen, setEditTournamentOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ name: "", description: "", location: "", event_date: "", category: "", status: "", registration_value: "" });
+  const [editForm, setEditForm] = useState({ name: "", description: "", location: "", event_date: "", category: "", status: "", registration_value: "", tournament_code: "" });
   const [savingTournament, setSavingTournament] = useState(false);
   const [isAssociatedOrganizer, setIsAssociatedOrganizer] = useState(false);
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
@@ -489,13 +489,32 @@ const TournamentDetail = () => {
       category: tournament?.category || "",
       status: tournament?.status || "",
       registration_value: tournament?.registration_value != null ? String(tournament.registration_value) : "",
+      tournament_code: tournament?.tournament_code || "",
     });
     setEditTournamentOpen(true);
   };
 
   const saveTournament = async () => {
     if (!editForm.name.trim()) { toast.error("Nome é obrigatório"); return; }
+    const normalizedCode = editForm.tournament_code.trim().toUpperCase();
+    if (!normalizedCode) { toast.error("Código do torneio é obrigatório"); return; }
     setSavingTournament(true);
+
+    // Check uniqueness if changed
+    if (normalizedCode !== (tournament?.tournament_code || "").toUpperCase()) {
+      const { data: existing } = await publicQuery({
+        table: "tournaments",
+        select: "id",
+        filters: { tournament_code: normalizedCode },
+        maybeSingle: true,
+      });
+      if (existing && (existing as any).id !== id) {
+        setSavingTournament(false);
+        toast.error("Já existe um torneio com este código. Escolha outro.");
+        return;
+      }
+    }
+
     const { error } = await organizerQuery({
       table: "tournaments",
       operation: "update",
@@ -507,6 +526,7 @@ const TournamentDetail = () => {
         category: editForm.category.trim() || null,
         status: editForm.status,
         registration_value: editForm.registration_value ? Number(editForm.registration_value) : null,
+        tournament_code: normalizedCode,
       },
       filters: { id },
     });
@@ -3096,6 +3116,16 @@ const TournamentDetail = () => {
                   <div className="space-y-1.5">
                     <label className="text-sm font-semibold">Nome *</label>
                     <Input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} placeholder="Nome do torneio" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-semibold">Código do Torneio *</label>
+                    <Input
+                      value={editForm.tournament_code}
+                      onChange={e => setEditForm(f => ({ ...f, tournament_code: e.target.value.toUpperCase() }))}
+                      placeholder="Ex: VERAO2026"
+                      className="font-mono tracking-wider"
+                    />
+                    <p className="text-xs text-muted-foreground">Letras e números. Será convertido para maiúsculas. Deve ser único.</p>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-sm font-semibold">Descrição</label>

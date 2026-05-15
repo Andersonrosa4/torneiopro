@@ -1561,18 +1561,18 @@ const TournamentDetail = () => {
 
     const allAdvancing = [...advancingTeamIds, ...indexTeamIds];
 
-    // === MODO VERANICO — preencher repescagens (2º×3º cruzados) e quartas (1º colocados) ===
+    // === MODO VERANICO — preencher repescagens (2º×3º CRUZADOS A↔D / B↔C) e quartas (1º colocados) ===
     const repechageShells = existingKnockout.filter((m: any) => m.bracket_type === "repechage");
     if (repechageShells.length === 4 && brackets.length === 4) {
       const g = (idx: number) => groupRankings[String(brackets[idx])] || [];
       const numG = brackets.length;
-      // Repescagem INTRA-CHAVE: 2º × 3º DA MESMA CHAVE; vencedor cruza com 1º de chave oposta nas quartas
-      // [pos, group (chave), quarterPos (slot do 1º colocado adversário), firstGroup (chave do 1º colocado)]
+      // Repescagem CRUZADA: A↔D e B↔C; vencedor cruza com 1º colocado de chave diferente nas quartas
+      // [pos, left (chave do 2º), right (chave do 3º), quarterPos (slot do 1º colocado), firstGroup (chave do 1º)]
       const repechageMap = [
-        { pos: 1, left: 0,        right: 0,        quarterPos: numG,     firstGroup: numG - 1 }, // 2A×3A → Q4 vs 1D
-        { pos: 2, left: 1,        right: 1,        quarterPos: numG - 1, firstGroup: numG - 2 }, // 2B×3B → Q3 vs 1C
-        { pos: 3, left: numG - 2, right: numG - 2, quarterPos: 2,        firstGroup: 1 },        // 2C×3C → Q2 vs 1B
-        { pos: 4, left: numG - 1, right: numG - 1, quarterPos: 1,        firstGroup: 0 },        // 2D×3D → Q1 vs 1A
+        { pos: 1, left: 0,        right: numG - 1, quarterPos: 2,        firstGroup: 1 },        // 2A×3D → Q2 vs 1B
+        { pos: 2, left: numG - 1, right: 0,        quarterPos: numG - 1, firstGroup: numG - 2 }, // 2D×3A → Q3 vs 1C
+        { pos: 3, left: 1,        right: numG - 2, quarterPos: 1,        firstGroup: 0 },        // 2B×3C → Q1 vs 1A
+        { pos: 4, left: numG - 2, right: 1,        quarterPos: numG,     firstGroup: numG - 1 }, // 2C×3B → Q4 vs 1D
       ];
       const findShell = (round: number, position: number, bt: string) =>
         existingKnockout.find((m: any) => m.round === round && m.position === position && (m.bracket_type || "winners") === bt);
@@ -1616,7 +1616,8 @@ const TournamentDetail = () => {
           })),
         },
       });
-      toast.success(`MODO VERANICO: repescagens INTRA-CHAVE (2º×3º) e quartas (1º colocados) preenchidas.`);
+      toast.success(`MODO VERANICO: repescagens CRUZADAS (2º×3º A↔D, B↔C) e quartas (1º colocados) preenchidas.`);
+
       fetchData();
       return;
     }

@@ -58,7 +58,7 @@ interface Tournament {
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user, organizerId, isAdmin } = useAuth();
+  const { user, organizerId, isAdmin, loading: authLoading } = useAuth();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -122,19 +122,26 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    if (user) fetchTournaments();
-  }, [user, isAdmin, organizerId]);
+    // Aguarda auth terminar de carregar e, para não-admin, ter organizerId resolvido.
+    // Sem isso, o primeiro fetch roda com organizerId vazio e zera a lista.
+    if (authLoading) return;
+    if (!user) return;
+    if (!isAdmin && !organizerId) return;
+    fetchTournaments();
+  }, [user, isAdmin, organizerId, authLoading]);
 
   // Realtime: tournaments
   useEffect(() => {
+    if (authLoading || !user) return;
+    if (!isAdmin && !organizerId) return;
     const channel = supabase
       .channel("dashboard-tournaments-rt")
       .on("postgres_changes", { event: "*", schema: "public", table: "tournaments" }, () => {
-        if (user) fetchTournaments();
+        fetchTournaments();
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [user, isAdmin, organizerId]);
+  }, [user, isAdmin, organizerId, authLoading]);
 
   const deleteTournament = async (tournamentId: string) => {
     try {

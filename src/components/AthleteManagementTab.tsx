@@ -52,8 +52,15 @@ const AthleteManagementTab = () => {
     const { data, error } = await supabase.functions.invoke("athlete-admin", {
       body: { operation: "list" },
     });
-    if (error) {
-      toast.error("Erro ao carregar atletas");
+    if (error || !data) {
+      const msg = (error as any)?.message || "";
+      if (msg.includes("401") || msg.toLowerCase().includes("invalid user")) {
+        toast.error("Sessão expirada. Faça login novamente.");
+        await supabase.auth.signOut();
+      } else {
+        toast.error("Erro ao carregar atletas");
+      }
+      setAthletes([]);
     } else {
       setAthletes(data.athletes || []);
     }

@@ -906,18 +906,21 @@ const TournamentDetail = () => {
         const findM = (round: number, position: number, bracket_type: string = "winners") =>
           luanaMatches.find((m: any) => m.round === round && m.position === position && (m.bracket_type || "winners") === bracket_type);
 
-        const linkUpdates: any[] = [];
+        // Descritores de link (executados sequencialmente para evitar race condition
+        // em escritas concorrentes contra a Edge Function organizer-api).
+        type LinkDesc = { matchId: string; data: Record<string, string>; label: string };
+        const linkDescs: LinkDesc[] = [];
 
-        // Repescagem → Quartas (slot team2_id)
+        // Repescagem → Quartas
         for (const meta of repechageMeta) {
           const repMatch = findM(1, meta.pos, "repechage");
           const quarterMatch = findM(2, meta.quarterPos, "winners");
           if (repMatch && quarterMatch) {
-            linkUpdates.push(organizerQuery({
-              table: "matches", operation: "update",
+            linkDescs.push({
+              matchId: repMatch.id,
               data: { next_win_match_id: quarterMatch.id },
-              filters: { id: repMatch.id },
-            }));
+              label: `Rep R1P${meta.pos} → Q${meta.quarterPos}`,
+            });
           }
         }
 
@@ -927,11 +930,11 @@ const TournamentDetail = () => {
           const q = findM(2, qp, "winners");
           const s = findM(3, quarterToSemi[qp], "winners");
           if (q && s) {
-            linkUpdates.push(organizerQuery({
-              table: "matches", operation: "update",
+            linkDescs.push({
+              matchId: q.id,
               data: { next_win_match_id: s.id },
-              filters: { id: q.id },
-            }));
+              label: `Q${qp} → S${quarterToSemi[qp]}`,
+            });
           }
         }
 
@@ -941,18 +944,74 @@ const TournamentDetail = () => {
         for (let sp = 1; sp <= 2; sp++) {
           const s = findM(3, sp, "winners");
           if (s && finalM) {
-            const linkData: any = { next_win_match_id: finalM.id };
+            const linkData: Record<string, string> = { next_win_match_id: finalM.id };
             if (thirdM) linkData.next_lose_match_id = thirdM.id;
-            linkUpdates.push(organizerQuery({
-              table: "matches", operation: "update",
+            linkDescs.push({
+              matchId: s.id,
               data: linkData,
-              filters: { id: s.id },
-            }));
+              label: `S${sp} → Final + 3º`,
+            });
           }
         }
 
-        await Promise.all(linkUpdates);
-        console.log(`[MODO VERANICO] Estrutura criada: ${luanaShells.length} shells (4 reps + 4 quartas + 2 semis + final + 3º)`);
+        // Execução sequencial com retry (até 3 tentativas) — evita race condition
+        // observada em Promise.all() contra a Edge Function organizer-api.
+        const failed: LinkDesc[] = [];
+        for (const desc of linkDescs) {
+          let attempt = 0;
+          let success = false;
+          let lastErr: any = null;
+          while (attempt < 3 && !success) {
+            attempt++;
+            const { error: linkErr } = await organizerQuery({
+              table: "matches", operation: "update",
+              data: desc.data,
+              filters: { id: desc.matchId },
+            });
+            if (!linkErr) { success = true; break; }
+            lastErr = linkErr;
+            await new Promise((r) => setTimeout(r, 150 * attempt));
+          }
+          if (!success) {
+            console.error(`[MODO VERANICO] Falha ao linkar ${desc.label} após 3 tentativas:`, lastErr);
+            failed.push(desc);
+          }
+        }
+
+        // Verificação pós-link: re-lê do banco e confirma cada next_win_match_id
+        const { data: verifyRows } = await organizerQuery({
+          table: "matches",
+          operation: "select",
+          filters: { tournament_id: id, modality_id: currentModalityId },
+        });
+        const byId = new Map<string, any>(((verifyRows as any[]) || []).map((m) => [m.id, m]));
+        const missing: LinkDesc[] = [];
+        for (const desc of linkDescs) {
+          const row = byId.get(desc.matchId);
+          for (const [field, expected] of Object.entries(desc.data)) {
+            if (!row || row[field] !== expected) {
+              missing.push(desc);
+              break;
+            }
+          }
+        }
+        // Última tentativa de reparo (sequencial) para qualquer link ainda ausente
+        if (missing.length > 0) {
+          console.warn(`[MODO VERANICO] ${missing.length} link(s) ausente(s) após escrita; reaplicando…`, missing.map(m => m.label));
+          for (const desc of missing) {
+            await organizerQuery({
+              table: "matches", operation: "update",
+              data: desc.data,
+              filters: { id: desc.matchId },
+            });
+          }
+        }
+
+        if (failed.length === 0 && missing.length === 0) {
+          console.log(`[MODO VERANICO] Estrutura criada: ${luanaShells.length} shells, ${linkDescs.length} links OK`);
+        } else {
+          console.warn(`[MODO VERANICO] Estrutura criada com avisos: ${failed.length} falhas iniciais, ${missing.length} reaplicados`);
+        }
       } else {
       // === PRE-GENERATE KNOCKOUT BRACKET STRUCTURE ===
       // Create empty match shells for all elimination rounds so they appear in the Sequence tab immediately

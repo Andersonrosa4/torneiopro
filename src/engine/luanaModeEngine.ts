@@ -86,14 +86,13 @@ export function generateLuanaRepechagePairs(input: LuanaPairInput): LuanaPair[] 
 
 /**
  * Calcula em qual posição da rodada eliminatória seguinte (quartas) o vencedor
- * de cada match de repescagem deve cair, garantindo que ele enfrente o 1º
- * colocado adversário (conforme padrão Mirrored Extremes do projeto).
+ * de cada match de repescagem deve cair.
  *
- * Convenção das quartas (4 matches, posições 1-4):
- *   Pos 1: 1A vs Vencedor(2D × 3A)
- *   Pos 2: 1B vs Vencedor(2C × 3B)
- *   Pos 3: 1C vs Vencedor(2B × 3C)
- *   Pos 4: 1D vs Vencedor(2A × 3D)
+ * Pareamento atualizado das quartas (4 matches, posições 1-4):
+ *   Pos 1 (Jogo 29): 1A vs Vencedor(2D × 3A)   ← pair index 1
+ *   Pos 2 (Jogo 30): 1B vs Vencedor(2B × 3C)   ← pair index 2
+ *   Pos 3 (Jogo 31): 1C vs Vencedor(2A × 3D)   ← pair index 0
+ *   Pos 4 (Jogo 32): 1D vs Vencedor(2C × 3B)   ← pair index 3
  *
  * Retorna a posição da quartas em que o vencedor do match `repechagePairIdx`
  * deve ser inserido (slot team2_id).
@@ -107,25 +106,18 @@ export function getLuanaRepechageWinnerSlot(
   if (!pair) {
     throw new Error(`[LuanaEngine] Par de repescagem ${repechagePairIdx} inexistente`);
   }
-  // O 2º colocado vem do groupIdx esquerdo OU direito — o adversário do
-  // 1º espelhado é quem cai na posição da quartas.
-  // Quartas Pos 1 → 1A vs winner contendo 3A → ou seja, par com 3A
-  // Quartas Pos 4 → 1D vs winner contendo 3D
-  const targetGroupIdx = Math.min(
-    pair.team1.rank === 3 ? pair.team1.groupIdx : pair.team2.groupIdx,
-    Number.MAX_SAFE_INTEGER,
-  );
-
-  // Mapeia groupIdx → posição da quartas (extremos espelhados).
-  // Para 4 grupos: A(0)→Pos1, B(1)→Pos2, C(2)→Pos3, D(3)→Pos4.
-  const quarterPosition = targetGroupIdx + 1;
-  if (quarterPosition < 1 || quarterPosition > groupCount) {
+  // Mapa fixo (groupCount=4): pair index → quarterPosition
+  //   0 (2A×3D) → Q3 ; 1 (2D×3A) → Q1 ; 2 (2B×3C) → Q2 ; 3 (2C×3B) → Q4
+  const idxToQuarter: Record<number, number> = { 0: 3, 1: 1, 2: 2, 3: 4 };
+  const quarterPosition = idxToQuarter[repechagePairIdx];
+  if (!quarterPosition || quarterPosition < 1 || quarterPosition > groupCount) {
     throw new Error(
       `[LuanaEngine] Posição da quartas (${quarterPosition}) fora do intervalo válido [1..${groupCount}]`,
     );
   }
   return { quarterPosition, slot: "team2" };
 }
+
 
 /**
  * Validação rápida pré-geração para garantir invariantes do Modo Luana.

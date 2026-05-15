@@ -20,15 +20,16 @@ const Auth = () => {
   const [loginType, setLoginType] = useState<"admin" | "organizer">("admin");
   const navigate = useNavigate();
   const location = useLocation();
-  const { setSelectedSport } = useSportTheme();
+  const { setSelectedSport, selectedSport } = useSportTheme();
   const { login, isAuthenticated, loading: authLoading } = useAuth();
-  const sport = (location.state as any)?.sport || null;
+  const sport = (location.state as any)?.sport || selectedSport || null;
 
   useEffect(() => {
-    if (sport) {
-      setSelectedSport(sport);
+    const stateSport = (location.state as any)?.sport;
+    if (stateSport) {
+      setSelectedSport(stateSport);
     }
-  }, [sport, setSelectedSport]);
+  }, [location.state, setSelectedSport]);
 
   // Redirect if already authenticated (e.g. page refresh with valid session)
   useEffect(() => {

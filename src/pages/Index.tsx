@@ -6,6 +6,7 @@ import FlowAppsBranding from "@/components/FlowAppsBranding";
 import LogoImage from "@/components/LogoImage";
 import qrCodeImg from "@/assets/qrcode-torneiopro.png";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
+import { useSportTheme } from "@/contexts/SportContext";
 
 const sports = [
   {
@@ -50,13 +51,18 @@ const particles = Array.from({ length: 40 }, (_, i) => ({
     : `hsl(35 80% ${55 + Math.random() * 20}% / ${0.2 + Math.random() * 0.3})`,
 }));
 
-const SportCard = ({ sport, i, navigate }: { sport: typeof sports[number]; i: number; navigate: ReturnType<typeof useNavigate> }) => (
+const SportCard = ({ sport, i, navigate }: { sport: typeof sports[number]; i: number; navigate: ReturnType<typeof useNavigate> }) => {
+  const { setSelectedSport } = useSportTheme();
+  return (
   <motion.button
     key={sport.id}
     initial={{ opacity: 0, y: 30 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ delay: 0.3 + i * 0.1, type: "spring", stiffness: 120 }}
-    onClick={() => navigate("/auth", { state: { sport: sport.id } })}
+    onClick={() => {
+      setSelectedSport(sport.id as any);
+      navigate("/auth", { state: { sport: sport.id } });
+    }}
     className="group relative overflow-hidden rounded-2xl sport-card-glow cursor-pointer w-full"
     style={{
       boxShadow: `0 4px 24px ${sport.glowColor}, inset 0 0 0 1px ${sport.borderGlow}`,
@@ -81,7 +87,8 @@ const SportCard = ({ sport, i, navigate }: { sport: typeof sports[number]; i: nu
       </h2>
     </div>
   </motion.button>
-);
+  );
+};
 
 const Index = () => {
   const navigate = useNavigate();

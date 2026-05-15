@@ -1309,6 +1309,7 @@ const MatchSequenceViewer = ({
                   getTeamName={getTeamName}
                   getRoundLabel={(r) => {
                     if ((match as any).bracket_type === 'third_place') return '3º Lugar';
+                    if ((match as any).bracket_type === 'repechage') return 'Repescagem';
                     if (isDoubleElim) {
                       const m = match;
                       if (m.bracket_type === 'semi_final') return 'Semifinal';

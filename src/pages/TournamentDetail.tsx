@@ -496,7 +496,25 @@ const TournamentDetail = () => {
 
   const saveTournament = async () => {
     if (!editForm.name.trim()) { toast.error("Nome é obrigatório"); return; }
+    const normalizedCode = editForm.tournament_code.trim().toUpperCase();
+    if (!normalizedCode) { toast.error("Código do torneio é obrigatório"); return; }
     setSavingTournament(true);
+
+    // Check uniqueness if changed
+    if (normalizedCode !== (tournament?.tournament_code || "").toUpperCase()) {
+      const { data: existing } = await publicQuery({
+        table: "tournaments",
+        select: "id",
+        filters: { tournament_code: normalizedCode },
+        maybeSingle: true,
+      });
+      if (existing && (existing as any).id !== id) {
+        setSavingTournament(false);
+        toast.error("Já existe um torneio com este código. Escolha outro.");
+        return;
+      }
+    }
+
     const { error } = await organizerQuery({
       table: "tournaments",
       operation: "update",
@@ -508,6 +526,7 @@ const TournamentDetail = () => {
         category: editForm.category.trim() || null,
         status: editForm.status,
         registration_value: editForm.registration_value ? Number(editForm.registration_value) : null,
+        tournament_code: normalizedCode,
       },
       filters: { id },
     });

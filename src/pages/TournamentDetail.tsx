@@ -1063,7 +1063,8 @@ const TournamentDetail = () => {
           });
           if (koInserted) {
             const koOnly = (koInserted as any[]).filter(m => m.round >= 1 && m.modality_id === currentModalityId);
-            const linkUpdates = [];
+            type LinkDesc = { matchId: string; data: Record<string, string>; label: string };
+            const linkDescs: LinkDesc[] = [];
             // Find the 3rd place match and final match
             const thirdPlaceMatch = koOnly.find((m: any) => m.bracket_type === 'third_place');
             const finalMatch = koOnly.find((m: any) => m.round === totalKORounds && m.bracket_type !== 'third_place');
@@ -1099,23 +1100,58 @@ const TournamentDetail = () => {
                 }
                 const nextMatch = koOnly.find((nm: any) => nm.round === m.round + 1 && nm.position === nextPos && nm.bracket_type !== 'third_place');
                 if (nextMatch) {
-                  const linkData: any = { next_win_match_id: nextMatch.id };
-                  // If this is a semifinal match, also link losers to 3rd place
+                  const linkData: Record<string, string> = { next_win_match_id: nextMatch.id };
                   if (m.round === semiRound && thirdPlaceMatch) {
                     linkData.next_lose_match_id = thirdPlaceMatch.id;
                   }
-                  linkUpdates.push(
-                    organizerQuery({
-                      table: "matches",
-                      operation: "update",
-                      data: linkData,
-                      filters: { id: m.id },
-                    })
-                  );
+                  linkDescs.push({
+                    matchId: m.id,
+                    data: linkData,
+                    label: `R${m.round}P${m.position} → R${m.round + 1}P${nextPos}`,
+                  });
                 }
               }
             }
-            await Promise.all(linkUpdates);
+
+            // Execução SEQUENCIAL com retry — evita race conditions observadas em
+            // Promise.all() concorrente contra a Edge Function organizer-api,
+            // que provocava perda de next_win_match_id em ~25% dos jogos.
+            for (const desc of linkDescs) {
+              let attempt = 0;
+              let success = false;
+              while (attempt < 3 && !success) {
+                attempt++;
+                const { error: linkErr } = await organizerQuery({
+                  table: "matches", operation: "update",
+                  data: desc.data,
+                  filters: { id: desc.matchId },
+                });
+                if (!linkErr) { success = true; break; }
+                await new Promise((r) => setTimeout(r, 150 * attempt));
+              }
+              if (!success) console.error(`[PreGen] Falha ao linkar ${desc.label}`);
+            }
+
+            // Verificação pós-link com reaplicação de qualquer link ausente
+            const { data: verifyRows } = await organizerQuery({
+              table: "matches", operation: "select",
+              filters: { tournament_id: id, modality_id: currentModalityId },
+            });
+            const byId = new Map<string, any>(((verifyRows as any[]) || []).map((r) => [r.id, r]));
+            for (const desc of linkDescs) {
+              const row = byId.get(desc.matchId);
+              for (const [field, expected] of Object.entries(desc.data)) {
+                if (!row || row[field] !== expected) {
+                  console.warn(`[PreGen] Reaplicando link ausente: ${desc.label} (${field})`);
+                  await organizerQuery({
+                    table: "matches", operation: "update",
+                    data: desc.data,
+                    filters: { id: desc.matchId },
+                  });
+                  break;
+                }
+              }
+            }
           }
         }
         console.log(`[PreGen] Knockout shells created: ${koShells.length} matches for ${totalKORounds} rounds (${advancingCount} advancing → padded to ${nextPow})`);

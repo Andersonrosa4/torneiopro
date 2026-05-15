@@ -58,7 +58,7 @@ interface Tournament {
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user, organizerId, isAdmin } = useAuth();
+  const { user, organizerId, isAdmin, loading: authLoading } = useAuth();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
 

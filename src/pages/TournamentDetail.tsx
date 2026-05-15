@@ -24,6 +24,7 @@ import { formatDateBR } from "@/lib/utils";
 import FlowAppsBranding from "@/components/FlowAppsBranding";
 import ModalityTabs from "@/components/ModalityTabs";
 import TournamentOrganizersManager from "@/components/TournamentOrganizersManager";
+import CourtAssignmentPanel from "@/components/CourtAssignmentPanel";
 import { useModalities } from "@/hooks/useModalities";
 import { generateDoubleEliminationBracket } from "@/lib/doubleEliminationLogic";
 import { processDoubleEliminationAdvance, handleResetFinal } from "@/lib/doubleEliminationAdvance";
@@ -3546,6 +3547,16 @@ const TournamentDetail = () => {
                     <Undo2 className="h-4 w-4" /> Desfazer Chaveamento
                   </Button>
                 </div>
+              )}
+
+              {filteredMatches.length > 0 && (
+                <CourtAssignmentPanel
+                  tournamentId={id!}
+                  modalityId={selectedModality?.id || null}
+                  matches={filteredMatches as any}
+                  canEdit={canEdit}
+                  onUpdated={fetchData}
+                />
               )}
 
               {filteredMatches.length > 0 ? (

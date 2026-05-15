@@ -489,6 +489,7 @@ const TournamentDetail = () => {
       category: tournament?.category || "",
       status: tournament?.status || "",
       registration_value: tournament?.registration_value != null ? String(tournament.registration_value) : "",
+      tournament_code: tournament?.tournament_code || "",
     });
     setEditTournamentOpen(true);
   };

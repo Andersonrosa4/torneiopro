@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { MapPin, Save } from "lucide-react";
+import { MapPin, Save, Trash2 } from "lucide-react";
 import { organizerQuery } from "@/lib/organizerApi";
 
 interface MatchLite {
@@ -116,6 +116,31 @@ export default function CourtAssignmentPanel({
     }
   };
 
+  const handleClearAll = async () => {
+    if (!canEdit) return;
+    if (!confirm("Remover o número da quadra de todas as chaves desta modalidade?")) return;
+    setSaving(true);
+    try {
+      const { error } = await organizerQuery({
+        table: "matches",
+        operation: "update",
+        data: { court_number: null },
+        filters: { tournament_id: tournamentId, modality_id: modalityId },
+      });
+      if (error) {
+        toast.error(`Falha ao limpar quadras: ${error.message || error}`);
+      } else {
+        setValues({});
+        toast.success("Quadras removidas de todas as chaves.");
+        onUpdated?.();
+      }
+    } catch (e: any) {
+      toast.error(`Erro ao limpar quadras: ${e?.message || e}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="mb-4 rounded-xl border border-border bg-card/50 p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
@@ -132,23 +157,48 @@ export default function CourtAssignmentPanel({
             <Label htmlFor={`court-${b}`} className="mb-1.5 block text-xs font-semibold text-muted-foreground">
               Chave {letterFor(b)}
             </Label>
-            <Input
-              id={`court-${b}`}
-              type="number"
-              min={1}
-              max={99}
-              inputMode="numeric"
-              placeholder="Nº da quadra"
-              disabled={!canEdit || saving}
-              value={values[b] ?? ""}
-              onChange={(e) => setValues((prev) => ({ ...prev, [b]: e.target.value }))}
-              className="h-9"
-            />
+            <div className="flex items-center gap-1.5">
+              <Input
+                id={`court-${b}`}
+                type="number"
+                min={1}
+                max={99}
+                inputMode="numeric"
+                placeholder="Nº da quadra"
+                disabled={!canEdit || saving}
+                value={values[b] ?? ""}
+                onChange={(e) => setValues((prev) => ({ ...prev, [b]: e.target.value }))}
+                className="h-9"
+              />
+              {canEdit && (values[b] ?? "") !== "" && (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+                  title={`Limpar quadra da Chave ${letterFor(b)}`}
+                  disabled={saving}
+                  onClick={() => setValues((prev) => ({ ...prev, [b]: "" }))}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </div>
         ))}
       </div>
       {canEdit && (
-        <div className="mt-3 flex justify-end">
+        <div className="mt-3 flex flex-wrap justify-end gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleClearAll}
+            disabled={saving}
+            className="gap-1.5 text-destructive hover:text-destructive"
+          >
+            <Trash2 className="h-4 w-4" />
+            Excluir Quadras
+          </Button>
           <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1.5">
             <Save className="h-4 w-4" />
             {saving ? "Salvando..." : "Salvar Quadras"}

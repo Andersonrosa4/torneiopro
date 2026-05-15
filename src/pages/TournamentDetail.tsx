@@ -917,7 +917,24 @@ const TournamentDetail = () => {
         });
 
         const { error: shellErr } = await organizerQuery({ table: "matches", operation: "insert", data: luanaShells });
-        if (shellErr) { toast.error(shellErr.message); return; }
+        if (shellErr) {
+          await logVeranico({
+            tournament_id: id!, modality_id: currentModalityId, stage_id: currentStageId,
+            action: "veranico.error",
+            detail: { phase: "shells_insert", error: shellErr.message, shells_attempted: luanaShells.length },
+          });
+          toast.error(shellErr.message); return;
+        }
+        await logVeranico({
+          tournament_id: id!, modality_id: currentModalityId, stage_id: currentStageId,
+          action: "veranico.quarters.shells_created",
+          detail: {
+            shells_total: luanaShells.length,
+            breakdown: {
+              repechage_r1: 4, quarters_r2: 4, semis_r3: 2, final_r4: 1, third_place_r4: 1,
+            },
+          },
+        });
 
         // Buscar shells inseridos para linkar
         const { data: inserted } = await organizerQuery({

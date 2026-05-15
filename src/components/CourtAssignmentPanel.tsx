@@ -318,30 +318,39 @@ export default function CourtAssignmentPanel({
       {/* Seção 2: Fases Eliminatórias */}
       {eliminationRounds.length > 0 && (
         <div className="mb-2">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Por Fase Eliminatória
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Quadras das Fases Finais
           </p>
-          <p className="mb-2 text-[11px] text-muted-foreground">
-            Defina quantas quadras serão usadas em cada fase e a partir de qual número. As partidas
-            da fase são distribuídas em rodízio entre as quadras.
+          <p className="mb-3 text-[12px] text-muted-foreground">
+            Para cada fase, escolha <b>quantas quadras</b> você quer usar e <b>qual o número da
+            primeira quadra</b>. Os jogos serão divididos entre essas quadras na ordem em que
+            aparecem na chave.
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {eliminationRounds.map((phase) => {
               const cfg = phaseValues[phase.round] ?? { count: "", start: "" };
+              const cN = Number(cfg.count);
+              const sN = Number(cfg.start);
+              const previewCourts: number[] = [];
+              if (Number.isFinite(cN) && cN >= 1 && Number.isFinite(sN) && sN >= 1) {
+                for (let i = 0; i < phase.matches.length; i++) {
+                  previewCourts.push(sN + (i % cN));
+                }
+              }
               return (
                 <div key={phase.round} className="rounded-lg border border-border/60 bg-background/40 p-3">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <Label className="text-xs font-semibold text-foreground">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <Label className="text-sm font-bold text-foreground">
                       {phase.label}
                     </Label>
-                    <span className="text-[10px] text-muted-foreground">
-                      {phase.matches.length} jogo(s)
+                    <span className="rounded-full bg-muted/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      {phase.matches.length} {phase.matches.length === 1 ? "jogo" : "jogos"}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <Label htmlFor={`phase-count-${phase.round}`} className="mb-1 block text-[10px] text-muted-foreground">
-                        Nº de quadras
+                      <Label htmlFor={`phase-count-${phase.round}`} className="mb-1 block text-[11px] font-medium text-foreground/80">
+                        Quantas quadras?
                       </Label>
                       <Input
                         id={`phase-count-${phase.round}`}
@@ -362,8 +371,8 @@ export default function CourtAssignmentPanel({
                       />
                     </div>
                     <div>
-                      <Label htmlFor={`phase-start-${phase.round}`} className="mb-1 block text-[10px] text-muted-foreground">
-                        Quadra inicial
+                      <Label htmlFor={`phase-start-${phase.round}`} className="mb-1 block text-[11px] font-medium text-foreground/80">
+                        A partir da quadra
                       </Label>
                       <Input
                         id={`phase-start-${phase.round}`}

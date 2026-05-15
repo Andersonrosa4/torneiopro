@@ -161,6 +161,28 @@ const TournamentDetail = () => {
   const bracketExportRef = useRef<HTMLDivElement>(null);
   const [exportingBracket, setExportingBracket] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("teams");
+  const [consistencyReport, setConsistencyReport] = useState<PropagationConsistencyReport | null>(null);
+  const [consistencyOpen, setConsistencyOpen] = useState(false);
+  const [scanningConsistency, setScanningConsistency] = useState(false);
+
+  const runConsistencyScan = useCallback(async () => {
+    if (!id) return;
+    setScanningConsistency(true);
+    try {
+      const report = await scanPropagationConsistency(id);
+      setConsistencyReport(report);
+      setConsistencyOpen(true);
+      if (report.ok) {
+        toast.success(`Consistência OK em ${report.modalities.length} modalidade(s).`);
+      } else {
+        toast.error(`${report.totalIssues} propagação(ões) inconsistente(s) detectada(s).`);
+      }
+    } catch (err: any) {
+      toast.error("Falha na verificação: " + (err?.message ?? String(err)));
+    } finally {
+      setScanningConsistency(false);
+    }
+  }, [id]);
 
   const { modalities, selectedModality, setSelectedModality, updateModality, createModality, deleteModality, loading: modalitiesLoading } = useModalities(id);
 

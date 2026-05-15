@@ -298,7 +298,7 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                     <Label htmlFor="luanaQuarters" className="cursor-pointer flex-1">
                       <span className="font-semibold text-foreground">Quartas de Final</span> (8 vagas)
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        1º de cada chave passa direto. 2º e 3º disputam repescagem dentro da própria chave (2A×3A, 2B×3B, 2C×3C, 2D×3D).
+                        1º de cada chave passa direto. 2º e 3º disputam repescagem cruzada entre chaves opostas (2A×3D, 2D×3A, 2B×3C, 2C×3B).
                       </p>
                     </Label>
                   </div>

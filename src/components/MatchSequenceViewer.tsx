@@ -1133,8 +1133,10 @@ const MatchSequenceViewer = ({
           });
         }
         const roundMatches = knockoutNormal.filter(m => m.round === r);
+        // Modo Veranico: rodada cujos jogos são todos repescagem → rótulo "Repescagem"
+        const allRepechage = roundMatches.length > 0 && roundMatches.every(m => (m as any).bracket_type === 'repechage');
         groups.push({
-          label: getRoundLabel(r),
+          label: allRepechage ? "Repescagem" : getRoundLabel(r),
           matches: roundMatches.map(m => ({ match: m, globalIndex: matchNumberMap.get(m.id) ?? 0 })),
           blockKey: `KO_R${r}`,
           isCompleted: roundMatches.every(m => m.status === 'completed'),

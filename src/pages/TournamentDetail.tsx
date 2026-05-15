@@ -1599,6 +1599,22 @@ const TournamentDetail = () => {
         }
       }
       await Promise.all(veranicoUpdates);
+      await logVeranico({
+        tournament_id: id!,
+        modality_id: modalityId,
+        stage_id: existingKnockout[0]?.stage_id ?? null,
+        action: "veranico.quarters.fill_classification",
+        detail: {
+          repechages_filled: repechageMap.length,
+          quarters_filled: repechageMap.length,
+          group_rankings_summary: brackets.map((b, idx) => ({
+            group: b,
+            top4: (groupRankings[String(b)] || []).slice(0, 4).map((t: any) => ({
+              teamId: t.teamId, pontos: t.pontos, saldo: t.saldoSets,
+            })),
+          })),
+        },
+      });
       toast.success(`MODO VERANICO: repescagens INTRA-CHAVE (2º×3º) e quartas (1º colocados) preenchidas.`);
       fetchData();
       return;

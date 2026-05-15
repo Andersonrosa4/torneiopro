@@ -3549,6 +3549,16 @@ const TournamentDetail = () => {
                 </div>
               )}
 
+              {filteredMatches.length > 0 && (
+                <CourtAssignmentPanel
+                  tournamentId={id!}
+                  modalityId={selectedModality?.id || null}
+                  matches={filteredMatches as any}
+                  canEdit={canEdit}
+                  onUpdated={fetchData}
+                />
+              )}
+
               {filteredMatches.length > 0 ? (
                 <section>
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-2">

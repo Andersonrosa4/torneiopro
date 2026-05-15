@@ -3749,6 +3749,74 @@ const TournamentDetail = () => {
           <FlowAppsBranding variant="tournament-cta" />
         </motion.div>
       </main>
+      <Dialog open={consistencyOpen} onOpenChange={setConsistencyOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {consistencyReport?.ok ? (
+                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 text-amber-500" />
+              )}
+              Verificação de Consistência
+            </DialogTitle>
+            <DialogDescription>
+              {consistencyReport
+                ? consistencyReport.ok
+                  ? `Todas as propagações estão corretas (${consistencyReport.modalities.length} modalidade(s) verificada(s)).`
+                  : `${consistencyReport.totalIssues} propagação(ões) inconsistente(s) detectada(s).`
+                : "Aguardando varredura..."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {consistencyReport && (
+            <div className="space-y-3">
+              {consistencyReport.modalities.map((m) => (
+                <div
+                  key={m.modalityId}
+                  className={`rounded-lg border p-3 ${m.ok ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/40 bg-amber-500/5"}`}
+                >
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <h4 className="font-semibold">{m.modalityName}</h4>
+                    <Badge variant={m.ok ? "secondary" : "destructive"}>
+                      {m.ok ? "OK" : `${m.brokenPropagations} erro(s)`}
+                    </Badge>
+                  </div>
+                  <div className="text-xs text-muted-foreground grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div>Total: <strong className="text-foreground">{m.totalMatches}</strong></div>
+                    <div>Concluídas: <strong className="text-foreground">{m.completedMatches}</strong></div>
+                    <div>Propagações OK: <strong className="text-emerald-500">{m.successfulPropagations}/{m.expectedPropagations}</strong></div>
+                    <div>Quebradas: <strong className={m.brokenPropagations > 0 ? "text-destructive" : "text-foreground"}>{m.brokenPropagations}</strong></div>
+                  </div>
+                  {m.issues.length > 0 && (
+                    <ul className="mt-2 space-y-1 text-xs max-h-40 overflow-y-auto">
+                      {m.issues.slice(0, 20).map((iss, idx) => (
+                        <li key={idx} className="text-muted-foreground">
+                          <span className="font-mono text-amber-500">[{iss.kind}]</span> {iss.detail}
+                        </li>
+                      ))}
+                      {m.issues.length > 20 && (
+                        <li className="text-muted-foreground italic">+{m.issues.length - 20} adicional(is)...</li>
+                      )}
+                    </ul>
+                  )}
+                </div>
+              ))}
+              {consistencyReport.modalities.length === 0 && (
+                <p className="text-sm text-muted-foreground">Nenhuma modalidade encontrada para este torneio.</p>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConsistencyOpen(false)}>Fechar</Button>
+            <Button onClick={runConsistencyScan} disabled={scanningConsistency} className="gap-1">
+              <ShieldCheck className="h-4 w-4" />
+              {scanningConsistency ? "Verificando..." : "Re-verificar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <FlowAppsBranding variant="internal-footer" />
     </ThemedBackground>
   );

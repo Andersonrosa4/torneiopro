@@ -1,0 +1,1 @@
+UPDATE tournaments SET name='1º CIRCUITO VERANICO BEACH' WHERE id='7478c4d5-f58e-4d85-b39f-0f8cd0d5c657';

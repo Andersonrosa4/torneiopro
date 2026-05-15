@@ -156,7 +156,7 @@ const TournamentDetail = () => {
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState("");
   const [editTournamentOpen, setEditTournamentOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ name: "", description: "", location: "", event_date: "", category: "", status: "", registration_value: "" });
+  const [editForm, setEditForm] = useState({ name: "", description: "", location: "", event_date: "", category: "", status: "", registration_value: "", tournament_code: "" });
   const [savingTournament, setSavingTournament] = useState(false);
   const [isAssociatedOrganizer, setIsAssociatedOrganizer] = useState(false);
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);

@@ -463,6 +463,45 @@ const MatchCard = ({
   const feederLabels = useMemo(() => {
     if (match.round === 0) return { team1: null, team2: null };
 
+    // ── MODO VERANICO (Quartas com Repescagem Intra-chave) ──
+    // R1 repechage: 4 jogos "2º X vs 3º X" (mesma chave) → vencedor enfrenta 1º cruzado nas Quartas (R2).
+    // R2 quartas: team1 = "1º X" (X = letra da posição), team2 = "Venc. Jogo Y" via feeder.
+    {
+      const groupRound0V = allMatches.filter(m => m.round === 0 && m.bracket_number);
+      const groupNumbersV = [...new Set(groupRound0V.map(m => m.bracket_number!))];
+      const numGroupsV = groupNumbersV.length;
+      const r1RepechageCount = allMatches.filter(m => m.round === 1 && (m as any).bracket_type === 'repechage').length;
+      const r2WinnersCount = allMatches.filter(m => m.round === 2 && ((m as any).bracket_type || 'winners') === 'winners').length;
+      const isVeranicoQuarters = numGroupsV === 4 && r1RepechageCount === 4 && r2WinnersCount === 4 && tournamentFormat !== 'double_elimination';
+
+      if (isVeranicoQuarters) {
+        if (match.round === 1 && (match as any).bracket_type === 'repechage') {
+          const letter = String.fromCharCode(65 + (match.position - 1));
+          return {
+            team1: match.team1_id ? null : `2º ${letter}`,
+            team2: match.team2_id ? null : `3º ${letter}`,
+          };
+        }
+        if (match.round === 2 && ((match as any).bracket_type || 'winners') === 'winners') {
+          const letter = String.fromCharCode(65 + (match.position - 1));
+          // team2 vem do vencedor da repescagem (feeder)
+          const slotFeedersV = getSlotFeeders(match as any, allMatches as any, matchNumberMap);
+          const feederV = slotFeedersV.team2 ?? slotFeedersV.team1;
+          let team2Label: string | null = null;
+          if (feederV) {
+            const prefix = feederV.type === 'winner' ? 'Venc.' : 'Perd.';
+            const num = matchNumberMap.get(feederV.matchNumber) ?? '';
+            team2Label = num ? `${prefix} Jogo ${num}` : feederV.label;
+          }
+          return {
+            team1: match.team1_id ? null : `1º ${letter}`,
+            team2: match.team2_id ? null : team2Label,
+          };
+        }
+        // Semis / Final / 3º lugar caem no fluxo padrão de feeder abaixo.
+      }
+    }
+
     // For Chaveamento Normal: the FIRST knockout round (right after groups)
     // has teams from group standings, NOT from specific match winners.
     // So we must NOT show "Venc. Jogo X" for that round — only "A definir".
@@ -1094,8 +1133,10 @@ const MatchSequenceViewer = ({
           });
         }
         const roundMatches = knockoutNormal.filter(m => m.round === r);
+        // Modo Veranico: rodada cujos jogos são todos repescagem → rótulo "Repescagem"
+        const allRepechage = roundMatches.length > 0 && roundMatches.every(m => (m as any).bracket_type === 'repechage');
         groups.push({
-          label: getRoundLabel(r),
+          label: allRepechage ? "Repescagem" : getRoundLabel(r),
           matches: roundMatches.map(m => ({ match: m, globalIndex: matchNumberMap.get(m.id) ?? 0 })),
           blockKey: `KO_R${r}`,
           isCompleted: roundMatches.every(m => m.status === 'completed'),
@@ -1268,6 +1309,7 @@ const MatchSequenceViewer = ({
                   getTeamName={getTeamName}
                   getRoundLabel={(r) => {
                     if ((match as any).bracket_type === 'third_place') return '3º Lugar';
+                    if ((match as any).bracket_type === 'repechage') return 'Repescagem';
                     if (isDoubleElim) {
                       const m = match;
                       if (m.bracket_type === 'semi_final') return 'Semifinal';

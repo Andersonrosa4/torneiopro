@@ -236,14 +236,14 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
                       <Sparkles className="h-6 w-6 text-amber-400" />
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-lg font-bold text-foreground">MODO VERANICO — Grupos + Repescagem Interna</h3>
+                      <h3 className="text-lg font-bold text-foreground">MODO VERANICO — Grupos + Repescagem Cruzada</h3>
                       <p className="text-sm text-muted-foreground mt-1">
                         Fase de grupos onde 1º colocado passa direto. 2º e 3º disputam
-                        repescagem dentro da própria chave (2A×3A, 2B×3B, 2C×3C, 2D×3D).
+                        repescagem cruzada entre chaves (2A×3D, 2D×3A, 2B×3C, 2C×3B).
                       </p>
                       <div className="mt-3 flex flex-wrap gap-2">
                         <span className="text-xs rounded-full bg-amber-500/20 px-2.5 py-1 text-amber-300">Vôlei de Praia</span>
-                        <span className="text-xs rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Repescagem Interna</span>
+                        <span className="text-xs rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Repescagem Cruzada A↔D / B↔C</span>
                         <span className="text-xs rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">Quartas ou Oitavas</span>
                       </div>
                     </div>

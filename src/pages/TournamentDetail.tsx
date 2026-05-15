@@ -1670,6 +1670,22 @@ const TournamentDetail = () => {
       }
 
       await Promise.all(updates);
+      await logVeranico({
+        tournament_id: id!,
+        modality_id: modalityId,
+        stage_id: existingKnockout[0]?.stage_id ?? null,
+        action: "veranico.eighths.fill_classification",
+        detail: {
+          eighths_filled: eighthsMap.length,
+          map_used: eighthsMap.map(m => ({ pos: m.pos, t1: m.t1, t2: m.t2 })),
+          group_rankings_summary: brackets.map((b) => ({
+            group: b,
+            top4: (groupRankings[String(b)] || []).slice(0, 4).map((t: any) => ({
+              teamId: t.teamId, pontos: t.pontos, saldo: t.saldoSets,
+            })),
+          })),
+        },
+      });
       toast.success("MODO VERANICO (Oitavas): 8 partidas geradas (A×D, B×C).");
       fetchData();
       return;

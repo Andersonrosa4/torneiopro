@@ -3460,6 +3460,17 @@ const TournamentDetail = () => {
                     }
                     return null;
                   })()}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1"
+                    onClick={runConsistencyScan}
+                    disabled={scanningConsistency}
+                    title="Valida se vencedores e perdedores foram propagados corretamente para o slot da próxima partida"
+                  >
+                    <ShieldCheck className="h-4 w-4" />
+                    {scanningConsistency ? "Verificando..." : "Verificar Consistência"}
+                  </Button>
                   <Button variant="destructive" size="sm" className="gap-1" onClick={undoBracket}>
                     <Undo2 className="h-4 w-4" /> Desfazer Chaveamento
                   </Button>

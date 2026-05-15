@@ -6,6 +6,7 @@ import FlowAppsBranding from "@/components/FlowAppsBranding";
 import LogoImage from "@/components/LogoImage";
 import qrCodeImg from "@/assets/qrcode-torneiopro.png";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
+import { useSportTheme } from "@/contexts/SportContext";
 
 const sports = [
   {

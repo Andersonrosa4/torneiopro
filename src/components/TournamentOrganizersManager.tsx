@@ -50,6 +50,7 @@ const TournamentOrganizersManager = ({ tournamentId, createdBy }: Props) => {
       organizerQuery<OrganizerAssociation[]>({
         table: "tournament_organizers",
         operation: "select",
+        select: "id, tournament_id, organizer_id, granted_by, created_at, organizers!organizer_id(id, username, display_name, role)",
         filters: { tournament_id: tournamentId },
       }),
       organizerQuery<OrganizerOption[]>({

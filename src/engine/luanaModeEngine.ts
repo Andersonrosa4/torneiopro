@@ -89,9 +89,9 @@ export function generateLuanaRepechagePairs(input: LuanaPairInput): LuanaPair[] 
  * de cada match de repescagem deve cair.
  *
  * Pareamento atualizado das quartas (4 matches, posições 1-4):
- *   Pos 1: 1A vs Vencedor(2D × 3A)   ← pair index 1
+ *   Pos 1: 1A vs Vencedor(2C × 3B)   ← pair index 3
  *   Pos 2: 1B vs Vencedor(2A × 3D)   ← pair index 0
- *   Pos 3: 1C vs Vencedor(2C × 3B)   ← pair index 3
+ *   Pos 3: 1C vs Vencedor(2D × 3A)   ← pair index 1
  *   Pos 4: 1D vs Vencedor(2B × 3C)   ← pair index 2
  *
  * Retorna a posição da quartas em que o vencedor do match `repechagePairIdx`

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { MapPin, Save } from "lucide-react";
+import { MapPin, Save, Trash2 } from "lucide-react";
 import { organizerQuery } from "@/lib/organizerApi";
 
 interface MatchLite {

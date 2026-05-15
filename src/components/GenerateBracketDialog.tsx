@@ -269,7 +269,7 @@ export const GenerateBracketDialog = ({ onGenerate, teamCount, teams, isDisabled
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-amber-400" />
-                MODO VERANICO — Grupos + Repescagem Interna
+                MODO VERANICO — Grupos + Repescagem Cruzada
               </DialogTitle>
               <DialogDescription>Configure o formato</DialogDescription>
             </DialogHeader>

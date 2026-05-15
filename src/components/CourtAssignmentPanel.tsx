@@ -393,6 +393,16 @@ export default function CourtAssignmentPanel({
                       />
                     </div>
                   </div>
+                  {previewCourts.length > 0 && (
+                    <div className="mt-2 rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-[11px] leading-relaxed text-foreground/80">
+                      <span className="font-semibold text-primary">Como vai ficar:</span>{" "}
+                      {previewCourts
+                        .slice(0, 6)
+                        .map((c, i) => `Jogo ${i + 1} → Quadra ${c}`)
+                        .join("  •  ")}
+                      {previewCourts.length > 6 ? "  •  ..." : ""}
+                    </div>
+                  )}
                   {canEdit && (cfg.count !== "" || cfg.start !== "") && (
                     <div className="mt-2 flex justify-end">
                       <Button

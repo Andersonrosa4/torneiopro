@@ -107,8 +107,8 @@ export function getLuanaRepechageWinnerSlot(
     throw new Error(`[LuanaEngine] Par de repescagem ${repechagePairIdx} inexistente`);
   }
   // Mapa fixo (groupCount=4): pair index → quarterPosition
-  //   0 (2A×3D) → Q2 ; 1 (2D×3A) → Q1 ; 2 (2B×3C) → Q4 ; 3 (2C×3B) → Q3
-  const idxToQuarter: Record<number, number> = { 0: 2, 1: 1, 2: 4, 3: 3 };
+  //   0 (2A×3D) → Q2 ; 1 (2D×3A) → Q3 ; 2 (2B×3C) → Q4 ; 3 (2C×3B) → Q1
+  const idxToQuarter: Record<number, number> = { 0: 2, 1: 3, 2: 4, 3: 1 };
   const quarterPosition = idxToQuarter[repechagePairIdx];
   if (!quarterPosition || quarterPosition < 1 || quarterPosition > groupCount) {
     throw new Error(

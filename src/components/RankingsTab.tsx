@@ -731,6 +731,71 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
         )}
       </motion.section>
 
+      {/* Modal de edição de pontuação/badge */}
+      <Dialog open={!!editingId} onOpenChange={(o) => { if (!o) setEditingId(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar pontuação</DialogTitle>
+            <DialogDescription>
+              {(() => {
+                const r = rankings.find((x) => x.id === editingId);
+                return r ? r.athlete_name : "";
+              })()}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="edit-points">Pontos</Label>
+              <Input
+                id="edit-points"
+                type="number"
+                inputMode="numeric"
+                value={editPoints}
+                onChange={(e) => setEditPoints(e.target.value)}
+                min="0"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && editingId) {
+                    updatePoints(editingId, Number(editPoints) || 0, editBadge);
+                  }
+                }}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Destaque (opcional)</Label>
+              <Select value={editBadge || "__none"} onValueChange={(v) => setEditBadge(v === "__none" ? null : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um ícone" />
+                </SelectTrigger>
+                <SelectContent>
+                  {BADGE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value || "__none"}>
+                      <span className="flex items-center gap-2">
+                        {opt.icon} {opt.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setEditingId(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => editingId && updatePoints(editingId, Number(editPoints) || 0, editBadge)}
+              className="bg-gradient-primary"
+            >
+              <Check className="h-4 w-4 mr-1" /> Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 };

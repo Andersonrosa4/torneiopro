@@ -51,6 +51,7 @@ import StageSelector from "@/components/StageSelector";
 import BugCombatantLogPanel from "@/components/BugCombatantLogPanel";
 import { generateFakeTeams, type FakeNameGender } from "@/lib/fakeNames";
 import { VERANICO_EIGHTHS_MAP } from "@/lib/veranicoEighthsMap";
+import { logVeranico } from "@/lib/veranicoAudit";
 
 const sportLabels: Record<string, string> = {
   beach_volleyball: "🏐 Vôlei de Praia",
@@ -916,7 +917,24 @@ const TournamentDetail = () => {
         });
 
         const { error: shellErr } = await organizerQuery({ table: "matches", operation: "insert", data: luanaShells });
-        if (shellErr) { toast.error(shellErr.message); return; }
+        if (shellErr) {
+          await logVeranico({
+            tournament_id: id!, modality_id: currentModalityId, stage_id: currentStageId,
+            action: "veranico.error",
+            detail: { phase: "shells_insert", error: shellErr.message, shells_attempted: luanaShells.length },
+          });
+          toast.error(shellErr.message); return;
+        }
+        await logVeranico({
+          tournament_id: id!, modality_id: currentModalityId, stage_id: currentStageId,
+          action: "veranico.quarters.shells_created",
+          detail: {
+            shells_total: luanaShells.length,
+            breakdown: {
+              repechage_r1: 4, quarters_r2: 4, semis_r3: 2, final_r4: 1, third_place_r4: 1,
+            },
+          },
+        });
 
         // Buscar shells inseridos para linkar
         const { data: inserted } = await organizerQuery({
@@ -1035,6 +1053,25 @@ const TournamentDetail = () => {
         } else {
           console.warn(`[MODO VERANICO] Estrutura criada com avisos: ${failed.length} falhas iniciais, ${missing.length} reaplicados`);
         }
+        await logVeranico({
+          tournament_id: id!, modality_id: currentModalityId, stage_id: currentStageId,
+          action: "veranico.quarters.links_written",
+          detail: {
+            links_total: linkDescs.length,
+            failed_initial: failed.length,
+            failed_labels: failed.map(f => f.label),
+            reapplied: missing.length,
+            reapplied_labels: missing.map(m => m.label),
+          },
+        });
+        await logVeranico({
+          tournament_id: id!, modality_id: currentModalityId, stage_id: currentStageId,
+          action: "veranico.quarters.links_verified",
+          detail: {
+            ok: failed.length === 0 && missing.length === 0,
+            broken_after_repair: missing.filter(m => failed.some(f => f.matchId === m.matchId)).length,
+          },
+        });
       } else {
       // === PRE-GENERATE KNOCKOUT BRACKET STRUCTURE ===
       // Create empty match shells for all elimination rounds so they appear in the Sequence tab immediately
@@ -1562,6 +1599,22 @@ const TournamentDetail = () => {
         }
       }
       await Promise.all(veranicoUpdates);
+      await logVeranico({
+        tournament_id: id!,
+        modality_id: modalityId,
+        stage_id: existingKnockout[0]?.stage_id ?? null,
+        action: "veranico.quarters.fill_classification",
+        detail: {
+          repechages_filled: repechageMap.length,
+          quarters_filled: repechageMap.length,
+          group_rankings_summary: brackets.map((b, idx) => ({
+            group: b,
+            top4: (groupRankings[String(b)] || []).slice(0, 4).map((t: any) => ({
+              teamId: t.teamId, pontos: t.pontos, saldo: t.saldoSets,
+            })),
+          })),
+        },
+      });
       toast.success(`MODO VERANICO: repescagens INTRA-CHAVE (2º×3º) e quartas (1º colocados) preenchidas.`);
       fetchData();
       return;
@@ -1617,6 +1670,22 @@ const TournamentDetail = () => {
       }
 
       await Promise.all(updates);
+      await logVeranico({
+        tournament_id: id!,
+        modality_id: modalityId,
+        stage_id: existingKnockout[0]?.stage_id ?? null,
+        action: "veranico.eighths.fill_classification",
+        detail: {
+          eighths_filled: eighthsMap.length,
+          map_used: eighthsMap.map(m => ({ pos: m.pos, t1: m.t1, t2: m.t2 })),
+          group_rankings_summary: brackets.map((b) => ({
+            group: b,
+            top4: (groupRankings[String(b)] || []).slice(0, 4).map((t: any) => ({
+              teamId: t.teamId, pontos: t.pontos, saldo: t.saldoSets,
+            })),
+          })),
+        },
+      });
       toast.success("MODO VERANICO (Oitavas): 8 partidas geradas (A×D, B×C).");
       fetchData();
       return;

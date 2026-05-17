@@ -230,8 +230,12 @@ const ClassificationTab = ({ matches, teams, rankingCriteriaOrder, classificatio
     });
 
     unplacedFromGroups.sort((a, b) => b.wins - a.wins || b.pointDiff - a.pointDiff);
+    const unplacedById: Record<string, typeof unplacedFromGroups[number]> = {};
+    unplacedFromGroups.forEach((t) => { unplacedById[t.id] = t; });
+    const reorderedUnplacedIds = applyGlobalOverrides(unplacedFromGroups.map((t) => t.id));
     const groupStart = ranked.length + 1;
-    unplacedFromGroups.forEach((t, idx) => {
+    reorderedUnplacedIds.forEach((tid, idx) => {
+      const t = unplacedById[tid];
       ranked.push({ id: t.id, name: t.name, position: groupStart + idx, label: `${groupStart + idx}º lugar` });
       placedTeams.add(t.id);
     });

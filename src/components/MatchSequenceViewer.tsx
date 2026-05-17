@@ -11,6 +11,7 @@ import { getVeranicoEighthsLabels } from "@/lib/veranicoEighthsMap";
 import { getEliminationRoundLabel, getEliminationRoundShortLabel } from "@/lib/roundLabels";
 import { buildSchedulerBlocks, schedulerSequence, getSchedulerBlockColor, getSchedulerBadgeColor, type SchedulerBlock } from "@/lib/roundScheduler";
 import { buildMatchNumberMap } from "@/lib/matchNumbering";
+import { resolveTie, type TeamStats } from "@/engine/tiebreakEngine";
 import { ManualMatchOverride } from "@/components/ManualMatchOverride";
 type ScoringRules = any;
 
@@ -422,6 +423,7 @@ const MatchCard = ({
     const teamPoints: Record<string, number> = {};
     const teamPointsFor: Record<string, number> = {};
     const teamPointsAgainst: Record<string, number> = {};
+    const headToHeadMap: Record<string, { winnerId: string }> = {};
     for (const m of allMatches) {
       if (m.round === 0 && m.bracket_number) {
         if (!groupTeams[m.bracket_number]) groupTeams[m.bracket_number] = new Set();
@@ -431,6 +433,9 @@ const MatchCard = ({
           if (m.winner_team_id) {
             teamWins[m.winner_team_id] = (teamWins[m.winner_team_id] || 0) + 1;
             teamPoints[m.winner_team_id] = (teamPoints[m.winner_team_id] || 0) + 3;
+            if (m.team1_id && m.team2_id) {
+              headToHeadMap[`${m.team1_id}_${m.team2_id}`] = { winnerId: m.winner_team_id };
+            }
           }
           // Track point differential
           if (m.team1_id && m.score1 != null && m.score2 != null) {
@@ -447,13 +452,12 @@ const MatchCard = ({
     // Sort teams in each group by points desc → point differential desc → assign position
     for (const [bn, teamSet] of Object.entries(groupTeams)) {
       const letter = String.fromCharCode(64 + Number(bn));
-      const sorted = [...teamSet].sort((a, b) => {
-        const ptDiff = (teamPoints[b] || 0) - (teamPoints[a] || 0);
-        if (ptDiff !== 0) return ptDiff;
-        const diffA = (teamPointsFor[a] || 0) - (teamPointsAgainst[a] || 0);
-        const diffB = (teamPointsFor[b] || 0) - (teamPointsAgainst[b] || 0);
-        return diffB - diffA;
-      });
+      const stats: TeamStats[] = [...teamSet].map((id) => ({
+        id,
+        wins: teamWins[id] || 0,
+        pointDiff: (teamPointsFor[id] || 0) - (teamPointsAgainst[id] || 0),
+      }));
+      const sorted = resolveTie(stats, ["wins", "head_to_head", "point_diff"], headToHeadMap).map((team) => team.id);
       sorted.forEach((tid, idx) => { map[tid] = { group: letter, pos: idx + 1 }; });
     }
     return map;

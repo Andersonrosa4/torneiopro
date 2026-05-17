@@ -317,6 +317,7 @@ const TournamentPublicView = () => {
                       sport={tournament?.sport || ""}
                       eventDate={tournament?.event_date ? formatDateBR(tournament.event_date) : undefined}
                       tournamentFormat={tournament?.format === 'double_elimination' ? 'double_elimination' : (selectedModality?.game_system || tournament?.format)}
+                      classificationOverrides={tournament?.classification_overrides}
                       onDeclareWinner={() => {}}
                       onUpdateScore={() => {}}
                     />

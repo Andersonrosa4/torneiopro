@@ -38,7 +38,7 @@ const DB_TO_ENGINE: Record<string, TiebreakCriteria> = {
   HEAD_TO_HEAD: "head_to_head",
 };
 
-const DEFAULT_CRITERIA: TiebreakCriteria[] = ["wins", "point_diff", "head_to_head"];
+const DEFAULT_CRITERIA: TiebreakCriteria[] = ["wins", "head_to_head", "point_diff"];
 
 function parseCriteriaOrder(raw?: string): TiebreakCriteria[] {
   if (!raw) return DEFAULT_CRITERIA;

@@ -3783,6 +3783,7 @@ const TournamentDetail = () => {
                       onOverrideSaved={fetchData}
                       tournamentRules={tournamentRules}
                       tournamentId={id || ""}
+                      classificationOverrides={tournament?.classification_overrides}
                     />
                 </section>
               ) : (

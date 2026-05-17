@@ -502,7 +502,11 @@ export function ManualMatchOverride({ match, matchNumber, teams, allMatches, tou
             if (pm.next_win_match_id && byeWinner) {
               const nextMatch = matchList.find(m => m.id === pm.next_win_match_id);
               if (nextMatch) {
-                const slot = !nextMatch.team1_id ? 'team1_id' : 'team2_id';
+                const slot = !nextMatch.team1_id ? 'team1_id' : (!nextMatch.team2_id ? 'team2_id' : null);
+                if (!slot) {
+                  console.warn(`[ManualOverride:BYE:SE] Destino ${nextMatch.id} cheio; não vou sobrescrever dupla existente.`);
+                  continue;
+                }
                 await organizerQuery({
                   table: "matches",
                   operation: "update",

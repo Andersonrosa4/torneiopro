@@ -218,10 +218,9 @@ const TournamentDetail = () => {
     };
     const violations = validateSystemRules(snapshot);
     if (violations.length > 0) {
-      console.error(`[SystemRulesGuard:${label}] ${violations.length} violação(ões):`);
-      violations.forEach(v => console.error(`  → [${v.rule}] ${v.message}`));
-      toast.error(`⛔ Violação de regra: ${violations[0].message}`);
-      return false; // blocked
+      console.warn(`[SystemRulesGuard:${label}] ${violations.length} violação(ões) ignorada(s) para permitir lançamento livre:`);
+      violations.forEach(v => console.warn(`  → [${v.rule}] ${v.message}`));
+      return true; // permissivo: não bloqueia lançamentos
     }
     return true; // ok
   }, [tournament?.format]);

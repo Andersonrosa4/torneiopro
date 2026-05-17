@@ -2817,6 +2817,8 @@ const TournamentDetail = () => {
                     (dest as any)[targetSlot] = cm.winner_team_id;
                     sweepRepaired = true;
                   }
+                } else {
+                  console.warn(`[SE-AUTO-REPAIR] Próximo jogo R${dest.round}P${dest.position} já está cheio; não vou sobrescrever nenhuma dupla.`);
                 }
               }
             }
@@ -2842,6 +2844,8 @@ const TournamentDetail = () => {
                     (dest as any)[targetSlot] = cmLoserId;
                     sweepRepaired = true;
                   }
+                } else {
+                  console.warn(`[SE-AUTO-REPAIR] Jogo de destino R${dest.round}P${dest.position} já está cheio; não vou sobrescrever nenhuma dupla.`);
                 }
               }
             }

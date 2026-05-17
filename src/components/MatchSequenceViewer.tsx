@@ -434,7 +434,13 @@ const MatchCard = ({
             teamWins[m.winner_team_id] = (teamWins[m.winner_team_id] || 0) + 1;
             teamPoints[m.winner_team_id] = (teamPoints[m.winner_team_id] || 0) + 3;
             if (m.team1_id && m.team2_id) {
-              headToHeadMap[`${m.team1_id}_${m.team2_id}`] = { winnerId: m.winner_team_id };
+              headToHeadMap[`${m.team1_id}_${m.team2_id}`] = {
+                winnerId: m.winner_team_id,
+                team1Id: m.team1_id,
+                team2Id: m.team2_id,
+                score1: m.score1 ?? 0,
+                score2: m.score2 ?? 0,
+              };
             }
           }
           // Track point differential

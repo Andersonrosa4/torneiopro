@@ -52,7 +52,7 @@ const MEDAL_BY_POS = ["🥇", "🥈", "🥉", "🏅"];
  * textual e simples por chave (grupo) da fase classificatória.
  * Mostra mesmo antes do encerramento da fase de grupos.
  */
-export default function GroupReportPanel({ matches, teams }: Props) {
+export default function GroupReportPanel({ matches, teams, classificationOverrides }: Props) {
   const [open, setOpen] = useState(false);
 
   const teamName = (id: string | null | undefined) => {

@@ -466,11 +466,19 @@ const MatchCard = ({
         wins: teamWins[id] || 0,
         pointDiff: (teamPointsFor[id] || 0) - (teamPointsAgainst[id] || 0),
       }));
-      const sorted = resolveTie(stats, ["wins", "head_to_head", "point_diff"], headToHeadMap).map((team) => team.id);
+      let sorted = resolveTie(stats, ["wins", "head_to_head", "point_diff"], headToHeadMap).map((team) => team.id);
+      // Apply manual classification override for this bracket (if any)
+      const overrideOrder = classificationOverrides?.[String(bn)];
+      if (overrideOrder && overrideOrder.length > 0) {
+        const present = overrideOrder.filter((id) => sorted.includes(id));
+        const presentSet = new Set(present);
+        const remainder = sorted.filter((id) => !presentSet.has(id));
+        sorted = [...present, ...remainder];
+      }
       sorted.forEach((tid, idx) => { map[tid] = { group: letter, pos: idx + 1 }; });
     }
     return map;
-  }, [allMatches]);
+  }, [allMatches, classificationOverrides]);
 
   // Build feeder labels for empty slots (knockout only)
   const feederLabels = useMemo(() => {

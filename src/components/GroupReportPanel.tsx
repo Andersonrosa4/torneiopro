@@ -195,7 +195,7 @@ export default function GroupReportPanel({ matches, teams, classificationOverrid
       sections.push(lines.join("\n"));
     }
     return sections.join("\n\n──────────────\n\n");
-  }, [brackets, teams]);
+  }, [brackets, teams, classificationOverrides]);
 
   if (brackets.length === 0) return null;
 

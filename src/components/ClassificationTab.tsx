@@ -27,6 +27,16 @@ interface ClassificationTabProps {
   matches: Match[];
   teams: Team[];
   rankingCriteriaOrder?: string;
+  classificationOverrides?: Record<string, string[]> | null;
+}
+
+function applyOverride(sortedIds: string[], override?: string[]): string[] {
+  if (!override || override.length === 0) return sortedIds;
+  const sortedSet = new Set(sortedIds);
+  const forced = override.filter((id) => sortedSet.has(id));
+  const forcedSet = new Set(forced);
+  const remainder = sortedIds.filter((id) => !forcedSet.has(id));
+  return [...forced, ...remainder];
 }
 
 const DB_TO_ENGINE: Record<string, TiebreakCriteria> = {

@@ -1903,17 +1903,9 @@ const TournamentDetail = () => {
     const match = matches.find((m) => m.id === matchId);
     if (!match || !id) { declareWinnerMutex.current.delete(matchId); return; }
 
-    // ── ROUND LOCK GUARD ──
+    // ── ROUND LOCK GUARD (desabilitado a pedido do organizador) ──
+    // Permite lançamento livre de qualquer partida, sem aguardar dependências.
     const modalityMatches = matches.filter(m => sameMatchScope(m, match));
-    const lockCheck = isRoundLocked(
-      { id: match.id, round: match.round, status: match.status, bracket_type: match.bracket_type, bracket_half: match.bracket_half, modality_id: match.modality_id, stage_id: match.stage_id, next_win_match_id: match.next_win_match_id, next_lose_match_id: match.next_lose_match_id },
-      modalityMatches.map(m => ({ id: m.id, round: m.round, status: m.status, bracket_type: m.bracket_type, bracket_half: m.bracket_half, modality_id: m.modality_id, stage_id: m.stage_id, next_win_match_id: m.next_win_match_id, next_lose_match_id: m.next_lose_match_id })),
-    );
-    if (lockCheck.locked) {
-      toast.error(lockCheck.reason);
-      declareWinnerMutex.current.delete(matchId);
-      return;
-    }
 
     // ── SYSTEM RULES GUARD (pre-declaration) ──
     // Skip pre-check if this is a re-declaration (editing existing result)

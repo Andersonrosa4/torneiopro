@@ -416,15 +416,18 @@ export function ManualMatchOverride({ match, matchNumber, teams, allMatches, tou
                 overrideLoserId,
               );
               for (const upd of [...advResult.winnerUpdates, ...advResult.loserUpdates]) {
+                const targetMatch = freshMatches.find(m => m.id === upd.matchId);
+                const safeData = mergeWithoutOverwritingSlots(targetMatch, upd.data, 'first-propagation');
+                if (!safeData) continue;
                 const { error: advError } = await organizerQuery({
                   table: "matches",
                   operation: "update",
-                  data: upd.data,
+                  data: safeData,
                   filters: { id: upd.matchId },
                 });
                 if (advError) throw new Error(`Propagation failed: ${advError.message}`);
                 freshMatches = freshMatches.map(m =>
-                  m.id === upd.matchId ? { ...m, ...upd.data } : m
+                  m.id === upd.matchId ? { ...m, ...safeData } : m
                 );
               }
 
@@ -483,14 +486,16 @@ export function ManualMatchOverride({ match, matchNumber, teams, allMatches, tou
           if (isDoubleElimination) {
             const byeAdv = processDoubleEliminationAdvance(matchList as any, pm as any, byeWinner!, null);
             for (const upd of [...byeAdv.winnerUpdates, ...byeAdv.loserUpdates]) {
+              const target = matchList.find(m => m.id === upd.matchId);
+              const safeData = mergeWithoutOverwritingSlots(target, upd.data, 'bye');
+              if (!safeData) continue;
               await organizerQuery({
                 table: "matches",
                 operation: "update",
-                data: upd.data,
+                data: safeData,
                 filters: { id: upd.matchId },
               });
-              const target = matchList.find(m => m.id === upd.matchId);
-              if (target) Object.assign(target, upd.data);
+              if (target) Object.assign(target, safeData);
             }
           } else {
             // SE: propagate via next_win_match_id

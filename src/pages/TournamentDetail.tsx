@@ -2428,16 +2428,18 @@ const TournamentDetail = () => {
               // Propagate BYE winner forward
               const byeAdvancement = processDoubleEliminationAdvance(modalityMatches, pm, byeWinner!, null);
               for (const upd of [...byeAdvancement.winnerUpdates, ...byeAdvancement.loserUpdates]) {
+                const targetMatch = modalityMatches.find(m => m.id === upd.matchId);
+                const safeData = mergeWithoutOverwritingSlots(targetMatch, upd.data, 'DE:bye');
+                if (!safeData) continue;
                 await organizerQuery({
                   table: "matches",
                   operation: "update",
-                  data: upd.data,
+                  data: safeData,
                   filters: { id: upd.matchId },
                 });
                 // Update in-memory
-                const targetMatch = modalityMatches.find(m => m.id === upd.matchId);
-                if (targetMatch) Object.assign(targetMatch, upd.data);
-                console.log(`[BYE:Propagate] → Match ${upd.matchId} (${JSON.stringify(upd.data)})`);
+                if (targetMatch) Object.assign(targetMatch, safeData);
+                console.log(`[BYE:Propagate] → Match ${upd.matchId} (${JSON.stringify(safeData)})`);
               }
               
               byeProcessed = true; // Loop again to catch cascading BYEs

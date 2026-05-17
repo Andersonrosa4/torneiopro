@@ -91,6 +91,43 @@ const matchScopeFilters = (match: Match, tournamentId: string) => {
   return filters;
 };
 
+const SLOT_KEYS = ["team1_id", "team2_id"] as const;
+type SlotKey = typeof SLOT_KEYS[number];
+const isSlotKey = (key: string): key is SlotKey => key === "team1_id" || key === "team2_id";
+
+const mergeWithoutOverwritingSlots = <T extends { team1_id: string | null; team2_id: string | null }>(
+  dest: T | undefined,
+  data: Record<string, any>,
+  label: string,
+) => {
+  if (!dest) return null;
+  const safeData: Record<string, any> = { ...data };
+
+  for (const key of Object.keys(data)) {
+    if (!isSlotKey(key) || data[key] === null || data[key] === undefined) continue;
+    const incomingTeam = data[key];
+    const otherSlot: SlotKey = key === "team1_id" ? "team2_id" : "team1_id";
+
+    if (dest[key] === incomingTeam || dest[otherSlot] === incomingTeam) {
+      delete safeData[key];
+      continue;
+    }
+
+    if (dest[key] && dest[key] !== incomingTeam) {
+      if (!dest[otherSlot]) {
+        delete safeData[key];
+        safeData[otherSlot] = incomingTeam;
+        console.warn(`[SlotSafe:${label}] ${key} ocupado; usando ${otherSlot} para não sobrescrever dupla existente.`);
+      } else {
+        delete safeData[key];
+        console.warn(`[SlotSafe:${label}] Próximo jogo cheio; resultado salvo, mas avanço automático ignorado para não sobrescrever dupla existente.`);
+      }
+    }
+  }
+
+  return Object.keys(safeData).length > 0 ? safeData : null;
+};
+
 const normalizeTeamName = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleLowerCase("pt-BR");
 
 const teamPairKey = (player1Name: string, player2Name: string) =>
@@ -1310,7 +1347,8 @@ const TournamentDetail = () => {
             );
             if (nextMatch) {
               const update = isTop ? { team1_id: m.winner_team_id } : { team2_id: m.winner_team_id };
-              await organizerQuery({ table: "matches", operation: "update", data: update, filters: { id: nextMatch.id } });
+              const safeData = mergeWithoutOverwritingSlots(nextMatch, update, 'generate:completed-advance');
+              if (safeData) await organizerQuery({ table: "matches", operation: "update", data: safeData, filters: { id: nextMatch.id } });
             }
           }
         }
@@ -2023,10 +2061,13 @@ const TournamentDetail = () => {
 
                  const allUpdates = [...advResult.winnerUpdates, ...advResult.loserUpdates];
                  for (const upd of allUpdates) {
+                   const targetMatch = postResetMatches.find(m => m.id === upd.matchId);
+                   const safeData = mergeWithoutOverwritingSlots(targetMatch, upd.data, 'DE:repropagation');
+                   if (!safeData) continue;
                    const { error: repropError } = await organizerQuery({
                      table: "matches",
                      operation: "update",
-                     data: upd.data,
+                     data: safeData,
                      filters: { id: upd.matchId },
                    });
                    if (repropError) {
@@ -2034,7 +2075,7 @@ const TournamentDetail = () => {
                    }
                    // Update local snapshot so subsequent iterations see correct state
                    postResetMatches = postResetMatches.map(m =>
-                     m.id === upd.matchId ? { ...m, ...upd.data } : m
+                     m.id === upd.matchId ? { ...m, ...safeData } : m
                    );
                  }
                  if (allUpdates.length > 0) {
@@ -2076,14 +2117,16 @@ const TournamentDetail = () => {
 
                         const byeAdv = processDoubleEliminationAdvance(postResetMatches, pm, byeWinner!, null);
                         for (const upd of [...byeAdv.winnerUpdates, ...byeAdv.loserUpdates]) {
+                          const target = postResetMatches.find(m => m.id === upd.matchId);
+                          const safeData = mergeWithoutOverwritingSlots(target, upd.data, 'DE:bye-post-cascade');
+                          if (!safeData) continue;
                           await organizerQuery({
                             table: "matches",
                             operation: "update",
-                            data: upd.data,
+                            data: safeData,
                             filters: { id: upd.matchId },
                           });
-                          const target = postResetMatches.find(m => m.id === upd.matchId);
-                          if (target) Object.assign(target, upd.data);
+                          if (target) Object.assign(target, safeData);
                         }
                         byeProcessed = true;
                       }
@@ -2185,7 +2228,11 @@ const TournamentDetail = () => {
                     if (pm.next_win_match_id && byeWinner) {
                       const nextMatch = seMatches.find(m => m.id === pm.next_win_match_id);
                       if (nextMatch) {
-                        const slot = !nextMatch.team1_id ? 'team1_id' : 'team2_id';
+                        const slot = !nextMatch.team1_id ? 'team1_id' : (!nextMatch.team2_id ? 'team2_id' : null);
+                        if (!slot) {
+                          console.warn(`[BYE:SE] Destino ${nextMatch.id} cheio; não vou sobrescrever dupla existente.`);
+                          continue;
+                        }
                         await organizerQuery({
                           table: "matches",
                           operation: "update",
@@ -2297,17 +2344,20 @@ const TournamentDetail = () => {
 
       const results = await Promise.all(
         allUpdates.map(async (update) => {
+          const destMatch = freshMatchList.find(m => m.id === update.matchId);
+          const safeData = mergeWithoutOverwritingSlots(destMatch, update.data, `DE:${update.type}`);
+          if (!safeData) return true;
           const { error } = await organizerQuery({
             table: "matches",
             operation: "update",
-            data: update.data,
+            data: safeData,
             filters: { id: update.matchId },
           });
           if (error) {
             console.error(`[DE:FeederFail] ${update.type} injection failed for match ${update.matchId}:`, error);
             return false;
           }
-          console.log(`[DE:FeederOK] ${update.type === 'winner' ? 'Winner' : 'Loser'} ${update.type === 'winner' ? winnerId : loserId} → Match ${update.matchId} (${JSON.stringify(update.data)})`);
+          console.log(`[DE:FeederOK] ${update.type === 'winner' ? 'Winner' : 'Loser'} ${update.type === 'winner' ? winnerId : loserId} → Match ${update.matchId} (${JSON.stringify(safeData)})`);
           return true;
         })
       );
@@ -2383,16 +2433,18 @@ const TournamentDetail = () => {
               // Propagate BYE winner forward
               const byeAdvancement = processDoubleEliminationAdvance(modalityMatches, pm, byeWinner!, null);
               for (const upd of [...byeAdvancement.winnerUpdates, ...byeAdvancement.loserUpdates]) {
+                const targetMatch = modalityMatches.find(m => m.id === upd.matchId);
+                const safeData = mergeWithoutOverwritingSlots(targetMatch, upd.data, 'DE:bye');
+                if (!safeData) continue;
                 await organizerQuery({
                   table: "matches",
                   operation: "update",
-                  data: upd.data,
+                  data: safeData,
                   filters: { id: upd.matchId },
                 });
                 // Update in-memory
-                const targetMatch = modalityMatches.find(m => m.id === upd.matchId);
-                if (targetMatch) Object.assign(targetMatch, upd.data);
-                console.log(`[BYE:Propagate] → Match ${upd.matchId} (${JSON.stringify(upd.data)})`);
+                if (targetMatch) Object.assign(targetMatch, safeData);
+                console.log(`[BYE:Propagate] → Match ${upd.matchId} (${JSON.stringify(safeData)})`);
               }
               
               byeProcessed = true; // Loop again to catch cascading BYEs
@@ -2512,8 +2564,8 @@ const TournamentDetail = () => {
           targetSlot = otherSlot;
           console.warn(`[SE:Propagate] Slot natural (${naturalSlot}) ocupado por ${dest[naturalSlot]}. Usando ${otherSlot} para preservar dupla.`);
         } else {
-          console.error(`[SE:Propagate] BLOQUEADO: ambos os slots de ${destMatchId} ocupados (${dest.team1_id} / ${dest.team2_id}). Não sobrescreverei. Time ${teamId} (${kind}) não propagado.`);
-          toast.error("Propagação bloqueada: a próxima partida já está cheia. Verifique manualmente.");
+          console.warn(`[SE:Propagate] Destino cheio (${dest.team1_id} / ${dest.team2_id}). Resultado salvo sem sobrescrever dupla existente. Time ${teamId} (${kind}) não propagado.`);
+          toast.warning("Resultado salvo. A próxima partida já estava cheia, então nenhuma dupla foi sobrescrita.");
           return;
         }
 
@@ -2777,6 +2829,8 @@ const TournamentDetail = () => {
                     (dest as any)[targetSlot] = cm.winner_team_id;
                     sweepRepaired = true;
                   }
+                } else {
+                  console.warn(`[SE-AUTO-REPAIR] Próximo jogo R${dest.round}P${dest.position} já está cheio; não vou sobrescrever nenhuma dupla.`);
                 }
               }
             }
@@ -2802,6 +2856,8 @@ const TournamentDetail = () => {
                     (dest as any)[targetSlot] = cmLoserId;
                     sweepRepaired = true;
                   }
+                } else {
+                  console.warn(`[SE-AUTO-REPAIR] Jogo de destino R${dest.round}P${dest.position} já está cheio; não vou sobrescrever nenhuma dupla.`);
                 }
               }
             }

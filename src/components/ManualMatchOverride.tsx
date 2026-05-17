@@ -61,6 +61,42 @@ const matchScopeFilters = (match: Match, tournamentId: string) => {
   return filters;
 };
 
+type SlotKey = "team1_id" | "team2_id";
+const isSlotKey = (key: string): key is SlotKey => key === "team1_id" || key === "team2_id";
+
+const mergeWithoutOverwritingSlots = <T extends { team1_id: string | null; team2_id: string | null }>(
+  dest: T | undefined,
+  data: Record<string, any>,
+  label: string,
+) => {
+  if (!dest) return null;
+  const safeData: Record<string, any> = { ...data };
+
+  for (const key of Object.keys(data)) {
+    if (!isSlotKey(key) || data[key] === null || data[key] === undefined) continue;
+    const incomingTeam = data[key];
+    const otherSlot: SlotKey = key === "team1_id" ? "team2_id" : "team1_id";
+
+    if (dest[key] === incomingTeam || dest[otherSlot] === incomingTeam) {
+      delete safeData[key];
+      continue;
+    }
+
+    if (dest[key] && dest[key] !== incomingTeam) {
+      if (!dest[otherSlot]) {
+        delete safeData[key];
+        safeData[otherSlot] = incomingTeam;
+        console.warn(`[ManualOverride:SlotSafe:${label}] ${key} ocupado; usando ${otherSlot} para não sobrescrever.`);
+      } else {
+        delete safeData[key];
+        console.warn(`[ManualOverride:SlotSafe:${label}] Próximo jogo cheio; avanço ignorado para não sobrescrever dupla existente.`);
+      }
+    }
+  }
+
+  return Object.keys(safeData).length > 0 ? safeData : null;
+};
+
 interface ManualMatchOverrideProps {
   match: Match;
   matchNumber: number;
@@ -258,10 +294,13 @@ export function ManualMatchOverride({ match, matchNumber, teams, allMatches, tou
 
               const allUpdates = [...advResult.winnerUpdates, ...advResult.loserUpdates];
               for (const upd of allUpdates) {
+                const targetMatch = postResetMatches.find(m => m.id === upd.matchId);
+                const safeData = mergeWithoutOverwritingSlots(targetMatch, upd.data, 'repropagation');
+                if (!safeData) continue;
                 const { error: repropError } = await organizerQuery({
                   table: "matches",
                   operation: "update",
-                  data: upd.data,
+                  data: safeData,
                   filters: { id: upd.matchId },
                 });
                 if (repropError) {
@@ -269,7 +308,7 @@ export function ManualMatchOverride({ match, matchNumber, teams, allMatches, tou
                 }
                 // Update local snapshot
                 postResetMatches = postResetMatches.map(m =>
-                  m.id === upd.matchId ? { ...m, ...upd.data } : m
+                  m.id === upd.matchId ? { ...m, ...safeData } : m
                 );
               }
               if (allUpdates.length > 0) {
@@ -288,17 +327,20 @@ export function ManualMatchOverride({ match, matchNumber, teams, allMatches, tou
                 overrideLoserId,
               );
               for (const upd of [...overrideAdv.winnerUpdates, ...overrideAdv.loserUpdates]) {
+                const targetMatch = postResetMatches.find(m => m.id === upd.matchId);
+                const safeData = mergeWithoutOverwritingSlots(targetMatch, upd.data, 'override');
+                if (!safeData) continue;
                 const { error: advError } = await organizerQuery({
                   table: "matches",
                   operation: "update",
-                  data: upd.data,
+                  data: safeData,
                   filters: { id: upd.matchId },
                 });
                 if (advError) {
                   throw new Error(`Override propagation failed for match ${upd.matchId}: ${advError.message}`);
                 }
                 postResetMatches = postResetMatches.map(m =>
-                  m.id === upd.matchId ? { ...m, ...upd.data } : m
+                  m.id === upd.matchId ? { ...m, ...safeData } : m
                 );
               }
             }
@@ -374,15 +416,18 @@ export function ManualMatchOverride({ match, matchNumber, teams, allMatches, tou
                 overrideLoserId,
               );
               for (const upd of [...advResult.winnerUpdates, ...advResult.loserUpdates]) {
+                const targetMatch = freshMatches.find(m => m.id === upd.matchId);
+                const safeData = mergeWithoutOverwritingSlots(targetMatch, upd.data, 'first-propagation');
+                if (!safeData) continue;
                 const { error: advError } = await organizerQuery({
                   table: "matches",
                   operation: "update",
-                  data: upd.data,
+                  data: safeData,
                   filters: { id: upd.matchId },
                 });
                 if (advError) throw new Error(`Propagation failed: ${advError.message}`);
                 freshMatches = freshMatches.map(m =>
-                  m.id === upd.matchId ? { ...m, ...upd.data } : m
+                  m.id === upd.matchId ? { ...m, ...safeData } : m
                 );
               }
 
@@ -441,21 +486,27 @@ export function ManualMatchOverride({ match, matchNumber, teams, allMatches, tou
           if (isDoubleElimination) {
             const byeAdv = processDoubleEliminationAdvance(matchList as any, pm as any, byeWinner!, null);
             for (const upd of [...byeAdv.winnerUpdates, ...byeAdv.loserUpdates]) {
+              const target = matchList.find(m => m.id === upd.matchId);
+              const safeData = mergeWithoutOverwritingSlots(target, upd.data, 'bye');
+              if (!safeData) continue;
               await organizerQuery({
                 table: "matches",
                 operation: "update",
-                data: upd.data,
+                data: safeData,
                 filters: { id: upd.matchId },
               });
-              const target = matchList.find(m => m.id === upd.matchId);
-              if (target) Object.assign(target, upd.data);
+              if (target) Object.assign(target, safeData);
             }
           } else {
             // SE: propagate via next_win_match_id
             if (pm.next_win_match_id && byeWinner) {
               const nextMatch = matchList.find(m => m.id === pm.next_win_match_id);
               if (nextMatch) {
-                const slot = !nextMatch.team1_id ? 'team1_id' : 'team2_id';
+                const slot = !nextMatch.team1_id ? 'team1_id' : (!nextMatch.team2_id ? 'team2_id' : null);
+                if (!slot) {
+                  console.warn(`[ManualOverride:BYE:SE] Destino ${nextMatch.id} cheio; não vou sobrescrever dupla existente.`);
+                  continue;
+                }
                 await organizerQuery({
                   table: "matches",
                   operation: "update",

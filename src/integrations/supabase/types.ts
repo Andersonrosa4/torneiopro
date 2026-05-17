@@ -2024,6 +2024,7 @@ export type Database = {
       tournaments: {
         Row: {
           category: string | null
+          classification_overrides: Json | null
           created_at: string
           created_by: string
           description: string | null
@@ -2045,6 +2046,7 @@ export type Database = {
         }
         Insert: {
           category?: string | null
+          classification_overrides?: Json | null
           created_at?: string
           created_by: string
           description?: string | null
@@ -2066,6 +2068,7 @@ export type Database = {
         }
         Update: {
           category?: string | null
+          classification_overrides?: Json | null
           created_at?: string
           created_by?: string
           description?: string | null

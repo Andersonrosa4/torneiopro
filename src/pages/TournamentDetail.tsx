@@ -3801,9 +3801,9 @@ const TournamentDetail = () => {
                     <h2 className="text-xl font-semibold flex items-center gap-2">
                       <Trophy className="h-5 w-5" /> Classificação
                     </h2>
-                    <GroupReportPanel matches={filteredMatches as any} teams={filteredTeams as any} />
+                    <GroupReportPanel matches={filteredMatches as any} teams={filteredTeams as any} classificationOverrides={tournament?.classification_overrides} />
                   </div>
-                  <ClassificationTab matches={filteredMatches} teams={filteredTeams} rankingCriteriaOrder={tournamentRules?.ranking_criteria_order} />
+                  <ClassificationTab matches={filteredMatches} teams={filteredTeams} rankingCriteriaOrder={tournamentRules?.ranking_criteria_order} classificationOverrides={tournament?.classification_overrides} />
                 </section>
               ) : (
                 <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">

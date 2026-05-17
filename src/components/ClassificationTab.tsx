@@ -288,9 +288,10 @@ const ClassificationTab = ({ matches, teams, rankingCriteriaOrder, classificatio
       headToHeadMap
     );
 
-    return sorted.map((t, idx) => ({
-      id: t.id,
-      name: getTeamName(t.id),
+    const finalIds = applyGlobalOverrides(sorted.map((t) => t.id));
+    return finalIds.map((id, idx) => ({
+      id,
+      name: getTeamName(id),
       position: idx + 1,
       label: `${idx + 1}º lugar`,
     }));

@@ -294,10 +294,13 @@ export function ManualMatchOverride({ match, matchNumber, teams, allMatches, tou
 
               const allUpdates = [...advResult.winnerUpdates, ...advResult.loserUpdates];
               for (const upd of allUpdates) {
+                const targetMatch = postResetMatches.find(m => m.id === upd.matchId);
+                const safeData = mergeWithoutOverwritingSlots(targetMatch, upd.data, 'repropagation');
+                if (!safeData) continue;
                 const { error: repropError } = await organizerQuery({
                   table: "matches",
                   operation: "update",
-                  data: upd.data,
+                  data: safeData,
                   filters: { id: upd.matchId },
                 });
                 if (repropError) {
@@ -305,7 +308,7 @@ export function ManualMatchOverride({ match, matchNumber, teams, allMatches, tou
                 }
                 // Update local snapshot
                 postResetMatches = postResetMatches.map(m =>
-                  m.id === upd.matchId ? { ...m, ...upd.data } : m
+                  m.id === upd.matchId ? { ...m, ...safeData } : m
                 );
               }
               if (allUpdates.length > 0) {
@@ -324,17 +327,20 @@ export function ManualMatchOverride({ match, matchNumber, teams, allMatches, tou
                 overrideLoserId,
               );
               for (const upd of [...overrideAdv.winnerUpdates, ...overrideAdv.loserUpdates]) {
+                const targetMatch = postResetMatches.find(m => m.id === upd.matchId);
+                const safeData = mergeWithoutOverwritingSlots(targetMatch, upd.data, 'override');
+                if (!safeData) continue;
                 const { error: advError } = await organizerQuery({
                   table: "matches",
                   operation: "update",
-                  data: upd.data,
+                  data: safeData,
                   filters: { id: upd.matchId },
                 });
                 if (advError) {
                   throw new Error(`Override propagation failed for match ${upd.matchId}: ${advError.message}`);
                 }
                 postResetMatches = postResetMatches.map(m =>
-                  m.id === upd.matchId ? { ...m, ...upd.data } : m
+                  m.id === upd.matchId ? { ...m, ...safeData } : m
                 );
               }
             }

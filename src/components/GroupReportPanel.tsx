@@ -32,6 +32,7 @@ interface TeamLite {
 interface Props {
   matches: MatchLite[];
   teams: TeamLite[];
+  classificationOverrides?: Record<string, string[]> | null;
 }
 
 interface Row {

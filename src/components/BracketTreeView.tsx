@@ -935,7 +935,7 @@ const BracketTreeView = ({ matches, participants }: BracketTreeViewProps) => {
     const losersInferiores = matches.filter((m) => m.bracket_type === "losers" && m.bracket_half === "lower");
     const sf = matches.filter((m) => m.bracket_type === "semi_final");
     const f = matches.filter((m) => m.bracket_type === "final");
-    const isDE = wA.length > 0 || wB.length > 0 || sf.length > 0;
+    const isDE = wA.length > 0 || wB.length > 0 || losersSuperiores.length > 0 || losersInferiores.length > 0;
 
     return { winnersA: wA, winnersB: wB, losersA: losersSuperiores, losersB: losersInferiores, semiFinals: sf, finalMatches: f, isDoubleElimination: isDE };
   }, [matches]);

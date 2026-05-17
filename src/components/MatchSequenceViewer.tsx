@@ -973,6 +973,7 @@ const MatchSequenceViewer = ({
   tournamentFormat = 'single_elimination',
   tournamentRules,
   tournamentId,
+  classificationOverrides,
   onDeclareWinner,
   onUpdateScore,
   onAutoResult,

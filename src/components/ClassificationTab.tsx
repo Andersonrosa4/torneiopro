@@ -196,7 +196,7 @@ const ClassificationTab = ({ matches, teams, rankingCriteriaOrder }: Classificat
     groupMatches: Match[]
   ): { id: string; name: string; position: number; label: string }[] {
     const stats: Record<string, { id: string; wins: number; played: number; pf: number; pa: number }> = {};
-    const headToHeadMap: Record<string, { winnerId: string }> = {};
+    const headToHeadMap: Record<string, { winnerId: string; team1Id?: string; team2Id?: string; score1?: number; score2?: number }> = {};
 
     const completed = groupMatches.filter((m) => m.status === "completed");
 
@@ -212,10 +212,16 @@ const ClassificationTab = ({ matches, teams, rankingCriteriaOrder }: Classificat
         if (m.winner_team_id === tid) stats[tid].wins++;
       });
 
-      // Montar mapa de confronto direto
+      // Montar mapa de confronto direto (com scores para mini-tabela em empates multi-way)
       if (m.team1_id && m.team2_id && m.winner_team_id) {
         const key = `${m.team1_id}_${m.team2_id}`;
-        headToHeadMap[key] = { winnerId: m.winner_team_id };
+        headToHeadMap[key] = {
+          winnerId: m.winner_team_id,
+          team1Id: m.team1_id,
+          team2Id: m.team2_id,
+          score1: m.score1 ?? 0,
+          score2: m.score2 ?? 0,
+        };
       }
     });
 

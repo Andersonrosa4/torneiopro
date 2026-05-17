@@ -423,7 +423,7 @@ const MatchCard = ({
     const teamPoints: Record<string, number> = {};
     const teamPointsFor: Record<string, number> = {};
     const teamPointsAgainst: Record<string, number> = {};
-    const headToHeadMap: Record<string, { winnerId: string }> = {};
+    const headToHeadMap: Record<string, { winnerId: string; team1Id?: string; team2Id?: string; score1?: number; score2?: number }> = {};
     for (const m of allMatches) {
       if (m.round === 0 && m.bracket_number) {
         if (!groupTeams[m.bracket_number]) groupTeams[m.bracket_number] = new Set();
@@ -434,7 +434,13 @@ const MatchCard = ({
             teamWins[m.winner_team_id] = (teamWins[m.winner_team_id] || 0) + 1;
             teamPoints[m.winner_team_id] = (teamPoints[m.winner_team_id] || 0) + 3;
             if (m.team1_id && m.team2_id) {
-              headToHeadMap[`${m.team1_id}_${m.team2_id}`] = { winnerId: m.winner_team_id };
+              headToHeadMap[`${m.team1_id}_${m.team2_id}`] = {
+                winnerId: m.winner_team_id,
+                team1Id: m.team1_id,
+                team2Id: m.team2_id,
+                score1: m.score1 ?? 0,
+                score2: m.score2 ?? 0,
+              };
             }
           }
           // Track point differential

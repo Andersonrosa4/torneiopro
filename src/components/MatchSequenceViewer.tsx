@@ -392,6 +392,7 @@ const MatchCard = ({
   teams,
   tournamentRules,
   tournamentId,
+  classificationOverrides,
   onDeclareWinner,
   onUpdateScore,
   onAutoResult,

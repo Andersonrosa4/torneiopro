@@ -2334,17 +2334,20 @@ const TournamentDetail = () => {
 
       const results = await Promise.all(
         allUpdates.map(async (update) => {
+          const destMatch = freshMatchList.find(m => m.id === update.matchId);
+          const safeData = mergeWithoutOverwritingSlots(destMatch, update.data, `DE:${update.type}`);
+          if (!safeData) return true;
           const { error } = await organizerQuery({
             table: "matches",
             operation: "update",
-            data: update.data,
+            data: safeData,
             filters: { id: update.matchId },
           });
           if (error) {
             console.error(`[DE:FeederFail] ${update.type} injection failed for match ${update.matchId}:`, error);
             return false;
           }
-          console.log(`[DE:FeederOK] ${update.type === 'winner' ? 'Winner' : 'Loser'} ${update.type === 'winner' ? winnerId : loserId} → Match ${update.matchId} (${JSON.stringify(update.data)})`);
+          console.log(`[DE:FeederOK] ${update.type === 'winner' ? 'Winner' : 'Loser'} ${update.type === 'winner' ? winnerId : loserId} → Match ${update.matchId} (${JSON.stringify(safeData)})`);
           return true;
         })
       );

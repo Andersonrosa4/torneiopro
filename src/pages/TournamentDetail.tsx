@@ -2564,8 +2564,8 @@ const TournamentDetail = () => {
           targetSlot = otherSlot;
           console.warn(`[SE:Propagate] Slot natural (${naturalSlot}) ocupado por ${dest[naturalSlot]}. Usando ${otherSlot} para preservar dupla.`);
         } else {
-          console.error(`[SE:Propagate] BLOQUEADO: ambos os slots de ${destMatchId} ocupados (${dest.team1_id} / ${dest.team2_id}). Não sobrescreverei. Time ${teamId} (${kind}) não propagado.`);
-          toast.error("Propagação bloqueada: a próxima partida já está cheia. Verifique manualmente.");
+          console.warn(`[SE:Propagate] Destino cheio (${dest.team1_id} / ${dest.team2_id}). Resultado salvo sem sobrescrever dupla existente. Time ${teamId} (${kind}) não propagado.`);
+          toast.warning("Resultado salvo. A próxima partida já estava cheia, então nenhuma dupla foi sobrescrita.");
           return;
         }
 

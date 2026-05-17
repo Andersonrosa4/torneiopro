@@ -3795,9 +3795,12 @@ const TournamentDetail = () => {
             <TabsContent value="classification">
               {filteredMatches.length > 0 ? (
                 <section>
-                  <h2 className="mb-4 text-xl font-semibold flex items-center gap-2">
-                    <Trophy className="h-5 w-5" /> Classificação
-                  </h2>
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="text-xl font-semibold flex items-center gap-2">
+                      <Trophy className="h-5 w-5" /> Classificação
+                    </h2>
+                    <GroupReportPanel matches={filteredMatches as any} teams={filteredTeams as any} />
+                  </div>
                   <ClassificationTab matches={filteredMatches} teams={filteredTeams} rankingCriteriaOrder={tournamentRules?.ranking_criteria_order} />
                 </section>
               ) : (

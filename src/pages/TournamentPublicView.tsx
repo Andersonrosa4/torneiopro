@@ -317,6 +317,7 @@ const TournamentPublicView = () => {
                       sport={tournament?.sport || ""}
                       eventDate={tournament?.event_date ? formatDateBR(tournament.event_date) : undefined}
                       tournamentFormat={tournament?.format === 'double_elimination' ? 'double_elimination' : (selectedModality?.game_system || tournament?.format)}
+                      classificationOverrides={tournament?.classification_overrides}
                       onDeclareWinner={() => {}}
                       onUpdateScore={() => {}}
                     />
@@ -334,7 +335,7 @@ const TournamentPublicView = () => {
                   <h2 className="mb-3 text-xl font-semibold flex items-center gap-2">
                     <Trophy className="h-5 w-5" /> Classificação
                   </h2>
-                  <ClassificationTab matches={filteredMatches} teams={filteredTeams} />
+                  <ClassificationTab matches={filteredMatches} teams={filteredTeams} classificationOverrides={tournament?.classification_overrides} />
                 </section>
               ) : (
                 <div className="rounded-xl border border-dashed border-border bg-card/50 p-12 text-center">

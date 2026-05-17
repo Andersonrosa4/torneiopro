@@ -1,0 +1,2 @@
+ALTER TABLE public.tournaments ADD COLUMN IF NOT EXISTS classification_overrides JSONB DEFAULT '{}'::jsonb;
+COMMENT ON COLUMN public.tournaments.classification_overrides IS 'Manual classification overrides per group. Format: { "bracket_number": ["team_id_1st", "team_id_2nd", ...] }';

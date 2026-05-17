@@ -32,6 +32,7 @@ interface TeamLite {
 interface Props {
   matches: MatchLite[];
   teams: TeamLite[];
+  classificationOverrides?: Record<string, string[]> | null;
 }
 
 interface Row {
@@ -51,7 +52,7 @@ const MEDAL_BY_POS = ["🥇", "🥈", "🥉", "🏅"];
  * textual e simples por chave (grupo) da fase classificatória.
  * Mostra mesmo antes do encerramento da fase de grupos.
  */
-export default function GroupReportPanel({ matches, teams }: Props) {
+export default function GroupReportPanel({ matches, teams, classificationOverrides }: Props) {
   const [open, setOpen] = useState(false);
 
   const teamName = (id: string | null | undefined) => {
@@ -132,9 +133,17 @@ export default function GroupReportPanel({ matches, teams }: Props) {
         wins: r.wins,
         pointDiff: r.pointDiff,
       }));
-      const sortedIds = resolveTie(stats, ["wins", "head_to_head", "point_diff"], headToHeadMap).map(
+      let sortedIds = resolveTie(stats, ["wins", "head_to_head", "point_diff"], headToHeadMap).map(
         (s) => s.id,
       );
+      // Aplicar override manual de classificação (se houver) para esta chave
+      const overrideOrder = classificationOverrides?.[String(bracket)];
+      if (overrideOrder && overrideOrder.length > 0) {
+        const present = overrideOrder.filter((id) => sortedIds.includes(id));
+        const presentSet = new Set(present);
+        const remainder = sortedIds.filter((id) => !presentSet.has(id));
+        sortedIds = [...present, ...remainder];
+      }
       const ordered = sortedIds
         .map((id) => rows[id])
         .filter(Boolean);
@@ -186,7 +195,7 @@ export default function GroupReportPanel({ matches, teams }: Props) {
       sections.push(lines.join("\n"));
     }
     return sections.join("\n\n──────────────\n\n");
-  }, [brackets, teams]);
+  }, [brackets, teams, classificationOverrides]);
 
   if (brackets.length === 0) return null;
 

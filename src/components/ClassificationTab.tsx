@@ -27,6 +27,16 @@ interface ClassificationTabProps {
   matches: Match[];
   teams: Team[];
   rankingCriteriaOrder?: string;
+  classificationOverrides?: Record<string, string[]> | null;
+}
+
+function applyOverride(sortedIds: string[], override?: string[]): string[] {
+  if (!override || override.length === 0) return sortedIds;
+  const sortedSet = new Set(sortedIds);
+  const forced = override.filter((id) => sortedSet.has(id));
+  const forcedSet = new Set(forced);
+  const remainder = sortedIds.filter((id) => !forcedSet.has(id));
+  return [...forced, ...remainder];
 }
 
 const DB_TO_ENGINE: Record<string, TiebreakCriteria> = {
@@ -50,12 +60,49 @@ function parseCriteriaOrder(raw?: string): TiebreakCriteria[] {
   return [...new Set(parsed)].length > 0 ? [...new Set(parsed)] : DEFAULT_CRITERIA;
 }
 
-const ClassificationTab = ({ matches, teams, rankingCriteriaOrder }: ClassificationTabProps) => {
+const ClassificationTab = ({ matches, teams, rankingCriteriaOrder, classificationOverrides }: ClassificationTabProps) => {
   const criteriaOrder = useMemo(() => parseCriteriaOrder(rankingCriteriaOrder), [rankingCriteriaOrder]);
   const getTeamName = (teamId: string | null) => {
     if (!teamId) return "A definir";
     const team = teams.find((t) => t.id === teamId);
     return team ? `${team.player1_name} / ${team.player2_name}` : "A definir";
+  };
+
+  // Map each team to its group (bracket_number) for override application
+  const teamBracketMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    matches.filter((m) => m.round === 0 && m.bracket_number).forEach((m) => {
+      if (m.team1_id) map[m.team1_id] = m.bracket_number!;
+      if (m.team2_id) map[m.team2_id] = m.bracket_number!;
+    });
+    return map;
+  }, [matches]);
+
+  // Reorders teams from same bracket within the global standings according to overrides
+  const applyGlobalOverrides = (sortedIds: string[]): string[] => {
+    if (!classificationOverrides) return sortedIds;
+    const result = [...sortedIds];
+    for (const [bracketKey, order] of Object.entries(classificationOverrides)) {
+      if (!Array.isArray(order) || order.length === 0) continue;
+      const bracketNum = Number(bracketKey);
+      // Positions in `result` that currently hold teams from this bracket
+      const positions: number[] = [];
+      result.forEach((id, idx) => {
+        if (teamBracketMap[id] === bracketNum) positions.push(idx);
+      });
+      const presentInOrder = order.filter((id) => result.includes(id) && teamBracketMap[id] === bracketNum);
+      if (presentInOrder.length === 0) continue;
+      // Append any bracket teams not listed in override (in their current relative order)
+      const presentSet = new Set(presentInOrder);
+      const remainingBracketTeams = positions
+        .map((idx) => result[idx])
+        .filter((id) => !presentSet.has(id));
+      const finalOrder = [...presentInOrder, ...remainingBracketTeams];
+      positions.forEach((pos, i) => {
+        result[pos] = finalOrder[i];
+      });
+    }
+    return result;
   };
 
   const standings = useMemo(() => {
@@ -69,7 +116,7 @@ const ClassificationTab = ({ matches, teams, rankingCriteriaOrder }: Classificat
     }
 
     return buildEliminationRanking(eliminationMatches, groupMatches);
-  }, [matches, teams]);
+  }, [matches, teams, classificationOverrides, teamBracketMap]);
 
   function buildEliminationRanking(
     elimMatches: Match[],
@@ -183,8 +230,12 @@ const ClassificationTab = ({ matches, teams, rankingCriteriaOrder }: Classificat
     });
 
     unplacedFromGroups.sort((a, b) => b.wins - a.wins || b.pointDiff - a.pointDiff);
+    const unplacedById: Record<string, typeof unplacedFromGroups[number]> = {};
+    unplacedFromGroups.forEach((t) => { unplacedById[t.id] = t; });
+    const reorderedUnplacedIds = applyGlobalOverrides(unplacedFromGroups.map((t) => t.id));
     const groupStart = ranked.length + 1;
-    unplacedFromGroups.forEach((t, idx) => {
+    reorderedUnplacedIds.forEach((tid, idx) => {
+      const t = unplacedById[tid];
       ranked.push({ id: t.id, name: t.name, position: groupStart + idx, label: `${groupStart + idx}º lugar` });
       placedTeams.add(t.id);
     });
@@ -237,9 +288,10 @@ const ClassificationTab = ({ matches, teams, rankingCriteriaOrder }: Classificat
       headToHeadMap
     );
 
-    return sorted.map((t, idx) => ({
-      id: t.id,
-      name: getTeamName(t.id),
+    const finalIds = applyGlobalOverrides(sorted.map((t) => t.id));
+    return finalIds.map((id, idx) => ({
+      id,
+      name: getTeamName(id),
       position: idx + 1,
       label: `${idx + 1}º lugar`,
     }));

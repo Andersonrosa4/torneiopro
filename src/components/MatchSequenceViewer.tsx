@@ -57,6 +57,7 @@ interface MatchSequenceViewerProps {
   tournamentFormat?: string;
   tournamentRules?: ScoringRules | null;
   tournamentId?: string;
+  classificationOverrides?: Record<string, string[]> | null;
   onDeclareWinner: (matchId: string, winnerId: string) => void;
   onUpdateScore: (matchId: string, score1: number, score2: number) => void;
   onAutoResult?: (matchId: string, score1: number, score2: number, winnerId: string) => void;
@@ -369,6 +370,7 @@ interface MatchCardProps {
   teams: Team[];
   tournamentRules?: ScoringRules | null;
   tournamentId?: string;
+  classificationOverrides?: Record<string, string[]> | null;
   onDeclareWinner: (matchId: string, winnerId: string) => void;
   onUpdateScore: (matchId: string, score1: number, score2: number) => void;
   onAutoResult?: (matchId: string, score1: number, score2: number, winnerId: string) => void;
@@ -390,6 +392,7 @@ const MatchCard = ({
   teams,
   tournamentRules,
   tournamentId,
+  classificationOverrides,
   onDeclareWinner,
   onUpdateScore,
   onAutoResult,
@@ -463,11 +466,19 @@ const MatchCard = ({
         wins: teamWins[id] || 0,
         pointDiff: (teamPointsFor[id] || 0) - (teamPointsAgainst[id] || 0),
       }));
-      const sorted = resolveTie(stats, ["wins", "head_to_head", "point_diff"], headToHeadMap).map((team) => team.id);
+      let sorted = resolveTie(stats, ["wins", "head_to_head", "point_diff"], headToHeadMap).map((team) => team.id);
+      // Apply manual classification override for this bracket (if any)
+      const overrideOrder = classificationOverrides?.[String(bn)];
+      if (overrideOrder && overrideOrder.length > 0) {
+        const present = overrideOrder.filter((id) => sorted.includes(id));
+        const presentSet = new Set(present);
+        const remainder = sorted.filter((id) => !presentSet.has(id));
+        sorted = [...present, ...remainder];
+      }
       sorted.forEach((tid, idx) => { map[tid] = { group: letter, pos: idx + 1 }; });
     }
     return map;
-  }, [allMatches]);
+  }, [allMatches, classificationOverrides]);
 
   // Build feeder labels for empty slots (knockout only)
   const feederLabels = useMemo(() => {
@@ -962,6 +973,7 @@ const MatchSequenceViewer = ({
   tournamentFormat = 'single_elimination',
   tournamentRules,
   tournamentId,
+  classificationOverrides,
   onDeclareWinner,
   onUpdateScore,
   onAutoResult,
@@ -1347,6 +1359,7 @@ const MatchSequenceViewer = ({
                   teams={teams}
                   tournamentRules={tournamentRules}
                   tournamentId={tournamentId}
+                  classificationOverrides={classificationOverrides}
                   onDeclareWinner={onDeclareWinner}
                   onUpdateScore={onUpdateScore}
                   onAutoResult={onAutoResult}

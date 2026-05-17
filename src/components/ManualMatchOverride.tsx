@@ -61,6 +61,42 @@ const matchScopeFilters = (match: Match, tournamentId: string) => {
   return filters;
 };
 
+type SlotKey = "team1_id" | "team2_id";
+const isSlotKey = (key: string): key is SlotKey => key === "team1_id" || key === "team2_id";
+
+const mergeWithoutOverwritingSlots = <T extends { team1_id: string | null; team2_id: string | null }>(
+  dest: T | undefined,
+  data: Record<string, any>,
+  label: string,
+) => {
+  if (!dest) return null;
+  const safeData: Record<string, any> = { ...data };
+
+  for (const key of Object.keys(data)) {
+    if (!isSlotKey(key) || data[key] === null || data[key] === undefined) continue;
+    const incomingTeam = data[key];
+    const otherSlot: SlotKey = key === "team1_id" ? "team2_id" : "team1_id";
+
+    if (dest[key] === incomingTeam || dest[otherSlot] === incomingTeam) {
+      delete safeData[key];
+      continue;
+    }
+
+    if (dest[key] && dest[key] !== incomingTeam) {
+      if (!dest[otherSlot]) {
+        delete safeData[key];
+        safeData[otherSlot] = incomingTeam;
+        console.warn(`[ManualOverride:SlotSafe:${label}] ${key} ocupado; usando ${otherSlot} para não sobrescrever.`);
+      } else {
+        delete safeData[key];
+        console.warn(`[ManualOverride:SlotSafe:${label}] Próximo jogo cheio; avanço ignorado para não sobrescrever dupla existente.`);
+      }
+    }
+  }
+
+  return Object.keys(safeData).length > 0 ? safeData : null;
+};
+
 interface ManualMatchOverrideProps {
   match: Match;
   matchNumber: number;

@@ -1347,7 +1347,8 @@ const TournamentDetail = () => {
             );
             if (nextMatch) {
               const update = isTop ? { team1_id: m.winner_team_id } : { team2_id: m.winner_team_id };
-              await organizerQuery({ table: "matches", operation: "update", data: update, filters: { id: nextMatch.id } });
+              const safeData = mergeWithoutOverwritingSlots(nextMatch, update, 'generate:completed-advance');
+              if (safeData) await organizerQuery({ table: "matches", operation: "update", data: safeData, filters: { id: nextMatch.id } });
             }
           }
         }

@@ -57,6 +57,7 @@ interface MatchSequenceViewerProps {
   tournamentFormat?: string;
   tournamentRules?: ScoringRules | null;
   tournamentId?: string;
+  classificationOverrides?: Record<string, string[]> | null;
   onDeclareWinner: (matchId: string, winnerId: string) => void;
   onUpdateScore: (matchId: string, score1: number, score2: number) => void;
   onAutoResult?: (matchId: string, score1: number, score2: number, winnerId: string) => void;

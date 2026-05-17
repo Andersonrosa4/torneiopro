@@ -2060,10 +2060,13 @@ const TournamentDetail = () => {
 
                  const allUpdates = [...advResult.winnerUpdates, ...advResult.loserUpdates];
                  for (const upd of allUpdates) {
+                   const targetMatch = postResetMatches.find(m => m.id === upd.matchId);
+                   const safeData = mergeWithoutOverwritingSlots(targetMatch, upd.data, 'DE:repropagation');
+                   if (!safeData) continue;
                    const { error: repropError } = await organizerQuery({
                      table: "matches",
                      operation: "update",
-                     data: upd.data,
+                     data: safeData,
                      filters: { id: upd.matchId },
                    });
                    if (repropError) {
@@ -2071,7 +2074,7 @@ const TournamentDetail = () => {
                    }
                    // Update local snapshot so subsequent iterations see correct state
                    postResetMatches = postResetMatches.map(m =>
-                     m.id === upd.matchId ? { ...m, ...upd.data } : m
+                     m.id === upd.matchId ? { ...m, ...safeData } : m
                    );
                  }
                  if (allUpdates.length > 0) {
@@ -2113,14 +2116,16 @@ const TournamentDetail = () => {
 
                         const byeAdv = processDoubleEliminationAdvance(postResetMatches, pm, byeWinner!, null);
                         for (const upd of [...byeAdv.winnerUpdates, ...byeAdv.loserUpdates]) {
+                          const target = postResetMatches.find(m => m.id === upd.matchId);
+                          const safeData = mergeWithoutOverwritingSlots(target, upd.data, 'DE:bye-post-cascade');
+                          if (!safeData) continue;
                           await organizerQuery({
                             table: "matches",
                             operation: "update",
-                            data: upd.data,
+                            data: safeData,
                             filters: { id: upd.matchId },
                           });
-                          const target = postResetMatches.find(m => m.id === upd.matchId);
-                          if (target) Object.assign(target, upd.data);
+                          if (target) Object.assign(target, safeData);
                         }
                         byeProcessed = true;
                       }

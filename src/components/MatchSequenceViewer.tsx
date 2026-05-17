@@ -423,7 +423,7 @@ const MatchCard = ({
     const teamPoints: Record<string, number> = {};
     const teamPointsFor: Record<string, number> = {};
     const teamPointsAgainst: Record<string, number> = {};
-    const headToHeadMap: Record<string, { winnerId: string }> = {};
+    const headToHeadMap: Record<string, { winnerId: string; team1Id?: string; team2Id?: string; score1?: number; score2?: number }> = {};
     for (const m of allMatches) {
       if (m.round === 0 && m.bracket_number) {
         if (!groupTeams[m.bracket_number]) groupTeams[m.bracket_number] = new Set();

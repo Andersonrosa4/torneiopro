@@ -1359,6 +1359,7 @@ const MatchSequenceViewer = ({
                   teams={teams}
                   tournamentRules={tournamentRules}
                   tournamentId={tournamentId}
+                  classificationOverrides={classificationOverrides}
                   onDeclareWinner={onDeclareWinner}
                   onUpdateScore={onUpdateScore}
                   onAutoResult={onAutoResult}

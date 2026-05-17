@@ -133,9 +133,17 @@ export default function GroupReportPanel({ matches, teams, classificationOverrid
         wins: r.wins,
         pointDiff: r.pointDiff,
       }));
-      const sortedIds = resolveTie(stats, ["wins", "head_to_head", "point_diff"], headToHeadMap).map(
+      let sortedIds = resolveTie(stats, ["wins", "head_to_head", "point_diff"], headToHeadMap).map(
         (s) => s.id,
       );
+      // Aplicar override manual de classificação (se houver) para esta chave
+      const overrideOrder = classificationOverrides?.[String(bracket)];
+      if (overrideOrder && overrideOrder.length > 0) {
+        const present = overrideOrder.filter((id) => sortedIds.includes(id));
+        const presentSet = new Set(present);
+        const remainder = sortedIds.filter((id) => !presentSet.has(id));
+        sortedIds = [...present, ...remainder];
+      }
       const ordered = sortedIds
         .map((id) => rows[id])
         .filter(Boolean);

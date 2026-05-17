@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { FileText, Copy, Download } from "lucide-react";
 import { toast } from "sonner";
+import { resolveTie, type TeamStats } from "@/engine/tiebreakEngine";
 
 interface MatchLite {
   id: string;

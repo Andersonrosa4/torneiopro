@@ -95,6 +95,8 @@ export default function GroupReportPanel({ matches, teams }: Props) {
         };
       });
 
+      const headToHeadMap: Record<string, { winnerId: string; team1Id?: string; team2Id?: string; score1?: number; score2?: number }> = {};
+
       ms.filter((m) => m.status === "completed" && m.winner_team_id).forEach((m) => {
         const s1 = m.score1 ?? 0;
         const s2 = m.score2 ?? 0;
@@ -113,11 +115,29 @@ export default function GroupReportPanel({ matches, teams }: Props) {
           rows[loserId].losses++;
           if (m.winner_team_id) rows[loserId].defeatedBy.add(m.winner_team_id);
         }
+        if (m.team1_id && m.team2_id && m.winner_team_id) {
+          headToHeadMap[`${m.team1_id}_${m.team2_id}`] = {
+            winnerId: m.winner_team_id,
+            team1Id: m.team1_id,
+            team2Id: m.team2_id,
+            score1: s1,
+            score2: s2,
+          };
+        }
       });
 
-      const ordered = Object.values(rows).sort(
-        (a, b) => b.wins - a.wins || b.pointDiff - a.pointDiff || a.name.localeCompare(b.name),
+      // Ordenar via motor de desempate: vitórias → confronto direto (mini-tabela) → saldo geral
+      const stats: TeamStats[] = Object.values(rows).map((r) => ({
+        id: r.id,
+        wins: r.wins,
+        pointDiff: r.pointDiff,
+      }));
+      const sortedIds = resolveTie(stats, ["wins", "head_to_head", "point_diff"], headToHeadMap).map(
+        (s) => s.id,
       );
+      const ordered = sortedIds
+        .map((id) => rows[id])
+        .filter(Boolean);
 
       const totalPlayed = ms.filter((m) => m.status === "completed").length;
       const totalScheduled = ms.length;

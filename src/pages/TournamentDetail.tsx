@@ -2487,31 +2487,54 @@ const TournamentDetail = () => {
       // UI refresh handled by finally block — no duplicate fetchData() here
       toast.success("Avanço automático realizado!");
     } else {
-      // Normal bracket: IMMEDIATE propagation via next_win_match_id
-      // GUARD: Group-stage matches (round 0) NEVER propagate — round-robin only.
-      if (!isGroupStageMatch && match.next_win_match_id) {
-        const isTopSlot = match.position % 2 === 1;
-        const slotField = isTopSlot ? 'team1_id' : 'team2_id';
+      // Helper: propaga time sem sobrescrever slot já ocupado por outra dupla.
+      // Resolve em ordem: (1) slot natural por position%2; (2) slot oposto se natural estiver ocupado por outra dupla;
+      // (3) se ambos os slots tiverem duplas diferentes, aborta e loga — não sobrescreve.
+      const safePropagate = async (destMatchId: string, teamId: string, kind: 'winner' | 'loser') => {
+        const { data: destRows } = await organizerQuery({
+          table: "matches",
+          operation: "select",
+          filters: { id: destMatchId },
+        });
+        const dest = Array.isArray(destRows) ? destRows[0] : destRows;
+        if (!dest) return;
+        // Já está em algum dos slots — nada a fazer
+        if (dest.team1_id === teamId || dest.team2_id === teamId) return;
+
+        const naturalIsTop = match.position % 2 === 1;
+        const naturalSlot = naturalIsTop ? 'team1_id' : 'team2_id';
+        const otherSlot = naturalIsTop ? 'team2_id' : 'team1_id';
+
+        let targetSlot: 'team1_id' | 'team2_id' | null = null;
+        if (!dest[naturalSlot]) {
+          targetSlot = naturalSlot;
+        } else if (!dest[otherSlot]) {
+          targetSlot = otherSlot;
+          console.warn(`[SE:Propagate] Slot natural (${naturalSlot}) ocupado por ${dest[naturalSlot]}. Usando ${otherSlot} para preservar dupla.`);
+        } else {
+          console.error(`[SE:Propagate] BLOQUEADO: ambos os slots de ${destMatchId} ocupados (${dest.team1_id} / ${dest.team2_id}). Não sobrescreverei. Time ${teamId} (${kind}) não propagado.`);
+          toast.error("Propagação bloqueada: a próxima partida já está cheia. Verifique manualmente.");
+          return;
+        }
+
         await organizerQuery({
           table: "matches",
           operation: "update",
-          data: { [slotField]: winnerId },
-          filters: { id: match.next_win_match_id },
+          data: { [targetSlot]: teamId },
+          filters: { id: destMatchId },
         });
-        console.log(`[SE:Propagate] Winner ${winnerId} → Match ${match.next_win_match_id} (${slotField})`);
+        console.log(`[SE:Propagate] ${kind} ${teamId} → Match ${destMatchId} (${targetSlot})`);
+      };
+
+      // Normal bracket: IMMEDIATE propagation via next_win_match_id
+      // GUARD: Group-stage matches (round 0) NEVER propagate — round-robin only.
+      if (!isGroupStageMatch && match.next_win_match_id) {
+        await safePropagate(match.next_win_match_id, winnerId, 'winner');
       }
 
       // Normal bracket: propagate LOSER to 3rd place match via next_lose_match_id
       if (!isGroupStageMatch && match.next_lose_match_id && loserId) {
-        const isTopSlot = match.position % 2 === 1;
-        const slotField = isTopSlot ? 'team1_id' : 'team2_id';
-        await organizerQuery({
-          table: "matches",
-          operation: "update",
-          data: { [slotField]: loserId },
-          filters: { id: match.next_lose_match_id },
-        });
-        console.log(`[SE:3rdPlace] Loser ${loserId} → Match ${match.next_lose_match_id} (${slotField})`);
+        await safePropagate(match.next_lose_match_id, loserId, 'loser');
       }
 
       // Re-fetch fresh state to check round completion

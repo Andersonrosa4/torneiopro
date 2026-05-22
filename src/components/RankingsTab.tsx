@@ -440,14 +440,21 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       });
 
       // Now create ranking entries for each individual player
-      // First delete existing rankings for this tournament + modality
+      // First delete existing rankings for this tournament + modality + STAGE
+      // (NUNCA apaga rankings de outras etapas — eles formam o Geral)
       const delFilters: Record<string, any> = { tournament_id: tournamentId };
       if (modalityId) delFilters.modality_id = modalityId;
+      if (viewStageId) delFilters.stage_id = viewStageId;
 
       const { data: existingRankings } = await publicQuery<any[]>({
         table: "rankings",
         filters: delFilters,
       });
+
+      // Em modo "sem etapa" (viewStageId null e sem etapas), apaga apenas linhas com stage_id NULL
+      const toDelete = viewStageId
+        ? (existingRankings || [])
+        : (existingRankings || []).filter((r: any) => !r.stage_id);
 
       if (existingRankings && existingRankings.length > 0) {
         for (const r of existingRankings) {

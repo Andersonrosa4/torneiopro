@@ -619,7 +619,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
     } else if (viewFilter === "female") {
       filtered = filtered.filter((r) => r.entry_type === "female");
     }
-    return filtered.sort((a, b) => {
+    const sorted = filtered.sort((a, b) => {
       // 1) pontos decrescente — se houver bônus, separa naturalmente
       if (b.points !== a.points) return b.points - a.points;
       // 2) com pontos iguais, mantém parceiros do mesmo time juntos
@@ -629,7 +629,45 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       // 3) dentro do mesmo time, ordem alfabética estável
       return a.athlete_name.localeCompare(b.athlete_name);
     });
+
+    // 4) Reagrupamento: se um atleta com bônus foi separado do parceiro,
+    //    mas o parceiro está empatado com outros logo abaixo, puxa o parceiro
+    //    para ficar imediatamente ao lado (não rebaixa ninguém — apenas
+    //    move dentro do bloco de empate).
+    const result = [...sorted];
+    for (let i = 0; i < result.length; i++) {
+      const cur = result[i];
+      const tk = teamKeyByAthlete.get(cur.athlete_name);
+      if (!tk) continue;
+      // já está colado no parceiro?
+      const nextIsPartner = i + 1 < result.length && teamKeyByAthlete.get(result[i + 1].athlete_name) === tk && result[i + 1].id !== cur.id;
+      if (nextIsPartner) continue;
+      // procura parceiro abaixo dentro do mesmo entry_type
+      let partnerIdx = -1;
+      for (let j = i + 1; j < result.length; j++) {
+        if (result[j].entry_type !== cur.entry_type) continue;
+        if (result[j].id === cur.id) continue;
+        if (teamKeyByAthlete.get(result[j].athlete_name) === tk) {
+          partnerIdx = j;
+          break;
+        }
+      }
+      if (partnerIdx === -1) continue;
+      const partner = result[partnerIdx];
+      // só pode subir até a posição i+1 se todos entre (i+1..partnerIdx-1)
+      // tiverem pontos == partner.points (bloco de empate contínuo do parceiro)
+      let canMove = true;
+      for (let k = i + 1; k < partnerIdx; k++) {
+        if (result[k].entry_type !== partner.entry_type) continue;
+        if (result[k].points !== partner.points) { canMove = false; break; }
+      }
+      if (!canMove) continue;
+      result.splice(partnerIdx, 1);
+      result.splice(i + 1, 0, partner);
+    }
+    return result;
   }, [displayRankings, viewFilter, teamKeyByAthlete]);
+
 
 
   if (loading) {

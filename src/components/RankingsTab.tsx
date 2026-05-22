@@ -240,6 +240,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       data: {
         athlete_name: selectedAthlete,
         points: Number(points),
+        manual_bonus: Number(points),
         sport: sport as "beach_volleyball" | "futevolei" | "beach_tennis",
         tournament_id: tournamentId,
         created_by: createdBy,
@@ -268,9 +269,11 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
 
     const currentRanking = rankings.find((r) => r.id === id);
     const oldPoints = currentRanking?.points || 0;
+    const oldBonus = Number((currentRanking as any)?.manual_bonus ?? 0);
     const pointsDiff = newPoints - oldPoints;
+    const newBonus = Math.max(0, oldBonus + pointsDiff);
 
-    const { error } = await organizerQuery({ table: "rankings", operation: "update", data: { points: newPoints, badge: badge || null }, filters: { id } });
+    const { error } = await organizerQuery({ table: "rankings", operation: "update", data: { points: newPoints, manual_bonus: newBonus, badge: badge || null }, filters: { id } });
 
     if (error) {
       toast.error("Erro ao atualizar pontos");
@@ -439,32 +442,42 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
         placedTeams.add(t.teamId);
       });
 
-      // Now create ranking entries for each individual player
-      // First delete existing rankings for this tournament + modality + STAGE
-      // (NUNCA apaga rankings de outras etapas — eles formam o Geral)
-      const delFilters: Record<string, any> = { tournament_id: tournamentId };
-      if (modalityId) delFilters.modality_id = modalityId;
-      if (viewStageId) delFilters.stage_id = viewStageId;
+      // Snapshot dos pontos manuais e badges atuais ANTES de apagar — preserva bônus/destaques.
+      const snapFilters: Record<string, any> = { tournament_id: tournamentId };
+      if (modalityId) snapFilters.modality_id = modalityId;
+      if (viewStageId) snapFilters.stage_id = viewStageId;
 
       const { data: existingRankings } = await publicQuery<any[]>({
         table: "rankings",
-        filters: delFilters,
+        filters: snapFilters,
       });
 
-      // Em modo "sem etapa" (viewStageId null e sem etapas), apaga apenas linhas com stage_id NULL
-      const toDelete = viewStageId
+      // Em modo "sem etapa" (viewStageId null), apaga apenas linhas com stage_id NULL
+      const scoped = viewStageId
         ? (existingRankings || [])
         : (existingRankings || []).filter((r: any) => !r.stage_id);
 
-      if (toDelete.length > 0) {
-        for (const r of toDelete) {
-          await organizerQuery({ table: "rankings", operation: "delete", filters: { id: r.id } });
-        }
+      // Mapa: chave (entry_type::athlete_name) → { manual_bonus, badge }
+      const manualMap = new Map<string, { manual_bonus: number; badge: string | null }>();
+      for (const r of scoped) {
+        const key = `${r.entry_type}::${r.athlete_name}`;
+        manualMap.set(key, {
+          manual_bonus: Number(r.manual_bonus ?? 0),
+          badge: r.badge ?? null,
+        });
+      }
+
+      // Apaga as linhas da etapa para recriar com pontos automáticos atualizados
+      for (const r of scoped) {
+        await organizerQuery({ table: "rankings", operation: "delete", filters: { id: r.id } });
       }
 
       // Build team map
       const teamMap = new Map<string, Team>();
       teams.forEach((t) => teamMap.set(t.id, t));
+
+      // Marca quais chaves já receberão linha automática (para não duplicar manuais soltos)
+      const insertedKeys = new Set<string>();
 
       // Insert individual player rankings
       let inserted = 0;
@@ -499,12 +512,20 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
           { name: `${team.player1_name} / ${team.player2_name}`, type: "pair" },
         ];
         for (const e of entries) {
+          const key = `${e.type}::${e.name}`;
+          const manual = manualMap.get(key);
+          const bonus = manual?.manual_bonus ?? 0;
+          const badge = manual?.badge ?? null;
+          insertedKeys.add(key);
+
           await organizerQuery({
             table: "rankings",
             operation: "insert",
             data: {
               athlete_name: e.name,
-              points: pts,
+              points: pts + bonus,
+              manual_bonus: bonus,
+              badge,
               sport: sport as any,
               tournament_id: tournamentId,
               created_by: createdBy,
@@ -517,7 +538,33 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
         }
       }
 
-      toast.success(`Ranking gerado! ${inserted} entradas criadas.`);
+      // Recria linhas dos atletas que tinham bônus/badge manual mas não apareceram no ranking automático
+      for (const [key, manual] of manualMap.entries()) {
+        if (insertedKeys.has(key)) continue;
+        if (manual.manual_bonus <= 0 && !manual.badge) continue;
+        const sepIdx = key.indexOf("::");
+        const entry_type = key.slice(0, sepIdx);
+        const athlete_name = key.slice(sepIdx + 2);
+        await organizerQuery({
+          table: "rankings",
+          operation: "insert",
+          data: {
+            athlete_name,
+            points: manual.manual_bonus,
+            manual_bonus: manual.manual_bonus,
+            badge: manual.badge,
+            sport: sport as any,
+            tournament_id: tournamentId,
+            created_by: createdBy,
+            entry_type,
+            ...(modalityId ? { modality_id: modalityId } : {}),
+            ...(viewStageId ? { stage_id: viewStageId } : {}),
+          },
+        });
+        inserted++;
+      }
+
+      toast.success(`Ranking gerado! ${inserted} entradas (bônus e destaques preservados).`);
       fetchRankings();
     } catch (e: any) {
       toast.error(e.message || "Erro ao gerar ranking");

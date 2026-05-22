@@ -1654,6 +1654,7 @@ export type Database = {
           created_by: string
           entry_type: string
           id: string
+          manual_bonus: number
           modality_id: string | null
           points: number
           sport: Database["public"]["Enums"]["sport_type"]
@@ -1667,6 +1668,7 @@ export type Database = {
           created_by: string
           entry_type?: string
           id?: string
+          manual_bonus?: number
           modality_id?: string | null
           points?: number
           sport: Database["public"]["Enums"]["sport_type"]
@@ -1680,6 +1682,7 @@ export type Database = {
           created_by?: string
           entry_type?: string
           id?: string
+          manual_bonus?: number
           modality_id?: string | null
           points?: number
           sport?: Database["public"]["Enums"]["sport_type"]

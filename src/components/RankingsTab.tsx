@@ -314,6 +314,10 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
 
   /** Auto-generate ranking from classification positions */
   const generateAutoRanking = async () => {
+    if (isGeneralView) {
+      toast.warning("Selecione uma etapa específica para gerar o ranking. O Geral é somatório das etapas.");
+      return;
+    }
     const createdBy = organizerId || user?.id || "";
     if (!createdBy) {
       toast.error("Você precisa estar logado");
@@ -322,9 +326,10 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
 
     setGenerating(true);
     try {
-      // Fetch matches for this tournament/modality
+      // Fetch matches for this tournament/modality (+ stage when applicable)
       const matchFilters: Record<string, any> = { tournament_id: tournamentId };
       if (modalityId) matchFilters.modality_id = modalityId;
+      if (viewStageId) matchFilters.stage_id = viewStageId;
 
       const { data: matchesData } = await publicQuery<any[]>({
         table: "matches",

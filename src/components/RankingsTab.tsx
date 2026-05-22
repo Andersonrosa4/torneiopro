@@ -587,11 +587,13 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       const prev = map.get(key);
       if (prev) {
         prev.points += r.points;
+        prev.manual_bonus = Number(prev.manual_bonus ?? 0) + Number(r.manual_bonus ?? 0);
         // mantém o primeiro badge encontrado
         if (!prev.badge && r.badge) prev.badge = r.badge;
       } else {
-        map.set(key, { ...r, id: `agg-${key}` });
+        map.set(key, { ...r, id: `agg-${key}`, manual_bonus: Number(r.manual_bonus ?? 0) });
       }
+
     }
     return Array.from(map.values());
   }, [rankings, isGeneralView]);

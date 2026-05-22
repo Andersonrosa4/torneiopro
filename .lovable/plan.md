@@ -1,103 +1,41 @@
-## Modo Luana — Formato com Repescagem Cruzada (Vôlei de Praia)
+## Objetivo
+Separar o ranking por **etapa** mantendo um **ranking geral** (consolidado das etapas) no mesmo torneio/modalidade, sem duplicar dados nem reescrever a aba de Ranking.
 
-Nova opção de formato de chaveamento, ao lado de **Eliminação Simples** e **Dupla Eliminação**, chamada **"Modo Luana — Grupos + Repescagem Cruzada"**. Disponível **apenas** para a organizadora `LUANA` e organizadores vinculados aos torneios dela; atletas inscritos veem automaticamente.
+## Estratégia (resumo)
+Hoje a tabela `rankings` guarda pontos por `tournament_id + modality_id + athlete_name` — sem `stage_id`. Por isso, ao trocar de etapa, o ranking é o mesmo. A solução mais eficiente é **persistir os pontos por etapa** e **calcular o Geral em tempo real somando as etapas** (sem tabela extra, sem job).
 
----
+## Mudanças
 
-### 1. Controle de acesso
+### 1. Banco (1 migração)
+- Adicionar coluna `stage_id uuid NULL` em `public.rankings`.
+- Índice composto `(tournament_id, modality_id, stage_id)` para leitura rápida.
+- Dados existentes ficam com `stage_id = NULL` → continuam aparecendo como "antes das etapas" (compatível).
 
-Criar helper `useLuanaAccess()` que retorna `true` se:
-- `organizers.username === 'LUANA'` (login atual), **OU**
-- `tournament.created_by` pertence à LUANA (organizador vinculado via `tournament_organizers` ou criado por ela), **OU**
-- usuário é admin global.
+### 2. UI da aba Ranking (`RankingsTab.tsx`)
+- Adicionar seletor no topo: **Geral · Etapa 1 · Etapa 2 · …** (usa as `tournament_stages` já existentes).
+- **Etapa específica**: lê `rankings` filtrando `stage_id = X` (já existe o filtro, só passa). Adicionar/editar/remover grava com `stage_id = X`.
+- **Geral**: lê todas as linhas do torneio/modalidade e agrega no cliente (`SUM(points) GROUP BY athlete_name`), exibindo somatório, etapas em que pontuou e badges acumuladas.
+- No modo Geral, edição manual fica desabilitada (com aviso "Edite a pontuação dentro da etapa correspondente"), evitando inconsistência.
 
-A opção só aparece no `GenerateBracketDialog` se `useLuanaAccess() === true` **e** `sport === 'beach_volleyball'`.
+### 3. Geração automática de ranking
+- A função `generateAutoRanking` já recebe `stageId` no escopo; ao gerar, gravar `stage_id = stageId` (etapa atual).
+- "Geral" passa a ser sempre derivado — nunca gerado diretamente.
 
-Atletas: visualização do bracket é pública por natureza (já passa pelo `TournamentPublicView`), então não precisa nada extra — qualquer atleta vê.
+### 4. Histórico de pontos
+- `ranking_points_history` já tem `stage_id`. Sem mudança de schema, só continua sendo populado corretamente.
 
----
+### 5. Exportações (PDF/Excel/CSV)
+- Quando estiver em uma etapa: exporta só aquela etapa (cabeçalho mostra o nome).
+- Quando estiver em Geral: exporta o consolidado.
 
-### 2. Formato — regras
+## Por que é eficiente
+- **1 coluna + 1 índice** resolvem a separação.
+- **Geral é uma agregação client-side** (poucas centenas de linhas no máximo), sem tabela materializada, sem trigger, sem job.
+- **Compatível com dados antigos** (NULL = "sem etapa", aparece tanto no Geral quanto na pseudo-etapa "Sem etapa", se quiser).
+- Reaproveita 100% da UI atual — só adiciona o seletor de etapa e a agregação.
 
-**Fase de grupos (Snake já existente):** distribui em `G` chaves de `S` times.
+## Fora de escopo
+- Nenhuma mudança em chaveamento, propagação ou Edge Functions.
+- Sem novas tabelas.
 
-**Repescagem cruzada (novo round):** entre fim dos grupos e quartas.
-- 1º colocados de cada chave passam **direto** para as quartas.
-- 2º e 3º colocados disputam vagas remanescentes em cruzamento espelhado entre chaves adjacentes:
-  - **2A × 3D** e **2D × 3A** (chaves extremas)
-  - **2B × 3C** e **2C × 3B** (chaves centrais)
-- Vencedores ocupam as 4 vagas restantes das quartas.
-
-**Pergunta no momento da geração** (dentro do `GenerateBracketDialog` quando o modo é selecionado):
-> "O torneio começa direto nas **Quartas de Final** (8 times) ou tem **Oitavas de Final** (16 times)?"
-
-- Se **Oitavas**: passam 4 (1º) + 8 da repescagem (2º+3º cruzados em 4 jogos, e mais 4 jogos extras com sobra) → 16 nas oitavas.
-- Se **Quartas**: passam 4 (1º) + 4 da repescagem cruzada → 8 nas quartas.
-
-Semis e final seguem o padrão atual (Mirrored Extremes). Disputa de 3º lugar mantida.
-
----
-
-### 3. Backend
-
-Sem alterações de schema. Usa colunas existentes:
-- `modalities.game_system` recebe novo valor `'group_cross_repechage'`.
-- `matches.bracket_type` recebe `'repechage'` para os jogos cruzados (round entre groups e knockout).
-- `matches.round` segue convenção: groups=0, repescagem=1, quartas=2, semi=3, final=4, 3º lugar=4.
-
-Edge function `organizer-api` apenas valida o novo `game_system` na lista de aceitos.
-
----
-
-### 4. Engine novo
-
-Arquivo `src/engine/luanaModeEngine.ts`:
-- `generateLuanaBracket({ teams, groupCount, startsAt: 'quarters' | 'eighths' })` → cria grupos via Snake existente, gera repescagem cruzada com pares fixos por chaveCount, e pluga vencedores nas quartas/oitavas.
-- Reutiliza `chapeuDistribution.ts` para os 1º colocados que aguardam.
-- Validação pós-geração via `postGenerationValidator.ts`.
-
-Engine **separado** de Single/Double Elim (regra de Engine Separation já no projeto).
-
----
-
-### 5. UI
-
-- `GenerateBracketDialog.tsx`: nova radio option "Modo Luana — Grupos + Repescagem Cruzada" (condicional ao `useLuanaAccess`). Quando selecionada, mostra:
-  - Slider de nº de chaves (default 4).
-  - Radio "Inicia em: Quartas / Oitavas".
-- Badges visuais nos matches de repescagem: `REP-1`, `REP-2` etc. com cor distinta (laranja).
-- `MatchSequenceViewer` e `BracketTreeView`: rótulos PT-BR ("Repescagem Cruzada", "Quartas via Repescagem").
-
----
-
-### 6. Testes
-
-`src/test/luanaModeEngine.test.ts`:
-- 12 duplas, 4 chaves de 3, inicia nas quartas → 4 jogos repescagem + 4 quartas.
-- 16 duplas, 4 chaves de 4, inicia nas quartas → mesmo padrão.
-- 20 duplas, 4 chaves de 5, inicia nas oitavas → repescagem expandida.
-- Validações: nenhum 1º enfrenta outro 1º antes da semi; cruzamento A×D / B×C respeitado; sem auto-confronto.
-
----
-
-### 7. O que **não** muda
-
-- Eliminação Simples e Dupla Eliminação intocados.
-- Outros esportes (Futevôlei, Beach Tennis) não enxergam o modo.
-- Outros organizadores (não-LUANA, não-vinculados) nem veem a opção no dialog.
-- Sistema de pontuação, ranking, status, e cascade resets reutilizam pipelines existentes.
-
----
-
-### Resumo do que será criado/alterado
-
-**Novos arquivos:**
-- `src/engine/luanaModeEngine.ts`
-- `src/hooks/useLuanaAccess.ts`
-- `src/test/luanaModeEngine.test.ts`
-
-**Editados:**
-- `src/components/GenerateBracketDialog.tsx` (nova opção condicional + sub-perguntas)
-- `src/lib/roundLabels.ts` (rótulo "Repescagem Cruzada")
-- `src/components/MatchSequenceViewer.tsx` (badge REP)
-- `supabase/functions/organizer-api/index.ts` (validar novo `game_system`)
+Confirma que sigo nesse caminho?

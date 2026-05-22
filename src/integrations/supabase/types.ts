@@ -1657,6 +1657,7 @@ export type Database = {
           modality_id: string | null
           points: number
           sport: Database["public"]["Enums"]["sport_type"]
+          stage_id: string | null
           tournament_id: string | null
         }
         Insert: {
@@ -1669,6 +1670,7 @@ export type Database = {
           modality_id?: string | null
           points?: number
           sport: Database["public"]["Enums"]["sport_type"]
+          stage_id?: string | null
           tournament_id?: string | null
         }
         Update: {
@@ -1681,6 +1683,7 @@ export type Database = {
           modality_id?: string | null
           points?: number
           sport?: Database["public"]["Enums"]["sport_type"]
+          stage_id?: string | null
           tournament_id?: string | null
         }
         Relationships: [

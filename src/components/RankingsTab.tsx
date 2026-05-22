@@ -786,7 +786,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                         <Badge variant="secondary" className="text-xs font-bold tabular-nums whitespace-nowrap">
                           {ranking.points} pts
                         </Badge>
-                        {isOwner ? (
+                        {isOwner && !isGeneralView ? (
                           <div className="flex gap-1">
                             <Button size="sm" variant="ghost" onClick={() => { setEditingId(ranking.id); setEditPoints(String(ranking.points)); setEditBadge(ranking.badge || null); }} className="h-7 w-7 p-0">
                               <Pencil className="h-3.5 w-3.5 text-muted-foreground" />

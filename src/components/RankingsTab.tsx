@@ -120,6 +120,9 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
   const fetchRankings = async () => {
     const filters: Record<string, any> = { tournament_id: tournamentId };
     if (modalityId) filters.modality_id = modalityId;
+    // Em modo Geral (viewStageId === null) buscamos TODAS as etapas
+    // e agregamos no cliente. Em modo de etapa específica, filtramos.
+    if (viewStageId) filters.stage_id = viewStageId;
 
     const { data, error } = await publicQuery<RankingEntry[]>({
       table: "rankings",
@@ -148,10 +151,19 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
     if (data) setTeams(data);
   };
 
+  const fetchStages = async () => {
+    const { data } = await publicQuery<Stage[]>({
+      table: "tournament_stages",
+      filters: { tournament_id: tournamentId },
+      order: { column: "stage_number", ascending: true },
+    });
+    setStages(data || []);
+  };
+
   const fetchHistory = async () => {
     const histFilters: Record<string, any> = { tournament_id: tournamentId };
     if (modalityId) histFilters.modality_id = modalityId;
-    if (stageId) histFilters.stage_id = stageId;
+    if (viewStageId) histFilters.stage_id = viewStageId;
     const { data } = await publicQuery<PointsHistoryEntry[]>({
       table: "ranking_points_history",
       filters: histFilters,
@@ -160,6 +172,15 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
     setPointsHistory(data || []);
   };
 
+  // Sync com a etapa selecionada no nível da página, sem travar o seletor interno
+  useEffect(() => {
+    setViewStageId(stageId ?? null);
+  }, [stageId]);
+
+  useEffect(() => {
+    fetchStages();
+  }, [tournamentId]);
+
   useEffect(() => {
     setViewFilter("individual");
     fetchRankings();
@@ -167,12 +188,12 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
     fetchHistory();
 
     const channel = supabase
-      .channel(`rankings-${tournamentId}`)
+      .channel(`rankings-${tournamentId}-${viewStageId ?? "all"}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "rankings", filter: `tournament_id=eq.${tournamentId}` }, () => { fetchRankings(); fetchHistory(); })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [tournamentId, modalityId, stageId]);
+  }, [tournamentId, modalityId, viewStageId]);
 
   // Build athlete options from teams (individual player names)
   const athleteOptions = useMemo(() => {

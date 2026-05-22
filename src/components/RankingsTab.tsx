@@ -79,12 +79,17 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
   const { user, organizerId } = useAuth();
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [stages, setStages] = useState<Stage[]>([]);
+  // null = "Geral" (somatório de todas as etapas); string = id da etapa específica
+  const [viewStageId, setViewStageId] = useState<string | null>(stageId ?? null);
   const [loading, setLoading] = useState(true);
   const [selectedAthlete, setSelectedAthlete] = useState("");
   const [points, setPoints] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPoints, setEditPoints] = useState("");
   const [editBadge, setEditBadge] = useState<string | null>(null);
+
+  const isGeneralView = viewStageId === null && stages.length > 0;
 
   const BADGE_OPTIONS = [
     { value: "", label: "Nenhum", icon: null },

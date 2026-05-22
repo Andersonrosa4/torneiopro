@@ -240,6 +240,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       data: {
         athlete_name: selectedAthlete,
         points: Number(points),
+        manual_bonus: Number(points),
         sport: sport as "beach_volleyball" | "futevolei" | "beach_tennis",
         tournament_id: tournamentId,
         created_by: createdBy,

@@ -594,6 +594,16 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
     return Array.from(map.values());
   }, [rankings, isGeneralView]);
 
+  // Mapa: nome do atleta → id do time (para agrupar parceiros)
+  const teamKeyByAthlete = useMemo(() => {
+    const m = new Map<string, string>();
+    teams.forEach((t) => {
+      m.set(t.player1_name, t.id);
+      m.set(t.player2_name, t.id);
+    });
+    return m;
+  }, [teams]);
+
   const sortedRankings = useMemo(() => {
     let filtered = [...displayRankings];
     if (viewFilter === "individual") {
@@ -605,8 +615,18 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
     } else if (viewFilter === "female") {
       filtered = filtered.filter((r) => r.entry_type === "female");
     }
-    return filtered.sort((a, b) => b.points - a.points);
-  }, [displayRankings, viewFilter]);
+    return filtered.sort((a, b) => {
+      // 1) pontos decrescente — se houver bônus, separa naturalmente
+      if (b.points !== a.points) return b.points - a.points;
+      // 2) com pontos iguais, mantém parceiros do mesmo time juntos
+      const ka = teamKeyByAthlete.get(a.athlete_name) ?? `~${a.athlete_name}`;
+      const kb = teamKeyByAthlete.get(b.athlete_name) ?? `~${b.athlete_name}`;
+      if (ka !== kb) return ka.localeCompare(kb);
+      // 3) dentro do mesmo time, ordem alfabética estável
+      return a.athlete_name.localeCompare(b.athlete_name);
+    });
+  }, [displayRankings, viewFilter, teamKeyByAthlete]);
+
 
   if (loading) {
     return (

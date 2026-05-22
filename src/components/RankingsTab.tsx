@@ -456,8 +456,8 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
         ? (existingRankings || [])
         : (existingRankings || []).filter((r: any) => !r.stage_id);
 
-      if (existingRankings && existingRankings.length > 0) {
-        for (const r of existingRankings) {
+      if (toDelete.length > 0) {
+        for (const r of toDelete) {
           await organizerQuery({ table: "rankings", operation: "delete", filters: { id: r.id } });
         }
       }

@@ -38,7 +38,9 @@ interface RankingEntry {
   entry_type: string;
   badge: string | null;
   stage_id?: string | null;
+  manual_bonus?: number | null;
 }
+
 
 interface PointsHistoryEntry {
   id: string;
@@ -585,11 +587,13 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       const prev = map.get(key);
       if (prev) {
         prev.points += r.points;
+        prev.manual_bonus = Number(prev.manual_bonus ?? 0) + Number(r.manual_bonus ?? 0);
         // mantém o primeiro badge encontrado
         if (!prev.badge && r.badge) prev.badge = r.badge;
       } else {
-        map.set(key, { ...r, id: `agg-${key}` });
+        map.set(key, { ...r, id: `agg-${key}`, manual_bonus: Number(r.manual_bonus ?? 0) });
       }
+
     }
     return Array.from(map.values());
   }, [rankings, isGeneralView]);
@@ -840,11 +844,20 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                       {idx + 1}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <p className="text-sm font-black leading-snug break-words" style={{ color: '#F5F7FA', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
                           {ranking.athlete_name}
                         </p>
                         {getBadgeIcon(ranking.badge)}
+                        {Number(ranking.manual_bonus ?? 0) > 0 && (
+                          <span
+                            title={`Pontos extras adicionados: +${ranking.manual_bonus}`}
+                            className="inline-flex items-center gap-0.5 rounded-full bg-amber-500/15 border border-amber-500/40 px-1.5 py-0.5 text-[10px] font-bold text-amber-300"
+                          >
+                            <Zap className="h-3 w-3" />
+                            +{ranking.manual_bonus}
+                          </span>
+                        )}
                       </div>
                       {ranking.badge && (
                         <span className="text-[10px] text-muted-foreground">{getBadgeLabel(ranking.badge)}</span>
@@ -853,6 +866,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                         <Badge variant="secondary" className="text-xs font-bold tabular-nums whitespace-nowrap">
                           {ranking.points} pts
                         </Badge>
+
                         {isOwner && !isGeneralView ? (
                           <div className="flex gap-1">
                             <Button size="sm" variant="ghost" onClick={() => { setEditingId(ranking.id); setEditPoints(String(ranking.points)); setEditBadge(ranking.badge || null); }} className="h-7 w-7 p-0">
@@ -866,8 +880,11 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                       </div>
                       {/* History toggle */}
                       {(() => {
-                        const athleteHistory = pointsHistory.filter((h) => h.ranking_id === ranking.id);
+                        const athleteHistory = isGeneralView
+                          ? pointsHistory.filter((h) => h.athlete_name === ranking.athlete_name)
+                          : pointsHistory.filter((h) => h.ranking_id === ranking.id);
                         if (athleteHistory.length === 0) return null;
+
                         const isExpanded = expandedHistoryId === ranking.id;
                         return (
                           <div className="mt-2">

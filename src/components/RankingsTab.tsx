@@ -269,9 +269,11 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
 
     const currentRanking = rankings.find((r) => r.id === id);
     const oldPoints = currentRanking?.points || 0;
+    const oldBonus = Number((currentRanking as any)?.manual_bonus ?? 0);
     const pointsDiff = newPoints - oldPoints;
+    const newBonus = Math.max(0, oldBonus + pointsDiff);
 
-    const { error } = await organizerQuery({ table: "rankings", operation: "update", data: { points: newPoints, badge: badge || null }, filters: { id } });
+    const { error } = await organizerQuery({ table: "rankings", operation: "update", data: { points: newPoints, manual_bonus: newBonus, badge: badge || null }, filters: { id } });
 
     if (error) {
       toast.error("Erro ao atualizar pontos");

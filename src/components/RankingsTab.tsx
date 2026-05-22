@@ -38,7 +38,9 @@ interface RankingEntry {
   entry_type: string;
   badge: string | null;
   stage_id?: string | null;
+  manual_bonus?: number | null;
 }
+
 
 interface PointsHistoryEntry {
   id: string;

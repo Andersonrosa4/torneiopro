@@ -880,8 +880,11 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                       </div>
                       {/* History toggle */}
                       {(() => {
-                        const athleteHistory = pointsHistory.filter((h) => h.ranking_id === ranking.id);
+                        const athleteHistory = isGeneralView
+                          ? pointsHistory.filter((h) => h.athlete_name === ranking.athlete_name)
+                          : pointsHistory.filter((h) => h.ranking_id === ranking.id);
                         if (athleteHistory.length === 0) return null;
+
                         const isExpanded = expandedHistoryId === ranking.id;
                         return (
                           <div className="mt-2">

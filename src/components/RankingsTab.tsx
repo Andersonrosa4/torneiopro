@@ -219,6 +219,10 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
   );
 
   const addAthletePoints = async () => {
+    if (isGeneralView) {
+      toast.warning("Selecione uma etapa específica para lançar pontos. O Geral é somatório.");
+      return;
+    }
     if (!selectedAthlete || !points || Number(points) < 0) {
       toast.error("Selecione o atleta e insira os pontos (≥ 0)");
       return;
@@ -241,6 +245,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
         created_by: createdBy,
         entry_type: selectedAthlete.includes(" / ") ? "pair" : "individual",
         ...(modalityId ? { modality_id: modalityId } : {}),
+        ...(viewStageId ? { stage_id: viewStageId } : {}),
       },
     });
 

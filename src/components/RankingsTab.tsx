@@ -528,8 +528,27 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
 
   const isMisto = modalityName?.toLowerCase().includes("misto");
 
+  // Em modo Geral: agrega por athlete_name (+ entry_type) somando pontos das etapas.
+  // Mantém estrutura visual igual a um RankingEntry.
+  const displayRankings = useMemo<RankingEntry[]>(() => {
+    if (!isGeneralView) return rankings;
+    const map = new Map<string, RankingEntry>();
+    for (const r of rankings) {
+      const key = `${r.entry_type}::${r.athlete_name}`;
+      const prev = map.get(key);
+      if (prev) {
+        prev.points += r.points;
+        // mantém o primeiro badge encontrado
+        if (!prev.badge && r.badge) prev.badge = r.badge;
+      } else {
+        map.set(key, { ...r, id: `agg-${key}` });
+      }
+    }
+    return Array.from(map.values());
+  }, [rankings, isGeneralView]);
+
   const sortedRankings = useMemo(() => {
-    let filtered = [...rankings];
+    let filtered = [...displayRankings];
     if (viewFilter === "individual") {
       filtered = filtered.filter((r) => r.entry_type !== "pair");
     } else if (viewFilter === "pair") {
@@ -540,7 +559,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       filtered = filtered.filter((r) => r.entry_type === "female");
     }
     return filtered.sort((a, b) => b.points - a.points);
-  }, [rankings, viewFilter]);
+  }, [displayRankings, viewFilter]);
 
   if (loading) {
     return (

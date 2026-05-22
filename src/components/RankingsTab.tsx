@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Trash2, TrendingUp, Download, FileText, Sheet, Pencil, Check, X, Zap, Users, User, Star, Heart, Award, History, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, TrendingUp, Download, FileText, Sheet, Pencil, Check, X, Zap, Users, User, Star, Heart, Award, History, ChevronDown, ChevronUp, Layers, Globe } from "lucide-react";
 import { motion } from "framer-motion";
 
 import { exportRankings } from "@/lib/exportUtils";
@@ -37,6 +37,7 @@ interface RankingEntry {
   created_by: string;
   entry_type: string;
   badge: string | null;
+  stage_id?: string | null;
 }
 
 interface PointsHistoryEntry {
@@ -56,6 +57,13 @@ interface Team {
   player2_name: string;
 }
 
+interface Stage {
+  id: string;
+  name: string;
+  stage_number: number;
+  event_date: string | null;
+}
+
 interface RankingsTabProps {
   tournamentId: string;
   isOwner: boolean;
@@ -71,12 +79,17 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
   const { user, organizerId } = useAuth();
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [stages, setStages] = useState<Stage[]>([]);
+  // null = "Geral" (somatório de todas as etapas); string = id da etapa específica
+  const [viewStageId, setViewStageId] = useState<string | null>(stageId ?? null);
   const [loading, setLoading] = useState(true);
   const [selectedAthlete, setSelectedAthlete] = useState("");
   const [points, setPoints] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPoints, setEditPoints] = useState("");
   const [editBadge, setEditBadge] = useState<string | null>(null);
+
+  const isGeneralView = viewStageId === null && stages.length > 0;
 
   const BADGE_OPTIONS = [
     { value: "", label: "Nenhum", icon: null },
@@ -107,6 +120,9 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
   const fetchRankings = async () => {
     const filters: Record<string, any> = { tournament_id: tournamentId };
     if (modalityId) filters.modality_id = modalityId;
+    // Em modo Geral (viewStageId === null) buscamos TODAS as etapas
+    // e agregamos no cliente. Em modo de etapa específica, filtramos.
+    if (viewStageId) filters.stage_id = viewStageId;
 
     const { data, error } = await publicQuery<RankingEntry[]>({
       table: "rankings",
@@ -135,10 +151,19 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
     if (data) setTeams(data);
   };
 
+  const fetchStages = async () => {
+    const { data } = await publicQuery<Stage[]>({
+      table: "tournament_stages",
+      filters: { tournament_id: tournamentId },
+      order: { column: "stage_number", ascending: true },
+    });
+    setStages(data || []);
+  };
+
   const fetchHistory = async () => {
     const histFilters: Record<string, any> = { tournament_id: tournamentId };
     if (modalityId) histFilters.modality_id = modalityId;
-    if (stageId) histFilters.stage_id = stageId;
+    if (viewStageId) histFilters.stage_id = viewStageId;
     const { data } = await publicQuery<PointsHistoryEntry[]>({
       table: "ranking_points_history",
       filters: histFilters,
@@ -147,6 +172,15 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
     setPointsHistory(data || []);
   };
 
+  // Sync com a etapa selecionada no nível da página, sem travar o seletor interno
+  useEffect(() => {
+    setViewStageId(stageId ?? null);
+  }, [stageId]);
+
+  useEffect(() => {
+    fetchStages();
+  }, [tournamentId]);
+
   useEffect(() => {
     setViewFilter("individual");
     fetchRankings();
@@ -154,12 +188,12 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
     fetchHistory();
 
     const channel = supabase
-      .channel(`rankings-${tournamentId}`)
+      .channel(`rankings-${tournamentId}-${viewStageId ?? "all"}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "rankings", filter: `tournament_id=eq.${tournamentId}` }, () => { fetchRankings(); fetchHistory(); })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [tournamentId, modalityId, stageId]);
+  }, [tournamentId, modalityId, viewStageId]);
 
   // Build athlete options from teams (individual player names)
   const athleteOptions = useMemo(() => {
@@ -185,6 +219,10 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
   );
 
   const addAthletePoints = async () => {
+    if (isGeneralView) {
+      toast.warning("Selecione uma etapa específica para lançar pontos. O Geral é somatório.");
+      return;
+    }
     if (!selectedAthlete || !points || Number(points) < 0) {
       toast.error("Selecione o atleta e insira os pontos (≥ 0)");
       return;
@@ -207,6 +245,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
         created_by: createdBy,
         entry_type: selectedAthlete.includes(" / ") ? "pair" : "individual",
         ...(modalityId ? { modality_id: modalityId } : {}),
+        ...(viewStageId ? { stage_id: viewStageId } : {}),
       },
     });
 
@@ -249,7 +288,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
             badge: badge || null,
             tournament_id: tournamentId,
             ...(modalityId ? { modality_id: modalityId } : {}),
-            ...(stageId ? { stage_id: stageId } : {}),
+            ...(viewStageId ? { stage_id: viewStageId } : {}),
             created_by: createdBy,
           },
         });
@@ -275,6 +314,10 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
 
   /** Auto-generate ranking from classification positions */
   const generateAutoRanking = async () => {
+    if (isGeneralView) {
+      toast.warning("Selecione uma etapa específica para gerar o ranking. O Geral é somatório das etapas.");
+      return;
+    }
     const createdBy = organizerId || user?.id || "";
     if (!createdBy) {
       toast.error("Você precisa estar logado");
@@ -283,9 +326,10 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
 
     setGenerating(true);
     try {
-      // Fetch matches for this tournament/modality
+      // Fetch matches for this tournament/modality (+ stage when applicable)
       const matchFilters: Record<string, any> = { tournament_id: tournamentId };
       if (modalityId) matchFilters.modality_id = modalityId;
+      if (viewStageId) matchFilters.stage_id = viewStageId;
 
       const { data: matchesData } = await publicQuery<any[]>({
         table: "matches",
@@ -396,17 +440,24 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       });
 
       // Now create ranking entries for each individual player
-      // First delete existing rankings for this tournament + modality
+      // First delete existing rankings for this tournament + modality + STAGE
+      // (NUNCA apaga rankings de outras etapas — eles formam o Geral)
       const delFilters: Record<string, any> = { tournament_id: tournamentId };
       if (modalityId) delFilters.modality_id = modalityId;
+      if (viewStageId) delFilters.stage_id = viewStageId;
 
       const { data: existingRankings } = await publicQuery<any[]>({
         table: "rankings",
         filters: delFilters,
       });
 
-      if (existingRankings && existingRankings.length > 0) {
-        for (const r of existingRankings) {
+      // Em modo "sem etapa" (viewStageId null e sem etapas), apaga apenas linhas com stage_id NULL
+      const toDelete = viewStageId
+        ? (existingRankings || [])
+        : (existingRankings || []).filter((r: any) => !r.stage_id);
+
+      if (toDelete.length > 0) {
+        for (const r of toDelete) {
           await organizerQuery({ table: "rankings", operation: "delete", filters: { id: r.id } });
         }
       }
@@ -459,6 +510,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
               created_by: createdBy,
               entry_type: e.type,
               ...(modalityId ? { modality_id: modalityId } : {}),
+              ...(viewStageId ? { stage_id: viewStageId } : {}),
             },
           });
           inserted++;
@@ -476,8 +528,27 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
 
   const isMisto = modalityName?.toLowerCase().includes("misto");
 
+  // Em modo Geral: agrega por athlete_name (+ entry_type) somando pontos das etapas.
+  // Mantém estrutura visual igual a um RankingEntry.
+  const displayRankings = useMemo<RankingEntry[]>(() => {
+    if (!isGeneralView) return rankings;
+    const map = new Map<string, RankingEntry>();
+    for (const r of rankings) {
+      const key = `${r.entry_type}::${r.athlete_name}`;
+      const prev = map.get(key);
+      if (prev) {
+        prev.points += r.points;
+        // mantém o primeiro badge encontrado
+        if (!prev.badge && r.badge) prev.badge = r.badge;
+      } else {
+        map.set(key, { ...r, id: `agg-${key}` });
+      }
+    }
+    return Array.from(map.values());
+  }, [rankings, isGeneralView]);
+
   const sortedRankings = useMemo(() => {
-    let filtered = [...rankings];
+    let filtered = [...displayRankings];
     if (viewFilter === "individual") {
       filtered = filtered.filter((r) => r.entry_type !== "pair");
     } else if (viewFilter === "pair") {
@@ -488,7 +559,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       filtered = filtered.filter((r) => r.entry_type === "female");
     }
     return filtered.sort((a, b) => b.points - a.points);
-  }, [rankings, viewFilter]);
+  }, [displayRankings, viewFilter]);
 
   if (loading) {
     return (
@@ -500,7 +571,52 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
 
   return (
     <div className="space-y-6">
-      {isOwner && (
+      {stages.length > 0 && (
+        <motion.section
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-border bg-card p-4 shadow-card"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <Layers className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-semibold text-muted-foreground">Ranking por Etapa</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <Button
+              size="sm"
+              variant={viewStageId === null ? "default" : "outline"}
+              onClick={() => setViewStageId(null)}
+              className="h-8 text-xs rounded-lg gap-1.5"
+            >
+              <Globe className="h-3.5 w-3.5" /> Geral
+            </Button>
+            <Button
+              size="sm"
+              variant={viewStageId === "__none__" ? "default" : "outline"}
+              onClick={() => setViewStageId(null)}
+              className="hidden"
+            />
+            {stages.map((s) => (
+              <Button
+                key={s.id}
+                size="sm"
+                variant={viewStageId === s.id ? "default" : "outline"}
+                onClick={() => setViewStageId(s.id)}
+                className="h-8 text-xs rounded-lg"
+              >
+                {s.name}
+              </Button>
+            ))}
+          </div>
+          {isGeneralView && (
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Visualização consolidada: soma dos pontos de todas as etapas. Para lançar ou editar, selecione uma etapa.
+            </p>
+          )}
+        </motion.section>
+      )}
+
+      {isOwner && !isGeneralView && (
         <motion.section
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -563,7 +679,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
           <h2 className="text-xl font-semibold">
-            Classificação Geral{modalityName ? ` — ${modalityName}` : ""}
+            {isGeneralView ? "Ranking Geral" : (stages.find((s) => s.id === viewStageId)?.name ? `Ranking — ${stages.find((s) => s.id === viewStageId)?.name}` : "Classificação Geral")}{modalityName ? ` · ${modalityName}` : ""}
           </h2>
           <div className="flex flex-wrap gap-1.5 rounded-lg border border-border p-1 bg-secondary/30">
             {isMisto ? (
@@ -670,7 +786,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                         <Badge variant="secondary" className="text-xs font-bold tabular-nums whitespace-nowrap">
                           {ranking.points} pts
                         </Badge>
-                        {isOwner ? (
+                        {isOwner && !isGeneralView ? (
                           <div className="flex gap-1">
                             <Button size="sm" variant="ghost" onClick={() => { setEditingId(ranking.id); setEditPoints(String(ranking.points)); setEditBadge(ranking.badge || null); }} className="h-7 w-7 p-0">
                               <Pencil className="h-3.5 w-3.5 text-muted-foreground" />

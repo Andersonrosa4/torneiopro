@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Trash2, TrendingUp, Download, FileText, Sheet, Pencil, Check, X, Zap, Users, User, Star, Heart, Award, History, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, TrendingUp, Download, FileText, Sheet, Pencil, Check, X, Zap, Users, User, Star, Heart, Award, History, ChevronDown, ChevronUp, Layers, Globe } from "lucide-react";
 import { motion } from "framer-motion";
 
 import { exportRankings } from "@/lib/exportUtils";

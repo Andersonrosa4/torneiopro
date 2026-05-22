@@ -288,7 +288,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
             badge: badge || null,
             tournament_id: tournamentId,
             ...(modalityId ? { modality_id: modalityId } : {}),
-            ...(stageId ? { stage_id: stageId } : {}),
+            ...(viewStageId ? { stage_id: viewStageId } : {}),
             created_by: createdBy,
           },
         });

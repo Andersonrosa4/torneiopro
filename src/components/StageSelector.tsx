@@ -55,6 +55,14 @@ const StageSelector = ({ tournamentId, isOwner, selectedStageId, onSelectStage }
     return () => { supabase.removeChannel(channel); };
   }, [tournamentId, fetchStages]);
 
+  // Auto-select first stage when stages exist and nothing is selected
+  useEffect(() => {
+    if (stages.length > 0 && !selectedStageId) {
+      onSelectStage(stages[0].id);
+    }
+  }, [stages, selectedStageId, onSelectStage]);
+
+
   const createStage = async () => {
     if (!newStageName.trim()) {
       toast.error("Nome da etapa é obrigatório");
@@ -167,14 +175,17 @@ const StageSelector = ({ tournamentId, isOwner, selectedStageId, onSelectStage }
         <span className="text-sm font-semibold text-muted-foreground">Etapas</span>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button
-          size="sm"
-          variant={selectedStageId === null ? "default" : "outline"}
-          onClick={() => onSelectStage(null)}
-          className="h-8 text-xs rounded-lg"
-        >
-          1ª Etapa
-        </Button>
+        {stages.length === 0 && (
+          <Button
+            size="sm"
+            variant="default"
+            className="h-8 text-xs rounded-lg"
+            disabled
+          >
+            1ª Etapa
+          </Button>
+        )}
+
         {stages.map((stage) => (
           <div key={stage.id} className="flex items-center gap-0.5 group">
             <Button

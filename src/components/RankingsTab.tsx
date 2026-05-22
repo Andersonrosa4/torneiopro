@@ -679,7 +679,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
           <h2 className="text-xl font-semibold">
-            Classificação Geral{modalityName ? ` — ${modalityName}` : ""}
+            {isGeneralView ? "Ranking Geral" : (stages.find((s) => s.id === viewStageId)?.name ? `Ranking — ${stages.find((s) => s.id === viewStageId)?.name}` : "Classificação Geral")}{modalityName ? ` · ${modalityName}` : ""}
           </h2>
           <div className="flex flex-wrap gap-1.5 rounded-lg border border-border p-1 bg-secondary/30">
             {isMisto ? (

@@ -37,6 +37,7 @@ interface RankingEntry {
   created_by: string;
   entry_type: string;
   badge: string | null;
+  stage_id?: string | null;
 }
 
 interface PointsHistoryEntry {
@@ -54,6 +55,13 @@ interface Team {
   id: string;
   player1_name: string;
   player2_name: string;
+}
+
+interface Stage {
+  id: string;
+  name: string;
+  stage_number: number;
+  event_date: string | null;
 }
 
 interface RankingsTabProps {

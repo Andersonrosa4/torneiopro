@@ -510,6 +510,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
               created_by: createdBy,
               entry_type: e.type,
               ...(modalityId ? { modality_id: modalityId } : {}),
+              ...(viewStageId ? { stage_id: viewStageId } : {}),
             },
           });
           inserted++;

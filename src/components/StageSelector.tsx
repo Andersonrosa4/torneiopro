@@ -55,6 +55,14 @@ const StageSelector = ({ tournamentId, isOwner, selectedStageId, onSelectStage }
     return () => { supabase.removeChannel(channel); };
   }, [tournamentId, fetchStages]);
 
+  // Auto-select first stage when stages exist and nothing is selected
+  useEffect(() => {
+    if (stages.length > 0 && !selectedStageId) {
+      onSelectStage(stages[0].id);
+    }
+  }, [stages, selectedStageId, onSelectStage]);
+
+
   const createStage = async () => {
     if (!newStageName.trim()) {
       toast.error("Nome da etapa é obrigatório");

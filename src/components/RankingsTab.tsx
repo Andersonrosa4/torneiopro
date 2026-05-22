@@ -571,7 +571,52 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
 
   return (
     <div className="space-y-6">
-      {isOwner && (
+      {stages.length > 0 && (
+        <motion.section
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-border bg-card p-4 shadow-card"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <Layers className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-semibold text-muted-foreground">Ranking por Etapa</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <Button
+              size="sm"
+              variant={viewStageId === null ? "default" : "outline"}
+              onClick={() => setViewStageId(null)}
+              className="h-8 text-xs rounded-lg gap-1.5"
+            >
+              <Globe className="h-3.5 w-3.5" /> Geral
+            </Button>
+            <Button
+              size="sm"
+              variant={viewStageId === "__none__" ? "default" : "outline"}
+              onClick={() => setViewStageId(null)}
+              className="hidden"
+            />
+            {stages.map((s) => (
+              <Button
+                key={s.id}
+                size="sm"
+                variant={viewStageId === s.id ? "default" : "outline"}
+                onClick={() => setViewStageId(s.id)}
+                className="h-8 text-xs rounded-lg"
+              >
+                {s.name}
+              </Button>
+            ))}
+          </div>
+          {isGeneralView && (
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Visualização consolidada: soma dos pontos de todas as etapas. Para lançar ou editar, selecione uma etapa.
+            </p>
+          )}
+        </motion.section>
+      )}
+
+      {isOwner && !isGeneralView && (
         <motion.section
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}

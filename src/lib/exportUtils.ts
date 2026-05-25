@@ -48,9 +48,9 @@ function downloadXLSX(filename: string, sheetName: string, headers: string[], ro
 
 // ── Badge labels (sem emojis: fontes PDF padrão não suportam) ──
 const BADGE_INFO: Record<string, { label: string; fill: [number, number, number]; text: [number, number, number] }> = {
-  destaque: { label: "DESTAQUE", fill: [251, 191, 36], text: [69, 26, 3] },   // amber
-  doacao:   { label: "DOACAO",   fill: [244, 114, 182], text: [80, 7, 36] },  // rose
-  mvp:      { label: "MVP",      fill: [56, 189, 248], text: [8, 47, 73] },   // sky
+  destaque: { label: "DESTAQUE", fill: [251, 191, 36], text: [69, 26, 3] },   // âmbar
+  doacao:   { label: "DOAÇÃO",   fill: [244, 114, 182], text: [80, 7, 36] },  // rosa
+  mvp:      { label: "CRAQUE",   fill: [56, 189, 248], text: [8, 47, 73] },   // azul
 };
 
 // ── PDF de Ranking ──

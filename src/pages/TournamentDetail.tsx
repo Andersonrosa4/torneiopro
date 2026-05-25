@@ -51,6 +51,7 @@ import ClassificationTab from "@/components/ClassificationTab";
 import RankingsTab from "@/components/RankingsTab";
 import StageSelector from "@/components/StageSelector";
 import BugCombatantLogPanel from "@/components/BugCombatantLogPanel";
+import RecycleBinTab from "@/components/RecycleBinTab";
 import { generateFakeTeams, type FakeNameGender } from "@/lib/fakeNames";
 import { VERANICO_EIGHTHS_MAP } from "@/lib/veranicoEighthsMap";
 import { logVeranico } from "@/lib/veranicoAudit";

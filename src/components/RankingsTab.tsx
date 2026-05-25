@@ -448,6 +448,78 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
         placedTeams.add(t.teamId);
       });
 
+      // ============================================================
+      // VERIFICADOR AUTOMÁTICO DE INTEGRIDADE DO RANKING
+      // Garante para sempre que nenhuma versão futura volte a premiar
+      // perdedores de quartas como campeões, ou perdedores da disputa
+      // de 3º como 3º lugar. Se detectar qualquer inconsistência,
+      // ABORTA a gravação e mostra erro detalhado no toast + console.
+      // ============================================================
+      const violations: string[] = [];
+      const posCount = new Map<number, number>();
+      ranked.forEach((r) => posCount.set(r.position, (posCount.get(r.position) || 0) + 1));
+
+      if (finalMatches.length > 0) {
+        if ((posCount.get(1) || 0) !== 1) violations.push(`Esperado 1 campeão, encontrado ${posCount.get(1) || 0}`);
+        if ((posCount.get(2) || 0) !== 1) violations.push(`Esperado 1 vice, encontrado ${posCount.get(2) || 0}`);
+        const finalM = finalMatches[0];
+        const champion = ranked.find((r) => r.position === 1)?.teamId;
+        const runnerUp = ranked.find((r) => r.position === 2)?.teamId;
+        if (champion && champion !== finalM.winner_team_id) {
+          violations.push("Campeão (pos 1) não bate com o vencedor da final");
+        }
+        const expectedRunner = finalM.team1_id === finalM.winner_team_id ? finalM.team2_id : finalM.team1_id;
+        if (runnerUp && expectedRunner && runnerUp !== expectedRunner) {
+          violations.push("Vice (pos 2) não bate com o perdedor da final");
+        }
+      }
+
+      if (completedThirdPlace.length > 0) {
+        const tpm = completedThirdPlace[0];
+        const third = ranked.find((r) => r.position === 3)?.teamId;
+        const fourth = ranked.find((r) => r.position === 4)?.teamId;
+        const expectedFourth = tpm.team1_id === tpm.winner_team_id ? tpm.team2_id : tpm.team1_id;
+        if (third && tpm.winner_team_id && third !== tpm.winner_team_id) {
+          violations.push("3º lugar não bate com o vencedor da disputa de 3º");
+        }
+        if (fourth && expectedFourth && fourth !== expectedFourth) {
+          violations.push("4º lugar não bate com o perdedor da disputa de 3º");
+        }
+      }
+
+      const seenTeams = new Set<string>();
+      for (const r of ranked) {
+        if (seenTeams.has(r.teamId)) {
+          violations.push(`Time ${r.teamId} aparece em mais de uma posição`);
+          break;
+        }
+        seenTeams.add(r.teamId);
+      }
+
+      const teamPos = new Map<string, number>();
+      ranked.forEach((r) => teamPos.set(r.teamId, r.position));
+      for (const m of winnersMatches) {
+        if (m.status !== "completed" || !m.winner_team_id) continue;
+        const loserId = m.team1_id === m.winner_team_id ? m.team2_id : m.team1_id;
+        if (!loserId) continue;
+        const wp = teamPos.get(m.winner_team_id);
+        const lp = teamPos.get(loserId);
+        if (wp != null && lp != null && wp > lp) {
+          violations.push(`Vencedor está em posição pior (${wp}) que o perdedor (${lp}) — partida ${m.id}`);
+          break;
+        }
+      }
+
+      if (violations.length > 0) {
+        console.error("[RANKING VALIDATOR] Inconsistências detectadas:", violations);
+        toast.error(
+          `Ranking bloqueado pelo verificador: ${violations[0]}${violations.length > 1 ? ` (+${violations.length - 1} outras)` : ""}`,
+          { duration: 8000 }
+        );
+        setGenerating(false);
+        return;
+      }
+
       // Snapshot dos pontos manuais e badges atuais ANTES de apagar — preserva bônus/destaques.
       const snapFilters: Record<string, any> = { tournament_id: tournamentId };
       if (modalityId) snapFilters.modality_id = modalityId;

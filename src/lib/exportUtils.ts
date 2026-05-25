@@ -179,7 +179,7 @@ function downloadRankingPDF(filename: string, meta: ExportMeta, rankings: Rankin
       doc.setFont("helvetica", "normal");
       const footerY = pageH - 8;
       doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")}`, 12, footerY);
-      doc.text(`Pagina ${pageNumber}`, pageW - 12, footerY, { align: "right" });
+      doc.text(`Página ${pageNumber}`, pageW - 12, footerY, { align: "right" });
       doc.text("torneio.pro", pageW / 2, footerY, { align: "center" });
     },
   });

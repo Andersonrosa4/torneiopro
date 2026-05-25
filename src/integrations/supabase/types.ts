@@ -2247,6 +2247,7 @@ export type Database = {
         Args: { ttl_seconds?: number }
         Returns: boolean
       }
+      detect_pt_gender: { Args: { _name: string }; Returns: string }
       get_organizer_id: { Args: never; Returns: string }
       has_role: {
         Args: {

@@ -349,7 +349,11 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       }
 
       // Build elimination ranking (same logic as ClassificationTab)
-      const winnersMatches = matchesData.filter((m: any) => m.round >= 1 && m.bracket_type === "winners");
+      // Inclui winners, semi_final e final na progressão principal — o gerador antigo
+      // filtrava só "winners" e ignorava as partidas marcadas como semi/final, fazendo
+      // com que as quartas fossem tratadas como final e premiando vários times com 20pts.
+      const knockoutTypes = new Set(["winners", "semi_final", "final"]);
+      const winnersMatches = matchesData.filter((m: any) => m.round >= 1 && knockoutTypes.has(m.bracket_type));
       const thirdPlaceMatches = matchesData.filter((m: any) => m.round >= 1 && m.bracket_type === "third_place");
       const groupMatches = matchesData.filter((m: any) => m.round === 0);
 

@@ -27,6 +27,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 interface RankingEntry {
   id: string;
@@ -887,19 +888,39 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
           </div>
 
           <div className="mt-4 pt-4 border-t border-border">
-            <Button
-              onClick={generateAutoRanking}
-              disabled={generating}
-              variant="outline"
-              className="w-full gap-2"
-            >
-              <Zap className="h-4 w-4" />
-              {generating ? "Gerando..." : "Gerar Ranking Automático pela Classificação"}
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  disabled={generating}
+                  variant="outline"
+                  className="w-full gap-2"
+                >
+                  <Zap className="h-4 w-4" />
+                  {generating ? "Gerando..." : "Gerar Ranking Automático pela Classificação"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Gerar ranking automático?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação vai recalcular e sobrescrever todo o ranking desta etapa/modalidade
+                    com base na classificação atual. Bônus e destaques manuais serão preservados,
+                    mas demais ajustes manuais serão perdidos. Tem certeza que deseja continuar?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => generateAutoRanking()}>
+                    Sim, gerar ranking
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             <p className="text-xs text-muted-foreground mt-2 text-center">
               1º=20pts · 2º=18pts · 3º=16pts · 4º=14pts · 5º–8º=10pts · 9º–16º=8pts · 17º–24º=6pts · 25º–32º=4pts
             </p>
           </div>
+
         </motion.section>
       )}
 

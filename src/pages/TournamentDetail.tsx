@@ -3936,6 +3936,12 @@ const TournamentDetail = () => {
                 />
               </TabsContent>
             )}
+
+            {canEdit && (
+              <TabsContent value="recycle">
+                <RecycleBinTab tournamentId={id || ""} />
+              </TabsContent>
+            )}
           </Tabs>
           <FlowAppsBranding variant="tournament-cta" />
         </motion.div>

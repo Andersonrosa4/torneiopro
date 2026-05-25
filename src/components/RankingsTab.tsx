@@ -579,12 +579,12 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
 
   // Em modo Geral: agrega por athlete_name (+ entry_type) somando pontos das etapas.
   // Mantém estrutura visual igual a um RankingEntry.
-  const displayRankings = useMemo<RankingEntry[]>(() => {
+  const displayRankings = useMemo<(RankingEntry & { stageIds?: string[] })[]>(() => {
     if (!isGeneralView) return rankings;
     // Normaliza entry_type para agregação: male/female/individual contam como "single"
     // (etapas diferentes podem ter classificado a mesma pessoa com tipos distintos).
     const bucket = (t: string) => (t === "pair" ? "pair" : "single");
-    const map = new Map<string, RankingEntry>();
+    const map = new Map<string, RankingEntry & { stageIds: string[]; _stageSet: Set<string> }>();
     for (const r of rankings) {
       const key = `${bucket(r.entry_type)}::${r.athlete_name.trim().toLowerCase()}`;
       const prev = map.get(key);
@@ -592,11 +592,14 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
         prev.points += r.points;
         prev.manual_bonus = Number(prev.manual_bonus ?? 0) + Number(r.manual_bonus ?? 0);
         if (!prev.badge && r.badge) prev.badge = r.badge;
+        if (r.stage_id) prev._stageSet.add(r.stage_id);
       } else {
-        map.set(key, { ...r, id: `agg-${key}`, manual_bonus: Number(r.manual_bonus ?? 0) });
+        const set = new Set<string>();
+        if (r.stage_id) set.add(r.stage_id);
+        map.set(key, { ...r, id: `agg-${key}`, manual_bonus: Number(r.manual_bonus ?? 0), _stageSet: set, stageIds: [] });
       }
     }
-    return Array.from(map.values());
+    return Array.from(map.values()).map((r) => ({ ...r, stageIds: Array.from(r._stageSet) }));
   }, [rankings, isGeneralView]);
 
   // Mapa: nome do atleta → id do time (para agrupar parceiros)

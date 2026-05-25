@@ -1,41 +1,68 @@
-## Objetivo
-Separar o ranking por **etapa** mantendo um **ranking geral** (consolidado das etapas) no mesmo torneio/modalidade, sem duplicar dados nem reescrever a aba de Ranking.
+# Lixeira Global (Soft-Delete + Recuperação)
 
-## Estratégia (resumo)
-Hoje a tabela `rankings` guarda pontos por `tournament_id + modality_id + athlete_name` — sem `stage_id`. Por isso, ao trocar de etapa, o ranking é o mesmo. A solução mais eficiente é **persistir os pontos por etapa** e **calcular o Geral em tempo real somando as etapas** (sem tabela extra, sem job).
+Hoje só `bracket_backups` salva chaves antes de apagar. Vou estender essa proteção para **toda** exclusão do sistema (torneios, etapas, modalidades, times, partidas, classificações, rankings, comunidades, reservas, atletas, etc.), criando uma "lixeira" central com restauração.
 
-## Mudanças
+## O que será feito
 
-### 1. Banco (1 migração)
-- Adicionar coluna `stage_id uuid NULL` em `public.rankings`.
-- Índice composto `(tournament_id, modality_id, stage_id)` para leitura rápida.
-- Dados existentes ficam com `stage_id = NULL` → continuam aparecendo como "antes das etapas" (compatível).
+### 1. Tabela central `deleted_records` (lixeira)
+Snapshot completo antes de qualquer DELETE:
+- `id`, `table_name`, `record_id`, `record_snapshot` (jsonb com a linha inteira)
+- `related_snapshots` (jsonb, ex: ao apagar torneio salva partidas/times/rankings juntos)
+- `tournament_id`, `modality_id`, `stage_id` (índices para filtrar)
+- `deleted_by`, `deleted_at`, `reason`, `restored_at`
+- RLS: organizador do torneio + admin podem ver/restaurar
 
-### 2. UI da aba Ranking (`RankingsTab.tsx`)
-- Adicionar seletor no topo: **Geral · Etapa 1 · Etapa 2 · …** (usa as `tournament_stages` já existentes).
-- **Etapa específica**: lê `rankings` filtrando `stage_id = X` (já existe o filtro, só passa). Adicionar/editar/remover grava com `stage_id = X`.
-- **Geral**: lê todas as linhas do torneio/modalidade e agrega no cliente (`SUM(points) GROUP BY athlete_name`), exibindo somatório, etapas em que pontuou e badges acumuladas.
-- No modo Geral, edição manual fica desabilitada (com aviso "Edite a pontuação dentro da etapa correspondente"), evitando inconsistência.
+### 2. Trigger genérico de captura
+Função `capture_before_delete()` que escreve em `deleted_records` antes de qualquer `BEFORE DELETE` nas tabelas relevantes:
+`tournaments`, `tournament_stages`, `modalities`, `teams`, `matches`, `groups`, `classificacao_grupos`, `rankings`, `ranking_points_history`, `participants`, `bookings`, `court_bookings`, `community_members`, `ranking_communities`, `challenges`, `arenas`, `courts`, `organizers`, `tournament_organizers`.
 
-### 3. Geração automática de ranking
-- A função `generateAutoRanking` já recebe `stageId` no escopo; ao gerar, gravar `stage_id = stageId` (etapa atual).
-- "Geral" passa a ser sempre derivado — nunca gerado diretamente.
+Vantagem: pega **toda** exclusão (via app, via Edge Function, via SQL direto) — impossível contornar.
 
-### 4. Histórico de pontos
-- `ranking_points_history` já tem `stage_id`. Sem mudança de schema, só continua sendo populado corretamente.
+### 3. TTL e retenção
+Padrão: 30 dias. Job/edge function `cleanup-deleted-records` (já existe `auto-healer`, dá pra encadear) apaga registros > 30 dias.
 
-### 5. Exportações (PDF/Excel/CSV)
-- Quando estiver em uma etapa: exporta só aquela etapa (cabeçalho mostra o nome).
-- Quando estiver em Geral: exporta o consolidado.
+### 4. UI "Lixeira"
+Nova aba `RecycleBinTab.tsx` no painel do torneio + página global `/admin/lixeira` para admin:
+- Lista agrupada por tipo (Torneio, Etapa, Modalidade, Time, Partida, Ranking…)
+- Filtro por data, tabela, atleta
+- Botão **Restaurar** (re-INSERT da linha + dependências) e **Apagar definitivo**
+- Aviso visual quando há itens na lixeira
 
-## Por que é eficiente
-- **1 coluna + 1 índice** resolvem a separação.
-- **Geral é uma agregação client-side** (poucas centenas de linhas no máximo), sem tabela materializada, sem trigger, sem job.
-- **Compatível com dados antigos** (NULL = "sem etapa", aparece tanto no Geral quanto na pseudo-etapa "Sem etapa", se quiser).
-- Reaproveita 100% da UI atual — só adiciona o seletor de etapa e a agregação.
+### 5. Edge Function `recycle-bin-api`
+- `restore(record_id)`: re-insere snapshot, valida que `record_id` não existe, restaura dependências do `related_snapshots` na ordem correta (pais antes de filhos)
+- `purge(record_id)`: remove definitivamente
+- `list(filters)`: lista paginada
 
-## Fora de escopo
-- Nenhuma mudança em chaveamento, propagação ou Edge Functions.
-- Sem novas tabelas.
+### 6. Ajuste das rotinas que já apagam
+- `undoBracket` em `organizerApi.ts` já tem snapshot — passa a também gravar em `deleted_records` no formato unificado
+- `aggressiveCascadeReset.ts`, deletions em `RankingsTab`, stage-deletion, etc.: nada muda no código de chamada (o trigger captura), mas adiciono `reason` via `SET LOCAL app.delete_reason` quando útil para auditoria
 
-Confirma que sigo nesse caminho?
+## Detalhes técnicos
+
+```text
+DELETE FROM <table>
+   │
+   ▼  BEFORE DELETE trigger
+capture_before_delete()
+   │   ├─ to_jsonb(OLD) → record_snapshot
+   │   ├─ coleta filhos por FK lógica → related_snapshots
+   │   └─ INSERT deleted_records
+   ▼
+DELETE prossegue normalmente
+```
+
+Restauração:
+1. Verifica que `record_id` não existe na tabela original
+2. Re-insere `record_snapshot` (com `OVERRIDING SYSTEM VALUE` se necessário)
+3. Re-insere `related_snapshots` na ordem topológica
+4. Marca `restored_at`
+
+## Escopo desta primeira entrega
+1. Migration: tabela `deleted_records` + função + triggers nas 19 tabelas listadas + RLS
+2. Edge Function `recycle-bin-api` (list/restore/purge)
+3. Componente `RecycleBinTab` (aba dentro de `TournamentDetail`) + rota admin `/lixeira`
+4. Badge de aviso no header quando há itens na lixeira do torneio atual
+
+Não inclui (pode vir depois): exportar lixeira para Excel, restauração parcial de campos, versionamento histórico de updates.
+
+Confirmar para eu começar pela migration.

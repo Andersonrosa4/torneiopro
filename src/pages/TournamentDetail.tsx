@@ -51,6 +51,7 @@ import ClassificationTab from "@/components/ClassificationTab";
 import RankingsTab from "@/components/RankingsTab";
 import StageSelector from "@/components/StageSelector";
 import BugCombatantLogPanel from "@/components/BugCombatantLogPanel";
+import RecycleBinTab from "@/components/RecycleBinTab";
 import { generateFakeTeams, type FakeNameGender } from "@/lib/fakeNames";
 import { VERANICO_EIGHTHS_MAP } from "@/lib/veranicoEighthsMap";
 import { logVeranico } from "@/lib/veranicoAudit";
@@ -3296,6 +3297,9 @@ const TournamentDetail = () => {
               {canEdit && (
                 <TabsTrigger value="audit" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Auditoria</TabsTrigger>
               )}
+              {canEdit && (
+                <TabsTrigger value="recycle" className="flex-1 min-w-[60px] text-center text-xs sm:text-sm font-medium h-8 sm:h-9 rounded-[12px] border border-white/[0.18] bg-white/[0.04] text-muted-foreground data-[state=active]:bg-white/[0.12] data-[state=active]:border-[#ffd700]/60 data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground">Lixeira</TabsTrigger>
+              )}
             </TabsList>
 
             {/* Duplas Tab */}
@@ -3930,6 +3934,12 @@ const TournamentDetail = () => {
                     }, 350);
                   }}
                 />
+              </TabsContent>
+            )}
+
+            {canEdit && (
+              <TabsContent value="recycle">
+                <RecycleBinTab tournamentId={id || ""} />
               </TabsContent>
             )}
           </Tabs>

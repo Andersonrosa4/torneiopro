@@ -581,19 +581,20 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
   // Mantém estrutura visual igual a um RankingEntry.
   const displayRankings = useMemo<RankingEntry[]>(() => {
     if (!isGeneralView) return rankings;
+    // Normaliza entry_type para agregação: male/female/individual contam como "single"
+    // (etapas diferentes podem ter classificado a mesma pessoa com tipos distintos).
+    const bucket = (t: string) => (t === "pair" ? "pair" : "single");
     const map = new Map<string, RankingEntry>();
     for (const r of rankings) {
-      const key = `${r.entry_type}::${r.athlete_name}`;
+      const key = `${bucket(r.entry_type)}::${r.athlete_name.trim().toLowerCase()}`;
       const prev = map.get(key);
       if (prev) {
         prev.points += r.points;
         prev.manual_bonus = Number(prev.manual_bonus ?? 0) + Number(r.manual_bonus ?? 0);
-        // mantém o primeiro badge encontrado
         if (!prev.badge && r.badge) prev.badge = r.badge;
       } else {
         map.set(key, { ...r, id: `agg-${key}`, manual_bonus: Number(r.manual_bonus ?? 0) });
       }
-
     }
     return Array.from(map.values());
   }, [rankings, isGeneralView]);

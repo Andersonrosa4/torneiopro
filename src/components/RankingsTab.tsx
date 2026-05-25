@@ -900,6 +900,24 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                             +{ranking.manual_bonus}
                           </span>
                         )}
+                        {isGeneralView && (ranking as any).stageIds?.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {((ranking as any).stageIds as string[])
+                              .map((sid) => stages.find((s) => s.id === sid))
+                              .filter(Boolean)
+                              .sort((a: any, b: any) => a.stage_number - b.stage_number)
+                              .map((s: any) => (
+                                <span
+                                  key={s.id}
+                                  title={`Pontuou em ${s.name}`}
+                                  className="inline-flex items-center gap-0.5 rounded-full bg-primary/15 border border-primary/40 px-1.5 py-0.5 text-[10px] font-bold text-primary"
+                                >
+                                  <Layers className="h-3 w-3" />
+                                  {s.name}
+                                </span>
+                              ))}
+                          </div>
+                        )}
                       </div>
                       {ranking.badge && (
                         <span className="text-[10px] text-muted-foreground">{getBadgeLabel(ranking.badge)}</span>

@@ -275,7 +275,7 @@ export function exportRankings(
 
   const rows = rankings.map((r) => {
     const row = [String(r.position), r.athlete_name];
-    if (hasCategory) row.push(r.category || "-");
+    if (hasCategory) row.push(translateCategory(r.category));
     if (hasBadges) row.push(badgeLabel(r.badge));
     row.push(String(r.points));
     return row;

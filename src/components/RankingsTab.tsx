@@ -567,22 +567,47 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
         // Insert for each player AND for the pair
         const isMisto = modalityName?.toLowerCase().includes("misto");
         
-        // For Misto: detect gender by name patterns instead of assuming player1=male
-        const detectGender = (name: string): "male" | "female" => {
-          const first = name.trim().split(/\s+/)[0].toLowerCase();
-          // Common feminine endings in Portuguese
-          if (/^(ana|ane|aline|adriane|andressa|bianca|camila|carina|cláudia|claudia|danielly|deisi|dejanira|eduarda|elisandra|francieli|gabrielle|gabrielly|helen|helena|isadora|jaqueline|jessica|joana|julia|juliana|keyla|kethelin|laura|lillian|luana|luiza|maria|mariana|manoella|michele|nicoly|nicole|olga|paola|patrícia|rafaela|raquel|roshane|sabrina|samira|scheila|sheila|stefany|taicline|tauane|thais|vanessa|veronica|veronilce)$/i.test(first)) {
-            return "female";
-          }
-          // Common feminine name endings
-          if (/[aeiã]$/.test(first) && !/^(davi|edu|kairã|timóteo|simeão|juliano|mário|eydrian|halan|márcio|allyson|wallace|vinicius|leonardo|lucas|leandro|guilherme|pedro|arthur|renan|felipe|fernando|rafael|gabriel|luis|oswaldo|pietro|ian|daniel|joão|vitor|carlos|dirceu|silmar|dilamar)$/i.test(first)) {
-            return "female";
-          }
-          return "male";
+        // For Misto: detect gender independently for each player using comprehensive dictionaries.
+        const MALE_NAMES = new Set<string>([
+          "simeão","simeao","davi","guilherme","kairã","kaira","silmar","timóteo","timoteo","pietro","edu","eduardo","juliano","vitor","victor","lucas","renan","joão","joao","luis","luiz","oswaldo","osvaldo","felipe","fernando","gilberto","junior","júnior","leonardo","rogério","rogerio","wallace","pedro","nilmar","charles","ian","rafael","dilamar","vinicius","vinícius","daniel","anderson","tayson","gabriel","allyson","mário","mario","márcio","marcio","eydrian","halan","carlos","dirceu","arthur","artur","tiago","thiago","ricardo","roberto","marcos","marcelo","bruno","matheus","mateus","gustavo","henrique","rodrigo","diego","alexandre","andré","andre","antonio","antônio","paulo","jorge","leandro","tarcísio","tarcisio","douglas","everton","cesar","césar","fábio","fabio","alex","alan","adriano","cristiano","emanuel","alexandre","jonas","jonathan","jefferson","kleber","márcio","murilo","nathan","nicolas","otávio","otavio","raul","renato","samuel","sérgio","sergio","valter","walter"
+        ]);
+        const FEMALE_NAMES = new Set<string>([
+          "claudia","cláudia","stefany","elisandra","raquel","veronilce","aline","laura","carina","camila","samira","tauane","andreia","andréia","paola","ane","dejanira","joana","luana","thaís","thais","helena","sabrina","bianca","josieli","sheila","scheila","ana","michele","kethelin","isadora","eduarda","taicline","juliana","rafaela","julia","júlia","deisi","vitória","vitoria","veronica","verônica","andressa","natália","natalia","helen","adriane","barbara","bárbara","danielly","francieli","gabrielle","gabrielly","jaqueline","jessica","jéssica","keyla","lillian","luiza","manoella","maria","mariana","nicole","nicoly","olga","patrícia","patricia","roshane","vanessa","amanda","ana","aparecida","beatriz","bruna","carla","carolina","catarina","cecília","cecilia","cíntia","cintia","clara","cristina","daniela","débora","debora","edna","eliane","elaine","elisa","eloá","eloa","emanuela","fabiana","fátima","fatima","fernanda","flávia","flavia","gabriela","geovana","giovana","giulia","graziela","heloísa","heloisa","inês","ines","ingrid","irene","jacqueline","janaína","janaina","kelly","larissa","letícia","leticia","lívia","livia","lorena","lucia","lúcia","luciana","luiza","mara","marcela","márcia","marcia","margarida","mariane","marília","marilia","marina","marlene","marta","melissa","michelle","milena","mônica","monica","monique","nádia","nadia","natasha","nayara","nina","núbia","nubia","olívia","olivia","patrícia","paula","priscila","rafaela","raissa","rebeca","regina","renata","roberta","rosa","rosana","sandra","silvia","sílvia","simone","sonia","sônia","sueli","suzana","tainá","taina","tamires","tatiane","teresa","valentina","valéria","valeria","vânia","vania","verônica","viviane","yara","yasmin"
+        ]);
+
+        const normalize = (s: string) =>
+          s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+        const detectGenderRaw = (name: string): "male" | "female" | "unknown" => {
+          const first = name.trim().split(/\s+/)[0];
+          if (!first) return "unknown";
+          const lower = first.toLowerCase();
+          const noAccent = normalize(first);
+          if (MALE_NAMES.has(lower) || MALE_NAMES.has(noAccent)) return "male";
+          if (FEMALE_NAMES.has(lower) || FEMALE_NAMES.has(noAccent)) return "female";
+          // Last-resort heuristic: ends in 'a' / 'ã' → likely female; ends in 'o'/consonant → likely male.
+          if (/[aã]$/i.test(first)) return "female";
+          if (/[ozrlnms]$/i.test(first)) return "male";
+          return "unknown";
         };
 
-        const p1Gender = isMisto ? detectGender(team.player1_name) : "individual" as any;
-        const p2Gender = isMisto ? (p1Gender === "male" ? "female" : "male") : "individual" as any;
+        let p1Gender: any = "individual";
+        let p2Gender: any = "individual";
+        if (isMisto) {
+          const g1 = detectGenderRaw(team.player1_name);
+          const g2 = detectGenderRaw(team.player2_name);
+          if (g1 !== "unknown" && g2 !== "unknown" && g1 !== g2) {
+            p1Gender = g1; p2Gender = g2;
+          } else if (g1 !== "unknown") {
+            p1Gender = g1; p2Gender = g1 === "male" ? "female" : "male";
+          } else if (g2 !== "unknown") {
+            p2Gender = g2; p1Gender = g2 === "male" ? "female" : "male";
+          } else {
+            // Não foi possível detectar — não atribui categoria errada; deixa como dupla apenas.
+            p1Gender = null; p2Gender = null;
+          }
+        }
+
 
         const entries = [
           { name: team.player1_name, type: isMisto ? p1Gender : "individual" },

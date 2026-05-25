@@ -944,6 +944,54 @@ export type Database = {
           },
         ]
       }
+      deleted_records: {
+        Row: {
+          deleted_at: string
+          deleted_by: string | null
+          expires_at: string
+          id: string
+          modality_id: string | null
+          reason: string | null
+          record_id: string | null
+          record_snapshot: Json
+          restored_at: string | null
+          restored_by: string | null
+          stage_id: string | null
+          table_name: string
+          tournament_id: string | null
+        }
+        Insert: {
+          deleted_at?: string
+          deleted_by?: string | null
+          expires_at?: string
+          id?: string
+          modality_id?: string | null
+          reason?: string | null
+          record_id?: string | null
+          record_snapshot: Json
+          restored_at?: string | null
+          restored_by?: string | null
+          stage_id?: string | null
+          table_name: string
+          tournament_id?: string | null
+        }
+        Update: {
+          deleted_at?: string
+          deleted_by?: string | null
+          expires_at?: string
+          id?: string
+          modality_id?: string | null
+          reason?: string | null
+          record_id?: string | null
+          record_snapshot?: Json
+          restored_at?: string | null
+          restored_by?: string | null
+          stage_id?: string | null
+          table_name?: string
+          tournament_id?: string | null
+        }
+        Relationships: []
+      }
       game_scores: {
         Row: {
           created_at: string

@@ -2266,6 +2266,7 @@ export type Database = {
         Returns: boolean
       }
       release_auto_healer_lock: { Args: never; Returns: undefined }
+      restore_deleted_record: { Args: { _id: string }; Returns: Json }
       verify_organizer_password: {
         Args: { _email: string; _password: string; _username: string }
         Returns: {

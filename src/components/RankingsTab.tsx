@@ -592,8 +592,26 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
         for (const e of entries) {
           const key = `${e.type}::${e.name}`;
           const manual = manualMap.get(key);
-          const bonus = manual?.manual_bonus ?? 0;
-          const badge = manual?.badge ?? null;
+          let bonus = manual?.manual_bonus ?? 0;
+          let badge = manual?.badge ?? null;
+
+          // Regra: DUPLA só herda destaque/bônus se AMBOS os atletas tiverem o mesmo destaque individual.
+          if (e.type === "pair") {
+            const t1 = isMisto ? p1Gender : "individual";
+            const t2 = isMisto ? p2Gender : "individual";
+            const m1 = manualMap.get(`${t1}::${team.player1_name}`);
+            const m2 = manualMap.get(`${t2}::${team.player2_name}`);
+            const b1 = m1?.badge ?? null;
+            const b2 = m2?.badge ?? null;
+            if (b1 && b1 === b2) {
+              badge = b1;
+              bonus = Math.min(Number(m1?.manual_bonus ?? 0), Number(m2?.manual_bonus ?? 0));
+            } else {
+              badge = null;
+              bonus = 0;
+            }
+          }
+
           insertedKeys.add(key);
 
           await organizerQuery({

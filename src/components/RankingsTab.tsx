@@ -927,24 +927,32 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => {
-                    const rows = sortedRankings.map((r, i) => ({ position: i + 1, athlete_name: r.athlete_name, points: r.points }));
-                    exportRankings("pdf", rows, { tournamentName, sport, date: eventDate });
-                  }}>
-                    <FileText className="h-4 w-4 mr-2" /> PDF
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => {
-                    const rows = sortedRankings.map((r, i) => ({ position: i + 1, athlete_name: r.athlete_name, points: r.points }));
-                    exportRankings("xlsx", rows, { tournamentName, sport, date: eventDate });
-                  }}>
-                    <Sheet className="h-4 w-4 mr-2" /> Excel (.xlsx)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => {
-                    const rows = sortedRankings.map((r, i) => ({ position: i + 1, athlete_name: r.athlete_name, points: r.points }));
-                    exportRankings("csv", rows, { tournamentName, sport, date: eventDate });
-                  }}>
-                    <FileText className="h-4 w-4 mr-2" /> CSV
-                  </DropdownMenuItem>
+                  {(() => {
+                    const stageName = viewStageId
+                      ? stages.find((s) => s.id === viewStageId)?.name
+                      : (stages.length > 0 ? "Geral (todas as etapas)" : undefined);
+                    const buildRows = () => sortedRankings.map((r, i) => ({
+                      position: i + 1,
+                      athlete_name: r.athlete_name,
+                      points: r.points,
+                      badge: r.badge,
+                      category: r.entry_type,
+                    }));
+                    const meta = { tournamentName, sport, date: eventDate, stageName, modalityName };
+                    return (
+                      <>
+                        <DropdownMenuItem onClick={() => exportRankings("pdf", buildRows(), meta)}>
+                          <FileText className="h-4 w-4 mr-2" /> PDF
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => exportRankings("xlsx", buildRows(), meta)}>
+                          <Sheet className="h-4 w-4 mr-2" /> Excel (.xlsx)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => exportRankings("csv", buildRows(), meta)}>
+                          <FileText className="h-4 w-4 mr-2" /> CSV
+                        </DropdownMenuItem>
+                      </>
+                    );
+                  })()}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

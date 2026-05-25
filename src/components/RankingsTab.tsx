@@ -613,7 +613,7 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
           { name: team.player1_name, type: isMisto ? p1Gender : "individual" },
           { name: team.player2_name, type: isMisto ? p2Gender : "individual" },
           { name: `${team.player1_name} / ${team.player2_name}`, type: "pair" },
-        ];
+        ].filter((e) => e.type); // pula entradas individuais quando gênero não foi detectado
         for (const e of entries) {
           const key = `${e.type}::${e.name}`;
           const manual = manualMap.get(key);

@@ -115,7 +115,7 @@ function downloadRankingPDF(filename: string, meta: ExportMeta, rankings: Rankin
       { content: String(r.position), styles: { halign: "center", fontStyle: "bold" } },
       r.athlete_name,
     ];
-    if (hasCategory) row.push(r.category || "-");
+    if (hasCategory) row.push(translateCategory(r.category));
     if (hasBadges) {
       const info = r.badge ? BADGE_INFO[r.badge] : null;
       row.push(info ? info.label : "");

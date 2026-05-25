@@ -53,6 +53,21 @@ const BADGE_INFO: Record<string, { label: string; fill: [number, number, number]
   mvp:      { label: "CRAQUE",   fill: [56, 189, 248], text: [8, 47, 73] },   // azul
 };
 
+const CATEGORY_PT: Record<string, string> = {
+  male: "Masculino",
+  female: "Feminino",
+  mixed: "Misto",
+  misto: "Misto",
+  masculino: "Masculino",
+  feminino: "Feminino",
+  pair: "Dupla",
+  individual: "Individual",
+};
+const translateCategory = (c?: string | null) => {
+  if (!c) return "-";
+  return CATEGORY_PT[c.toLowerCase()] ?? c;
+};
+
 // ── PDF de Ranking ──
 function downloadRankingPDF(filename: string, meta: ExportMeta, rankings: RankingRow[]) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
@@ -100,7 +115,7 @@ function downloadRankingPDF(filename: string, meta: ExportMeta, rankings: Rankin
       { content: String(r.position), styles: { halign: "center", fontStyle: "bold" } },
       r.athlete_name,
     ];
-    if (hasCategory) row.push(r.category || "-");
+    if (hasCategory) row.push(translateCategory(r.category));
     if (hasBadges) {
       const info = r.badge ? BADGE_INFO[r.badge] : null;
       row.push(info ? info.label : "");
@@ -260,7 +275,7 @@ export function exportRankings(
 
   const rows = rankings.map((r) => {
     const row = [String(r.position), r.athlete_name];
-    if (hasCategory) row.push(r.category || "-");
+    if (hasCategory) row.push(translateCategory(r.category));
     if (hasBadges) row.push(badgeLabel(r.badge));
     row.push(String(r.points));
     return row;

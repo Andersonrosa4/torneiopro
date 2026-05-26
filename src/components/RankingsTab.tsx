@@ -778,11 +778,12 @@ const RankingsTab = ({ tournamentId, isOwner, sport, tournamentName = "", eventD
       }
       if (partnerIdx === -1) continue;
       const partner = result[partnerIdx];
-      // só pode subir até a posição i+1 se todos entre (i+1..partnerIdx-1)
-      // tiverem pontos == partner.points (bloco de empate contínuo do parceiro)
+      // só pode subir até a posição i+1 se TODOS entre (i+1..partnerIdx-1)
+      // tiverem pontos == partner.points. Verifica independente do entry_type,
+      // senão um parceiro com poucos pontos passa por cima de jogadores com
+      // mais pontos de outra categoria (bug do ranking geral).
       let canMove = true;
       for (let k = i + 1; k < partnerIdx; k++) {
-        if (result[k].entry_type !== partner.entry_type) continue;
         if (result[k].points !== partner.points) { canMove = false; break; }
       }
       if (!canMove) continue;
